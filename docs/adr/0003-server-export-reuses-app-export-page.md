@@ -1,0 +1,3 @@
+# Server-side PDF generation loads the app's own export page in headless Chromium
+
+There is exactly one rendering pipeline (packages/core: markdown → HTML → pagination → page layout). The preview renders it live; the client prints it via `window.print()`; the server runs the built web app's hidden `/export` route in Playwright Chromium with the document + settings injected, calls `Page.pdf()`, and injects the bookmark outline with pdf-lib — mirroring the plugin's Electron `printToPDF` approach. This makes preview-vs-output divergence structurally impossible. The cost is Chromium's RAM footprint on the server, accepted at this scale.

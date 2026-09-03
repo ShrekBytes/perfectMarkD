@@ -1,0 +1,3 @@
+# Free-tier exports go through the browser's print pipeline
+
+Browsers expose no API for a web page to write a PDF file directly, and the raster alternatives (html2canvas + jsPDF) produce blurry, non-searchable output that betrays the pixel-perfect promise. Free-tier Client Export therefore prepares the same print-ready HTML the plugin built and calls `window.print()` on a hidden iframe; the user picks "Save as PDF" in the browser dialog. Chrome/Edge's print-to-PDF is the same Chromium engine the server uses, so output quality is identical across tiers — paid plans sell one-click convenience and server muscle, not fidelity.

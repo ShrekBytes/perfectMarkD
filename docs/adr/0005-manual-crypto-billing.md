@@ -1,0 +1,3 @@
+# Billing is manual crypto verification — no payment gateway
+
+At launch, payments are USDT on TRC-20, USDT on BEP-20, and Litecoin, sent to static wallet addresses displayed per order with an order reference code. The user submits the transaction details in-app; the Admin verifies on-chain in the admin panel and grants/extends the Entitlement (1/3/6/12 months or custom). Nothing auto-renews; quota enforcement and feature gates live server-side. Trade-off: verification labor scales linearly with signups — accepted deliberately while volumes are small, and consistent with a crypto-native audience. The known weakness of client-side feature gating (devtools bypass on an AGPL client) is accepted: everything of value (Server Export) is enforced server-side.
