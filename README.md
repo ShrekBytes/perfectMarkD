@@ -8,7 +8,7 @@ Status: pre-launch. The roadmap lives in [PLAN.md](PLAN.md), decisions in [docs/
 
 pnpm monorepo:
 
-| Package                          | What it is                                                              |
+| Package                          | Planned scope                                                           |
 | -------------------------------- | ----------------------------------------------------------------------- |
 | [`packages/core`](packages/core) | Framework-free rendering engine: markdown → paginated, print-ready HTML |
 | [`apps/web`](apps/web)           | React + Vite SPA: editor, Paper Canvas preview, Client Export           |

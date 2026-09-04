@@ -45,6 +45,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@perfectmarkd/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       react:
         specifier: ^19.2.8
         version: 19.2.8

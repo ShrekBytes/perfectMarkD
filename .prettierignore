@@ -4,3 +4,8 @@ coverage/
 pnpm-lock.yaml
 LICENSE
 .scratch/
+
+# Author-owned prose; prettier churns these (table padding, emphasis marks)
+PLAN.md
+CONTEXT.md
+docs/
