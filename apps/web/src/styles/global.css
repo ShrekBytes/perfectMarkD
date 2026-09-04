@@ -1,0 +1,89 @@
+@import 'tailwindcss';
+
+/*
+ * Dark mode: the theme is applied as `data-theme` on <html> by the inline script
+ * in index.html (before first paint) and kept in sync by useTheme().
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Semantic design tokens. Light values are the default; dark overrides live under
+ * [data-theme='dark']. Chrome darkens; --page (the paper) stays white in both.
+ */
+:root {
+  --canvas: #f1efe9; /* warm-gray Paper Canvas backdrop */
+  --surface: #faf9f7; /* chrome surfaces: top bar + side panes */
+  --surface-hover: #efede7;
+  --page: #ffffff; /* document paper — white in both themes */
+  --ink: #232220;
+  --ink-soft: #5f5b53;
+  --ink-faint: #918c81;
+  --hairline: #e7e3da;
+  --hairline-strong: #d5d0c4;
+  --accent: #7c6af7;
+  --accent-strong: #6a55f2;
+  --accent-soft: rgb(124 106 247 / 0.11);
+  --accent-ink: #ffffff;
+}
+
+[data-theme='dark'] {
+  --canvas: #232227;
+  --surface: #2b2a30;
+  --surface-hover: #36353c;
+  --page: #ffffff;
+  --ink: #ecebe8;
+  --ink-soft: #b4b1aa;
+  --ink-faint: #827e76;
+  --hairline: #3c3b41;
+  --hairline-strong: #4b4a52;
+  --accent: #7c6af7;
+  --accent-strong: #8e7ef9;
+  --accent-soft: rgb(124 106 247 / 0.2);
+  --accent-ink: #ffffff;
+}
+
+/* Expose the tokens as Tailwind utilities (bg-canvas, text-ink, border-hairline, …). */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-page: var(--page);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --radius-control: 8px;
+  --radius-pane: 10px;
+
+  /* Motion: 150–200ms ease-out. Components pick duration-150/200; the curve is the default. */
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  --default-transition-duration: 150ms;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+}

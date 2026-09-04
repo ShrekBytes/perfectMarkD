@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PerfectMarkD</title>
+    <script>
+      // Apply the theme before first paint to avoid a flash of the wrong colors.
+      // Keep this logic in sync with src/theme/theme.ts (STORAGE_KEY).
+      (() => {
+        try {
+          const stored = localStorage.getItem('perfectmarkd:theme');
+          const theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          document.documentElement.dataset.theme = theme;
+        } catch {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

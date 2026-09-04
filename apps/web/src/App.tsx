@@ -1,9 +1,5 @@
-import { hello } from '@perfectmarkd/core';
+import { AppShell } from './shell/AppShell';
 
 export function App() {
-  return (
-    <main>
-      <h1>{hello('PerfectMarkD')}</h1>
-    </main>
-  );
+  return <AppShell />;
 }

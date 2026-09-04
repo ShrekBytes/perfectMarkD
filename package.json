@@ -9,14 +9,15 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "cross-env NODE_OPTIONS=--no-webstorage vitest run",
+    "test:watch": "cross-env NODE_OPTIONS=--no-webstorage vitest",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "eslint": "^10.9.1",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
