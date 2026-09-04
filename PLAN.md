@@ -27,21 +27,21 @@ Preview, client print, and server PDF are pixel-identical by construction (ADR-0
 
 ### Tiers
 
-| | Free | Pro — 3 USDT/mo | Premium — 7 USDT/mo |
-|---|---|---|---|
-| Account | none | required | required |
-| Client Export (print dialog) | ✓ | ✓ | ✓ |
-| Server Export (one-click PDF) | never | 300/mo | 1000/mo |
-| Pages per server export | — | 300 | 1000 |
-| Custom page size | — | ✓ | ✓ |
-| Custom stylesheet | — | ✓ | ✓ |
-| Header/footer banner images | — | ✓ | ✓ |
-| Background image | — | ✓ | ✓ |
-| Custom fonts (load/upload) | — | ✓ | ✓ |
-| Priority render queue | — | — | ✓ |
-| Export History (30 days) | — | — | ✓ |
+|                               | Free  | Pro — 3 USDT/mo | Premium — 7 USDT/mo |
+| ----------------------------- | ----- | --------------- | ------------------- |
+| Account                       | none  | required        | required            |
+| Client Export (print dialog)  | ✓     | ✓               | ✓                   |
+| Server Export (one-click PDF) | never | 300/mo          | 1000/mo             |
+| Pages per server export       | —     | 300             | 1000                |
+| Custom page size              | —     | ✓               | ✓                   |
+| Custom stylesheet             | —     | ✓               | ✓                   |
+| Header/footer banner images   | —     | ✓               | ✓                   |
+| Background image              | —     | ✓               | ✓                   |
+| Custom fonts (load/upload)    | —     | ✓               | ✓                   |
+| Priority render queue         | —     | —               | ✓                   |
+| Export History (30 days)      | —     | —               | ✓                   |
 
-- All core styling is free: presets, typography, colors, code themes, header/footer *text*, page numbers, page frame, mermaid, math, outline. No watermarks anywhere.
+- All core styling is free: presets, typography, colors, code themes, header/footer _text_, page numbers, page frame, mermaid, math, outline. No watermarks anywhere.
 - Durations: 1 / 3 / 6 / 12 months; 12 months costs 10× (two months free). Prices editable in admin settings.
 - No public API on any plan (non-goal).
 
@@ -69,11 +69,11 @@ Server Export payloads are processed in memory and deleted immediately after ren
 
 **Monorepo (pnpm):**
 
-| Package | Contents |
-|---|---|
+| Package         | Contents                                                                                                                                                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/core` | Framework-free engine ported from the plugin: settings/presets, css-builder, markdown rendering (markdown-it + KaTeX + Shiki + mermaid), paginator, page layout builder, outline extraction/injection, export HTML builder |
-| `apps/web` | React + Vite SPA (no Next.js — no SEO surface, static hosting): CodeMirror 6, Tailwind, Zustand, IndexedDB doc library; `/` editor, `/pricing`, `/export` (hidden route the server loads) |
-| `apps/server` | Node + Hono + Drizzle + SQLite: auth, Orders, Entitlements, quotas, Export History, export worker |
+| `apps/web`      | React + Vite SPA (no Next.js — no SEO surface, static hosting): CodeMirror 6, Tailwind, Zustand, IndexedDB doc library; `/` editor, `/pricing`, `/export` (hidden route the server loads)                                  |
+| `apps/server`   | Node + Hono + Drizzle + SQLite: auth, Orders, Entitlements, quotas, Export History, export worker                                                                                                                          |
 
 **Key decisions** (see `docs/adr/`): whole repo AGPL-3.0 (ADR-0001) · Client Export via print pipeline (ADR-0002) · server renders the app's own `/export` route in Playwright (ADR-0003) · stack (ADR-0004) · manual crypto billing (ADR-0005).
 
@@ -85,11 +85,11 @@ Server Export payloads are processed in memory and deleted immediately after ren
 
 ## 4. Roadmap
 
-| Phase | Scope | Ship |
-|---|---|---|
-| **1 — Engine + free app** (~3–4 wks) | Monorepo, `packages/core` port with regression tests, editor app: 3-pane UI, library, Inspector (locks inert), Client Export print flow, sample onboarding, /pricing page | Public free launch — no accounts exist yet |
-| **2 — Paid tier** (~2–3 wks) | Server + auth, Server Export pipeline, quotas, upgrade flow + Order submission, admin panel (payments/users/settings/audit), gated-feature unlocks (custom page size, CSS, fonts, banner/background images), Export History | Payments go live |
-| **3 — Polish & launch ops** (~1–2 wks) | Umami analytics, docs page, backups + restore runbook, perf guards (large-doc warning, lazy Shiki, mermaid caching), deploy hardening, launch checklist | Full launch |
+| Phase                                  | Scope                                                                                                                                                                                                                       | Ship                                       |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **1 — Engine + free app** (~3–4 wks)   | Monorepo, `packages/core` port with regression tests, editor app: 3-pane UI, library, Inspector (locks inert), Client Export print flow, sample onboarding, /pricing page                                                   | Public free launch — no accounts exist yet |
+| **2 — Paid tier** (~2–3 wks)           | Server + auth, Server Export pipeline, quotas, upgrade flow + Order submission, admin panel (payments/users/settings/audit), gated-feature unlocks (custom page size, CSS, fonts, banner/background images), Export History | Payments go live                           |
+| **3 — Polish & launch ops** (~1–2 wks) | Umami analytics, docs page, backups + restore runbook, perf guards (large-doc warning, lazy Shiki, mermaid caching), deploy hardening, launch checklist                                                                     | Full launch                                |
 
 Workstreams & tickets live in `.scratch/`: [`engine-port`](.scratch/engine-port/spec.md) · [`editor-app`](.scratch/editor-app/spec.md) · [`server`](.scratch/server/spec.md) · [`billing`](.scratch/billing/spec.md) · [`launch`](.scratch/launch/spec.md). **Execution sequence: [build order](.scratch/build-order.md)** — each ticket's `Blocked by:` line is the source of truth.
 

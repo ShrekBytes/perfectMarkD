@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // tsup's dts build injects a default baseUrl; TS 6 deprecates the option
+    "ignoreDeprecations": "6.0",
+
+    // Shared alias: every package typechecks against core's source, before core is built.
+    // Paths are resolved relative to this file, which sits at the repo root.
+    "paths": {
+      "@perfectmarkd/core": ["./packages/core/src/index.ts"]
+    }
+  }
+}

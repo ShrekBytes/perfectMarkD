@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - packages/*
+
+# esbuild's postinstall must run for the vite/tsup/tsx binaries to work
+allowBuilds:
+  esbuild: true
