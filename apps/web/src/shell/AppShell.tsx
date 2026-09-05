@@ -1,15 +1,22 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { TopBar } from './TopBar';
+import { StaleBanner } from './StaleBanner';
 import { EmptyState } from './EmptyState';
 import { CollapsedPaneToggle, PaneDivider } from './PaneDivider';
-import { FileTextIcon, PagesIcon, SlidersIcon } from './icons';
+import { FileTextIcon, PagesIcon, SlidersIcon, UploadIcon } from './icons';
 import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
+import { useDocumentStore } from '../documents/store';
+import { DeleteToast } from '../library/DeleteToast';
+import { LibraryPanel } from '../library/LibraryPanel';
+import { useFileDrop } from '../library/useFileDrop';
 
 /**
  * The app shell: top bar + three panes (editor · Paper Canvas · inspector).
  * Panes collapse via their divider toggles; with both collapsed the shell is in
- * fullscreen-canvas mode.
+ * fullscreen-canvas mode. Document state lives in the document store; the
+ * Library drawer, delete-undo toast, staleness banner, and .md drag-drop
+ * import mount here.
  */
 export function AppShell() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -18,12 +25,50 @@ export function AppShell() {
   const pane = usePaneLayout(containerRef);
   const { theme, toggle } = useTheme();
 
-  // Local until the document store lands (editor-app/02) and owns the name.
-  const [docName, setDocName] = useState('Untitled document');
+  const status = useDocumentStore((state) => state.status);
+  const docName = useDocumentStore((state) =>
+    state.activeId ? state.name : 'Untitled document',
+  );
+  const saveState = useDocumentStore((state) =>
+    state.activeId ? state.saveState : null,
+  );
+  const renameDocument = useDocumentStore((state) => state.renameDocument);
+  const importDocument = useDocumentStore((state) => state.importDocument);
+
+  const [libraryOpen, setLibraryOpen] = useState(false);
+
+  useEffect(() => {
+    void useDocumentStore.getState().init();
+  }, []);
+
+  const importFiles = useCallback(
+    (files: File[]) => {
+      void (async () => {
+        for (const file of files) {
+          await importDocument(file.name, await file.text());
+        }
+      })();
+    },
+    [importDocument],
+  );
+  const draggingFiles = useFileDrop(importFiles);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-canvas text-ink">
-      <TopBar docName={docName} onRename={setDocName} theme={theme} onToggleTheme={toggle} />
+      <TopBar
+        docName={docName}
+        onRename={(name) => {
+          const activeId = useDocumentStore.getState().activeId;
+          if (activeId) void renameDocument(activeId, name);
+        }}
+        saveState={saveState}
+        libraryOpen={libraryOpen}
+        onOpenLibrary={() => setLibraryOpen(true)}
+        theme={theme}
+        onToggleTheme={toggle}
+      />
+
+      <StaleBanner />
 
       <div
         ref={containerRef}
@@ -42,7 +87,9 @@ export function AppShell() {
               ref={editorRef}
               aria-label="Editor pane"
               style={{
-                width: pane.editor.width ?? `${PANE_LIMITS.editorDefaultRatio * 100}%`,
+                width:
+                  pane.editor.width ??
+                  `${PANE_LIMITS.editorDefaultRatio * 100}%`,
                 minWidth: PANE_LIMITS.editorMin,
               }}
               className="flex flex-col bg-surface"
@@ -71,7 +118,11 @@ export function AppShell() {
           <EmptyState
             icon={<PagesIcon />}
             title="Paper Canvas"
-            hint="Your pages will appear here as you write."
+            hint={
+              status === 'loading'
+                ? 'Loading your documents…'
+                : 'Your pages will appear here as you write.'
+            }
           />
         </main>
 
@@ -92,7 +143,10 @@ export function AppShell() {
             <aside
               ref={inspectorRef}
               aria-label="Inspector pane"
-              style={{ width: pane.inspector.width, minWidth: PANE_LIMITS.inspectorMin }}
+              style={{
+                width: pane.inspector.width,
+                minWidth: PANE_LIMITS.inspectorMin,
+              }}
               className="flex flex-col bg-surface"
             >
               <EmptyState
@@ -104,6 +158,23 @@ export function AppShell() {
           </>
         )}
       </div>
+
+      {draggingFiles && (
+        <div
+          data-testid="drop-overlay"
+          className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-black/25 p-6"
+        >
+          <div className="flex flex-col items-center gap-2 rounded-pane border-2 border-dashed border-accent bg-surface px-10 py-8 text-accent shadow-xl">
+            <UploadIcon className="text-2xl" />
+            <p className="text-sm font-medium text-ink">
+              Drop .md files to import
+            </p>
+          </div>
+        </div>
+      )}
+
+      {libraryOpen && <LibraryPanel onClose={() => setLibraryOpen(false)} />}
+      <DeleteToast />
     </div>
   );
 }

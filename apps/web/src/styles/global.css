@@ -24,6 +24,7 @@
   --accent-strong: #6a55f2;
   --accent-soft: rgb(124 106 247 / 0.11);
   --accent-ink: #ffffff;
+  --danger: #dc2626; /* destructive actions (delete) */
 }
 
 [data-theme='dark'] {
@@ -40,6 +41,7 @@
   --accent-strong: #8e7ef9;
   --accent-soft: rgb(124 106 247 / 0.2);
   --accent-ink: #ffffff;
+  --danger: #f87171;
 }
 
 /* Expose the tokens as Tailwind utilities (bg-canvas, text-ink, border-hairline, …). */
@@ -57,6 +59,7 @@
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
 
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
 
@@ -66,6 +69,29 @@
   /* Motion: 150–200ms ease-out. Components pick duration-150/200; the curve is the default. */
   --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
   --default-transition-duration: 150ms;
+
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-slide-in-left: slide-in-left 150ms ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-16px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
 }
 
 @layer base {
