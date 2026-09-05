@@ -2,10 +2,25 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFNumber,
+  PDFRef,
+} from 'pdf-lib';
+
+import { DEFAULT_SETTINGS, type DocumentSettings } from './settings';
+import {
+  buildPageLayouts,
+  extractOutlineEntries,
+  injectPDFOutline,
   splitInlineElement,
   splitListElement,
   splitPreElement,
   splitTableElement,
+  type PageLayout,
 } from './paginator';
 
 /** A deterministic stand-in for the paginator's DOM measurement: an element
@@ -410,5 +425,302 @@ describe('paginateEl', () => {
     const bodyChildren = document.body.children.length;
     withMockedHeights(() => paginateEl(source, 600, 150, ''));
     expect(document.body.children.length).toBe(bodyChildren);
+  });
+});
+
+// ─── buildPageLayouts ─────────────────────────────────────────────────────────
+
+const settings = (over: Partial<DocumentSettings> = {}): DocumentSettings => ({
+  ...DEFAULT_SETTINGS,
+  ...over,
+});
+
+describe('buildPageLayouts', () => {
+  const layouts = (
+    pages: number,
+    over: Partial<DocumentSettings> = {},
+    title = 'Note',
+  ): PageLayout[] =>
+    buildPageLayouts(
+      Array.from({ length: pages }, () => [document.createElement('div')]),
+      settings(over),
+      title,
+    );
+
+  it('resolves the default current/total template into the right-hand footer', () => {
+    const [first, , third] = layouts(3);
+    expect(first!.pageShowsFooter).toBe(true);
+    expect(first!.footerRight).toBe('1 / 3');
+    expect(third!.footerRight).toBe('3 / 3');
+    expect(first!.footerLeft).toBe('');
+    expect(first!.footerCenter).toBe('');
+  });
+
+  it('substitutes {{current}}, {{total}} and {{title}} in a custom format', () => {
+    const [first] = layouts(3, {
+      pageNumberFormat: '{{title}} — {{current}}/{{total}}',
+    });
+    expect(first!.footerRight).toBe('Note — 1/3');
+  });
+
+  it('substitutes {{title}} last so a title containing placeholders stays literal', () => {
+    const [first] = layouts(
+      2,
+      { pageNumberFormat: '{{title}} {{current}}/{{total}}' },
+      '{{current}} note',
+    );
+    expect(first!.footerRight).toBe('{{current}} note 1/2');
+  });
+
+  it('falls back to the default template for a blank format', () => {
+    const [first] = layouts(2, { pageNumberFormat: '   ' });
+    expect(first!.footerRight).toBe('1 / 2');
+  });
+
+  it('suppresses header and footer zones on the first page when asked', () => {
+    const [first, second] = layouts(2, {
+      showHeaderOnFirstPage: false,
+      showFooterOnFirstPage: false,
+      headerText: 'Header',
+    });
+    expect(first!.pageShowsHeader).toBe(false);
+    expect(first!.pageShowsFooter).toBe(false);
+    expect(first!.headerRight).toBe('');
+    expect(first!.footerRight).toBe('');
+    expect(first!.hasHeader).toBe(false);
+    expect(first!.hasFooter).toBe(false);
+    expect(second!.pageShowsHeader).toBe(true);
+    expect(second!.pageShowsFooter).toBe(true);
+    expect(second!.headerRight).toBe('Header');
+  });
+
+  it('shifts the displayed page numbers by one when the first-page footer is hidden', () => {
+    const [, second, third] = layouts(3, { showFooterOnFirstPage: false });
+    expect(second!.footerRight).toBe('1 / 2');
+    expect(third!.footerRight).toBe('2 / 2');
+  });
+
+  it('offsets numbering by pageNumberStart', () => {
+    const [first] = layouts(3, { pageNumberStart: 5 });
+    expect(first!.footerRight).toBe('5 / 7');
+  });
+
+  it('routes footer text and page numbers by alignment/position', () => {
+    const [left] = layouts(2, {
+      footerText: 'Confidential',
+      footerTextAlignment: 'left',
+      pageNumberPosition: 'center',
+    });
+    expect(left!.footerLeft).toBe('Confidential');
+    expect(left!.footerCenter).toBe('1 / 2');
+    expect(left!.footerRight).toBe('');
+
+    const [merged] = layouts(2, {
+      footerText: 'Confidential',
+      footerTextAlignment: 'right',
+      pageNumberPosition: 'right',
+    });
+    expect(merged!.footerRight).toBe('Confidential — 1 / 2');
+  });
+
+  it('routes header text by headerAlignment', () => {
+    const [first] = layouts(2, {
+      headerText: 'My Note',
+      headerAlignment: 'center',
+    });
+    expect(first!.headerCenter).toBe('My Note');
+    expect(first!.headerLeft).toBe('');
+    expect(first!.headerRight).toBe('');
+  });
+
+  it('flags hasHeader/hasFooter from show flags, zones and borders', () => {
+    const [noHeader] = layouts(2);
+    expect(noHeader!.hasHeader).toBe(false);
+    expect(noHeader!.hasFooter).toBe(true);
+
+    const [borderOnly] = layouts(2, { showHeaderBorder: true });
+    expect(borderOnly!.hasHeader).toBe(true);
+
+    const [disabled] = layouts(2, {
+      headerText: 'Header',
+      showHeader: false,
+      showFooter: false,
+    });
+    expect(disabled!.hasHeader).toBe(false);
+    expect(disabled!.hasFooter).toBe(false);
+  });
+});
+
+// ─── extractOutlineEntries ────────────────────────────────────────────────────
+
+describe('extractOutlineEntries', () => {
+  const layoutsFrom = (pagesHtml: string[]): PageLayout[] =>
+    buildPageLayouts(
+      pagesHtml.map((html) => {
+        // One page-node per page, matching paginateEl's output shape.
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        return [div];
+      }),
+      settings(),
+      'T',
+    );
+
+  it('collects headings across pages in document order with 1-indexed pages', () => {
+    const entries = extractOutlineEntries(
+      layoutsFrom(['<h1>A</h1><p>…</p><h2>B</h2>', '<h1>C</h1>']),
+    );
+    expect(entries).toEqual([
+      { title: 'A', level: 1, page: 1 },
+      { title: 'B', level: 2, page: 1 },
+      { title: 'C', level: 1, page: 2 },
+    ]);
+  });
+
+  it('finds headings nested inside split-fragment containers and bare heading nodes', () => {
+    const layouts = layoutsFrom(['<div><h3>Nested</h3><p>x</p></div>']);
+    // A page node can also *be* the heading after pagination.
+    const bare = document.createElement('h4');
+    bare.textContent = 'Bare';
+    layouts[0]!.pageNodes.unshift(bare);
+
+    const entries = extractOutlineEntries(layouts);
+    expect(entries).toEqual([
+      { title: 'Bare', level: 4, page: 1 },
+      { title: 'Nested', level: 3, page: 1 },
+    ]);
+  });
+
+  it('skips headings with no text', () => {
+    const entries = extractOutlineEntries(
+      layoutsFrom(['<h1>Real</h1><h2>   </h2>']),
+    );
+    expect(entries).toEqual([{ title: 'Real', level: 1, page: 1 }]);
+  });
+
+  it('returns nothing for layouts without headings', () => {
+    expect(extractOutlineEntries(layoutsFrom(['<p>only text</p>']))).toEqual(
+      [],
+    );
+  });
+});
+
+// ─── injectPDFOutline ─────────────────────────────────────────────────────────
+
+describe('injectPDFOutline', () => {
+  const dummyPdf = async (pageCount: number): Promise<Uint8Array> => {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < pageCount; i++) doc.addPage();
+    return await doc.save();
+  };
+
+  const outlinesDict = (doc: PDFDocument): PDFDict =>
+    doc.context.lookup(
+      doc.catalog.get(PDFName.of('Outlines')) as PDFRef,
+      PDFDict,
+    );
+
+  const dictAt = (doc: PDFDocument, dict: PDFDict, name: string): PDFDict =>
+    doc.context.lookup(dict.get(PDFName.of(name)) as PDFRef, PDFDict);
+
+  const titleOf = (dict: PDFDict): string =>
+    (dict.get(PDFName.of('Title')) as PDFHexString).decodeText();
+
+  const countOf = (dict: PDFDict): number =>
+    (dict.get(PDFName.of('Count')) as PDFNumber).asNumber();
+
+  /** Asserts an XYZ destination (null left/top, zoom 0) and returns the
+   *  1-indexed page it points at. */
+  const destPageOf = (doc: PDFDocument, dict: PDFDict): number => {
+    const dest = doc.context.lookup(
+      dict.get(PDFName.of('Dest')) as PDFRef,
+      PDFArray,
+    );
+    expect(String(dest.get(1))).toBe('/XYZ');
+    expect(String(dest.get(2))).toBe('null');
+    expect(String(dest.get(3))).toBe('null');
+    expect((dest.get(4) as PDFNumber).asNumber()).toBe(0);
+    const target = dest.get(0) as PDFRef;
+    const pages = doc.getPages();
+    return (
+      pages.findIndex((p) => p.ref.objectNumber === target.objectNumber) + 1
+    );
+  };
+
+  it('injects a hierarchical outline with collapsed subtrees and UseOutlines', async () => {
+    const doc = await PDFDocument.load(
+      await injectPDFOutline(await dummyPdf(3), [
+        { title: 'Chapter Ünï — 中文', level: 1, page: 1 },
+        { title: 'Section A', level: 2, page: 1 },
+        { title: 'Section B', level: 2, page: 2 },
+        { title: 'Chapter Two', level: 1, page: 3 },
+      ]),
+    );
+
+    expect(String(doc.catalog.get(PDFName.of('PageMode')))).toBe(
+      '/UseOutlines',
+    );
+
+    const root = outlinesDict(doc);
+    expect(String(root.get(PDFName.of('Type')))).toBe('/Outlines');
+    expect(countOf(root)).toBe(2);
+
+    const ch1 = dictAt(doc, root, 'First');
+    const ch2 = dictAt(doc, root, 'Last');
+    expect(titleOf(ch1)).toBe('Chapter Ünï — 中文');
+    expect(titleOf(ch2)).toBe('Chapter Two');
+
+    // Roots link to each other; their parents resolve back to the root dict.
+    expect(dictAt(doc, ch1, 'Next')).toBe(ch2);
+    expect(dictAt(doc, ch2, 'Prev')).toBe(ch1);
+    expect(dictAt(doc, ch1, 'Parent')).toBe(root);
+    expect(String(ch2.get(PDFName.of('Next')))).toBe('undefined');
+    expect(String(ch1.get(PDFName.of('Prev')))).toBe('undefined');
+
+    // Chapter One: two direct children, collapsed by default (negative /Count).
+    expect(countOf(ch1)).toBe(-2);
+    const secA = dictAt(doc, ch1, 'First');
+    const secB = dictAt(doc, ch1, 'Last');
+    expect(titleOf(secA)).toBe('Section A');
+    expect(titleOf(secB)).toBe('Section B');
+    expect(dictAt(doc, secA, 'Next')).toBe(secB);
+    expect(dictAt(doc, secB, 'Prev')).toBe(secA);
+    expect(dictAt(doc, secA, 'Parent')).toBe(ch1);
+    expect(secA.get(PDFName.of('First'))).toBeUndefined();
+    expect(secA.get(PDFName.of('Count'))).toBeUndefined();
+
+    // Leaf chapters carry no child keys at all.
+    expect(ch2.get(PDFName.of('First'))).toBeUndefined();
+    expect(ch2.get(PDFName.of('Count'))).toBeUndefined();
+
+    // XYZ destinations inherit scroll and zoom, and point at the right pages.
+    expect(destPageOf(doc, ch1)).toBe(1);
+    expect(destPageOf(doc, secB)).toBe(2);
+    expect(destPageOf(doc, ch2)).toBe(3);
+  });
+
+  it('clamps an out-of-range page number to the last page', async () => {
+    const doc = await PDFDocument.load(
+      await injectPDFOutline(await dummyPdf(2), [
+        { title: 'Far', level: 1, page: 99 },
+      ]),
+    );
+    expect(destPageOf(doc, dictAt(doc, outlinesDict(doc), 'First'))).toBe(2);
+  });
+
+  it('returns the input bytes unchanged when there are no entries', async () => {
+    const bytes = await dummyPdf(2);
+    expect(await injectPDFOutline(bytes, [])).toBe(bytes);
+  });
+
+  it('treats a leading H2 (no H1) as a root-level item', async () => {
+    const doc = await PDFDocument.load(
+      await injectPDFOutline(await dummyPdf(2), [
+        { title: 'Only H2', level: 2, page: 1 },
+      ]),
+    );
+    const root = outlinesDict(doc);
+    expect(countOf(root)).toBe(1);
+    expect(destPageOf(doc, dictAt(doc, root, 'First'))).toBe(1);
   });
 });

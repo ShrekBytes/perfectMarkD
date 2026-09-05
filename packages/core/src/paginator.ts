@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pagination engine.
+// Pagination engine, page-layout builder, PDF outline (bookmarks).
 //
 // Takes rendered HTML and distributes its block children into page-height
 // buckets, splitting oversized elements by natural unit (line, row, list item,
-// word/character). Ported from the plugin's paginator.ts; the page-layout
-// builder and PDF outline injection live with the export path (engine-port/06).
+// word/character). buildPageLayouts then resolves each page's header/footer
+// text and page-number string, and injectPDFOutline post-processes finished
+// PDF bytes to embed a bookmark tree derived from the same paginated headings.
+// Ported from the plugin's paginator.ts.
 //
 // Measurement happens inside a hidden shadow-root sandbox so the scoped
 // docCSS can't pollute the host document and host styles can't distort
@@ -16,7 +18,41 @@
 // Runs against the ambient DOM (browser, or a DOM-emulating test environment).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFNull,
+  PDFNumber,
+} from 'pdf-lib';
+
 import { createDiv, createEl, setCssStyles } from './dom.js';
+import type { DocumentSettings } from './settings.js';
+
+/** One entry in the PDF outline/bookmark tree, extracted from the heading nodes. */
+export interface OutlineEntry {
+  title: string;
+  level: number; // 1–6 matching H1–H6
+  page: number; // 1-indexed page number in the exported PDF
+}
+
+export interface PageLayout {
+  pageNodes: HTMLElement[];
+  pageNum: number;
+  totalPages: number;
+  pageShowsHeader: boolean;
+  pageShowsFooter: boolean;
+  hasHeader: boolean;
+  hasFooter: boolean;
+  headerLeft: string;
+  headerCenter: string;
+  headerRight: string;
+  footerLeft: string;
+  footerRight: string;
+  footerCenter: string;
+}
 
 // ─── Shared measurement helpers ─────────────────────────────────────────────────
 
@@ -531,4 +567,279 @@ export function paginateEl(
     document.body.removeChild(sandboxHost);
   }
   return pages.length > 0 ? pages : [[]];
+}
+
+// ─── Page layout builder ──────────────────────────────────────────────────────
+
+/** Resolves a page-number format template by substituting the {{current}},
+ *  {{total}}, and {{title}} placeholders. Falls back to the default
+ *  "current / total" template when the format is empty. {{title}} is
+ *  substituted last so literal "{{current}}"/"{{total}}" text inside the
+ *  document title itself isn't mistaken for a placeholder. */
+function resolvePageNumberFormat(
+  format: string,
+  current: number,
+  total: number,
+  title: string,
+): string {
+  const template = format && format.trim() ? format : '{{current}} / {{total}}';
+  return template
+    .replace(/\{\{\s*current\s*\}\}/g, String(current))
+    .replace(/\{\{\s*total\s*\}\}/g, String(total))
+    .replace(/\{\{\s*title\s*\}\}/g, title);
+}
+
+/** Converts paginated page-node arrays into fully-resolved PageLayout objects,
+ *  computing header/footer text and page number strings for each page.
+ *  documentTitle backs the {{title}} placeholder in pageNumberFormat. */
+export function buildPageLayouts(
+  allPages: HTMLElement[][],
+  s: DocumentSettings,
+  documentTitle: string,
+): PageLayout[] {
+  const totalPages = allPages.length;
+  return allPages.map((pageNodes, i) => {
+    const pageNum = i + 1;
+    const pageShowsHeader = s.showHeaderOnFirstPage || i > 0;
+    const pageShowsFooter = s.showFooterOnFirstPage || i > 0;
+
+    // Page-number offset: when footer is hidden on page 1 the numbering shifts by 1.
+    const displayNum = s.showFooterOnFirstPage
+      ? s.pageNumberStart + i
+      : s.pageNumberStart + (i - 1);
+    const displayTotal = s.showFooterOnFirstPage
+      ? s.pageNumberStart + totalPages - 1
+      : s.pageNumberStart + totalPages - 2;
+    const numStr = resolvePageNumberFormat(
+      s.pageNumberFormat,
+      displayNum,
+      displayTotal,
+      documentTitle,
+    );
+
+    let footerLeft = '',
+      footerRight = '',
+      footerCenter = '';
+    let headerLeft = '',
+      headerCenter = '',
+      headerRight = '';
+
+    if (pageShowsFooter) {
+      if (s.footerText) {
+        if (s.footerTextAlignment === 'center') footerCenter = s.footerText;
+        else if (s.footerTextAlignment === 'left') footerLeft = s.footerText;
+        else footerRight = s.footerText;
+      }
+      // Place page number in its own zone; merge with a separator when both land in the same slot.
+      if (s.showPageNumbers) {
+        const join = (existing: string) =>
+          existing ? existing + ' — ' + numStr : numStr;
+        if (s.pageNumberPosition === 'center')
+          footerCenter = join(footerCenter);
+        else if (s.pageNumberPosition === 'left') footerLeft = join(footerLeft);
+        else footerRight = join(footerRight);
+      }
+    }
+
+    if (pageShowsHeader) {
+      if (s.headerText) {
+        if (s.headerAlignment === 'center') {
+          headerCenter = s.headerText;
+        } else if (s.headerAlignment === 'left') {
+          headerLeft = s.headerText;
+        } else {
+          headerRight = s.headerText;
+        }
+      }
+    }
+
+    // Compute once here so both preview and export paths can read directly from
+    // the layout object instead of re-deriving the same boolean expressions.
+    const hasHeader =
+      s.showHeader &&
+      pageShowsHeader &&
+      !!(headerLeft || headerCenter || headerRight || s.showHeaderBorder);
+    const hasFooter =
+      s.showFooter &&
+      pageShowsFooter &&
+      !!(footerLeft || footerRight || footerCenter || s.showFooterBorder);
+
+    return {
+      pageNodes,
+      pageNum,
+      totalPages,
+      pageShowsHeader,
+      pageShowsFooter,
+      hasHeader,
+      hasFooter,
+      headerLeft,
+      headerCenter,
+      headerRight,
+      footerLeft,
+      footerRight,
+      footerCenter,
+    };
+  });
+}
+
+// ─── PDF outline (bookmarks) ──────────────────────────────────────────────────
+// Chromium's print pipeline does not generate bookmarks — we post-process the
+// raw PDF bytes with pdf-lib to inject a hierarchical outline derived from the
+// heading elements already present in the paginated layout.
+
+/**
+ * Walks every page's node list and collects heading elements in document order.
+ * Headings can sit at the top level of pageNodes (the common case) or be nested
+ * inside a container fragment produced by the page-splitter.
+ */
+export function extractOutlineEntries(layouts: PageLayout[]): OutlineEntry[] {
+  const entries: OutlineEntry[] = [];
+  for (const layout of layouts) {
+    for (const node of layout.pageNodes) {
+      const topLevel: HTMLElement[] = /^H[1-6]$/.test(node.tagName)
+        ? [node]
+        : [];
+      const nested = Array.from(
+        node.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
+      );
+      for (const el of [...topLevel, ...nested]) {
+        const level = parseInt(el.tagName[1]!, 10);
+        const title = (el.textContent ?? '').trim();
+        if (title) entries.push({ title, level, page: layout.pageNum });
+      }
+    }
+  }
+  return entries;
+}
+
+/**
+ * Post-processes a PDF buffer produced by the browser's print pipeline and
+ * injects a hierarchical bookmark outline built from the supplied entries.
+ *
+ * Heading nesting (H1 → H2 → H3 …) is preserved. Each item links to its page
+ * via an XYZ destination that inherits the reader's current zoom. Sub-trees are
+ * collapsed by default (negative /Count per PDF spec). PageMode is set to
+ * UseOutlines so readers open the bookmarks panel on load.
+ */
+export async function injectPDFOutline(
+  pdfBuffer: Uint8Array,
+  entries: OutlineEntry[],
+): Promise<Uint8Array> {
+  if (!entries.length) return pdfBuffer;
+
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
+  const pages = pdfDoc.getPages();
+  const ctx = pdfDoc.context;
+  const n = entries.length;
+
+  // ── Compute tree relationships ───────────────────────────────────────────
+  // parentIdx[i] = index of the nearest ancestor entry with a lower heading
+  // level, or -1 when the entry sits at the root of the outline.
+  const parentIdx = new Array<number>(n).fill(-1);
+  for (let i = 1; i < n; i++) {
+    for (let j = i - 1; j >= 0; j--) {
+      if (entries[j]!.level < entries[i]!.level) {
+        parentIdx[i] = j;
+        break;
+      }
+    }
+  }
+
+  // Sibling linkage (prev / next among entries that share the same parent).
+  const prevSib = new Array<number>(n).fill(-1);
+  const nextSib = new Array<number>(n).fill(-1);
+  for (let i = 0; i < n; i++) {
+    for (let j = i - 1; j >= 0; j--) {
+      if (parentIdx[j] === parentIdx[i]) {
+        prevSib[i] = j;
+        break;
+      }
+    }
+    for (let j = i + 1; j < n; j++) {
+      if (parentIdx[j] === parentIdx[i]) {
+        nextSib[i] = j;
+        break;
+      }
+    }
+  }
+
+  // First / last direct child of each entry, and direct child count.
+  // directChildCount is computed here in O(n) so the item-building loop
+  // below doesn't need an inner scan (which would be O(n²) overall).
+  const firstChild = new Array<number>(n).fill(-1);
+  const lastChild = new Array<number>(n).fill(-1);
+  const directChildCount = new Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    const p = parentIdx[i]!;
+    if (p >= 0) {
+      if (firstChild[p]! < 0) firstChild[p] = i;
+      lastChild[p] = i;
+      directChildCount[p]!++;
+    }
+  }
+
+  // ── Allocate PDF indirect references ─────────────────────────────────────
+  const outlineRef = ctx.nextRef();
+  const itemRefs = entries.map(() => ctx.nextRef());
+
+  // ── Build each outline item object ───────────────────────────────────────
+  for (let i = 0; i < n; i++) {
+    const pageIdx = Math.min(entries[i]!.page - 1, pages.length - 1);
+
+    // XYZ destination: navigate to this page, null left/top inherits scroll, 0 zoom inherits zoom.
+    const dest = PDFArray.withContext(ctx);
+    dest.push(pages[pageIdx]!.ref);
+    dest.push(PDFName.of('XYZ'));
+    dest.push(PDFNull);
+    dest.push(PDFNull);
+    dest.push(PDFNumber.of(0));
+
+    const itemDict = PDFDict.withContext(ctx);
+    itemDict.set(PDFName.of('Title'), PDFHexString.fromText(entries[i]!.title)); // UTF-16 → full Unicode
+    itemDict.set(
+      PDFName.of('Parent'),
+      parentIdx[i]! >= 0 ? itemRefs[parentIdx[i]!]! : outlineRef,
+    );
+    itemDict.set(PDFName.of('Dest'), dest);
+    if (prevSib[i]! >= 0)
+      itemDict.set(PDFName.of('Prev'), itemRefs[prevSib[i]!]!);
+    if (nextSib[i]! >= 0)
+      itemDict.set(PDFName.of('Next'), itemRefs[nextSib[i]!]!);
+    if (firstChild[i]! >= 0) {
+      itemDict.set(PDFName.of('First'), itemRefs[firstChild[i]!]!);
+      itemDict.set(PDFName.of('Last'), itemRefs[lastChild[i]!]!);
+      // Negative /Count = subtree is collapsed by default in the PDF reader.
+      itemDict.set(PDFName.of('Count'), PDFNumber.of(-directChildCount[i]!));
+    }
+    ctx.assign(itemRefs[i]!, itemDict);
+  }
+
+  // ── Build the outline root dictionary ────────────────────────────────────
+  let rootFirst = -1,
+    rootLast = -1,
+    rootCount = 0;
+  for (let i = 0; i < n; i++) {
+    if (parentIdx[i]! < 0) {
+      if (rootFirst < 0) rootFirst = i;
+      rootLast = i;
+      rootCount++;
+    }
+  }
+  // Safety: if every entry has a parent (e.g. the document starts with H2 and
+  // never has an H1), there are no root-level items. Injecting an empty or
+  // half-wired outline dict would produce a malformed PDF — bail out instead.
+  if (rootFirst < 0) return pdfBuffer;
+
+  const rootDict = PDFDict.withContext(ctx);
+  rootDict.set(PDFName.of('Type'), PDFName.of('Outlines'));
+  rootDict.set(PDFName.of('First'), itemRefs[rootFirst]!);
+  rootDict.set(PDFName.of('Last'), itemRefs[rootLast]!);
+  rootDict.set(PDFName.of('Count'), PDFNumber.of(rootCount));
+  ctx.assign(outlineRef, rootDict);
+
+  // ── Wire into the document catalog ───────────────────────────────────────
+  pdfDoc.catalog.set(PDFName.of('Outlines'), outlineRef);
+  pdfDoc.catalog.set(PDFName.of('PageMode'), PDFName.of('UseOutlines'));
+
+  return await pdfDoc.save();
 }
