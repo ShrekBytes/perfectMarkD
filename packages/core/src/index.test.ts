@@ -7,6 +7,8 @@ it('exposes the public engine surface from the package index', () => {
   expect(api).toContain('postProcessRenderedHTML');
   expect(api).toContain('buildDocCSS');
   expect(api).toContain('DEFAULT_SETTINGS');
+  expect(api).toContain('buildExportHTML');
+  expect(api).toContain('resolvePageGeometry');
   // The scaffold placeholder is gone.
   expect(api).not.toContain('hello');
 });

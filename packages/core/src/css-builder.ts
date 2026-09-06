@@ -1,12 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CSS generation.
+// CSS generation + page geometry.
 //
 // Turns a DocumentSettings object into the CSS strings the preview (shadow
 // DOM) and export (print HTML) paths both consume, plus the small string
-// utilities and HTML fragments those paths share. Everything here is pure
-// string-building — no DOM, no platform imports. Code-block colors live at the
-// markdown-render layer (Shiki emits its own token colors inline); math is
-// KaTeX, which ships static CSS, so no stylesheet extraction happens here.
+// utilities, HTML fragments, and the page-box geometry (resolvePageGeometry)
+// those paths share. Everything here is pure computation — no DOM, no
+// platform imports. Code-block colors live at the markdown-render layer
+// (Shiki emits its own token colors inline); math is KaTeX, which ships
+// static CSS, so no stylesheet extraction happens here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { PAGE_SIZES, type DocumentSettings } from './settings.js';
@@ -29,6 +30,76 @@ export function resolvePageDims(s: DocumentSettings): { w: number; h: number } {
     };
   }
   return PAGE_SIZES[s.pageSize] ?? PAGE_SIZES['A4']!;
+}
+
+/** The full page box geometry shared by pagination, the preview, and the
+ *  export HTML: page size (orientation applied), margins in px, header/footer
+ *  band heights, and the resulting content box. Every consumer must derive
+ *  these from this one function — pagination measures against contentH, and
+ *  the export positions layers with the same numbers, so divergent derivations
+ *  would shift content between preview and print. */
+export interface PageGeometry {
+  /** Page width/height in px, orientation already applied. */
+  pw: number;
+  ph: number;
+  /** Page margins in px. */
+  mTop: number;
+  mBottom: number;
+  mLeft: number;
+  mRight: number;
+  /** Header/footer band heights in px; 0 when the band is off. */
+  headerH: number;
+  footerH: number;
+  /** Content box: page minus margins minus both bands, clamped ≥ 1px so the
+   *  paginator sandbox never measures at zero size. */
+  contentW: number;
+  contentH: number;
+}
+
+/** Resolves the page box geometry for the current settings.
+ *  Band heights follow the same rules as the plugin's render pass: an
+ *  explicit setting wins; otherwise the band auto-sizes from its font size
+ *  and only exists when it has something to show (text, page number, border,
+ *  or banner image). */
+export function resolvePageGeometry(s: DocumentSettings): PageGeometry {
+  const dims = resolvePageDims(s);
+  const pw = s.orientation === 'landscape' ? dims.h : dims.w;
+  const ph = s.orientation === 'landscape' ? dims.w : dims.h;
+
+  const mTop = mmToPx(s.marginTop);
+  const mBottom = mmToPx(s.marginBottom);
+  const mLeft = mmToPx(s.marginLeft);
+  const mRight = mmToPx(s.marginRight);
+
+  const footerH =
+    s.showFooter &&
+    (s.showPageNumbers ||
+      !!s.footerText ||
+      s.showFooterBorder ||
+      !!s.footerImageRef)
+      ? s.footerHeight > 0
+        ? s.footerHeight
+        : Math.max(28, s.footerFontSize + 14)
+      : 0;
+  const headerH =
+    s.showHeader && (!!s.headerText || s.showHeaderBorder || !!s.headerImageRef)
+      ? s.headerHeight > 0
+        ? s.headerHeight
+        : Math.max(20, s.headerFontSize + 10)
+      : 0;
+
+  return {
+    pw,
+    ph,
+    mTop,
+    mBottom,
+    mLeft,
+    mRight,
+    headerH,
+    footerH,
+    contentW: Math.max(1, pw - mLeft - mRight),
+    contentH: Math.max(1, ph - mTop - mBottom - footerH - headerH),
+  };
 }
 
 export function escapeHTML(s: string): string {

@@ -12,6 +12,7 @@ import {
   resolveCodeFont,
   resolveFont,
   resolvePageDims,
+  resolvePageGeometry,
 } from './css-builder';
 import {
   DEFAULT_SETTINGS,
@@ -328,5 +329,102 @@ describe('buildDocCSS', () => {
   it('sets RTL direction only when requested', () => {
     expect(buildDocCSS(DEFAULT_SETTINGS)).not.toContain('direction: rtl');
     expect(buildDocCSS(DEFAULT_SETTINGS, true)).toContain('direction: rtl;');
+  });
+});
+
+describe('resolvePageGeometry', () => {
+  it('derives A4 portrait geometry from the default settings', () => {
+    const g = resolvePageGeometry(DEFAULT_SETTINGS);
+    expect(g.pw).toBe(794);
+    expect(g.ph).toBe(1123);
+    expect(g.mTop).toBeCloseTo(mmToPx(20), 10);
+    expect(g.mBottom).toBeCloseTo(mmToPx(20), 10);
+    expect(g.mLeft).toBeCloseTo(mmToPx(25), 10);
+    expect(g.mRight).toBeCloseTo(mmToPx(25), 10);
+    // Default header has no text, border, or banner → no band.
+    expect(g.headerH).toBe(0);
+    // Default footer shows page numbers → auto band height max(28, 9 + 14).
+    expect(g.footerH).toBe(28);
+    expect(g.contentW).toBeCloseTo(794 - mmToPx(50), 10);
+    expect(g.contentH).toBeCloseTo(1123 - mmToPx(40) - 28, 10);
+  });
+
+  it('swaps page dimensions in landscape', () => {
+    const g = resolvePageGeometry(settings({ orientation: 'landscape' }));
+    expect(g.pw).toBe(1123);
+    expect(g.ph).toBe(794);
+  });
+
+  it('auto-derives band heights from font size when not set explicitly', () => {
+    const g = resolvePageGeometry(
+      settings({ headerText: 'Hello', footerText: 'Bye' }),
+    );
+    expect(g.headerH).toBe(20); // max(20, 9 + 10)
+    expect(g.footerH).toBe(28); // max(28, 9 + 14)
+    const gBig = resolvePageGeometry(
+      settings({
+        headerText: 'Hello',
+        headerFontSize: 14,
+        footerText: 'Bye',
+        footerFontSize: 20,
+      }),
+    );
+    expect(gBig.headerH).toBe(24); // 14 + 10
+    expect(gBig.footerH).toBe(34); // 20 + 14
+  });
+
+  it('prefers explicit band heights over the auto-derived ones', () => {
+    const g = resolvePageGeometry(
+      settings({
+        headerText: 'Hello',
+        headerHeight: 48,
+        footerText: 'Bye',
+        footerHeight: 60,
+      }),
+    );
+    expect(g.headerH).toBe(48);
+    expect(g.footerH).toBe(60);
+  });
+
+  it('drops bands whose header/footer is fully disabled', () => {
+    const noHeader = resolvePageGeometry(
+      settings({ showHeader: false, headerText: 'Hello' }),
+    );
+    expect(noHeader.headerH).toBe(0);
+    const noFooter = resolvePageGeometry(
+      settings({ showFooter: false, footerText: 'Bye', showPageNumbers: true }),
+    );
+    expect(noFooter.footerH).toBe(0);
+  });
+
+  it('keeps a band alive for a banner alone (no text, no border)', () => {
+    const g = resolvePageGeometry(settings({ headerImageRef: 'banner.png' }));
+    expect(g.headerH).toBe(20);
+  });
+
+  it('clamps the content box to at least 1px when margins overflow the page', () => {
+    const g = resolvePageGeometry(
+      settings({
+        pageSize: 'A5',
+        marginLeft: 200,
+        marginRight: 200,
+        marginTop: 300,
+        marginBottom: 300,
+      }),
+    );
+    expect(g.contentW).toBe(1);
+    expect(g.contentH).toBe(1);
+  });
+
+  it('converts custom mm page sizes through resolvePageDims', () => {
+    const g = resolvePageGeometry(
+      settings({
+        pageSize: 'Custom',
+        customPageWidth: 210,
+        customPageHeight: 297,
+      }),
+    );
+    expect(g.pw).toBe(794); // round(210 / 25.4 * 96)
+    expect(g.ph).toBe(1123); // round(297 / 25.4 * 96)
   });
 });
