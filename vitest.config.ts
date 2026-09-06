@@ -12,6 +12,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Restores jsdom's storage under Node 26 + --no-webstorage (see file).
+    setupFiles: ['apps/web/src/testing/webstorage-compat.ts'],
     include: [
       'packages/*/src/**/*.test.{ts,tsx}',
       'apps/*/src/**/*.test.{ts,tsx}',
