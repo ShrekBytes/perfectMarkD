@@ -25,7 +25,9 @@ it('commits a rename on Enter', async () => {
 
 it('commits a rename on blur', async () => {
   const onRename = vi.fn();
-  const { container } = render(<DocName name="My report" onRename={onRename} />);
+  const { container } = render(
+    <DocName name="My report" onRename={onRename} />,
+  );
   const input = screen.getByRole('textbox', { name: 'Document name' });
   await userEvent.type(input, ' — final');
   await userEvent.tab(); // move focus away → blur

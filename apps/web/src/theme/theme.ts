@@ -19,7 +19,9 @@ export function readStoredTheme(): Theme | null {
 }
 
 export function systemTheme(): Theme {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 }
 
 /** Stored preference wins; otherwise follow the operating system. */

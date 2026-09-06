@@ -63,12 +63,17 @@ it('useTheme exposes the resolved theme and toggling persists the choice', () =>
 
 it('useTheme follows system changes while no preference is stored', () => {
   const changeListeners: Array<(event: { matches: boolean }) => void> = [];
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
-    matches: false,
-    addEventListener: (_: string, listener: (event: { matches: boolean }) => void) =>
-      changeListeners.push(listener),
-    removeEventListener: vi.fn(),
-  }));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: (
+        _: string,
+        listener: (event: { matches: boolean }) => void,
+      ) => changeListeners.push(listener),
+      removeEventListener: vi.fn(),
+    }),
+  );
 
   const { result } = renderHook(() => useTheme());
   expect(result.current.theme).toBe('light');
@@ -81,12 +86,17 @@ it('useTheme follows system changes while no preference is stored', () => {
 
 it('useTheme ignores system changes once a preference is stored', () => {
   const changeListeners: Array<(event: { matches: boolean }) => void> = [];
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
-    matches: false,
-    addEventListener: (_: string, listener: (event: { matches: boolean }) => void) =>
-      changeListeners.push(listener),
-    removeEventListener: vi.fn(),
-  }));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: (
+        _: string,
+        listener: (event: { matches: boolean }) => void,
+      ) => changeListeners.push(listener),
+      removeEventListener: vi.fn(),
+    }),
+  );
 
   const { result } = renderHook(() => useTheme());
   act(() => result.current.setTheme('light'));

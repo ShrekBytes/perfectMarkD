@@ -25,7 +25,9 @@ export function effectiveEditorWidth(
   containerWidth: number,
 ): number {
   if (editor.collapsed) return 0;
-  return editor.width ?? Math.round(containerWidth * PANE_LIMITS.editorDefaultRatio);
+  return (
+    editor.width ?? Math.round(containerWidth * PANE_LIMITS.editorDefaultRatio)
+  );
 }
 
 /**
@@ -39,7 +41,8 @@ export function clampPaneWidth(
   containerWidth: number,
   layout: PaneLayoutState,
 ): number {
-  const min = id === 'editor' ? PANE_LIMITS.editorMin : PANE_LIMITS.inspectorMin;
+  const min =
+    id === 'editor' ? PANE_LIMITS.editorMin : PANE_LIMITS.inspectorMin;
   const otherPane =
     id === 'editor'
       ? layout.inspector.collapsed
@@ -56,9 +59,9 @@ export function clampPaneWidth(
  *
  * `containerRef` only needs `clientWidth` — React refs satisfy it structurally.
  */
-export function usePaneLayout(
-  containerRef: { current: { clientWidth: number } | null },
-) {
+export function usePaneLayout(containerRef: {
+  current: { clientWidth: number } | null;
+}) {
   const [layout, setLayout] = useState<PaneLayoutState>({
     editor: { collapsed: false, width: null },
     inspector: { collapsed: false, width: PANE_LIMITS.inspectorDefault },
@@ -71,21 +74,26 @@ export function usePaneLayout(
     }));
   }, []);
 
-  const setPaneWidth = useCallback((id: PaneId, width: number) => {
-    const containerWidth = containerRef.current?.clientWidth ?? 0;
-    setLayout((current) => ({
-      ...current,
-      [id]: { ...current[id], width: clampPaneWidth(id, width, containerWidth, current) },
-    }));
-  }, [containerRef]);
+  const setPaneWidth = useCallback(
+    (id: PaneId, width: number) => {
+      const containerWidth = containerRef.current?.clientWidth ?? 0;
+      setLayout((current) => ({
+        ...current,
+        [id]: {
+          ...current[id],
+          width: clampPaneWidth(id, width, containerWidth, current),
+        },
+      }));
+    },
+    [containerRef],
+  );
 
   const resetPaneWidth = useCallback((id: PaneId) => {
     setLayout((current) => ({
       ...current,
       [id]: {
         ...current[id],
-        width:
-          id === 'editor' ? null : PANE_LIMITS.inspectorDefault,
+        width: id === 'editor' ? null : PANE_LIMITS.inspectorDefault,
       },
     }));
   }, []);

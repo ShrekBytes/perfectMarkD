@@ -58,13 +58,17 @@ describe('clampPaneWidth', () => {
       ...openLayout,
       editor: { collapsed: true, width: 400 },
     };
-    expect(clampPaneWidth('inspector', 900, CONTAINER, editorCollapsed)).toBe(880);
+    expect(clampPaneWidth('inspector', 900, CONTAINER, editorCollapsed)).toBe(
+      880,
+    );
 
     const inspectorCollapsed: PaneLayoutState = {
       ...openLayout,
       inspector: { collapsed: true, width: 320 },
     };
-    expect(clampPaneWidth('editor', 900, CONTAINER, inspectorCollapsed)).toBe(880);
+    expect(clampPaneWidth('editor', 900, CONTAINER, inspectorCollapsed)).toBe(
+      880,
+    );
   });
 
   it('protects the pane minimum when the container is too small', () => {
@@ -73,7 +77,10 @@ describe('clampPaneWidth', () => {
   });
 
   it('measures a default-ratio editor against the real container', () => {
-    const narrow = { ...openLayout, inspector: { collapsed: false, width: 260 } };
+    const narrow = {
+      ...openLayout,
+      inspector: { collapsed: false, width: 260 },
+    };
     // editor effective 380 → inspector max = 1000 - 380 - 320 = 300
     expect(clampPaneWidth('inspector', 400, 1000, narrow)).toBe(300);
   });

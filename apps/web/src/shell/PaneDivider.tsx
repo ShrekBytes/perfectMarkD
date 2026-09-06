@@ -45,8 +45,7 @@ export function PaneDivider({
     }
   };
 
-  const CollapseIcon =
-    side === 'editor' ? ChevronLeftIcon : ChevronRightIcon;
+  const CollapseIcon = side === 'editor' ? ChevronLeftIcon : ChevronRightIcon;
 
   return (
     <div
