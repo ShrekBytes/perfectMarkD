@@ -3,6 +3,7 @@ import { TopBar } from './TopBar';
 import { StaleBanner } from './StaleBanner';
 import { EmptyState } from './EmptyState';
 import { CollapsedPaneToggle, PaneDivider } from './PaneDivider';
+import { WelcomeStrip } from './WelcomeStrip';
 import { SlidersIcon, UploadIcon } from './icons';
 import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
@@ -33,6 +34,8 @@ export function AppShell() {
   const saveState = useDocumentStore((state) =>
     state.activeId ? state.saveState : null,
   );
+  const ready = useDocumentStore((state) => state.status === 'ready');
+  const docCount = useDocumentStore((state) => state.docs.length);
   const renameDocument = useDocumentStore((state) => state.renameDocument);
   const importDocument = useDocumentStore((state) => state.importDocument);
 
@@ -45,6 +48,12 @@ export function AppShell() {
   useEffect(() => {
     void useDocumentStore.getState().init();
   }, []);
+
+  // With no documents at all there is nothing to open — land the user in the
+  // Library (the second-run "or Library if none" case).
+  useEffect(() => {
+    if (ready && docCount === 0) setLibraryOpen(true);
+  }, [ready, docCount]);
 
   const importFiles = useCallback(
     (files: File[]) => {
@@ -99,14 +108,17 @@ export function AppShell() {
               }}
               className="flex flex-col bg-surface"
             >
-              {/* Ctrl/Cmd+Enter and scroll events route to the Paper Canvas
-                  via the shell's canvas API ref. */}
-              <EditorPane
-                onRequestRender={() => canvasApiRef.current?.renderNow()}
-                onEditorScroll={(fraction) =>
-                  canvasApiRef.current?.setScrollFraction(fraction)
-                }
-              />
+              <WelcomeStrip />
+              <div className="flex min-h-0 flex-1 flex-col">
+                {/* Ctrl/Cmd+Enter and scroll events route to the Paper Canvas
+                    via the shell's canvas API ref. */}
+                <EditorPane
+                  onRequestRender={() => canvasApiRef.current?.renderNow()}
+                  onEditorScroll={(fraction) =>
+                    canvasApiRef.current?.setScrollFraction(fraction)
+                  }
+                />
+              </div>
             </aside>
             <PaneDivider
               side="editor"

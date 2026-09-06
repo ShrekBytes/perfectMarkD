@@ -18,13 +18,25 @@ import type { IDBPDatabase } from 'idb';
 import { create } from 'zustand';
 import { assetRef, prepareAsset, type AssetSource } from '../assets/ingest';
 import * as dbApi from './db';
+import { SAMPLE_MARKDOWN, SAMPLE_NAME, sampleSettings } from './sample';
 import { exportFileName, nameFromFile, uniqueName } from './text';
 import type { AssetRecord, DocumentRecord, DocumentSummary } from './types';
 
 export const AUTOSAVE_DELAY_MS = 500;
 const CHANNEL_NAME = 'perfectmarkd';
 const ACTIVE_DOC_KEY = 'perfectmarkd:activeDoc';
+const ONBOARDING_KEY = 'onboarding';
 const UNTITLED = 'Untitled document';
+
+/** Persisted under the ONBOARDING_KEY meta record: which document is the
+ *  auto-created sample and whether the welcome strip was dismissed. Present
+ *  in the database from the first run on, so the sample is seeded only once —
+ *  never re-created after dismissal, and not re-created for profiles that
+ *  predate it (they have documents but no meta record). */
+export interface OnboardingMeta {
+  sampleDocId: string | null;
+  dismissed: boolean;
+}
 
 export type SaveState = 'saved' | 'saving';
 
@@ -52,6 +64,10 @@ export interface DocumentStore {
   /** Library rows, most recently updated first. */
   docs: DocumentSummary[];
   activeId: string | null;
+  /** The auto-created first-run sample document, when it exists. */
+  sampleDocId: string | null;
+  /** True once the sample welcome strip was dismissed (persisted). */
+  sampleDismissed: boolean;
   /** Working copy of the active document. */
   name: string;
   markdown: string;
@@ -64,6 +80,12 @@ export interface DocumentStore {
   init(): Promise<void>;
   createDocument(): Promise<void>;
   openDocument(id: string): Promise<void>;
+  /** Marks the sample document dismissed: the strip hides and the sample is
+   *  never auto-loaded again. */
+  dismissSample(): Promise<void>;
+  /** The welcome strip's "Start blank": dismiss the sample, then open a
+   *  fresh blank document. */
+  startBlankDocument(): Promise<void>;
   updateActive(patch: {
     name?: string;
     markdown?: string;
@@ -94,6 +116,8 @@ const INITIAL_STATE = {
   status: 'loading' as const,
   docs: [] as DocumentSummary[],
   activeId: null,
+  sampleDocId: null,
+  sampleDismissed: false,
   name: '',
   markdown: '',
   settings: { ...DEFAULT_SETTINGS },
@@ -112,12 +136,13 @@ function newRecord(
   name: string,
   markdown: string,
   now: number,
+  settings: DocumentSettings = { ...DEFAULT_SETTINGS },
 ): DocumentRecord {
   return {
     id: newId(),
     name,
     markdown,
-    settings: { ...DEFAULT_SETTINGS },
+    settings,
     assetIds: [],
     createdAt: now,
     updatedAt: now,
@@ -307,32 +332,58 @@ export function createDocumentStore() {
             if (document.hidden) void flush();
           });
 
-          let docs = await dbApi.listDocuments(dbp);
-          if (docs.length === 0) {
-            // First run: seed one blank document so the app is ready to type in.
-            const record = newRecord(UNTITLED, '', Date.now());
+          const meta =
+            (await dbApi.getMeta<OnboardingMeta>(dbp, ONBOARDING_KEY)) ?? null;
+          const docs = await dbApi.listDocuments(dbp);
+
+          if (!meta && docs.length === 0) {
+            // First visit: seed the sample document and open it. The meta
+            // record marks the first run as seen, so the sample is created
+            // exactly once — the dismissed flag only governs the strip.
+            const record = newRecord(
+              SAMPLE_NAME,
+              SAMPLE_MARKDOWN,
+              Date.now(),
+              sampleSettings(),
+            );
             await persistAndBroadcast(record);
-            docs = [record];
+            await dbApi.putMeta(dbp, ONBOARDING_KEY, {
+              sampleDocId: record.id,
+              dismissed: false,
+            } satisfies OnboardingMeta);
             writeActiveDocId(record.id);
             setWorkingCopy(record);
-            set({ status: 'ready' });
+            set({
+              status: 'ready',
+              docs: [toSummary(record)],
+              sampleDocId: record.id,
+              sampleDismissed: false,
+            });
             return;
           }
 
+          const onboarding = {
+            sampleDocId: meta?.sampleDocId ?? null,
+            sampleDismissed: meta?.dismissed ?? false,
+          };
           const wanted = readActiveDocId();
           const active = docs.find((doc) => doc.id === wanted) ?? docs[0];
           if (!active) {
-            set({ status: 'ready', docs: docs.map(toSummary) });
+            set({ status: 'ready', docs: docs.map(toSummary), ...onboarding });
             return;
           }
           const record = await dbApi.getDocument(dbp, active.id);
           if (!record) {
-            set({ status: 'ready', docs: docs.map(toSummary) });
+            set({ status: 'ready', docs: docs.map(toSummary), ...onboarding });
             return;
           }
           writeActiveDocId(record.id);
           setWorkingCopy(record);
-          set({ status: 'ready', docs: docs.map(toSummary) });
+          set({
+            status: 'ready',
+            docs: docs.map(toSummary),
+            ...onboarding,
+          });
         })();
         return initPromise;
       },
@@ -359,6 +410,21 @@ export function createDocumentStore() {
         }
         writeActiveDocId(id);
         setWorkingCopy(record);
+      },
+
+      dismissSample: async () => {
+        if (get().sampleDismissed) return;
+        set({ sampleDismissed: true });
+        if (!dbp) return;
+        await dbApi.putMeta(dbp, ONBOARDING_KEY, {
+          sampleDocId: get().sampleDocId,
+          dismissed: true,
+        } satisfies OnboardingMeta);
+      },
+
+      startBlankDocument: async () => {
+        await get().dismissSample();
+        await get().createDocument();
       },
 
       updateActive: (patch) => {

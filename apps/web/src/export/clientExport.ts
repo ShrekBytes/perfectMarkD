@@ -22,6 +22,7 @@ import { buildExportHTML, type DocumentSettings } from '@perfectmarkd/core';
 import { createAssetResolver } from '../assets/resolver';
 import { KATEX_EXPORT_CSS } from '../canvas/katex-css';
 import { collectAssetRefs, runDocumentPipeline } from '../canvas/pipeline';
+import { renderMermaid } from '../canvas/mermaid';
 import { openDatabase } from '../documents/db';
 
 /**
@@ -36,7 +37,10 @@ export async function buildExportDocument(
   const assets = createAssetResolver(await openDatabase(), 'data-uri');
   try {
     await assets.warmup(collectAssetRefs(markdown, settings));
-    const result = await runDocumentPipeline(markdown, settings, { title });
+    const result = await runDocumentPipeline(markdown, settings, {
+      title,
+      renderMermaid,
+    });
 
     // Markdown images keep their asset:// refs through the render (the
     // resolver is the host's concern, not renderMarkdown's); the export

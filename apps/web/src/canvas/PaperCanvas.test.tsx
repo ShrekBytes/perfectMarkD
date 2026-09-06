@@ -18,6 +18,14 @@ import { stubBroadcastChannel } from '../testing/stub-broadcast-channel';
 import { stubClientRects } from '../testing/stub-client-rects';
 import { stubIndexedDB } from '../testing/stub-idb';
 
+// The sample document carries a mermaid fence; component tests must not pull
+// the real (multi-MB, DOM-timing) bundle. The hook itself is covered in
+// mermaid.test.ts.
+vi.mock('./mermaid', async () => {
+  const { stubMermaidModule } = await import('../testing/stub-mermaid');
+  return stubMermaidModule;
+});
+
 beforeEach(async () => {
   localStorage.clear();
   stubIndexedDB();
@@ -163,6 +171,8 @@ describe('PaperCanvas rendering', () => {
 
   it('renders a blank document as one empty page', async () => {
     mountCanvas();
+    // First run seeds the sample; switch to a blank document for this check.
+    await createDocumentSettled();
     await flushRender();
     expect(pageHosts()).toHaveLength(1);
     // No content nodes — the only shadow text is the footer page number.
@@ -315,60 +325,78 @@ describe('PaperCanvas large-document guard', () => {
     );
   }
 
-  it('pauses renders over 100 pages behind a toast until confirmed', async () => {
-    mountCanvas();
-    setMarkdown(hugeDoc(101));
-    await flushRender();
+  // Each test paginates 100+ real pages — well over the default 5s when the
+  // suite runs in parallel, so they carry an explicit budget.
+  it(
+    'pauses renders over 100 pages behind a toast until confirmed',
+    { timeout: 20_000 },
+    async () => {
+      mountCanvas();
+      setMarkdown(hugeDoc(101));
+      await flushRender();
 
-    const toast = screen.getByTestId('large-doc-toast');
-    expect(toast).toHaveTextContent('101 pages');
-    expect(pageHosts()).toHaveLength(0);
+      const toast = screen.getByTestId('large-doc-toast');
+      expect(toast).toHaveTextContent('101 pages');
+      expect(pageHosts()).toHaveLength(0);
 
-    fireEvent.click(screen.getByTestId('render-anyway'));
-    await flushRender(0);
-    expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
-    expect(pageHosts()).toHaveLength(101);
-  });
+      fireEvent.click(screen.getByTestId('render-anyway'));
+      await flushRender(0);
+      expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
+      expect(pageHosts()).toHaveLength(101);
+    },
+  );
 
-  it('does not re-prompt after confirmation within the same document', async () => {
-    mountCanvas();
-    setMarkdown(hugeDoc(101));
-    await flushRender();
-    fireEvent.click(screen.getByTestId('render-anyway'));
-    await flushRender(0);
+  it(
+    'does not re-prompt after confirmation within the same document',
+    { timeout: 20_000 },
+    async () => {
+      mountCanvas();
+      setMarkdown(hugeDoc(101));
+      await flushRender();
+      fireEvent.click(screen.getByTestId('render-anyway'));
+      await flushRender(0);
 
-    setMarkdown(hugeDoc(102));
-    await flushRender();
-    expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
-    expect(pageHosts()).toHaveLength(102);
-  });
+      setMarkdown(hugeDoc(102));
+      await flushRender();
+      expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
+      expect(pageHosts()).toHaveLength(102);
+    },
+  );
 
-  it('re-arms the guard after dismissing and editing again', async () => {
-    mountCanvas();
-    setMarkdown(hugeDoc(101));
-    await flushRender();
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-    expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
+  it(
+    're-arms the guard after dismissing and editing again',
+    { timeout: 20_000 },
+    async () => {
+      mountCanvas();
+      setMarkdown(hugeDoc(101));
+      await flushRender();
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+      expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
 
-    // Renders are edit-driven: the next edit re-asks (stale pages stay).
-    setMarkdown(`${hugeDoc(101)}\n\nmore`);
-    await flushRender();
-    expect(screen.getByTestId('large-doc-toast')).toBeInTheDocument();
-  });
+      // Renders are edit-driven: the next edit re-asks (stale pages stay).
+      setMarkdown(`${hugeDoc(101)}\n\nmore`);
+      await flushRender();
+      expect(screen.getByTestId('large-doc-toast')).toBeInTheDocument();
+    },
+  );
 
-  it('resets the guard when the document switches', async () => {
-    mountCanvas();
-    setMarkdown(hugeDoc(101));
-    await flushRender();
-    fireEvent.click(screen.getByTestId('render-anyway'));
-    await flushRender(0);
-    expect(pageHosts()).toHaveLength(101);
+  it(
+    'resets the guard when the document switches',
+    { timeout: 20_000 },
+    async () => {
+      mountCanvas();
+      setMarkdown(hugeDoc(101));
+      await flushRender();
+      fireEvent.click(screen.getByTestId('render-anyway'));
+      await flushRender(0);
+      expect(pageHosts()).toHaveLength(101);
 
-    await createDocumentSettled();
-    setMarkdown(hugeDoc(101));
-    await flushRender();
-    expect(screen.getByTestId('large-doc-toast')).toBeInTheDocument();
-  });
+      await createDocumentSettled();
+      setMarkdown(hugeDoc(101));
+      await flushRender();
+      expect(screen.getByTestId('large-doc-toast')).toBeInTheDocument();
+    },
+  );
 });
 
 describe('PaperCanvas empty states', () => {

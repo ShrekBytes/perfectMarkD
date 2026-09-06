@@ -15,6 +15,7 @@ import { useDocumentStore } from '../documents/store';
 import { EmptyState } from '../shell/EmptyState';
 import { ExpandIcon, MinusIcon, PagesIcon, PlusIcon } from '../shell/icons';
 import { KATEX_LAYOUT_CSS } from './katex-css';
+import { renderMermaid } from './mermaid';
 import { buildPage, createPageSheets } from './pageBuilder';
 import {
   collectAssetRefs,
@@ -177,6 +178,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
 
       const result = await runDocumentPipeline(md, docSettings, {
         title: name,
+        renderMermaid,
       });
       if (token !== tokenRef.current) return;
 

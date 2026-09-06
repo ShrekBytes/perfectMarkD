@@ -2,6 +2,7 @@
 import { DEFAULT_SETTINGS } from '@perfectmarkd/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as dbApi from './db';
+import { SAMPLE_MARKDOWN, SAMPLE_NAME, sampleSettings } from './sample';
 import { AUTOSAVE_DELAY_MS, createDocumentStore } from './store';
 import { MAX_ASSET_BYTES, parseAssetRef } from '../assets/ingest';
 import { pngFile } from '../testing/test-assets';
@@ -69,14 +70,21 @@ afterEach(() => {
 });
 
 describe('init', () => {
-  it('seeds one blank document on first run', async () => {
+  it('seeds the sample document on first run and opens it', async () => {
     const { store, id } = await readyStore();
 
     expect(store.getState().docs).toEqual([
-      { id, name: 'Untitled document', updatedAt: T0 },
+      { id, name: SAMPLE_NAME, updatedAt: T0 },
     ]);
     expect(store.getState().activeId).toBe(id);
-    expect(store.getState().markdown).toBe('');
+    expect(store.getState().markdown).toBe(SAMPLE_MARKDOWN);
+    expect(store.getState().name).toBe(SAMPLE_NAME);
+    expect(store.getState().sampleDocId).toBe(id);
+    expect(store.getState().sampleDismissed).toBe(false);
+    // The sample shows off the page furniture: frame + footer page numbers.
+    expect(store.getState().settings.frameEnabled).toBe(true);
+    expect(store.getState().settings.showPageNumbers).toBe(true);
+    expect(store.getState().settings).toEqual(sampleSettings());
   });
 
   it('restores documents, the active document, and content on reload', async () => {
@@ -105,6 +113,79 @@ describe('init', () => {
   });
 });
 
+describe('sample onboarding', () => {
+  it('writes the onboarding meta record on first run', async () => {
+    const { store, id } = await readyStore();
+
+    const reader = await dbApi.openDatabase();
+    expect(await dbApi.getMeta(reader, 'onboarding')).toEqual({
+      sampleDocId: id,
+      dismissed: false,
+    });
+    reader.close();
+    expect(store.getState().status).toBe('ready');
+  });
+
+  it('persists dismissal; the sample never auto-loads again', async () => {
+    const first = await readyStore();
+    const sampleId = first.id;
+    await first.store.getState().dismissSample();
+    first.reset();
+
+    // Second run: the sample is still the most recent document…
+    const second = await readyStore();
+    expect(second.store.getState().activeId).toBe(sampleId);
+    expect(second.store.getState().sampleDismissed).toBe(true);
+
+    // …and once every document is gone, the library stays empty.
+    await second.store.getState().deleteDocument(sampleId);
+    expect(second.store.getState().docs).toHaveLength(0);
+    expect(second.store.getState().activeId).toBeNull();
+    second.reset();
+
+    const third = await readyStore();
+    expect(third.store.getState().docs).toHaveLength(0);
+    expect(third.store.getState().activeId).toBeNull();
+    expect(third.store.getState().sampleDocId).toBe(sampleId);
+  });
+
+  it('keeps the sample open when only the strip is dismissed', async () => {
+    const { store, id } = await readyStore();
+
+    await store.getState().dismissSample();
+
+    expect(store.getState().activeId).toBe(id);
+    expect(store.getState().sampleDismissed).toBe(true);
+    const reader = await dbApi.openDatabase();
+    expect(await dbApi.getMeta(reader, 'onboarding')).toEqual({
+      sampleDocId: id,
+      dismissed: true,
+    });
+    reader.close();
+  });
+
+  it('does not seed the sample for profiles that predate it', async () => {
+    const writer = await dbApi.openDatabase();
+    await dbApi.putDocument(writer, {
+      id: 'old-1',
+      name: 'Old notes',
+      markdown: '# Old',
+      settings: { ...DEFAULT_SETTINGS },
+      assetIds: [],
+      createdAt: T0,
+      updatedAt: T0,
+    });
+    writer.close();
+
+    const { store } = await readyStore();
+
+    expect(store.getState().docs.map((row) => row.name)).toEqual(['Old notes']);
+    expect(store.getState().activeId).toBe('old-1');
+    expect(store.getState().sampleDocId).toBeNull();
+    expect(store.getState().sampleDismissed).toBe(false);
+  });
+});
+
 describe('editing and autosave', () => {
   it('debounces edits and persists them after the delay', async () => {
     const { store, id } = await readyStore();
@@ -113,7 +194,10 @@ describe('editing and autosave', () => {
     expect(store.getState().saveState).toBe('saving');
 
     const reader = await dbApi.openDatabase();
-    expect((await dbApi.getDocument(reader, id))?.markdown).toBe('');
+    // The seeded record (sample content) is already durable before the edit.
+    expect((await dbApi.getDocument(reader, id))?.markdown).toBe(
+      SAMPLE_MARKDOWN,
+    );
 
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
     expect((await dbApi.getDocument(reader, id))?.markdown).toBe('# Hello');
@@ -173,7 +257,7 @@ describe('editing and autosave', () => {
     const { store } = await readyStore();
 
     store.getState().updateActive({ name: '   ' });
-    expect(store.getState().name).toBe('Untitled document');
+    expect(store.getState().name).toBe(SAMPLE_NAME);
     expect(store.getState().saveState).toBe('saved');
   });
 
@@ -209,10 +293,10 @@ describe('create, import, duplicate, rename', () => {
     await store.getState().createDocument();
 
     expect(store.getState().name).toBe('Untitled document');
-    expect(store.getState().docs).toHaveLength(3);
+    expect(store.getState().docs).toHaveLength(3); // sample plus two blanks
     expect(
-      store.getState().docs.every((row) => row.name === 'Untitled document'),
-    ).toBe(true);
+      store.getState().docs.filter((row) => row.name === 'Untitled document'),
+    ).toHaveLength(2);
   });
 
   it('imports markdown as a new document named after the file', async () => {
@@ -250,7 +334,7 @@ describe('create, import, duplicate, rename', () => {
     const reader = await dbApi.openDatabase();
     const copyRecord = await dbApi.getDocument(reader, copy.id);
     expect(copyRecord?.markdown).toBe('# Original');
-    expect(copyRecord?.settings).toEqual(DEFAULT_SETTINGS);
+    expect(copyRecord?.settings).toEqual(sampleSettings());
     expect(copyRecord?.id).not.toBe(id);
     reader.close();
   });
@@ -465,7 +549,7 @@ describe('export', () => {
 
     const payload = await store.getState().exportDocument(seedId);
 
-    expect(payload?.markdown).toBe('');
+    expect(payload?.markdown).toBe(SAMPLE_MARKDOWN);
   });
 });
 
@@ -558,7 +642,7 @@ describe('multi-tab sync', () => {
 
     // "Load changes" adopts the remote version.
     await b.getState().loadRemoteVersion();
-    expect(b.getState().markdown).toBe('');
+    expect(b.getState().markdown).toBe(SAMPLE_MARKDOWN);
     expect(b.getState().name).toBe('Theirs');
     expect(b.getState().remotePending).toBeNull();
   });
@@ -579,7 +663,7 @@ describe('multi-tab sync', () => {
     const reader = await dbApi.openDatabase();
     const winner = await dbApi.getDocument(reader, seedId);
     expect(winner?.markdown).toBe('mine wins');
-    expect(winner?.name).toBe('Untitled document');
+    expect(winner?.name).toBe(SAMPLE_NAME);
     expect(b.getState().remotePending).toBeNull();
     reader.close();
   });

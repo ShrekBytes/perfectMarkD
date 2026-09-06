@@ -8,9 +8,11 @@ import { openDB, type IDBPDatabase } from 'idb';
 import type { AssetRecord, DocumentRecord } from './types';
 
 const DB_NAME = 'perfectmarkd';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DOCS = 'documents';
 const ASSETS = 'assets';
+/** Out-of-line-keyed key/value store for app-level flags (e.g. onboarding). */
+const META = 'meta';
 
 /** Opens (and on first use creates) the library database. */
 export function openDatabase(): Promise<IDBPDatabase> {
@@ -22,8 +24,26 @@ export function openDatabase(): Promise<IDBPDatabase> {
       if (!db.objectStoreNames.contains(ASSETS)) {
         db.createObjectStore(ASSETS, { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains(META)) {
+        db.createObjectStore(META);
+      }
     },
   });
+}
+
+export async function getMeta<T>(
+  db: IDBPDatabase,
+  key: string,
+): Promise<T | undefined> {
+  return db.get(META, key);
+}
+
+export function putMeta(
+  db: IDBPDatabase,
+  key: string,
+  value: unknown,
+): Promise<void> {
+  return db.put(META, value, key).then(() => undefined);
 }
 
 export async function getDocument(

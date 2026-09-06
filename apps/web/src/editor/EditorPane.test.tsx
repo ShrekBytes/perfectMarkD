@@ -30,6 +30,8 @@ beforeEach(async () => {
   stubClientRects();
   resetDocumentStoreForTests();
   await useDocumentStore.getState().init();
+  // First run seeds the sample document; these tests exercise a blank one.
+  await useDocumentStore.getState().createDocument();
 });
 
 afterEach(() => {

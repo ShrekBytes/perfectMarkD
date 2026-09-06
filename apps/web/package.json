@@ -21,6 +21,7 @@
     "@lezer/highlight": "^1.2.3",
     "@perfectmarkd/core": "workspace:*",
     "idb": "^8.0.3",
+    "mermaid": "^11.17.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zustand": "^5.0.15"

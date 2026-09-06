@@ -7,10 +7,12 @@ import {
   getAsset,
   getAssets,
   getDocument,
+  getMeta,
   listDocuments,
   openDatabase,
   putAssets,
   putDocument,
+  putMeta,
 } from './db';
 import type { AssetRecord, DocumentRecord } from './types';
 import { stubIndexedDB } from '../testing/stub-idb';
@@ -109,4 +111,28 @@ it('deletes assets by id', async () => {
 
   expect(await getAsset(db, 'asset-1')).toBeUndefined();
   expect(await getAsset(db, 'asset-2')).toBeDefined();
+});
+
+it('round-trips meta values under their key', async () => {
+  expect(await getMeta(db, 'onboarding')).toBeUndefined();
+
+  await putMeta(db, 'onboarding', { sampleDocId: 'doc-1', dismissed: false });
+  expect(await getMeta(db, 'onboarding')).toEqual({
+    sampleDocId: 'doc-1',
+    dismissed: false,
+  });
+
+  await putMeta(db, 'onboarding', { sampleDocId: 'doc-1', dismissed: true });
+  expect(await getMeta(db, 'onboarding')).toEqual({
+    sampleDocId: 'doc-1',
+    dismissed: true,
+  });
+});
+
+it('keeps meta keys independent', async () => {
+  await putMeta(db, 'a', 1);
+  await putMeta(db, 'b', 2);
+
+  expect(await getMeta(db, 'a')).toBe(1);
+  expect(await getMeta(db, 'b')).toBe(2);
 });

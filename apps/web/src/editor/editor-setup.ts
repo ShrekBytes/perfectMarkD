@@ -6,7 +6,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import { RangeSetBuilder, type Extension } from '@codemirror/state';
+import { RangeSetBuilder, Annotation, type Extension } from '@codemirror/state';
 import {
   Decoration,
   EditorView,
@@ -94,6 +94,11 @@ export interface EditorHandlers {
   onImageFiles(files: File[], pos?: number): void;
 }
 
+/** Tags the pane's own dispatches that adopt markdown changed elsewhere (doc
+ *  switch, import, remote adoption): the store already holds that text, so
+ *  the update listener must not push it back as an edit. */
+export const externalSync = Annotation.define();
+
 /** Clipboard/dragged image files, ignoring everything else so text pastes and
  *  .md drops flow through their normal paths untouched. */
 function imageFiles(source: FileList | null | undefined): File[] {
@@ -154,7 +159,12 @@ export function createEditorExtensions(handlers: EditorHandlers): Extension[] {
     keymap.of(historyKeymap),
     keymap.of(defaultKeymap),
     EditorView.updateListener.of((update) => {
-      if (update.docChanged) handlers.onDocChanged(update.state.doc.toString());
+      if (!update.docChanged) return;
+      // Adopted external markdown must not echo back as an edit.
+      if (update.transactions.some((tr) => tr.annotation(externalSync))) {
+        return;
+      }
+      handlers.onDocChanged(update.state.doc.toString());
     }),
   ];
 }

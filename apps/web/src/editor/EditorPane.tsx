@@ -16,7 +16,11 @@ import {
   TableIcon,
   UndoIcon,
 } from '../shell/icons';
-import { createEditorExtensions, editorScrollFraction } from './editor-setup';
+import {
+  createEditorExtensions,
+  editorScrollFraction,
+  externalSync,
+} from './editor-setup';
 import {
   cycleHeading,
   insertAssetImages,
@@ -172,7 +176,7 @@ export function EditorPane({
       view.state.update({
         changes: { from: 0, to: view.state.doc.length, insert: markdown },
         selection: { anchor: caret },
-        annotations: isolateHistory.of('full'),
+        annotations: [isolateHistory.of('full'), externalSync.of(true)],
       }),
     );
   }, [markdown]);

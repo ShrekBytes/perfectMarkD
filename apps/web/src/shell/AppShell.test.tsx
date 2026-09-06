@@ -21,6 +21,14 @@ import { stubClientRects } from '../testing/stub-client-rects';
 import { stubIndexedDB } from '../testing/stub-idb';
 import { stubSystemTheme } from '../testing/match-media';
 
+// The sample document carries a mermaid fence; component tests must not pull
+// the real (multi-MB, DOM-timing) bundle. The hook itself is covered in
+// canvas/mermaid.test.ts.
+vi.mock('../canvas/mermaid', async () => {
+  const { stubMermaidModule } = await import('../testing/stub-mermaid');
+  return stubMermaidModule;
+});
+
 /**
  * jsdom performs no layout, so widths read as 0 and every width would clamp to
  * its minimum. Give the shell a virtual width for the drag tests; the editor
@@ -50,8 +58,9 @@ afterEach(() => {
 async function renderReadyShell() {
   const result = render(<AppShell />);
   // The save indicator only renders once the store has an active document,
-  // so its appearance doubles as the "ready" gate.
-  await screen.findByTestId('save-state');
+  // so its appearance doubles as the "ready" gate. The generous timeout
+  // absorbs first-run seeding plus CPU contention from the parallel suite.
+  await screen.findByTestId('save-state', {}, { timeout: 5000 });
   return result;
 }
 
@@ -61,8 +70,9 @@ it('renders the top bar contract: wordmark, doc name, save state, Library, theme
   // The wordmark is styled across nested spans, so match its full text content.
   expect(screen.getByRole('banner')).toHaveTextContent('PerfectMarkD');
   expect(screen.getByText('Mark')).toHaveClass('text-accent');
+  // First run opens the seeded sample document.
   expect(screen.getByRole('textbox', { name: 'Document name' })).toHaveValue(
-    'Untitled document',
+    'Welcome to PerfectMarkD',
   );
   expect(screen.getByTestId('save-state')).toHaveTextContent('Saved');
   expect(screen.getByRole('button', { name: 'Library' })).toBeInTheDocument();
@@ -72,7 +82,7 @@ it('renders the top bar contract: wordmark, doc name, save state, Library, theme
   expect(screen.getByTestId('export-split')).toBeInTheDocument();
 });
 
-it('renders the three panes with their empty states', async () => {
+it('renders the three panes with the sample experience on first run', async () => {
   await renderReadyShell();
 
   expect(
@@ -87,8 +97,10 @@ it('renders the three panes with their empty states', async () => {
   // The Paper Canvas mounts live: the pages area is present, shimmering
   // until the first render lands (PaperCanvas.test.tsx covers the render).
   expect(screen.getByTestId('canvas-loading')).toBeInTheDocument();
+  // The welcome strip sits above the editor for the auto-created sample.
+  expect(screen.getByTestId('welcome-strip')).toBeInTheDocument();
   expect(
-    screen.getByText('Start writing — your markdown goes here.'),
+    screen.getByText('This is a sample — edit or clear it.'),
   ).toBeInTheDocument();
   expect(
     screen.getByText('Page, style, and header/footer settings live here.'),
@@ -120,6 +132,24 @@ it('opens the Library panel from the top bar and closes it with Escape', async (
   expect(
     screen.queryByRole('dialog', { name: 'Library' }),
   ).not.toBeInTheDocument();
+});
+
+it('lands in the Library when no documents exist', async () => {
+  await renderReadyShell();
+
+  expect(
+    screen.queryByRole('dialog', { name: 'Library' }),
+  ).not.toBeInTheDocument();
+  await act(async () => {
+    const { activeId } = useDocumentStore.getState();
+    if (activeId) await useDocumentStore.getState().deleteDocument(activeId);
+  });
+  await waitFor(() => {
+    expect(useDocumentStore.getState().docs).toHaveLength(0);
+  });
+  await waitFor(() => {
+    expect(screen.getByRole('dialog', { name: 'Library' })).toBeInTheDocument();
+  });
 });
 
 it('shows the saving affordance while an edit is pending', async () => {

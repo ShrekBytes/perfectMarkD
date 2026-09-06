@@ -81,7 +81,7 @@ it('prints straight away when the session hint was already shown', async () => {
     'class="mpdf-export-page"',
   );
   expect(printStub.iframesAtPrint[0]?.getAttribute('srcdoc')).toContain(
-    '<title>Untitled document</title>',
+    '<title>Welcome to PerfectMarkD</title>',
   );
   // No hint dialog got between click and print; the frame is cleaned up.
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
