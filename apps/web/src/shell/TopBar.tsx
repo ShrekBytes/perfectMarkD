@@ -1,6 +1,7 @@
-import { BookIcon, ChevronDownIcon, DownloadIcon } from './icons';
+import { BookIcon } from './icons';
 import { DocName } from './DocName';
 import { ThemeToggle } from '../theme/ThemeToggle';
+import { ExportSplitButton } from '../export/ExportSplitButton';
 import type { Theme } from '../theme/theme';
 import type { SaveState } from '../documents/store';
 
@@ -57,28 +58,9 @@ export function TopBar({
 
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
 
-        {/* Split-button placeholder until the Client Export flow (editor-app/06). */}
-        <div
-          data-testid="export-split"
-          title="Export — coming soon"
-          className="flex items-stretch rounded-control bg-accent text-accent-ink shadow-sm"
-        >
-          <button
-            type="button"
-            className="flex h-8 items-center gap-1.5 rounded-l-control py-1 pl-3 pr-2 text-sm font-medium transition-colors duration-150 hover:bg-accent-strong"
-          >
-            <DownloadIcon />
-            Export
-          </button>
-          <span aria-hidden="true" className="my-2 w-px bg-accent-ink/30" />
-          <button
-            type="button"
-            aria-label="More export options"
-            className="flex h-8 w-6 items-center justify-center rounded-r-control transition-colors duration-150 hover:bg-accent-strong"
-          >
-            <ChevronDownIcon />
-          </button>
-        </div>
+        {/* Client Export flow (editor-app/06): self-contained split button —
+            print flow, one-time hint, and toasts all live inside it. */}
+        <ExportSplitButton />
       </div>
     </header>
   );

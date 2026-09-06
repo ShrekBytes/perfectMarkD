@@ -12,8 +12,17 @@
 //   against the app root and 404-ing.
 import '@perfectmarkd/core/katex.css';
 import katexCss from '@perfectmarkd/core/katex.css?raw';
+import katexFull from '@perfectmarkd/core/katex.css?inline';
 
 const firstLayoutRule = katexCss.indexOf('.katex{');
 
 export const KATEX_LAYOUT_CSS =
   firstLayoutRule === -1 ? katexCss : katexCss.slice(firstLayoutRule);
+
+// The Client Export document inlines the FULL processed stylesheet: the export
+// iframe is its own document, so KaTeX's fonts must register inside it — the
+// preview gets away with document-level @font-face, but nothing crosses the
+// iframe boundary. `?inline` returns the processed CSS with the font URLs
+// rewritten to origin-absolute assets, which resolve fine from the srcdoc
+// frame (it inherits the app document's base URL).
+export const KATEX_EXPORT_CSS: string = katexFull;

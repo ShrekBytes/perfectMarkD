@@ -131,7 +131,13 @@ export function buildExportHTML(
   });
 
   const printCSS = `
-      *, *::before, *::after { box-sizing: border-box; }
+      /* Exact colors are the print pipeline's whole point (banners, backgrounds,
+         syntax themes): without this browsers strip them to save ink. */
+      *, *::before, *::after {
+        box-sizing: border-box;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
       @page { size: ${g.pw}px ${g.ph}px; margin: 0; }
       html, body { margin: 0; padding: 0; background: ${s.pageBackground}; }
       .mpdf-export-page {

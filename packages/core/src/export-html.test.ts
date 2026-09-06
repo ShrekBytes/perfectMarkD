@@ -68,6 +68,8 @@ describe('buildExportHTML', () => {
     const pages = html.match(/class="mpdf-export-page"/g) ?? [];
     expect(pages).toHaveLength(2);
     expect(html).toContain('@page { size: 794px 1123px; margin: 0; }');
+    expect(html).toContain('-webkit-print-color-adjust: exact;');
+    expect(html).toContain('print-color-adjust: exact;');
     expect(html).toContain('page-break-after: always; break-after: page;');
     expect(html).toContain(
       '.mpdf-export-page:last-child { page-break-after: avoid;',

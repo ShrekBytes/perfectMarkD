@@ -4,7 +4,13 @@
 <meta charset="UTF-8">
 <title>Quarterly Report</title>
 <style>
-      *, *::before, *::after { box-sizing: border-box; }
+      /* Exact colors are the print pipeline's whole point (banners, backgrounds,
+         syntax themes): without this browsers strip them to save ink. */
+      *, *::before, *::after {
+        box-sizing: border-box;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
       @page { size: 794px 1123px; margin: 0; }
       html, body { margin: 0; padding: 0; background: #ffffff; }
       .mpdf-export-page {
