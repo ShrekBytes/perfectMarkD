@@ -17,10 +17,15 @@ export interface DocumentRecord {
   updatedAt: number;
 }
 
-/** A binary blob owned by whichever documents reference its id. */
+/** A binary asset owned by whichever documents reference its id. Stored as
+ *  raw bytes plus media type (not a Blob): bytes survive structured clone
+ *  everywhere, and the resolver rebuilds a Blob — or a data: URI for export —
+ *  on read. */
 export interface AssetRecord {
   id: string;
-  blob: Blob;
+  /** ArrayBuffer-backed so the bytes double as a Blob part at resolve time. */
+  bytes: Uint8Array<ArrayBuffer>;
+  mediaType: string;
   createdAt: number;
 }
 

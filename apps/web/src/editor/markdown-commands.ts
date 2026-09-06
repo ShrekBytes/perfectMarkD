@@ -258,3 +258,37 @@ export const insertPageBreak: StateCommand = ({ state, dispatch }) => {
   );
   return true;
 };
+
+export interface AssetImage {
+  /** `asset://<id>` ref of a stored local asset. */
+  ref: string;
+  /** Markdown-safe alt text (derived from the file name at ingest). */
+  alt: string;
+}
+
+/** Inserts `![alt](asset://…)` refs as their own block: on an empty line at
+ *  `at` (the drop point for drag-drop; the cursor otherwise), breaking the
+ *  current line when it has text. Multiple images stack on consecutive lines. */
+export function insertAssetImages(
+  items: readonly AssetImage[],
+  at?: number,
+): StateCommand {
+  return ({ state, dispatch }) => {
+    if (items.length === 0) return false;
+    const from = Math.min(
+      Math.max(at ?? state.selection.main.head, 0),
+      state.doc.length,
+    );
+    const line = state.doc.lineAt(from);
+    const lead = line.text.length === 0 ? '' : '\n';
+    const insert = `${lead}${items.map((i) => `![${i.alt}](${i.ref})`).join('\n')}\n`;
+    dispatch(
+      state.update({
+        changes: { from, insert },
+        selection: EditorSelection.cursor(from + insert.length),
+        scrollIntoView: true,
+      }),
+    );
+    return true;
+  };
+}

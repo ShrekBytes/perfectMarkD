@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isolateHistory, redo, undo } from '@codemirror/commands';
 import { EditorState, type StateCommand } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import type { ComponentType, SVGProps } from 'react';
+import { MAX_ASSET_BYTES } from '../assets/ingest';
 import { useDocumentStore } from '../documents/store';
 import {
   BoldIcon,
@@ -18,11 +19,13 @@ import {
 import { createEditorExtensions, editorScrollFraction } from './editor-setup';
 import {
   cycleHeading,
+  insertAssetImages,
   insertPageBreak,
   insertTable,
   toggleBold,
   toggleBulletList,
   toggleItalic,
+  type AssetImage,
 } from './markdown-commands';
 import { countCharacters, countWords } from './word-count';
 import './editor.css';
@@ -30,11 +33,14 @@ import './editor.css';
 interface EditorPaneProps {
   /** Ctrl/Cmd+Enter target — the Paper Canvas's manual render (ticket 04). */
   onRequestRender?: () => void;
-  /** Image picker (ticket 08); absent until image handling ships. */
-  onPickImage?: () => void;
   /** Proportional editor scroll position for the canvas scroll sync (04). */
   onEditorScroll?: (fraction: number) => void;
 }
+
+/** How long the ingest notice (oversized / non-image file) stays visible. */
+const NOTICE_MS = 6000;
+
+const MB = 1024 * 1024;
 
 function ToolButton(props: {
   label: string;
@@ -68,15 +74,17 @@ function Divider() {
  * The markdown editor: slim formatting toolbar, the CodeMirror 6 view, and a
  * word/character footer. The editor is the write path into the store — every
  * document change flows through `updateActive`, and markdown changed elsewhere
- * (doc switch, import, remote adoption) replaces the editor content.
+ * (doc switch, import, remote adoption) replaces the editor content. Images
+ * enter via paste, drop, or the picker and land in the asset store as
+ * `![alt](asset://…)` refs (ticket 08).
  */
 export function EditorPane({
   onRequestRender,
-  onPickImage,
   onEditorScroll,
 }: EditorPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const pickerRef = useRef<HTMLInputElement>(null);
   // Latest props for the closures the one-time editor setup captures.
   const handlers = useRef({ onRequestRender, onEditorScroll });
   handlers.current = { onRequestRender, onEditorScroll };
@@ -86,9 +94,43 @@ export function EditorPane({
     () => ({ words: countWords(markdown), chars: countCharacters(markdown) }),
     [markdown],
   );
+  const [notice, setNotice] = useState<string | null>(null);
   // The last text this component pushed out or pulled in; edits from the view
   // must not echo back through the external-sync effect.
   const lastSynced = useRef(markdown);
+
+  /** Paste/drop/picker entry point: stores each file as a local asset and
+   *  inserts its markdown ref (at the drop point, else the cursor). Files that
+   *  fail ingest surface a notice instead. */
+  const handleImageFiles = useCallback((files: File[], pos?: number) => {
+    void (async () => {
+      const items: AssetImage[] = [];
+      let failed: { error: string; name: string } | null = null;
+      for (const file of files) {
+        const result = await useDocumentStore.getState().addAsset(file);
+        if (result.ok) items.push({ ref: result.ref, alt: result.alt });
+        else failed = { error: result.error, name: file.name };
+      }
+      const view = viewRef.current;
+      if (items.length > 0 && view) insertAssetImages(items, pos)(view);
+      if (failed) {
+        const mb = Math.round(MAX_ASSET_BYTES / MB);
+        setNotice(
+          failed.error === 'too-large'
+            ? `"${failed.name}" is over the ${mb} MB image limit and was not added.`
+            : failed.error === 'unsupported'
+              ? `"${failed.name}" is not an image — paste, drop, or pick PNG, JPEG, WebP, SVG, or similar files.`
+              : 'Open a document before adding images.',
+        );
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     const view = new EditorView({
@@ -101,6 +143,7 @@ export function EditorPane({
             useDocumentStore.getState().updateActive({ markdown: text });
           },
           onRequestRender: () => handlers.current.onRequestRender?.(),
+          onImageFiles: handleImageFiles,
         }),
       }),
     });
@@ -178,9 +221,8 @@ export function EditorPane({
         />
         <ToolButton
           label="Insert image"
-          hint={onPickImage ? 'Insert image' : 'Images — coming soon'}
-          onClick={onPickImage}
-          disabled={!onPickImage}
+          hint="Insert image (paste or drop an image also works)"
+          onClick={() => pickerRef.current?.click()}
           icon={ImageIcon}
         />
         <ToolButton
@@ -207,6 +249,15 @@ export function EditorPane({
 
       <div ref={containerRef} className="pm-editor min-h-0 flex-1" />
 
+      {notice && (
+        <p
+          role="status"
+          className="shrink-0 border-t border-hairline px-3 py-1.5 text-xs text-danger"
+        >
+          {notice}
+        </p>
+      )}
+
       <footer
         data-testid="editor-stats"
         className="flex h-7 shrink-0 select-none items-center border-t border-hairline px-3 text-xs text-ink-faint"
@@ -214,6 +265,20 @@ export function EditorPane({
         {stats.words.toLocaleString('en-US')} words ·{' '}
         {stats.chars.toLocaleString('en-US')} characters
       </footer>
+
+      <input
+        ref={pickerRef}
+        data-testid="image-picker"
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = '';
+          handleImageFiles(files);
+        }}
+      />
     </div>
   );
 }

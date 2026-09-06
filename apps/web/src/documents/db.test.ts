@@ -77,18 +77,33 @@ it('deletes a document', async () => {
 });
 
 it('round-trips assets and reads several at once', async () => {
-  const blob = new Blob(['png-bytes'], { type: 'image/png' });
-  const asset: AssetRecord = { id: 'asset-1', blob, createdAt: 1000 };
+  const bytes = new Uint8Array([137, 80, 78, 71]);
+  const asset: AssetRecord = {
+    id: 'asset-1',
+    bytes,
+    mediaType: 'image/png',
+    createdAt: 1000,
+  };
   await putAssets(db, [asset]);
 
-  expect((await getAsset(db, 'asset-1'))?.blob).toEqual(blob);
+  expect((await getAsset(db, 'asset-1'))?.bytes).toEqual(bytes);
   expect(await getAssets(db, ['asset-1', 'missing'])).toEqual([asset]);
 });
 
 it('deletes assets by id', async () => {
   await putAssets(db, [
-    { id: 'asset-1', blob: new Blob(['a']), createdAt: 1000 },
-    { id: 'asset-2', blob: new Blob(['b']), createdAt: 1000 },
+    {
+      id: 'asset-1',
+      bytes: new Uint8Array([1]),
+      mediaType: 'image/png',
+      createdAt: 1000,
+    },
+    {
+      id: 'asset-2',
+      bytes: new Uint8Array([2]),
+      mediaType: 'image/png',
+      createdAt: 1000,
+    },
   ]);
   await deleteAssets(db, ['asset-1']);
 

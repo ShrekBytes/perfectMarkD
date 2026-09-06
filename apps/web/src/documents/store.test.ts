@@ -3,6 +3,8 @@ import { DEFAULT_SETTINGS } from '@perfectmarkd/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as dbApi from './db';
 import { AUTOSAVE_DELAY_MS, createDocumentStore } from './store';
+import { MAX_ASSET_BYTES, parseAssetRef } from '../assets/ingest';
+import { pngFile } from '../testing/test-assets';
 import type { DocumentRecord } from './types';
 import { stubBroadcastChannel } from '../testing/stub-broadcast-channel';
 import { stubIndexedDB } from '../testing/stub-idb';
@@ -40,7 +42,12 @@ async function readyStore(): Promise<ReadyStore> {
 async function withAssetIds(id: string, assetIds: string[]): Promise<void> {
   const reader = await dbApi.openDatabase();
   await dbApi.putAssets(reader, [
-    { id: 'asset-1', blob: new Blob(['png']), createdAt: T0 },
+    {
+      id: 'asset-1',
+      bytes: new Uint8Array([137, 80, 78, 71]),
+      mediaType: 'image/png',
+      createdAt: T0,
+    },
   ]);
   await dbApi.putDocument(reader, {
     ...(await dbApi.getDocument(reader, id))!,
@@ -367,6 +374,73 @@ describe('delete with undo', () => {
     const after = await dbApi.openDatabase();
     expect(await dbApi.getAsset(after, 'asset-1')).toBeDefined();
     after.close();
+  });
+});
+
+describe('addAsset', () => {
+  it('stores the asset, returns the markdown ref, and persists the reference', async () => {
+    const { store, id } = await readyStore();
+
+    const result = await store.getState().addAsset(pngFile('sunrise.png'));
+
+    expect(result).toMatchObject({ ok: true, alt: 'sunrise' });
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.ref).toMatch(/^asset:\/\/[a-z0-9-]+$/i);
+
+    // The asset is durable immediately, before any autosave…
+    const reader = await dbApi.openDatabase();
+    const assetId = parseAssetRef(result.ref)!;
+    const asset = await dbApi.getAsset(reader, assetId);
+    expect(asset?.mediaType).toBe('image/png');
+    // fake-indexeddb's clone hands bytes back as an array-like under jsdom;
+    // compare bytewise rather than by typed-array identity.
+    expect(Array.from(asset?.bytes ?? [])).toEqual(new Array(8).fill(0));
+
+    // …and the reference rides the next flush even without a markdown edit.
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
+    expect((await dbApi.getDocument(reader, id))?.assetIds).toEqual([assetId]);
+    reader.close();
+  });
+
+  it('refuses oversized files without touching the document', async () => {
+    const { store, id } = await readyStore();
+
+    const result = await store
+      .getState()
+      .addAsset(pngFile('big.png', MAX_ASSET_BYTES + 1));
+
+    expect(result).toEqual({ ok: false, error: 'too-large' });
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
+    const reader = await dbApi.openDatabase();
+    expect((await dbApi.getDocument(reader, id))?.assetIds).toEqual([]);
+    reader.close();
+  });
+
+  it('refuses files that are not images', async () => {
+    const { store } = await readyStore();
+
+    const result = await store
+      .getState()
+      .addAsset(
+        new File([new Uint8Array(8)], 'paper.pdf', { type: 'application/pdf' }),
+      );
+
+    expect(result).toEqual({ ok: false, error: 'unsupported' });
+  });
+
+  it('keeps assets across a reload', async () => {
+    const first = await readyStore();
+    const result = await first.store.getState().addAsset(pngFile());
+    if (!result.ok) throw new Error('expected ok');
+    await first.store.getState().flush();
+    first.reset();
+
+    await readyStore();
+    const reader = await dbApi.openDatabase();
+    const asset = await dbApi.getAsset(reader, parseAssetRef(result.ref)!);
+    expect(Array.from(asset?.bytes ?? [])).toEqual(new Array(8).fill(0));
+    expect(asset?.mediaType).toBe('image/png');
+    reader.close();
   });
 });
 

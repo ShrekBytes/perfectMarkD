@@ -16,6 +16,7 @@
 import { DEFAULT_SETTINGS, type DocumentSettings } from '@perfectmarkd/core';
 import type { IDBPDatabase } from 'idb';
 import { create } from 'zustand';
+import { assetRef, prepareAsset, type AssetSource } from '../assets/ingest';
 import * as dbApi from './db';
 import { exportFileName, nameFromFile, uniqueName } from './text';
 import type { AssetRecord, DocumentRecord, DocumentSummary } from './types';
@@ -39,6 +40,12 @@ export interface ExportPayload {
   fileName: string;
   markdown: string;
 }
+
+/** Outcome of storing one pasted/dropped/picked image against the active
+ *  document. On success the caller inserts `ref` as `![alt](ref)` markdown. */
+export type AddAssetResult =
+  | { ok: true; ref: string; alt: string }
+  | { ok: false; error: 'too-large' | 'unsupported' | 'no-document' };
 
 export interface DocumentStore {
   status: 'loading' | 'ready';
@@ -68,6 +75,9 @@ export interface DocumentStore {
   undoDelete(): Promise<void>;
   dismissDeleteToast(): void;
   importDocument(fileName: string, markdown: string): Promise<void>;
+  /** Stores an image as a local asset and attaches it to the active document;
+   *  returns the `asset://` ref the editor inserts into the markdown. */
+  addAsset(file: AssetSource): Promise<AddAssetResult>;
   /** Persists unflushed edits first, then returns the download payload. */
   exportDocument(id: string): Promise<ExportPayload | null>;
   loadRemoteVersion(): Promise<void>;
@@ -157,6 +167,10 @@ export function createDocumentStore() {
   /** The active document as last persisted; dirty = working copy differs. */
   let savedRecord: DocumentRecord | null = null;
   let dirty = false;
+  /** Asset ids stored since the last flush (addAsset); they merge into the
+   *  next write of the active record. Kept outside savedRecord so a peer's
+   *  last-writer-wins adoption between addAsset and flush cannot drop them. */
+  let pendingAssetIds: string[] = [];
   let initPromise: Promise<void> | null = null;
 
   const useStore = create<DocumentStore>()((set, get) => {
@@ -190,8 +204,14 @@ export function createDocumentStore() {
       }
       if (!dirty || !dbp || !savedRecord) return;
 
+      const assetIds =
+        pendingAssetIds.length > 0
+          ? [...new Set([...savedRecord.assetIds, ...pendingAssetIds])]
+          : savedRecord.assetIds;
+      pendingAssetIds = [];
       const record: DocumentRecord = {
         ...savedRecord,
+        assetIds,
         name: get().name,
         markdown: get().markdown,
         settings: { ...get().settings },
@@ -460,6 +480,29 @@ export function createDocumentStore() {
         setWorkingCopy(record);
       },
 
+      addAsset: async (file) => {
+        if (!dbp || !get().activeId || !savedRecord) {
+          return { ok: false, error: 'no-document' };
+        }
+        const prepared = await prepareAsset(file);
+        if (!prepared.ok) return prepared;
+
+        const id = newId();
+        const asset: AssetRecord = {
+          id,
+          bytes: prepared.asset.bytes,
+          mediaType: prepared.asset.mediaType,
+          createdAt: Date.now(),
+        };
+        // Durable before the ref enters the markdown, so a peer that adopts
+        // the saved document can always resolve what it references.
+        await dbApi.putAssets(dbp, [asset]);
+        pendingAssetIds.push(id);
+        dirty = true;
+        scheduleFlush();
+        return { ok: true, ref: assetRef(id), alt: prepared.asset.alt };
+      },
+
       exportDocument: async (id) => {
         if (!dbp) return null;
         if (id === get().activeId) await flush();
@@ -496,6 +539,7 @@ export function createDocumentStore() {
     dbp = null;
     savedRecord = null;
     dirty = false;
+    pendingAssetIds = [];
     initPromise = null;
     useStore.setState({ ...INITIAL_STATE, settings: { ...DEFAULT_SETTINGS } });
   }

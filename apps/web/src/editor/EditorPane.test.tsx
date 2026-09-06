@@ -12,6 +12,8 @@ import {
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { EditorPane } from './EditorPane';
+import { MAX_ASSET_BYTES } from '../assets/ingest';
+import { getAsset, openDatabase } from '../documents/db';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
@@ -19,6 +21,7 @@ import {
 import { stubBroadcastChannel } from '../testing/stub-broadcast-channel';
 import { stubClientRects } from '../testing/stub-client-rects';
 import { stubIndexedDB } from '../testing/stub-idb';
+import { pngFile } from '../testing/test-assets';
 
 beforeEach(async () => {
   localStorage.clear();
@@ -65,10 +68,13 @@ it('renders the toolbar contract', () => {
   ]) {
     expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
   }
-  // The image picker arrives with ticket 08; the button waits disabled.
+  // The image picker lives inside the pane; the button opens it.
   const image = screen.getByRole('button', { name: 'Insert image' });
-  expect(image).toBeDisabled();
-  expect(image).toHaveAttribute('title', 'Images — coming soon');
+  expect(image).toBeEnabled();
+  expect(image).toHaveAttribute(
+    'title',
+    expect.stringContaining('Insert image'),
+  );
 });
 
 it('shows the word and character counts in the footer', async () => {
@@ -194,4 +200,148 @@ it('reports the proportional scroll fraction', () => {
 
   fireEvent.scroll(scrollDOM);
   expect(onEditorScroll).toHaveBeenLastCalledWith(0.75);
+});
+
+// ─── Image handling (ticket 08) ──────────────────────────────────────────────
+
+/** The markdown once the asset ref for `file` has landed, if it landed. */
+function assetMarkdown(alt: string): RegExp {
+  return new RegExp(`^!\\[${alt}\\]\\(asset:\\/\\/[a-z0-9-]+\\)\\n$`);
+}
+
+it('opens the picker from the Insert image button', async () => {
+  const user = userEvent.setup();
+  render(<EditorPane />);
+  const input = screen.getByTestId('image-picker') as HTMLInputElement;
+  const click = vi.spyOn(input, 'click');
+
+  await user.click(screen.getByRole('button', { name: 'Insert image' }));
+  expect(click).toHaveBeenCalledTimes(1);
+});
+
+it('inserts picked images as asset refs and stores them', async () => {
+  const user = userEvent.setup();
+  render(<EditorPane />);
+
+  await user.upload(screen.getByTestId('image-picker'), pngFile('sunrise.png'));
+
+  await waitFor(() => {
+    expect(useDocumentStore.getState().markdown).toMatch(
+      assetMarkdown('sunrise'),
+    );
+  });
+  // Round-trip: the asset itself landed in the IndexedDB asset store.
+  const ref = /\(asset:\/\/([^)]+)\)/.exec(
+    useDocumentStore.getState().markdown,
+  )![1]!;
+  const reader = await openDatabase();
+  const asset = await getAsset(reader, ref);
+  expect(asset?.mediaType).toBe('image/png');
+  reader.close();
+});
+
+it('inserts several picked images on consecutive lines', async () => {
+  render(<EditorPane />);
+
+  fireEvent.change(screen.getByTestId('image-picker'), {
+    target: { files: [pngFile('one.png'), pngFile('two.png')] },
+  });
+
+  await waitFor(() => {
+    expect(useDocumentStore.getState().markdown).toMatch(
+      /!\[one\]\(asset:\/\/[a-z0-9-]+\)\n!\[two\]\(asset:\/\/[a-z0-9-]+\)\n/,
+    );
+  });
+});
+
+it('pastes a copied image as an asset ref', async () => {
+  render(<EditorPane />);
+
+  fireEvent.paste(editorView().contentDOM, {
+    clipboardData: { files: [pngFile('shot.png')], getData: () => '' },
+  });
+
+  await waitFor(() => {
+    expect(useDocumentStore.getState().markdown).toMatch(assetMarkdown('shot'));
+  });
+});
+
+it('lets text win when the clipboard carries text and an image', async () => {
+  render(<EditorPane />);
+
+  fireEvent.paste(editorView().contentDOM, {
+    clipboardData: { files: [pngFile('shot.png')], getData: () => 'hello' },
+  });
+
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  expect(useDocumentStore.getState().markdown).not.toMatch(/asset:\/\//);
+});
+
+it('drops image files at the drop position', async () => {
+  render(<EditorPane />);
+  await setMarkdown('abc');
+  const view = editorView();
+  vi.spyOn(view, 'posAtCoords').mockReturnValue(1);
+
+  fireEvent.drop(view.contentDOM, {
+    clientX: 10,
+    clientY: 10,
+    dataTransfer: { files: [pngFile('sunrise.png')] },
+  });
+
+  await waitFor(() => {
+    expect(useDocumentStore.getState().markdown).toMatch(
+      /^a\n!\[sunrise\]\(asset:\/\/[a-z0-9-]+\)\nbc$/,
+    );
+  });
+});
+
+it('leaves .md drops to the app import path', async () => {
+  render(<EditorPane />);
+
+  fireEvent.drop(editorView().contentDOM, {
+    clientX: 10,
+    clientY: 10,
+    dataTransfer: {
+      files: [new File(['# Hi'], 'notes.md', { type: 'text/markdown' })],
+    },
+  });
+
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  expect(useDocumentStore.getState().markdown).toBe('');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+it('surfaces the size limit for an oversized image', async () => {
+  const user = userEvent.setup();
+  render(<EditorPane />);
+
+  await user.upload(
+    screen.getByTestId('image-picker'),
+    pngFile('big.png', MAX_ASSET_BYTES + 1),
+  );
+
+  expect(await screen.findByRole('status')).toHaveTextContent('20 MB');
+  expect(useDocumentStore.getState().markdown).toBe('');
+});
+
+it('surfaces a notice for non-image files picked by hand', async () => {
+  render(<EditorPane />);
+
+  // user-event's upload honors accept="image/*" and would skip the file like
+  // a real picker; drive the change event directly to reach ingest validation.
+  fireEvent.change(screen.getByTestId('image-picker'), {
+    target: {
+      files: [
+        new File([new Uint8Array(4)], 'notes.pdf', { type: 'application/pdf' }),
+      ],
+    },
+  });
+
+  expect(await screen.findByRole('status')).toHaveTextContent('not an image');
+  expect(useDocumentStore.getState().markdown).toBe('');
 });

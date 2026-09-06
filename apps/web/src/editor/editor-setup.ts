@@ -18,6 +18,7 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
+import { isImageFile } from '../assets/ingest';
 import { insertLink, toggleBold, toggleItalic } from './markdown-commands';
 
 /** Matches the engine's section splitter: a `///` marker alone on its line. */
@@ -87,6 +88,16 @@ export interface EditorHandlers {
   onDocChanged(text: string): void;
   /** Ctrl/Cmd+Enter — the manual render request for the Paper Canvas. */
   onRequestRender(): void;
+  /** Image files pasted or dropped onto the editor; `pos` is the drop point
+   *  (undefined for paste — the cursor). Image detection is a cheap pre-filter
+   *  here; ingest validation has the final word. */
+  onImageFiles(files: File[], pos?: number): void;
+}
+
+/** Clipboard/dragged image files, ignoring everything else so text pastes and
+ *  .md drops flow through their normal paths untouched. */
+function imageFiles(source: FileList | null | undefined): File[] {
+  return Array.from(source ?? []).filter(isImageFile);
 }
 
 export function createEditorExtensions(handlers: EditorHandlers): Extension[] {
@@ -111,6 +122,35 @@ export function createEditorExtensions(handlers: EditorHandlers): Extension[] {
         },
       },
     ]),
+    // Image paste/drop (ticket 08). Returning true suppresses CodeMirror's
+    // own clipboard handling for these events.
+    EditorView.domEventHandlers({
+      paste(event) {
+        const data = event.clipboardData;
+        const files = imageFiles(data?.files);
+        // Text on the clipboard wins over attached images (e.g. copying from
+        // a web page that ships both).
+        if (files.length === 0 || data?.getData('text/plain')) return false;
+        event.preventDefault();
+        handlers.onImageFiles(files);
+        return true;
+      },
+      drop(event, view) {
+        const all = Array.from(event.dataTransfer?.files ?? []);
+        if (all.length === 0) return false;
+        event.preventDefault();
+        const files = all.filter(isImageFile);
+        if (files.length > 0) {
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+          handlers.onImageFiles(files, pos ?? undefined);
+        }
+        // Non-image files (.md import, anything else) are claimed but ignored
+        // — otherwise CodeMirror's own drop path would insert their text
+        // content and race the window-level .md import, which still receives
+        // this event.
+        return true;
+      },
+    }),
     keymap.of(historyKeymap),
     keymap.of(defaultKeymap),
     EditorView.updateListener.of((update) => {

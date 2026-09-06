@@ -12,6 +12,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
   cycleHeading,
+  insertAssetImages,
   insertLink,
   insertPageBreak,
   insertTable,
@@ -234,5 +235,48 @@ describe('insertPageBreak', () => {
 
   it('appends after the current line when the cursor is at its end', () => {
     expect(doc(insertPageBreak, 'abc', 3)).toBe('abc\n///\n\n');
+  });
+});
+
+describe('insertAssetImages', () => {
+  const one = { ref: 'asset://a-1', alt: 'first' };
+  const two = { ref: 'asset://b-2', alt: 'second' };
+
+  it('inserts the image markdown on a fresh line and parks the cursor after it', () => {
+    expect(doc(insertAssetImages([one]), '', 0)).toBe(
+      '![first](asset://a-1)\n',
+    );
+    expect(selection(insertAssetImages([one]), '', 0)).toEqual({
+      anchor: 22,
+      head: 22,
+    });
+  });
+
+  it('breaks the current line so the image renders as its own block', () => {
+    expect(doc(insertAssetImages([one]), 'abc', 2)).toBe(
+      'ab\n![first](asset://a-1)\nc',
+    );
+  });
+
+  it('inserts several images on consecutive lines', () => {
+    expect(doc(insertAssetImages([one, two]), 'abc', 3)).toBe(
+      'abc\n![first](asset://a-1)\n![second](asset://b-2)\n',
+    );
+  });
+
+  it('anchors to an explicit position when given (drop point)', () => {
+    expect(doc(insertAssetImages([one], 1), 'abc', 3)).toBe(
+      'a\n![first](asset://a-1)\nbc',
+    );
+  });
+
+  it('clamps an out-of-range drop position into the document', () => {
+    expect(doc(insertAssetImages([one], 99), 'abc', 3)).toBe(
+      'abc\n![first](asset://a-1)\n',
+    );
+  });
+
+  it('does nothing without items', () => {
+    expect(doc(insertAssetImages([]), 'abc', 0)).toBe('abc');
   });
 });

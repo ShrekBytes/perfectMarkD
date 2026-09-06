@@ -95,8 +95,8 @@ export function AppShell() {
               }}
               className="flex flex-col bg-surface"
             >
-              {/* Ctrl/Cmd+Enter render and the image picker wire up in
-                  tickets 04 and 08. */}
+              {/* Ctrl/Cmd+Enter manual render wires up with the Paper
+                  Canvas (ticket 04); the image picker is editor-internal. */}
               <EditorPane />
             </aside>
             <PaneDivider
