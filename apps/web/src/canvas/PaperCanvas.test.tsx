@@ -1,0 +1,390 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PaperCanvas, type PaperCanvasApi } from './PaperCanvas';
+import * as pipelineModule from './pipeline';
+import {
+  resetDocumentStoreForTests,
+  useDocumentStore,
+} from '../documents/store';
+import { stubBroadcastChannel } from '../testing/stub-broadcast-channel';
+import { stubClientRects } from '../testing/stub-client-rects';
+import { stubIndexedDB } from '../testing/stub-idb';
+
+beforeEach(async () => {
+  localStorage.clear();
+  stubIndexedDB();
+  stubBroadcastChannel().reset();
+  stubClientRects();
+  resetDocumentStoreForTests();
+  // Store init (fake-indexeddb) must run on real timers; fake timers start
+  // after it, covering the canvas's debounce/render scheduling.
+  await useDocumentStore.getState().init();
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+/** Mounts the canvas and resolves the API the shell holds through the ref. */
+function mountCanvas(): PaperCanvasApi {
+  const ref = { current: null as PaperCanvasApi | null };
+  render(<PaperCanvas ref={ref} />);
+  const api = ref.current;
+  if (!api) throw new Error('canvas did not expose its API');
+  return api;
+}
+
+function setMarkdown(markdown: string): void {
+  act(() => {
+    useDocumentStore.setState({ markdown });
+  });
+}
+
+/** Store writes hit IndexedDB, whose hops need timer time under fake timers —
+ *  pump while the write settles (a hung act poisons every later test). */
+async function createDocumentSettled(): Promise<void> {
+  await act(async () => {
+    const creating = useDocumentStore.getState().createDocument();
+    for (let i = 0; i < 20; i++) {
+      await vi.advanceTimersByTimeAsync(10);
+    }
+    await creating;
+  });
+}
+
+function pageHosts(): HTMLElement[] {
+  return Array.from(document.querySelectorAll('.pm-page-host'));
+}
+
+/** Advances fake timers without the settling pump — for firing (or not
+ *  firing) the debounce itself. */
+async function flushRenderRaw(ms: number): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+/** Drives the debounce and settles the render's full async chain: the
+ *  debounce timer, then the IndexedDB + pipeline hops that schedule their own
+ *  macrotasks under fake-indexeddb. Each advance yields microtasks too, so a
+ *  short pump drains everything. */
+async function flushRender(ms = 400): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+    for (let i = 0; i < 10; i++) {
+      await vi.advanceTimersByTimeAsync(1);
+    }
+  });
+}
+
+describe('PaperCanvas rendering', () => {
+  it('shows the loading shimmer until the first render lands', async () => {
+    mountCanvas();
+    expect(screen.getByTestId('canvas-loading')).toBeInTheDocument();
+    expect(pageHosts()).toHaveLength(0);
+
+    setMarkdown('# Hello\n\nWorld.');
+    await flushRender();
+
+    expect(screen.queryByTestId('canvas-loading')).not.toBeInTheDocument();
+    expect(pageHosts()).toHaveLength(1);
+    expect(document.querySelector('.pm-page-label')!.textContent).toBe(
+      'Page 1 of 1',
+    );
+  });
+
+  it('debounces edits and coalesces bursts into one engine run', async () => {
+    const spy = vi.spyOn(pipelineModule, 'runDocumentPipeline');
+    mountCanvas();
+    setMarkdown('# One');
+    setMarkdown('# One two');
+    setMarkdown('# One two three');
+    await flushRender();
+    await flushRender(); // a second window must not re-run without edits
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(pageHosts()).toHaveLength(1);
+  });
+
+  it('re-renders when settings change', async () => {
+    const spy = vi.spyOn(pipelineModule, 'runDocumentPipeline');
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+    act(() => {
+      useDocumentStore.setState({
+        settings: {
+          ...useDocumentStore.getState().settings,
+          showFooter: false,
+        },
+      });
+    });
+    await flushRender();
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders immediately on the manual render call (Ctrl/Cmd+Enter path)', async () => {
+    const spy = vi.spyOn(pipelineModule, 'runDocumentPipeline');
+    const api = mountCanvas();
+    setMarkdown('# Hello');
+    await act(async () => {
+      api.renderNow();
+      await flushRenderRaw(0);
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(pageHosts()).toHaveLength(1);
+    // The pending debounced render is cancelled: no second run.
+    await flushRender();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('splits /// sections into labeled pages', async () => {
+    mountCanvas();
+    setMarkdown('one\n\n///\n\ntwo\n\n///\n\nthree');
+    await flushRender();
+    const hosts = pageHosts();
+    expect(hosts).toHaveLength(3);
+    const labels = Array.from(document.querySelectorAll('.pm-page-label')).map(
+      (el) => el.textContent,
+    );
+    expect(labels).toEqual(['Page 1 of 3', 'Page 2 of 3', 'Page 3 of 3']);
+  });
+
+  it('renders a blank document as one empty page', async () => {
+    mountCanvas();
+    await flushRender();
+    expect(pageHosts()).toHaveLength(1);
+    // No content nodes — the only shadow text is the footer page number.
+    const content = pageHosts()[0]!.shadowRoot!.querySelector(
+      '[data-pm-layer="content"]',
+    )!;
+    expect(content.children).toHaveLength(0);
+  });
+
+  it('clears the previous document and renders the new one on doc switch', async () => {
+    mountCanvas();
+    setMarkdown('# First doc');
+    await flushRender();
+    expect(pageHosts()).toHaveLength(1);
+
+    await createDocumentSettled();
+    // Stale pages are dropped before the new document renders.
+    expect(pageHosts()).toHaveLength(0);
+    await flushRender();
+    expect(pageHosts()).toHaveLength(1);
+  });
+
+  it('marks the canvas busy while a render is in flight', async () => {
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+    const scroll = screen.getByTestId('canvas-scroll');
+    expect(scroll).toHaveAttribute('aria-busy', 'false');
+    setMarkdown('# Hello again');
+    await flushRender();
+    // The render chain settles within the flush above; aria-busy settles with it.
+    expect(scroll.getAttribute('aria-busy')).toBe('false');
+  });
+});
+
+describe('PaperCanvas zoom pill', () => {
+  it('steps zoom in and out, clamped to 35–100%', async () => {
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+
+    const out = screen.getByRole('button', { name: 'Zoom out' });
+    const level = screen.getByTestId('zoom-level');
+    expect(level).toHaveTextContent('100%');
+
+    fireEvent.click(out);
+    fireEvent.click(out);
+    expect(level).toHaveTextContent('90%');
+
+    for (let i = 0; i < 15; i++) fireEvent.click(out);
+    expect(level).toHaveTextContent('35%');
+
+    const inBtn = screen.getByRole('button', { name: 'Zoom in' });
+    for (let i = 0; i < 20; i++) fireEvent.click(inBtn);
+    expect(level).toHaveTextContent('100%');
+  });
+
+  it('fit width derives zoom from the canvas width and the page size', async () => {
+    const spy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockReturnValue(600);
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fit page width' }));
+    // (600 − 2×24) / 794 (A4) = 69.5% → displayed rounded.
+    expect(screen.getByTestId('zoom-level')).toHaveTextContent('70%');
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('applies zoom to the mounted page slots', async () => {
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+    const frame = document.querySelector('.pm-page-frame') as HTMLElement;
+    const host = pageHosts()[0]!;
+    // 100%: the frame is the page's true size.
+    expect(frame.style.width).toBe('794px');
+    expect(host.style.transform).toBe('scale(1)');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(frame.style.width).toBe(`${794 * 0.95}px`);
+    expect(host.style.transform).toBe('scale(0.95)');
+  });
+});
+
+describe('PaperCanvas anchor navigation', () => {
+  it('scrolls to the page containing the anchor target', async () => {
+    mountCanvas();
+    setMarkdown('# Top\n\n[down](#target)\n\n///\n\n## Target');
+    await flushRender();
+    expect(pageHosts()).toHaveLength(2);
+
+    const scroll = screen.getByTestId('canvas-scroll');
+    const setScroll = vi.fn();
+    Object.defineProperty(scroll, 'scrollTop', { set: setScroll });
+
+    // The link lives inside page 1's shadow root; composed bubbles cross the
+    // shadow boundary the way a real click does.
+    const anchor = pageHosts()[0]!.shadowRoot!.querySelector('a')!;
+    anchor.dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      }),
+    );
+    expect(setScroll).toHaveBeenCalled();
+  });
+
+  it('ignores clicks on links without a matching target', async () => {
+    mountCanvas();
+    setMarkdown('[missing](#nowhere)');
+    await flushRender();
+    const scroll = screen.getByTestId('canvas-scroll');
+    const setScroll = vi.fn();
+    Object.defineProperty(scroll, 'scrollTop', { set: setScroll });
+
+    const anchor = pageHosts()[0]!.shadowRoot!.querySelector('a')!;
+    anchor.dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      }),
+    );
+    expect(setScroll).not.toHaveBeenCalled();
+  });
+});
+
+describe('PaperCanvas scroll sync', () => {
+  it('maps the editor scroll fraction onto the canvas scroll height', () => {
+    const api = mountCanvas();
+    const scroll = screen.getByTestId('canvas-scroll');
+    const setScroll = vi.fn();
+    Object.defineProperty(scroll, 'scrollTop', { set: setScroll });
+    Object.defineProperty(scroll, 'scrollHeight', { value: 2000 });
+    Object.defineProperty(scroll, 'clientHeight', { value: 500 });
+
+    api.setScrollFraction(0.5);
+    expect(setScroll).toHaveBeenCalledWith(750);
+  });
+});
+
+describe('PaperCanvas large-document guard', () => {
+  function hugeDoc(pages: number): string {
+    return Array.from({ length: pages }, (_, i) => `page ${i}`).join(
+      '\n\n///\n\n',
+    );
+  }
+
+  it('pauses renders over 100 pages behind a toast until confirmed', async () => {
+    mountCanvas();
+    setMarkdown(hugeDoc(101));
+    await flushRender();
+
+    const toast = screen.getByTestId('large-doc-toast');
+    expect(toast).toHaveTextContent('101 pages');
+    expect(pageHosts()).toHaveLength(0);
+
+    fireEvent.click(screen.getByTestId('render-anyway'));
+    await flushRender(0);
+    expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
+    expect(pageHosts()).toHaveLength(101);
+  });
+
+  it('does not re-prompt after confirmation within the same document', async () => {
+    mountCanvas();
+    setMarkdown(hugeDoc(101));
+    await flushRender();
+    fireEvent.click(screen.getByTestId('render-anyway'));
+    await flushRender(0);
+
+    setMarkdown(hugeDoc(102));
+    await flushRender();
+    expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
+    expect(pageHosts()).toHaveLength(102);
+  });
+
+  it('re-arms the guard after dismissing and editing again', async () => {
+    mountCanvas();
+    setMarkdown(hugeDoc(101));
+    await flushRender();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
+
+    // Renders are edit-driven: the next edit re-asks (stale pages stay).
+    setMarkdown(`${hugeDoc(101)}\n\nmore`);
+    await flushRender();
+    expect(screen.getByTestId('large-doc-toast')).toBeInTheDocument();
+  });
+
+  it('resets the guard when the document switches', async () => {
+    mountCanvas();
+    setMarkdown(hugeDoc(101));
+    await flushRender();
+    fireEvent.click(screen.getByTestId('render-anyway'));
+    await flushRender(0);
+    expect(pageHosts()).toHaveLength(101);
+
+    await createDocumentSettled();
+    setMarkdown(hugeDoc(101));
+    await flushRender();
+    expect(screen.getByTestId('large-doc-toast')).toBeInTheDocument();
+  });
+});
+
+describe('PaperCanvas empty states', () => {
+  it('shows the loading hint while the store initializes', () => {
+    act(() => {
+      useDocumentStore.setState({ status: 'loading', activeId: null });
+    });
+    render(<PaperCanvas />);
+    expect(screen.getByText('Loading your documents…')).toBeInTheDocument();
+  });
+
+  it('shows a no-document hint when no document is active', () => {
+    act(() => {
+      useDocumentStore.setState({ status: 'ready', activeId: null });
+    });
+    render(<PaperCanvas />);
+    expect(screen.getByText(/Open a document/)).toBeInTheDocument();
+  });
+});

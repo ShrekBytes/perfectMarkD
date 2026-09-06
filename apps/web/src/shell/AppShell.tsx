@@ -3,7 +3,7 @@ import { TopBar } from './TopBar';
 import { StaleBanner } from './StaleBanner';
 import { EmptyState } from './EmptyState';
 import { CollapsedPaneToggle, PaneDivider } from './PaneDivider';
-import { PagesIcon, SlidersIcon, UploadIcon } from './icons';
+import { SlidersIcon, UploadIcon } from './icons';
 import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
 import { useDocumentStore } from '../documents/store';
@@ -11,6 +11,7 @@ import { EditorPane } from '../editor/EditorPane';
 import { DeleteToast } from '../library/DeleteToast';
 import { LibraryPanel } from '../library/LibraryPanel';
 import { useFileDrop } from '../library/useFileDrop';
+import { PaperCanvas, type PaperCanvasApi } from '../canvas/PaperCanvas';
 
 /**
  * The app shell: top bar + three panes (editor · Paper Canvas · inspector).
@@ -26,7 +27,6 @@ export function AppShell() {
   const pane = usePaneLayout(containerRef);
   const { theme, toggle } = useTheme();
 
-  const status = useDocumentStore((state) => state.status);
   const docName = useDocumentStore((state) =>
     state.activeId ? state.name : 'Untitled document',
   );
@@ -37,6 +37,10 @@ export function AppShell() {
   const importDocument = useDocumentStore((state) => state.importDocument);
 
   const [libraryOpen, setLibraryOpen] = useState(false);
+
+  /** The canvas exposes its API through this ref so the editor's Ctrl/Cmd+Enter
+   *  and scroll events reach it without threading through re-renders. */
+  const canvasApiRef = useRef<PaperCanvasApi | null>(null);
 
   useEffect(() => {
     void useDocumentStore.getState().init();
@@ -95,9 +99,14 @@ export function AppShell() {
               }}
               className="flex flex-col bg-surface"
             >
-              {/* Ctrl/Cmd+Enter manual render wires up with the Paper
-                  Canvas (ticket 04); the image picker is editor-internal. */}
-              <EditorPane />
+              {/* Ctrl/Cmd+Enter and scroll events route to the Paper Canvas
+                  via the shell's canvas API ref. */}
+              <EditorPane
+                onRequestRender={() => canvasApiRef.current?.renderNow()}
+                onEditorScroll={(fraction) =>
+                  canvasApiRef.current?.setScrollFraction(fraction)
+                }
+              />
             </aside>
             <PaneDivider
               side="editor"
@@ -112,17 +121,9 @@ export function AppShell() {
         <main
           aria-label="Paper Canvas"
           style={{ minWidth: PANE_LIMITS.canvasMin }}
-          className="flex flex-1 flex-col"
+          className="flex min-w-0 flex-1 flex-col"
         >
-          <EmptyState
-            icon={<PagesIcon />}
-            title="Paper Canvas"
-            hint={
-              status === 'loading'
-                ? 'Loading your documents…'
-                : 'Your pages will appear here as you write.'
-            }
-          />
+          <PaperCanvas ref={canvasApiRef} />
         </main>
 
         {pane.inspector.collapsed ? (

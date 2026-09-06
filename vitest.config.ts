@@ -1,9 +1,25 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
+const katexCssPath = fileURLToPath(
+  new URL(
+    './packages/core/node_modules/katex/dist/katex.min.css',
+    import.meta.url,
+  ),
+);
+
 export default defineConfig({
   resolve: {
     alias: {
+      // Must precede the core alias: Vite string aliases prefix-match, so
+      // '@perfectmarkd/core' would otherwise swallow this subpath. Tests get
+      // the KaTeX stylesheet straight from katex's package (the same file
+      // core's build copies into dist — see apps/web/src/canvas/katex-css.ts).
+      '@perfectmarkd/core/katex.css': katexCssPath,
+      // ?raw variant: the query defeats prefix matching, so it needs its own
+      // exact entry — the query is preserved in the replacement so the raw
+      // text (not a CSS module) is what gets imported.
+      '@perfectmarkd/core/katex.css?raw': `${katexCssPath}?raw`,
       // Test against core's source so suites run without a prior build
       '@perfectmarkd/core': fileURLToPath(
         new URL('./packages/core/src/index.ts', import.meta.url),

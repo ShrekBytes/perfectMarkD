@@ -214,6 +214,75 @@ export function buildFrameOverlayHTML(s: DocumentSettings): string {
   return `<div style="position:absolute;top:${inset};left:${inset};right:${inset};bottom:${inset};pointer-events:none;box-sizing:border-box;border:${frameBorderCSS(s)};"></div>`;
 }
 
+// ─── Page box layers ──────────────────────────────────────────────────────────
+// Inline-style strings for the layers inside a page box, shared verbatim by
+// the export HTML builder and the preview page builder: one source keeps the
+// preview pixel-consistent with print by construction. Callers guard the
+// enable/resolution conditions (band shown, ref resolvable) and wrap the
+// string in their own element.
+
+/** Style for the page background image layer; caller passes undefined when
+ *  the background is disabled or the ref unresolvable. */
+export function bgImageLayerStyle(
+  s: DocumentSettings,
+  g: PageGeometry,
+  url: string | undefined,
+): string | undefined {
+  if (!url) return undefined;
+  const bgCss = bgImageCssProps(s.backgroundImageSize);
+  const pos =
+    s.backgroundImageScope === 'content-only'
+      ? `top:${g.mTop + g.headerH}px;left:${g.mLeft}px;width:${g.contentW}px;height:${g.contentH}px;`
+      : 'inset:0;';
+  return `position:absolute;${pos}background-image:url('${url}');background-size:${bgCss.size};background-repeat:${bgCss.repeat};background-position:center;opacity:${s.backgroundImageOpacity};pointer-events:none;`;
+}
+
+/** Style for a header/footer banner image behind the band text. */
+export function bannerStyle(
+  s: DocumentSettings,
+  g: PageGeometry,
+  url: string,
+  band: 'header' | 'footer',
+): string {
+  const edge =
+    band === 'header'
+      ? `top:${g.mTop * 0.4}px;left:${s.headerImageMargin}px;right:${s.headerImageMargin}px;height:${g.headerH}px;`
+      : `bottom:0;left:${s.footerImageMargin}px;right:${s.footerImageMargin}px;height:${g.footerH}px;`;
+  return `position:absolute;${edge}background-image:url('${url}');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;`;
+}
+
+/** Style for the header text band (the band's inner markup is
+ *  buildHFInnerHTML). */
+export function headerBandStyle(s: DocumentSettings, g: PageGeometry): string {
+  const border = s.showHeaderBorder
+    ? `border-bottom:0.5px solid ${s.accentColor}33;`
+    : '';
+  return `position:absolute;top:${g.mTop * 0.4}px;left:${g.mLeft}px;right:${g.mRight}px;height:${g.headerH}px;display:flex;align-items:center;font-size:${s.headerFontSize}px;color:${s.headerFontColor};font-family:${resolveFont(s)};white-space:nowrap;${border}`;
+}
+
+/** Style for the footer text band. */
+export function footerBandStyle(s: DocumentSettings, g: PageGeometry): string {
+  const border = s.showFooterBorder
+    ? `border-top:0.5px solid ${s.accentColor}33;`
+    : '';
+  return `position:absolute;bottom:0;left:0;right:0;height:${g.footerH}px;display:flex;align-items:center;${border}padding:0 ${g.mRight}px 0 ${g.mLeft}px;font-size:${s.footerFontSize}px;color:${s.footerFontColor};font-family:${resolveFont(s)};`;
+}
+
+/** Inner markup for a header/footer band: a centered span when center text is
+ *  present, otherwise a left span plus a margin-left:auto right span. Empty
+ *  when the band has no text at all. Shared verbatim by the preview DOM path
+ *  and the export HTML builder so band text renders identically in both. */
+export function buildHFInnerHTML(
+  center: string,
+  left: string,
+  right: string,
+): string {
+  if (!center && !left && !right) return '';
+  return center
+    ? `<span style="flex:1;text-align:center;">${escapeHTML(center)}</span>`
+    : `<span>${escapeHTML(left)}</span><span style="margin-left:auto;">${escapeHTML(right)}</span>`;
+}
+
 // ─── Doc CSS builder ──────────────────────────────────────────────────────────
 
 /** Builds the full `.mpdf-doc` stylesheet (typography, tables, GFM alerts,

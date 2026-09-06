@@ -84,9 +84,9 @@ it('renders the three panes with their empty states', async () => {
   expect(
     screen.getByRole('complementary', { name: 'Inspector pane' }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByText('Your pages will appear here as you write.'),
-  ).toBeInTheDocument();
+  // The Paper Canvas mounts live: the pages area is present, shimmering
+  // until the first render lands (PaperCanvas.test.tsx covers the render).
+  expect(screen.getByTestId('canvas-loading')).toBeInTheDocument();
   expect(
     screen.getByText('Start writing — your markdown goes here.'),
   ).toBeInTheDocument();

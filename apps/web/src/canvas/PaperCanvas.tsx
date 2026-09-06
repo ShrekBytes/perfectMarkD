@@ -1,0 +1,448 @@
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
+import type { DocumentSettings, PageGeometry } from '@perfectmarkd/core';
+import {
+  createAssetResolver,
+  type AssetResolverCache,
+} from '../assets/resolver';
+import { openDatabase } from '../documents/db';
+import { useDocumentStore } from '../documents/store';
+import { EmptyState } from '../shell/EmptyState';
+import { ExpandIcon, MinusIcon, PagesIcon, PlusIcon } from '../shell/icons';
+import { KATEX_LAYOUT_CSS } from './katex-css';
+import { buildPage, createPageSheets } from './pageBuilder';
+import {
+  collectAssetRefs,
+  runDocumentPipeline,
+  type PipelineResult,
+} from './pipeline';
+
+/** Coalesces typing bursts into one engine run (spec: 400ms auto-render). */
+const RENDER_DEBOUNCE_MS = 400;
+const ZOOM_MIN = 0.35;
+const ZOOM_MAX = 1;
+const ZOOM_STEP = 0.05;
+/** Horizontal breathing room on both sides (fit-width math, anchor offset). */
+const FIT_GUTTER_PX = 24;
+/** Above this page count, the first render pauses for explicit confirmation. */
+const LARGE_DOC_PAGES = 100;
+
+/** What the shell can drive from outside: the manual render (Ctrl/Cmd+Enter
+ *  path) and editor→canvas scroll sync. Exposed via the canvas ref. */
+export interface PaperCanvasApi {
+  renderNow(): void;
+  setScrollFraction(fraction: number): void;
+}
+
+interface PaperCanvasProps {
+  ref?: React.Ref<PaperCanvasApi>;
+}
+
+const clampZoom = (value: number): number =>
+  Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+
+/** Applies zoom to one mounted page slot: the frame wrapper takes the scaled
+ *  box (and keeps layout flowing), the host inside scales from its top-left
+ *  corner (set in buildPage) to stay aligned with the frame. */
+function applyZoomToSlot(
+  slot: Element,
+  geometry: PageGeometry,
+  zoom: number,
+): void {
+  const frame = slot.firstElementChild as HTMLElement;
+  const host = frame.firstElementChild as HTMLElement;
+  frame.style.width = `${geometry.pw * zoom}px`;
+  frame.style.height = `${geometry.ph * zoom}px`;
+  host.style.transform = `scale(${zoom})`;
+}
+
+/**
+ * Replaces the pages area with one shadow-DOM page per layout (pageBuilder)
+ * and returns the heading-id → page index map the canvas resolves anchor
+ * clicks against. Applies the current zoom to the slots as it goes.
+ */
+function mountPageSlots(
+  pagesEl: HTMLDivElement,
+  result: PipelineResult,
+  settings: DocumentSettings,
+  assets: AssetResolverCache,
+  zoom: number,
+): Map<string, number> {
+  const headingIndex = new Map<string, number>();
+  const sheets = createPageSheets(result.docCSS, KATEX_LAYOUT_CSS);
+  const fragment = document.createDocumentFragment();
+
+  result.layouts.forEach((layout, index) => {
+    const slot = document.createElement('div');
+    slot.className = 'pm-page-slot';
+
+    // The frame wrapper carries the zoom-scaled box and the ambient page
+    // shadow; the shadow host inside stays at true page pixels and scales.
+    const frame = document.createElement('div');
+    frame.className =
+      'pm-page-frame shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.12)]';
+
+    const { host, contentRoot } = buildPage({
+      layout,
+      settings,
+      geometry: result.geometry,
+      sheets,
+      assets,
+      isRTL: result.isRTL,
+    });
+    frame.appendChild(host);
+
+    contentRoot.querySelectorAll('[id]').forEach((el) => {
+      headingIndex.set(el.id, index);
+    });
+
+    const label = document.createElement('p');
+    label.className =
+      'pm-page-label pt-2 pb-0.5 text-center text-xs text-ink-faint select-none';
+    label.textContent = `Page ${layout.pageNum} of ${layout.totalPages}`;
+
+    slot.appendChild(frame);
+    slot.appendChild(label);
+    applyZoomToSlot(slot, result.geometry, zoom);
+    fragment.appendChild(slot);
+  });
+
+  pagesEl.replaceChildren(fragment);
+  return headingIndex;
+}
+
+/**
+ * The Paper Canvas: live paginated preview. Runs the engine pipeline
+ * (debounced, plus manual renders) and mounts the result as one shadow-DOM
+ * page per layout. Pages are imperative DOM — the engine hands over finished
+ * subtrees, which React doesn't reconcile — while the zoom pill, labels,
+ * shimmer, and toast are React-rendered chrome around them.
+ */
+export function PaperCanvas({ ref }: PaperCanvasProps) {
+  const status = useDocumentStore((state) => state.status);
+  const activeId = useDocumentStore((state) => state.activeId);
+  const markdown = useDocumentStore((state) => state.markdown);
+  const settings = useDocumentStore((state) => state.settings);
+
+  const [zoom, setZoom] = useState(1);
+  const [rendering, setRendering] = useState(false);
+  const [pageCount, setPageCount] = useState(0);
+  const [largeDocCount, setLargeDocCount] = useState<number | null>(null);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pagesRef = useRef<HTMLDivElement>(null);
+  /** Bumped per run: async steps abandon their work when the token moves on. */
+  const tokenRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resolverRef = useRef<{
+    docId: string;
+    resolver: AssetResolverCache;
+  } | null>(null);
+  /** "Render anyway" acknowledged for the current document. */
+  const ackRef = useRef(false);
+  const geometryRef = useRef<PageGeometry | null>(null);
+  const headingIndexRef = useRef(new Map<string, number>());
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
+  const runRenderRef = useRef<() => Promise<void>>(async () => {});
+  runRenderRef.current = async () => {
+    const store = useDocumentStore.getState();
+    if (store.status !== 'ready' || !store.activeId) return;
+    const token = ++tokenRef.current;
+    const {
+      activeId: docId,
+      markdown: md,
+      settings: docSettings,
+      name,
+    } = store;
+    setRendering(true);
+    try {
+      // One resolver per document: its blob URLs die with the doc switch.
+      if (resolverRef.current?.docId !== docId) {
+        resolverRef.current?.resolver.dispose();
+        resolverRef.current = {
+          docId,
+          resolver: createAssetResolver(await openDatabase(), 'blob-url'),
+        };
+      }
+      const resolver = resolverRef.current.resolver;
+      await resolver.warmup(collectAssetRefs(md, docSettings));
+      if (token !== tokenRef.current) return;
+
+      const result = await runDocumentPipeline(md, docSettings, {
+        title: name,
+      });
+      if (token !== tokenRef.current) return;
+
+      // Large documents: pause instead of hammering the main thread uninvited.
+      if (result.layouts.length > LARGE_DOC_PAGES && !ackRef.current) {
+        setLargeDocCount(result.layouts.length);
+        return;
+      }
+      setLargeDocCount(null);
+
+      const pagesEl = pagesRef.current;
+      const scrollEl = scrollRef.current;
+      if (!pagesEl || !scrollEl) return;
+      const prevScroll = scrollEl.scrollTop;
+      headingIndexRef.current = mountPageSlots(
+        pagesEl,
+        result,
+        docSettings,
+        resolver,
+        zoomRef.current,
+      );
+      geometryRef.current = result.geometry;
+      // Keep the reader's place across re-renders (same doc, similar height).
+      scrollEl.scrollTop = Math.min(prevScroll, scrollEl.scrollHeight);
+      setPageCount(result.layouts.length);
+    } catch (error) {
+      // A failed render keeps the previous pages on screen.
+      console.error('Paper Canvas render failed:', error);
+    } finally {
+      if (token === tokenRef.current) setRendering(false);
+    }
+  };
+
+  // Debounced auto-render on any input that affects the pages.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      void runRenderRef.current();
+    }, RENDER_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, [markdown, settings, activeId, status]);
+
+  // Document switch (and unmount): drop stale pages immediately — never show
+  // another document's pages — cancel in-flight work, release the document's
+  // blob URLs, and re-arm the guard.
+  useEffect(() => {
+    pagesRef.current?.replaceChildren();
+    headingIndexRef.current = new Map();
+    geometryRef.current = null;
+    ackRef.current = false;
+    setPageCount(0);
+    setLargeDocCount(null);
+    return () => {
+      tokenRef.current += 1;
+      resolverRef.current?.resolver.dispose();
+      resolverRef.current = null;
+    };
+  }, [activeId]);
+
+  // The shell drives manual renders and scroll sync through the ref.
+  useImperativeHandle(
+    ref,
+    () => ({
+      renderNow: () => {
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+        }
+        void runRenderRef.current();
+      },
+      setScrollFraction: (fraction) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        el.scrollTop = fraction * (el.scrollHeight - el.clientHeight);
+      },
+    }),
+    [],
+  );
+
+  // Zoom changes re-scale the mounted slots (pages area is imperative DOM).
+  useEffect(() => {
+    const geometry = geometryRef.current;
+    const pages = pagesRef.current;
+    if (!geometry || !pages) return;
+    for (const slot of Array.from(pages.children)) {
+      applyZoomToSlot(slot, geometry, zoom);
+    }
+  }, [zoom]);
+
+  /** In-page anchor link → scroll to the page containing its target. */
+  const handleCanvasClick = useCallback((event: React.MouseEvent) => {
+    // Clicks inside the page shadow roots retarget to the host; the real
+    // anchor is at the head of the native event's composed path.
+    const native = event.nativeEvent as Event & {
+      composedPath?: () => EventTarget[];
+    };
+    const target = (
+      native.composedPath ? native.composedPath()[0] : event.target
+    ) as HTMLElement | undefined;
+    const anchor = target?.closest?.(
+      'a[href^="#"]',
+    ) as HTMLAnchorElement | null;
+    if (!anchor) return;
+    const href = anchor.getAttribute('href');
+    if (!href?.startsWith('#')) return;
+    let id = href.slice(1);
+    try {
+      id = decodeURIComponent(id);
+    } catch {
+      // Malformed escape: match the raw text instead.
+    }
+    const pageIndex = headingIndexRef.current.get(id);
+    if (pageIndex === undefined) return;
+    event.preventDefault();
+    const slot = pagesRef.current?.children[pageIndex] as
+      HTMLElement | undefined;
+    const scrollEl = scrollRef.current;
+    if (!slot || !scrollEl) return;
+    // The scroll container is position:relative, so offsetTop is scroll space.
+    scrollEl.scrollTop = Math.max(0, slot.offsetTop - FIT_GUTTER_PX);
+  }, []);
+
+  const zoomBy = useCallback((delta: number) => {
+    setZoom((current) => clampZoom(current + delta));
+  }, []);
+
+  const fitToWidth = useCallback(() => {
+    const geometry = geometryRef.current;
+    const el = scrollRef.current;
+    if (!geometry || !el) return;
+    const available = el.clientWidth - FIT_GUTTER_PX * 2;
+    if (available <= 0) return;
+    setZoom(clampZoom(available / geometry.pw));
+  }, []);
+
+  const ackLargeDoc = useCallback(() => {
+    ackRef.current = true;
+    setLargeDocCount(null);
+    void runRenderRef.current();
+  }, []);
+
+  if (status !== 'ready' || !activeId) {
+    return (
+      <EmptyState
+        icon={<PagesIcon />}
+        title="Paper Canvas"
+        hint={
+          status === 'loading'
+            ? 'Loading your documents…'
+            : 'Open a document from the Library to see its pages.'
+        }
+      />
+    );
+  }
+
+  const pillButton =
+    'flex h-7 w-7 items-center justify-center rounded-full text-ink-soft transition-colors duration-150 hover:bg-surface-hover hover:text-ink';
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <div
+        ref={scrollRef}
+        data-testid="canvas-scroll"
+        aria-busy={rendering}
+        onClick={handleCanvasClick}
+        className="absolute inset-0 overflow-auto bg-canvas"
+      >
+        <div
+          ref={pagesRef}
+          data-testid="canvas-pages"
+          className="pm-pages flex w-max min-w-full flex-col items-center gap-6 px-6 py-8"
+        />
+      </div>
+
+      {pageCount === 0 && (
+        <div
+          data-testid="canvas-loading"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+        >
+          <div className="w-56 max-w-[60%] animate-pulse space-y-2">
+            <div className="aspect-[1/1.414] w-full rounded-pane border border-hairline bg-surface-hover" />
+            <div className="mx-auto h-2.5 w-20 rounded bg-surface-hover" />
+          </div>
+        </div>
+      )}
+
+      {largeDocCount !== null && (
+        <div
+          role="status"
+          data-testid="large-doc-toast"
+          className="absolute inset-x-0 bottom-16 flex justify-center px-4"
+        >
+          <div className="flex animate-fade-in items-center gap-3 rounded-pane border border-hairline bg-surface px-4 py-2.5 shadow-xl">
+            <p className="text-xs text-ink-soft">
+              This document renders {largeDocCount} pages — previewing may slow
+              your browser.
+            </p>
+            <button
+              type="button"
+              data-testid="render-anyway"
+              onClick={ackLargeDoc}
+              className="shrink-0 rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-strong"
+            >
+              Render anyway
+            </button>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setLargeDocCount(null)}
+              className="shrink-0 rounded-control px-1 text-ink-faint transition-colors duration-150 hover:text-ink"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+        <div
+          role="group"
+          aria-label="Zoom"
+          data-testid="zoom-pill"
+          className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-hairline bg-surface/95 py-1 pr-1.5 pl-1.5 shadow-lg backdrop-blur"
+        >
+          <button
+            type="button"
+            aria-label="Zoom out"
+            title="Zoom out"
+            onClick={() => zoomBy(-ZOOM_STEP)}
+            className={pillButton}
+          >
+            <MinusIcon />
+          </button>
+          <span
+            data-testid="zoom-level"
+            className="w-11 text-center text-xs text-ink-soft tabular-nums select-none"
+          >
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            aria-label="Zoom in"
+            title="Zoom in"
+            onClick={() => zoomBy(ZOOM_STEP)}
+            className={pillButton}
+          >
+            <PlusIcon />
+          </button>
+          <span aria-hidden="true" className="mx-1 h-4 w-px bg-hairline" />
+          <button
+            type="button"
+            aria-label="Fit page width"
+            title="Fit page width"
+            onClick={fitToWidth}
+            className={pillButton}
+          >
+            <ExpandIcon />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

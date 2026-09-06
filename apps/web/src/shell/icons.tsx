@@ -269,3 +269,22 @@ export function RedoIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+export function MinusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M5 12h14" />
+    </Icon>
+  );
+}
+
+export function ExpandIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M14 3h7v7" />
+      <path d="M10 21H3v-7" />
+      <path d="M21 3l-7 7" />
+      <path d="M3 21l7-7" />
+    </Icon>
+  );
+}
