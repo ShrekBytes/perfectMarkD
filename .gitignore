@@ -8,6 +8,12 @@ coverage/
 .env.*
 !.env.example
 
+# Local SQLite data (default DB_PATH)
+data/
+*.db
+*.db-wal
+*.db-shm
+
 # OS / editor noise
 .DS_Store
 *.log

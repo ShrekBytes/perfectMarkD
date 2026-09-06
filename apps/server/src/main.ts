@@ -1,8 +1,12 @@
 import { serve } from '@hono/node-server';
-import { app } from './index.js';
+import { createDatabase } from './db/database.js';
+import { loadEnv } from './env.js';
+import { createApp } from './index.js';
 
-const port = Number(process.env.PORT) || 3000;
+const env = loadEnv(process.env);
+const db = createDatabase(env.dbPath);
+const app = createApp({ db });
 
-serve({ fetch: app.fetch, port }, (info) => {
+serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`PerfectMarkD API listening on http://localhost:${info.port}`);
 });

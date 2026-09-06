@@ -2,6 +2,8 @@ packages:
   - apps/*
   - packages/*
 
-# esbuild's postinstall must run for the vite/tsup/tsx binaries to work
+# esbuild's postinstall must run for the vite/tsup/tsx binaries to work;
+# better-sqlite3 compiles its native binding on install
 allowBuilds:
+  better-sqlite3: true
   esbuild: true

@@ -1,0 +1,15 @@
+# Keep the build context small; manifests are copied explicitly by the
+# Dockerfile, this keeps source copies from dragging in junk.
+.git
+.scratch
+**/node_modules
+**/dist
+**/coverage
+**/data
+**/*.db
+**/*.db-wal
+**/*.db-shm
+.env
+.env.*
+**/*.log
+**/.DS_Store
