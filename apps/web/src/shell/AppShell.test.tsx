@@ -17,6 +17,7 @@ import {
   useDocumentStore,
 } from '../documents/store';
 import { stubBroadcastChannel } from '../testing/stub-broadcast-channel';
+import { stubClientRects } from '../testing/stub-client-rects';
 import { stubIndexedDB } from '../testing/stub-idb';
 import { stubSystemTheme } from '../testing/match-media';
 
@@ -36,6 +37,7 @@ beforeEach(async () => {
   stubSystemTheme('light');
   stubIndexedDB();
   stubBroadcastChannel().reset();
+  stubClientRects();
   resetDocumentStoreForTests();
 });
 

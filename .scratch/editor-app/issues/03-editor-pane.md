@@ -1,8 +1,21 @@
 # 03 — Editor pane (CodeMirror 6)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: editor-app/02, engine-port/04 (for live render wiring)
 
 CodeMirror 6 with markdown language + syntax highlighting, line wrapping, `///` page-break lines visually flagged. Slim toolbar: bold, italic, heading cycle, list, table snippet, image (opens picker), insert Page Break, undo/redo. Shortcuts: Ctrl/Cmd+B/I/K (K = link), Ctrl/Cmd+Enter = render. Word/char count in pane footer. Paste/drop of `.md`/images handled with ticket 08. Scroll sync: approximate proportional sync editor↔canvas (heading-anchor based when possible).
 
 **Accepts**: editing flows into the render pipeline via store; toolbar + shortcuts work; sync feels instant on a 20-page doc.
+
+## Comments
+
+Implemented (2026-09-06), TDD at two pure seams (`markdown-commands`, `word-count`) plus component tests; 303 workspace tests green (44 new); toolbar, shortcuts, Page Break flagging, counts, and both themes verified in a real browser.
+
+- Layout: `apps/web/src/editor/` — `markdown-commands.ts` (toolbar commands as CM `StateCommand`s: bold/italic wrap-unwrap with multi-cursor + shift bookkeeping, heading cycle plain→H1…→H6→plain skipping empty lines, bullet toggle that skips already-bulleted and empty lines, link wrap/template, GFM table snippet with first header cell selected, `///` Page Break insert), `word-count.ts` (whitespace-run words, code-point chars), `editor-setup.ts` (extension bundle: markdown language, class-based HighlightStyle styled in `editor.css` via design tokens so dark mode needs no second style, line wrapping, placeholder, history, keymaps, `///` line-decoration plugin, doc-changed hook), `EditorPane.tsx` (toolbar + CM view + word/char footer + store sync). Icons added to `shell/icons.tsx`; pane replaces the editor EmptyState in AppShell.
+- Store flow: every editor change pushes through `updateActive` (autosave/flush/broadcast all inherited from ticket 02); markdown changed elsewhere (doc switch, import, remote adoption) replaces the editor doc with `isolateHistory`, guarded by a last-synced ref so nothing echoes back. `EditorView.findFromDOM` drives the component tests.
+- Emphasis toggling beyond the brief: Ctrl+B → type → Ctrl+B closes the active pair (cursor moves past the closing markers) via the lezer tree (`StrongEmphasis`/`Emphasis` node lookup); toggling twice with nothing typed removes the pair. Needed a fallback for the empty pair: `****` parses as a thematic break, so an empty pair is detected by markers hugging the cursor (the same opens/closes check as the unwrap branch).
+- Seams for dependent tickets, per the ticket's own scope notes: `onRequestRender` (Ctrl/Cmd+Enter — Paper Canvas manual render, ticket 04), `onPickImage` (image button renders disabled with "Images — coming soon", like the export-split placeholder, until ticket 08), `onEditorScroll` (proportional 0..1 scroll fraction from the editor, clamped; the canvas side and any heading-anchor refinement land in ticket 04). Paste/drop of .md/images deliberately untouched (ticket 08).
+- Spec-layout note: the layout contract's "import/export .md" for the editor pane shipped app-wide in ticket 02 (Library drawer + drag-drop + export); no duplicate affordance added to the pane.
+- `@codemirror/language-data` included for fenced-code inner highlighting (the standard lang-markdown recipe for an Obsidian-import audience); it lazy-loads per language, so the initial bundle only carries markdown itself.
+- Test infrastructure: `testing/stub-client-rects.ts` — jsdom lacks Range/Element client rects; CM's measure pass calls them on every frame and an aborted measure leaks its measuring dummy into the document and corrupts the content. Pre-existing AppShell tests needed the same stub once the pane mounted. Also worth remembering: run suites via `pnpm test` — it sets `NODE_OPTIONS=--no-webstorage` so Node 22's experimental `localStorage` global doesn't shadow jsdom's.
+- Code review fixes applied: dropped an unrequested Mod-Shift+H binding (spec lists the shortcuts; the heading button covers it), de-duplicated the marker-hug check into the opens/closes pair check, fixed a stale comment and a misleading variable name; reformat-only churn in six pre-existing shell/theme files split into its own style commit. Deliberately kept: language-data (above) and the caret-preserving doc replace (raw offset clamp — acceptable approximation).

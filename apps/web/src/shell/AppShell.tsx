@@ -3,10 +3,11 @@ import { TopBar } from './TopBar';
 import { StaleBanner } from './StaleBanner';
 import { EmptyState } from './EmptyState';
 import { CollapsedPaneToggle, PaneDivider } from './PaneDivider';
-import { FileTextIcon, PagesIcon, SlidersIcon, UploadIcon } from './icons';
+import { PagesIcon, SlidersIcon, UploadIcon } from './icons';
 import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
 import { useDocumentStore } from '../documents/store';
+import { EditorPane } from '../editor/EditorPane';
 import { DeleteToast } from '../library/DeleteToast';
 import { LibraryPanel } from '../library/LibraryPanel';
 import { useFileDrop } from '../library/useFileDrop';
@@ -94,11 +95,9 @@ export function AppShell() {
               }}
               className="flex flex-col bg-surface"
             >
-              <EmptyState
-                icon={<FileTextIcon />}
-                title="Editor"
-                hint="Start writing — your markdown goes here."
-              />
+              {/* Ctrl/Cmd+Enter render and the image picker wire up in
+                  tickets 04 and 08. */}
+              <EditorPane />
             </aside>
             <PaneDivider
               side="editor"

@@ -1,0 +1,106 @@
+/* Editor pane styling. CodeMirror generates its own DOM classes, so these are
+ * real CSS rules scoped under .pm-editor rather than Tailwind utilities. All
+ * colors come from the design tokens so dark mode works without extra rules. */
+
+.pm-editor,
+.pm-editor .cm-editor {
+  height: 100%;
+}
+
+.pm-editor .cm-editor {
+  background: transparent;
+}
+
+.pm-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.pm-editor .cm-scroller {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.pm-editor .cm-content {
+  /* Room for the caret at the very end without growing the layout viewport. */
+  padding-block: 12px 40vh;
+  caret-color: var(--accent);
+}
+
+.pm-editor .cm-line {
+  padding-inline: 16px;
+}
+
+.pm-editor .cm-placeholder {
+  color: var(--ink-faint);
+}
+
+.pm-editor .cm-cursor {
+  border-left-color: var(--accent);
+}
+
+.pm-editor .cm-selectionBackground,
+.pm-editor.cm-editor .cm-selectionBackground,
+.pm-editor .cm-editor.cm-focused .cm-selectionBackground {
+  background: var(--accent-soft) !important;
+}
+
+/* ─── Page Break flagging ──────────────────────────────────────────────────── */
+
+.pm-editor .cm-page-break {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.pm-editor .cm-page-break::after {
+  content: 'Page Break';
+  position: absolute;
+  right: 12px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* ─── Markdown syntax highlighting (class-based, see editor-setup.ts) ─────── */
+
+.pm-editor .cm-md-heading {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.pm-editor .cm-md-strong {
+  font-weight: 650;
+}
+
+.pm-editor .cm-md-em {
+  font-style: italic;
+}
+
+.pm-editor .cm-md-strike {
+  text-decoration: line-through;
+}
+
+.pm-editor .cm-md-link,
+.pm-editor .cm-md-url {
+  color: var(--accent);
+}
+
+.pm-editor .cm-md-code {
+  font-size: 0.92em;
+  color: var(--ink-soft);
+}
+
+.pm-editor .cm-md-quote {
+  color: var(--ink-soft);
+}
+
+.pm-editor .cm-md-meta,
+.pm-editor .cm-md-sep {
+  color: var(--ink-faint);
+}
