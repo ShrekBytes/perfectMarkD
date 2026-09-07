@@ -159,6 +159,14 @@ const CODE_THEME_ALIASES: Record<string, string> = {
 
 const FALLBACK_CODE_THEME = 'github-light';
 
+/** The Shiki theme ids the highlighting pass can resolve, exported for hosts'
+ *  code-theme pickers (the Inspector's dropdown renders this catalog; shiki
+ *  itself is a core dependency, so hosts don't import it directly). */
+export const CODE_THEMES: readonly string[] = [
+  'none',
+  ...Object.keys(bundledThemes).sort((a, b) => a.localeCompare(b)),
+];
+
 /** A fence with no theme/lang match renders as markdown-it's default plain
  *  block, escaped, with no highlighting spans. */
 function plainCodeBlock(code: string, lang: string): string {

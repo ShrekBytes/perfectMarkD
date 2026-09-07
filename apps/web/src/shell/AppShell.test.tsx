@@ -70,10 +70,14 @@ it('renders the top bar contract: wordmark, doc name, save state, Library, theme
   // The wordmark is styled across nested spans, so match its full text content.
   expect(screen.getByRole('banner')).toHaveTextContent('PerfectMarkD');
   expect(screen.getByText('Mark')).toHaveClass('text-accent');
-  // First run opens the seeded sample document.
-  expect(screen.getByRole('textbox', { name: 'Document name' })).toHaveValue(
-    'Welcome to PerfectMarkD',
-  );
+  // First run opens the seeded sample document. DocName's draft syncs via
+  // effect after the store lands, so the value settles rather than being
+  // read mid-seed (a rare-but-real flake under suite parallelism).
+  await waitFor(() => {
+    expect(screen.getByRole('textbox', { name: 'Document name' })).toHaveValue(
+      'Welcome to PerfectMarkD',
+    );
+  });
   expect(screen.getByTestId('save-state')).toHaveTextContent('Saved');
   expect(screen.getByRole('button', { name: 'Library' })).toBeInTheDocument();
   expect(
@@ -102,8 +106,10 @@ it('renders the three panes with the sample experience on first run', async () =
   expect(
     screen.getByText('This is a sample — edit or clear it.'),
   ).toBeInTheDocument();
+  // The Inspector is live (editor-app/05): tabs render, not a placeholder.
+  expect(screen.getByRole('tab', { name: 'Page' })).toBeInTheDocument();
   expect(
-    screen.getByText('Page, style, and header/footer settings live here.'),
+    screen.getByRole('tabpanel', { name: 'Page settings' }),
   ).toBeInTheDocument();
 });
 
@@ -219,6 +225,26 @@ it('imports dropped .md files anywhere in the window', async () => {
   await waitFor(() => {
     expect(useDocumentStore.getState().name).toBe('dropped');
     expect(useDocumentStore.getState().markdown).toBe('# Dropped');
+  });
+});
+
+it('edits settings in the Inspector and re-renders the canvas pages', async () => {
+  await renderReadyShell();
+
+  // Inspector edits flow through updateActive; the canvas re-renders on the
+  // settings reference change (PaperCanvas.test.tsx covers the render loop,
+  // this pins the shell-level wiring).
+  const top = screen.getByRole('spinbutton', { name: 'Top margin' });
+  await userEvent.clear(top);
+  await userEvent.type(top, '30');
+  await act(async () => {
+    await useDocumentStore.getState().flush();
+  });
+
+  expect(useDocumentStore.getState().settings.marginTop).toBe(30);
+  // The pages area still hosts a page for the seeded sample document.
+  await waitFor(() => {
+    expect(document.querySelector('.pm-page-host')).toBeInTheDocument();
   });
 });
 

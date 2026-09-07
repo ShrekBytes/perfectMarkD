@@ -325,3 +325,14 @@ export function ServerIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+/** The padlock on gated (paid) controls: opens the pricing modal, never a
+ *  signup wall (editor-app/09). */
+export function LockIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect width="18" height="13" x="3" y="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </Icon>
+  );
+}

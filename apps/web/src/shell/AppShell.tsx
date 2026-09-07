@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TopBar } from './TopBar';
 import { StaleBanner } from './StaleBanner';
-import { EmptyState } from './EmptyState';
 import { CollapsedPaneToggle, PaneDivider } from './PaneDivider';
 import { WelcomeStrip } from './WelcomeStrip';
-import { SlidersIcon, UploadIcon } from './icons';
+import { UploadIcon } from './icons';
 import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
 import { useDocumentStore } from '../documents/store';
@@ -13,6 +12,7 @@ import { DeleteToast } from '../library/DeleteToast';
 import { LibraryPanel } from '../library/LibraryPanel';
 import { useFileDrop } from '../library/useFileDrop';
 import { PaperCanvas, type PaperCanvasApi } from '../canvas/PaperCanvas';
+import { Inspector } from '../inspector/Inspector';
 
 /**
  * The app shell: top bar + three panes (editor · Paper Canvas · inspector).
@@ -161,11 +161,7 @@ export function AppShell() {
               }}
               className="flex flex-col bg-surface"
             >
-              <EmptyState
-                icon={<SlidersIcon />}
-                title="Inspector"
-                hint="Page, style, and header/footer settings live here."
-              />
+              <Inspector />
             </aside>
           </>
         )}
