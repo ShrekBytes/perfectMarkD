@@ -9,6 +9,10 @@ LICENSE
 # must not reformat it or the comparison never settles.
 packages/core/src/*.golden.html
 
+# Generated regression-suite snapshots (engine-port/08) — same byte-for-byte
+# comparison; vitest's serializer owns their exact formatting.
+packages/core/src/golden/goldens/
+
 # Author-owned prose; prettier churns these (table padding, emphasis marks)
 PLAN.md
 CONTEXT.md

@@ -45,5 +45,11 @@ export default defineConfig({
       'packages/*/src/**/*.test.{ts,tsx}',
       'apps/*/src/**/*.test.{ts,tsx}',
     ],
+    // The real-Chromium golden suite (packages/core/src/golden/) runs under
+    // its own config — packages/core/playwright.vitest.config.ts — via
+    // `pnpm --filter @perfectmarkd/core test:golden` (CI runs it as its own
+    // step after `pnpm test`). It needs Playwright's browser and a single
+    // process; keeping it out keeps this suite browser-independent.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/src/golden/**'],
   },
 });

@@ -21,6 +21,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Browser for the engine's real-Chromium golden suite (engine-port/08).
+      # Pinned to the same version the devDependency expects.
+      - name: Install Playwright Chromium
+        run: pnpm --filter @perfectmarkd/core exec playwright install chromium --with-deps
+
       - name: Lint
         run: pnpm lint
 
@@ -32,3 +37,6 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Engine golden tests (real Chromium)
+        run: pnpm --filter @perfectmarkd/core test:golden

@@ -12,10 +12,14 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:golden": "vitest run --config playwright.vitest.config.ts",
+    "test:golden:update": "vitest run --config playwright.vitest.config.ts -u"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.4.1",
+    "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3"
