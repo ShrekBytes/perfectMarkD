@@ -238,3 +238,26 @@ it('surfaces an export failure and recovers', async () => {
   expect(printStub.windows).toHaveLength(0);
   expect(exportButton()).toBeEnabled();
 });
+
+it('opens the pricing modal from the Server Export item without exporting', async () => {
+  markPrintHintShown();
+  render(<ExportSplitButton />);
+  typeMarkdown('# Priced out');
+
+  await userEvent.click(chevron());
+  await userEvent.click(
+    screen.getByRole('menuitem', { name: /server export/i }),
+  );
+
+  // The menu closed and the pricing modal took its place — no print ran.
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  const dialog = screen.getByRole('dialog', { name: /plans and pricing/i });
+  expect(dialog).toHaveTextContent('Premium');
+  expect(dialog).toHaveTextContent(/payments are launching soon/i);
+  expect(printStub.windows).toHaveLength(0);
+
+  // Escape closes the modal and the button is ready for a Client Export.
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(exportButton()).toBeEnabled();
+});

@@ -3,21 +3,26 @@ import {
   ChevronDownIcon,
   DownloadIcon,
   PrinterIcon,
+  ServerIcon,
   SpinnerIcon,
 } from '../shell/icons';
+import { PricingModal } from '../pricing/PricingModal';
 import { PrintHintDialog } from './PrintHintDialog';
 import { useClientExport } from './useClientExport';
 
 /**
  * The top bar's `⬇ Export ▾` split button: the main action is Client Export
  * (ADR-0002's print flow); the dropdown's "Print…" item is the same flow, the
- * dialog being inherent. Phase 2 adds Server Export to this menu. The hint
- * dialog and toasts mount here so the whole flow is one self-contained
- * control the TopBar doesn't need to know about.
+ * dialog being inherent. "Server Export" is the Phase-1 inert entry — it opens
+ * the pricing modal (editor-app/09) until the billing workstream swaps in the
+ * real flow. The hint dialog, toasts, and pricing modal mount here so the
+ * whole flow is one self-contained control the TopBar doesn't need to know
+ * about.
  */
 export function ExportSplitButton() {
   const flow = useClientExport();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pricingOpen, setPricingOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Dropdown dismissal: outside pointer press or Escape.
@@ -97,6 +102,19 @@ export function ExportSplitButton() {
               <PrinterIcon className="text-ink-soft" />
               Print…
             </button>
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                setPricingOpen(true);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
+            >
+              <ServerIcon className="text-ink-soft" />
+              Server Export
+              <span className="ml-auto text-xs text-ink-faint">soon</span>
+            </button>
           </div>
         )}
       </div>
@@ -108,6 +126,8 @@ export function ExportSplitButton() {
           onCancel={flow.cancelHint}
         />
       )}
+
+      {pricingOpen && <PricingModal onClose={() => setPricingOpen(false)} />}
 
       {flow.toast && (
         <div

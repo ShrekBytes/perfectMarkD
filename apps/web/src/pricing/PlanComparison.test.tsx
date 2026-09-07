@@ -1,0 +1,72 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PlanComparison } from './PlanComparison';
+
+afterEach(() => {
+  cleanup();
+});
+
+const openEditor = vi.fn();
+
+function renderComparison(compact = false) {
+  return render(<PlanComparison compact={compact} onOpenEditor={openEditor} />);
+}
+
+describe('plan columns (from the plans module)', () => {
+  it('shows all three plans with their USDT prices', () => {
+    renderComparison();
+
+    expect(
+      screen.getByRole('columnheader', { name: /Free/ }),
+    ).toHaveTextContent('Free');
+    expect(screen.getByText('3 USDT/mo')).toBeInTheDocument();
+    expect(screen.getByText('7 USDT/mo')).toBeInTheDocument();
+  });
+
+  it('renders the feature matrix with quotas and marks', () => {
+    renderComparison();
+
+    // Quota strings straight from the plan table…
+    expect(screen.getByText('never')).toBeInTheDocument();
+    expect(screen.getByText('300/mo')).toBeInTheDocument();
+    expect(screen.getByText('1000/mo')).toBeInTheDocument();
+    // …and every feature row label present, including Premium-only ones.
+    expect(screen.getAllByRole('row').length).toBeGreaterThanOrEqual(12);
+    expect(screen.getByText('Priority render queue')).toBeInTheDocument();
+    expect(screen.getByText('Export History (30 days)')).toBeInTheDocument();
+  });
+});
+
+describe('calls to action', () => {
+  it('gives the free plan a working "Open the editor" CTA', async () => {
+    const user = userEvent.setup();
+    renderComparison();
+
+    expect(openEditor).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Open the editor' }));
+    expect(openEditor).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders exactly two inert "Coming soon" CTAs (Pro + Premium)', () => {
+    renderComparison();
+
+    const comingSoon = screen.getAllByRole('button', { name: 'Coming soon' });
+    expect(comingSoon).toHaveLength(2);
+    for (const button of comingSoon) {
+      expect(button).toBeDisabled();
+    }
+  });
+});
+
+describe('compact mode (modal)', () => {
+  it('keeps every feature row but drops the plan blurbs', () => {
+    renderComparison(true);
+
+    expect(screen.getByText('Priority render queue')).toBeInTheDocument();
+    // No blurb in compact mode: "everyday documents" only appears on /pricing.
+    expect(screen.queryByText(/everyday documents/i)).not.toBeInTheDocument();
+  });
+});
