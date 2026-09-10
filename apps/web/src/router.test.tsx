@@ -19,8 +19,10 @@ afterEach(() => {
 });
 
 describe('routeForPath', () => {
-  it('maps /pricing to the pricing route and everything else to the editor', () => {
+  it('maps known paths and falls back to the editor', () => {
     expect(routeForPath('/pricing')).toBe('pricing');
+    expect(routeForPath('/login')).toBe('login');
+    expect(routeForPath('/register')).toBe('register');
     expect(routeForPath('/')).toBe('editor');
     // /export is the hidden route the server loads (ADR-0003); until that
     // ships, unknown paths fall back to the editor rather than a 404.

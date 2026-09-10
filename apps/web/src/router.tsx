@@ -9,12 +9,15 @@ import { useEffect, useState, type AnchorHTMLAttributes } from 'react';
  * handles it in server/06).
  */
 
-export type Route = 'editor' | 'pricing';
+export type Route = 'editor' | 'pricing' | 'login' | 'register';
 
 const NAVIGATE_EVENT = 'perfectmarkd:navigate';
 
 export function routeForPath(pathname: string): Route {
-  return pathname === '/pricing' ? 'pricing' : 'editor';
+  if (pathname === '/pricing') return 'pricing';
+  if (pathname === '/login') return 'login';
+  if (pathname === '/register') return 'register';
+  return 'editor';
 }
 
 /** Pushes a new history entry and notifies useRoute() subscribers in this tab. */

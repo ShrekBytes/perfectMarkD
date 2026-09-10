@@ -59,3 +59,15 @@ it('renders the pricing page at /pricing, then swaps to the editor on the wordma
   expect(window.location.pathname).toBe('/');
   await screen.findByTestId('save-state', {}, { timeout: 5000 });
 });
+
+it.each([
+  ['/login', 'Sign in'],
+  ['/register', 'Create account'],
+])('renders the auth form at %s', (path, heading) => {
+  window.history.pushState({}, '', path);
+  render(<App />);
+
+  expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+  // The editor must not mount behind the form.
+  expect(screen.queryByTestId('export-split')).not.toBeInTheDocument();
+});

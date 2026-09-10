@@ -56,6 +56,8 @@ export const users = sqliteTable('users', {
     .$defaultFn(() => new Date()),
 });
 
+export type User = typeof users.$inferSelect;
+
 export const sessions = sqliteTable('sessions', {
   token: text('token').primaryKey(),
   userId: integer('user_id')

@@ -16,7 +16,10 @@ function makeApp() {
   const sink: LogSink = (line) => lines.push(line);
   const { db, dir } = createTestDatabase();
   cleanup = () => removeTestDatabase(dir);
-  return { app: createApp({ db, log: sink }), lines };
+  return {
+    app: createApp({ db, sessionSecret: 'test-secret', log: sink }),
+    lines,
+  };
 }
 
 describe('health check', () => {
@@ -77,10 +80,11 @@ describe('database on context', () => {
     const lines: string[] = [];
     const { db, dir } = createTestDatabase();
     cleanup = () => removeTestDatabase(dir);
-    const app: AppType = createApp({ db, log: (l) => lines.push(l) }).get(
-      '/__probe',
-      (c) => c.json({ hasDb: c.var.db === db }),
-    );
+    const app: AppType = createApp({
+      db,
+      sessionSecret: 'test-secret',
+      log: (l) => lines.push(l),
+    }).get('/__probe', (c) => c.json({ hasDb: c.var.db === db }));
     const res = await app.request('/__probe');
     expect(await res.json()).toEqual({ hasDb: true });
   });
