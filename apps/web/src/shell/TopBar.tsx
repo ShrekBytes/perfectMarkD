@@ -1,4 +1,5 @@
 import { BookIcon } from './icons';
+import { AccountMenu } from './AccountMenu';
 import { DocName } from './DocName';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { ExportSplitButton } from '../export/ExportSplitButton';
@@ -14,6 +15,8 @@ interface TopBarProps {
   onOpenLibrary: () => void;
   theme: Theme;
   onToggleTheme: () => void;
+  /** Opens the Upgrade status dialog (billing/01). */
+  onOpenUpgradeStatus: () => void;
 }
 
 export function TopBar({
@@ -24,6 +27,7 @@ export function TopBar({
   onOpenLibrary,
   theme,
   onToggleTheme,
+  onOpenUpgradeStatus,
 }: TopBarProps) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-surface px-3">
@@ -61,6 +65,8 @@ export function TopBar({
         {/* Client Export flow (editor-app/06): self-contained split button —
             print flow, one-time hint, and toasts all live inside it. */}
         <ExportSplitButton />
+
+        <AccountMenu onOpenUpgradeStatus={onOpenUpgradeStatus} />
       </div>
     </header>
   );

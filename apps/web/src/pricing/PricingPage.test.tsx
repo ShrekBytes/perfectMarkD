@@ -27,12 +27,9 @@ it('renders the three-column comparison from the shared plans module', () => {
   expect(screen.getByText('Priority render queue')).toBeInTheDocument();
 });
 
-it('carries the Phase-1 inert state, AGPL note, and duration terms', () => {
+it('carries the AGPL note and duration terms', () => {
   render(<PricingPage />);
 
-  expect(screen.getByTestId('pricing-coming-soon')).toHaveTextContent(
-    /payments are launching soon/i,
-  );
   expect(screen.getByText(/AGPL-3\.0 — the whole app/)).toBeInTheDocument();
   expect(screen.getByText(/12 months costs 10×/)).toBeInTheDocument();
 });
@@ -60,4 +57,19 @@ it('swaps to the editor when the wordmark is clicked', async () => {
   await user.click(screen.getByRole('link', { name: 'PerfectMarkD home' }));
 
   expect(window.location.pathname).toBe('/');
+});
+
+it('opens the upgrade flow when a paid plan is chosen', async () => {
+  const user = userEvent.setup();
+  render(<PricingPage />);
+
+  // Column order: Pro first, then Premium.
+  const [proCta] = screen.getAllByRole('button', { name: 'Upgrade' });
+  await user.click(proCta!);
+
+  const dialog = await screen.findByRole('dialog', {
+    name: /upgrade to pro/i,
+  });
+  expect(dialog).toBeInTheDocument();
+  expect(screen.getByTestId('upgrade-flow')).toBeInTheDocument();
 });

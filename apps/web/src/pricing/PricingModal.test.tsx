@@ -19,15 +19,19 @@ it('renders the compact plan comparison', () => {
   expect(screen.getByText('Priority render queue')).toBeInTheDocument();
 });
 
-it('shows the Phase-1 coming-soon state instead of a signup wall', () => {
+it('swaps to the upgrade flow when a paid plan is chosen', async () => {
+  const user = userEvent.setup();
   render(<PricingModal onClose={vi.fn()} />);
 
-  expect(screen.getByText(/payments are launching soon/i)).toBeInTheDocument();
-  const paidCtas = screen.getAllByRole('button', { name: 'Coming soon' });
-  expect(paidCtas).toHaveLength(2);
-  for (const button of paidCtas) {
-    expect(button).toBeDisabled();
-  }
+  const [proCta] = screen.getAllByRole('button', { name: 'Upgrade' });
+  await user.click(proCta!);
+
+  const dialog = screen.getByRole('dialog', { name: /upgrade to pro/i });
+  expect(dialog).toBeInTheDocument();
+  expect(screen.getByTestId('upgrade-flow')).toBeInTheDocument();
+  // Signed out, the flow starts from plan details (auth comes on Continue).
+  expect(screen.getByTestId('upgrade-step-details')).toBeInTheDocument();
+  expect(screen.getByText(/total/i)).toBeInTheDocument();
 });
 
 it('closes via the close button, Escape, and the backdrop', async () => {

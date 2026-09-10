@@ -30,7 +30,8 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export type Coin = 'USDT' | 'LTC';
 /** Blockchain network of the receiving wallet; LTC has only mainnet. */
-export type Network = 'TRC20' | 'BEP20' | 'mainnet';
+export const NETWORKS = ['TRC20', 'BEP20', 'mainnet'] as const;
+export type Network = (typeof NETWORKS)[number];
 
 export type WalletAddresses = Record<PaymentMethod, string>;
 
@@ -86,6 +87,8 @@ export const orders = sqliteTable('orders', {
   /** Null until the user submits their transaction details. */
   txid: text('txid'),
   amountExpected: text('amount_expected').notNull(),
+  /** USDT per LTC captured when the Order was created; set only for LTC. */
+  ltcRateUsdt: text('ltc_rate_usdt'),
   /** Amount the user claims to have sent, from their submission. */
   amountClaimed: text('amount_claimed'),
   status: text('status').notNull().default('pending'), // OrderStatus
@@ -97,6 +100,8 @@ export const orders = sqliteTable('orders', {
   /** Set when the Order leaves `pending`. */
   decidedAt: integer('decided_at', { mode: 'timestamp_ms' }),
 });
+
+export type Order = typeof orders.$inferSelect;
 
 /** One row per user — the current Entitlement state; history lives in orders. */
 export const entitlements = sqliteTable('entitlements', {

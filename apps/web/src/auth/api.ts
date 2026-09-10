@@ -5,28 +5,14 @@
 // message for display.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { errorFrom, postJson, ApiError } from '../api/client';
+
+/** The auth client's name for the shared API error. */
+export { ApiError as AuthError };
+
 export interface AuthUser {
   email: string;
   isAdmin: boolean;
-}
-
-export class AuthError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = 'AuthError';
-  }
-}
-
-function postJson(path: string, payload: unknown): Promise<Response> {
-  return fetch(path, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
 }
 
 export async function register(
@@ -73,15 +59,4 @@ async function readUserOrThrow(res: Response): Promise<AuthUser> {
   if (!res.ok) throw await errorFrom(res);
   const body = (await res.json()) as { user: AuthUser };
   return body.user;
-}
-
-async function errorFrom(res: Response): Promise<AuthError> {
-  const body: unknown = await res.json().catch(() => null);
-  const message =
-    typeof body === 'object' &&
-    body !== null &&
-    typeof (body as { error?: unknown }).error === 'string'
-      ? (body as { error: string }).error
-      : 'Something went wrong.';
-  return new AuthError(message, res.status);
 }

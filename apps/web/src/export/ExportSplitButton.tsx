@@ -13,9 +13,9 @@ import { useClientExport } from './useClientExport';
 /**
  * The top bar's `⬇ Export ▾` split button: the main action is Client Export
  * (ADR-0002's print flow); the dropdown's "Print…" item is the same flow, the
- * dialog being inherent. "Server Export" is the Phase-1 inert entry — it opens
- * the pricing modal (editor-app/09) until the billing workstream swaps in the
- * real flow. The hint dialog, toasts, and pricing modal mount here so the
+ * dialog being inherent. "Server Export" requires a paid plan, so it opens
+ * the pricing modal — whose Upgrade CTAs now run the real upgrade flow
+ * (billing/01). The hint dialog, toasts, and pricing modal mount here so the
  * whole flow is one self-contained control the TopBar doesn't need to know
  * about.
  */
@@ -113,7 +113,7 @@ export function ExportSplitButton() {
             >
               <ServerIcon className="text-ink-soft" />
               Server Export
-              <span className="ml-auto text-xs text-ink-faint">soon</span>
+              <span className="ml-auto text-xs text-ink-faint">Paid</span>
             </button>
           </div>
         )}

@@ -12,6 +12,7 @@ import {
 
 export const WALLETS_KEY = 'wallets';
 export const PRICES_KEY = 'prices';
+export const LTC_RATE_KEY = 'ltc_rate_usdt';
 
 const MONTHLY_PRICE_USDT: Record<Plan, number> = { pro: 3, premium: 7 };
 const TWELVE_MONTH_MULTIPLIER = 10;
@@ -125,6 +126,23 @@ export function getPlanPrices(db: AppDatabase): PlanPrices {
   if (!isPlanPrices(value)) {
     throw new Error(
       'settings_kv: prices setting is malformed — expected monthly and per-duration USDT amounts for every plan',
+    );
+  }
+  return value;
+}
+
+/**
+ * USDT per LTC captured into new Orders (ADR-0005). Absent until the Admin
+ * sets it — like wallet addresses, nothing ships pointing at a placeholder
+ * rate, and LTC orders are refused while it is unset (billing/03 adds the
+ * admin UI that maintains it).
+ */
+export function getLtcRate(db: AppDatabase): number | null {
+  const value = getSetting(db, LTC_RATE_KEY);
+  if (value === undefined || value === null) return null;
+  if (!isFiniteNumber(value) || value <= 0) {
+    throw new Error(
+      'settings_kv: ltc_rate_usdt setting is malformed — expected a positive USDT-per-LTC number',
     );
   }
   return value;

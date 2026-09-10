@@ -1,0 +1,1 @@
+ALTER TABLE `orders` ADD `ltc_rate_usdt` text;

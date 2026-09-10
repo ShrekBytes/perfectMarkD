@@ -1,8 +1,10 @@
 import { Link, navigate } from '../router';
 import { useTheme } from '../theme/theme';
 import { ThemeToggle } from '../theme/ThemeToggle';
+import { UpgradeDialog } from '../billing/UpgradeDialog';
 import { PlanComparison } from './PlanComparison';
-import { BILLING_LIVE, COMING_SOON_NOTE, DURATION_NOTE } from './plans';
+import { DURATION_NOTE } from './plans';
+import { useState } from 'react';
 
 // Repo links for the footer. The project's own GitHub org/repo is one of
 // PLAN.md §7's open action items — flip these constants when it's decided.
@@ -11,13 +13,16 @@ export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
 export const PLUGIN_URL = 'https://github.com/ShrekBytes/advanced-pdf-export';
 
 /**
- * The /pricing page: three-column plan comparison, the Phase-1 "payments
- * launching soon" state, the AGPL note, and the footer's GitHub + license
+ * The /pricing page: three-column plan comparison whose paid CTAs open the
+ * upgrade flow (billing/01), the AGPL note, and the footer's GitHub + license
  * badge links. Static content in the SPA; renders entirely from the shared
  * plans module.
  */
 export function PricingPage() {
   const { theme, toggle } = useTheme();
+  const [upgradePlan, setUpgradePlan] = useState<'pro' | 'premium' | null>(
+    null,
+  );
 
   return (
     <div className="flex min-h-full flex-col bg-canvas text-ink">
@@ -51,17 +56,11 @@ export function PricingPage() {
         </p>
 
         <div className="mt-8 rounded-pane border border-hairline bg-surface p-4 shadow-sm">
-          <PlanComparison onOpenEditor={() => navigate('/')} />
+          <PlanComparison
+            onOpenEditor={() => navigate('/')}
+            onUpgrade={setUpgradePlan}
+          />
         </div>
-
-        {!BILLING_LIVE && (
-          <p
-            data-testid="pricing-coming-soon"
-            className="mt-3 text-sm text-ink-soft"
-          >
-            {COMING_SOON_NOTE}
-          </p>
-        )}
 
         <section aria-label="Good to know" className="mt-8">
           <ul className="list-disc space-y-2 pl-5 text-sm text-ink-soft">
@@ -100,6 +99,13 @@ export function PricingPage() {
           Successor to the Advanced PDF Export plugin
         </a>
       </footer>
+
+      {upgradePlan && (
+        <UpgradeDialog
+          plan={upgradePlan}
+          onClose={() => setUpgradePlan(null)}
+        />
+      )}
     </div>
   );
 }

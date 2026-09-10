@@ -10,9 +10,16 @@ afterEach(() => {
 });
 
 const openEditor = vi.fn();
+const openUpgrade = vi.fn();
 
 function renderComparison(compact = false) {
-  return render(<PlanComparison compact={compact} onOpenEditor={openEditor} />);
+  return render(
+    <PlanComparison
+      compact={compact}
+      onOpenEditor={openEditor}
+      onUpgrade={openUpgrade}
+    />,
+  );
 }
 
 describe('plan columns (from the plans module)', () => {
@@ -50,14 +57,23 @@ describe('calls to action', () => {
     expect(openEditor).toHaveBeenCalledTimes(1);
   });
 
-  it('renders exactly two inert "Coming soon" CTAs (Pro + Premium)', () => {
+  it('opens the upgrade flow from both paid CTAs, naming the plan', async () => {
+    const user = userEvent.setup();
     renderComparison();
 
-    const comingSoon = screen.getAllByRole('button', { name: 'Coming soon' });
-    expect(comingSoon).toHaveLength(2);
-    for (const button of comingSoon) {
-      expect(button).toBeDisabled();
+    const upgradeButtons = screen.getAllByRole('button', {
+      name: 'Upgrade',
+    });
+    expect(upgradeButtons).toHaveLength(2);
+    for (const button of upgradeButtons) {
+      expect(button).toBeEnabled();
     }
+
+    // Column order: Pro then Premium.
+    await user.click(upgradeButtons[0]!);
+    expect(openUpgrade).toHaveBeenLastCalledWith('pro');
+    await user.click(upgradeButtons[1]!);
+    expect(openUpgrade).toHaveBeenLastCalledWith('premium');
   });
 });
 

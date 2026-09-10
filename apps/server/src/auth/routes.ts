@@ -1,6 +1,8 @@
 import { Hono, type Context } from 'hono';
 import { eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
+import { isUniqueViolation } from '../db/sqlite-errors.js';
+import { asRecord, parseJson } from '../request-body.js';
 import { users } from '../db/schema.js';
 import {
   hashPassword,
@@ -40,21 +42,6 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 interface Credentials {
   email: string;
   password: string;
-}
-
-function parseJson(body: string): unknown {
-  try {
-    return JSON.parse(body);
-  } catch {
-    return null;
-  }
-}
-
-/** The request body as a plain object, or null when it isn't one. */
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
 }
 
 function normalizeEmail(value: unknown): string | null {
@@ -105,15 +92,6 @@ function parseLogin(body: unknown): Credentials | { error: string } {
 
 function publicUser(user: { email: string; isAdmin: boolean }) {
   return { email: user.email, isAdmin: user.isAdmin };
-}
-
-/** SQLite's unique-index violation (better-sqlite3 error code). */
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === 'SQLITE_CONSTRAINT_UNIQUE'
-  );
 }
 
 /**

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BILLING_LIVE,
   DURATION_NOTE,
+  DURATIONS,
   FEATURE_ROWS,
   PLANS,
+  priceForDuration,
   type PlanId,
 } from './plans';
 
@@ -67,14 +68,22 @@ describe('plan catalog (PLAN.md §1 tiers table)', () => {
   });
 });
 
-describe('Phase-1 billing state', () => {
-  it('ships with billing inert — Phase 2 flips the flag to swap CTAs', () => {
-    expect(BILLING_LIVE).toBe(false);
-  });
-
+describe('billing (ADR-0005 manual crypto)', () => {
   it('documents the manual crypto duration options', () => {
     expect(DURATION_NOTE).toMatch(/1.*3.*6.*12 months/);
     expect(DURATION_NOTE).toMatch(/10×/);
     expect(DURATION_NOTE).toMatch(/auto-renew/i);
+  });
+
+  it('offers the four Order durations', () => {
+    expect(DURATIONS).toEqual([1, 3, 6, 12]);
+  });
+
+  it('prices durations linearly, 12 months at 10× monthly', () => {
+    expect(priceForDuration('pro', 1)).toBe(3);
+    expect(priceForDuration('pro', 3)).toBe(9);
+    expect(priceForDuration('pro', 6)).toBe(18);
+    expect(priceForDuration('pro', 12)).toBe(30);
+    expect(priceForDuration('premium', 12)).toBe(70);
   });
 });

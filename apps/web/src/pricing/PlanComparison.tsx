@@ -1,4 +1,4 @@
-import { BILLING_LIVE, FEATURE_ROWS, PLANS, formatPrice } from './plans';
+import { FEATURE_ROWS, PLANS, formatPrice } from './plans';
 import type { Plan } from './plans';
 import { CheckIcon } from '../shell/icons';
 
@@ -8,6 +8,8 @@ interface PlanComparisonProps {
   /** The free plan's CTA: on /pricing this navigates to the editor, in the
    *  modal it just closes the modal (the editor is already underneath). */
   onOpenEditor: () => void;
+  /** Starts the upgrade flow for a paid plan (billing/01). */
+  onUpgrade: (plan: 'pro' | 'premium') => void;
 }
 
 /**
@@ -16,7 +18,11 @@ interface PlanComparisonProps {
  * keep visually hidden text so the table still reads as yes/no/quote for
  * screen readers.
  */
-export function PlanComparison({ compact, onOpenEditor }: PlanComparisonProps) {
+export function PlanComparison({
+  compact,
+  onOpenEditor,
+  onUpgrade,
+}: PlanComparisonProps) {
   const bodyText = compact ? 'text-xs' : 'text-sm';
   const cellPad = compact ? 'px-2 py-1.5' : 'px-3 py-2';
 
@@ -52,6 +58,7 @@ export function PlanComparison({ compact, onOpenEditor }: PlanComparisonProps) {
                   <PlanCta
                     plan={plan}
                     onOpenEditor={onOpenEditor}
+                    onUpgrade={onUpgrade}
                     compact={compact}
                   />
                 </span>
@@ -106,10 +113,12 @@ function CellValue({ value }: { value: string | boolean }) {
 function PlanCta({
   plan,
   onOpenEditor,
+  onUpgrade,
   compact,
 }: {
   plan: Plan;
   onOpenEditor: () => void;
+  onUpgrade: (plan: 'pro' | 'premium') => void;
   compact?: boolean;
 }) {
   const size = compact ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-sm';
@@ -127,22 +136,16 @@ function PlanCta({
     );
   }
 
-  // Phase 1 (editor-app/09): no accounts or payments exist, so the paid CTA is
-  // an inert "Coming soon" — never a signup wall. BILLING_LIVE flips both this
-  // button and the coming-soon notes; Phase 2's billing workstream then wires
-  // the click to the real upgrade flow. The comparison layout stays as-is.
+  // Paid plans open the upgrade flow (billing/01): duration + payment method,
+  // an account if needed, then the Order with its payment instructions.
+  const paidPlanId = plan.id;
   return (
     <button
       type="button"
-      disabled={!BILLING_LIVE}
-      title={BILLING_LIVE ? undefined : 'Payments are launching soon'}
-      className={`${base} border ${
-        BILLING_LIVE
-          ? 'border-accent bg-accent text-accent-ink hover:bg-accent-strong'
-          : 'cursor-default border-hairline bg-surface text-ink-faint'
-      }`}
+      onClick={() => onUpgrade(paidPlanId)}
+      className={`${base} border border-accent bg-accent text-accent-ink hover:bg-accent-strong`}
     >
-      {BILLING_LIVE ? 'Upgrade' : 'Coming soon'}
+      Upgrade
     </button>
   );
 }

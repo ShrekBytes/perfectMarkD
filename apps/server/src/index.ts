@@ -4,6 +4,7 @@ import type { AppDatabase } from './db/database.js';
 import type { User } from './db/schema.js';
 import { requestLogger, type LogSink } from './request-logger.js';
 import { authRoutes, type AuthOptions } from './auth/routes.js';
+import { orderRoutes } from './orders/routes.js';
 import { setSessionCookie } from './auth/http.js';
 import {
   SESSION_COOKIE,
@@ -70,7 +71,8 @@ export function createApp({
     .route(
       '/api/auth',
       authRoutes({ sessionSecret, adminEmail, authRateLimit, now: clock }),
-    );
+    )
+    .route('/api/orders', orderRoutes());
 }
 
 /** Typed-routes handle for hono clients (RPC type inference). */

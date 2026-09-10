@@ -7,6 +7,8 @@ import { UploadIcon } from './icons';
 import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
 import { useDocumentStore } from '../documents/store';
+import { useAccountStore } from '../auth/account-store';
+import { UpgradeStatusDialog } from '../billing/UpgradeStatusDialog';
 import { EditorPane } from '../editor/EditorPane';
 import { DeleteToast } from '../library/DeleteToast';
 import { LibraryPanel } from '../library/LibraryPanel';
@@ -40,6 +42,7 @@ export function AppShell() {
   const importDocument = useDocumentStore((state) => state.importDocument);
 
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [upgradeStatusOpen, setUpgradeStatusOpen] = useState(false);
 
   /** The canvas exposes its API through this ref so the editor's Ctrl/Cmd+Enter
    *  and scroll events reach it without threading through re-renders. */
@@ -47,6 +50,8 @@ export function AppShell() {
 
   useEffect(() => {
     void useDocumentStore.getState().init();
+    // The account menu (billing/01) needs to know who is signed in.
+    void useAccountStore.getState().load();
   }, []);
 
   // With no documents at all there is nothing to open — land the user in the
@@ -80,6 +85,7 @@ export function AppShell() {
         onOpenLibrary={() => setLibraryOpen(true)}
         theme={theme}
         onToggleTheme={toggle}
+        onOpenUpgradeStatus={() => setUpgradeStatusOpen(true)}
       />
 
       <StaleBanner />
@@ -182,6 +188,9 @@ export function AppShell() {
       )}
 
       {libraryOpen && <LibraryPanel onClose={() => setLibraryOpen(false)} />}
+      {upgradeStatusOpen && (
+        <UpgradeStatusDialog onClose={() => setUpgradeStatusOpen(false)} />
+      )}
       <DeleteToast />
     </div>
   );

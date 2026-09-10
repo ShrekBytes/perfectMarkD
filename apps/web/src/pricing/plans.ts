@@ -99,21 +99,34 @@ export const FEATURE_ROWS: FeatureRow[] = [
 ];
 
 /**
- * Manual crypto billing (ADR-0005): no card processor, no auto-renewal. Phase 2
- * renders the real Order flow from this; the copy already matches it.
+ * Manual crypto billing (ADR-0005): no card processor, no auto-renewal —
+ * payments in USDT or Litecoin, verified by hand.
  */
 export const DURATION_NOTE =
   'Paid plans run 1, 3, 6, or 12 months — 12 months costs 10× (two months free). ' +
   'Payments are manual crypto (USDT or Litecoin), verified by hand. Nothing auto-renews.';
 
-/**
- * Phase 1 has no accounts, so every paid CTA renders as an inert "coming
- * soon" — this flag drives both the CTA in PlanComparison and the coming-soon
- * notes on the page and modal. Phase 2's billing workstream flips it to true
- * and wires the upgrade flow into the same components.
- */
-export const BILLING_LIVE = false;
+/** The Order duration options; 12 months costs 10× the monthly rate. */
+export const DURATIONS = [1, 3, 6, 12] as const;
+export type DurationMonths = (typeof DURATIONS)[number];
 
-/** Shared Phase-1 note (page + modal); hidden once BILLING_LIVE flips. */
-export const COMING_SOON_NOTE =
-  'Payments are launching soon — paid plans cannot be purchased yet.';
+/** Display name for a plan id ("Free", "Pro", "Premium"). */
+export function planName(planId: PlanId): string {
+  return PLANS.find((p) => p.id === planId)?.name ?? planId;
+}
+
+/** Display total for a plan + duration, mirroring the server's seeded prices.
+ * Display only — the authoritative amount arrives with the Order itself.
+ */
+export function priceForDuration(
+  planId: 'pro' | 'premium',
+  months: DurationMonths,
+): number {
+  const plan = PLANS.find((p) => p.id === planId);
+  if (!plan || plan.priceMonthlyUsdt === null) {
+    throw new Error(`no price for plan ${planId}`);
+  }
+  return months === 12
+    ? plan.priceMonthlyUsdt * 10
+    : plan.priceMonthlyUsdt * months;
+}

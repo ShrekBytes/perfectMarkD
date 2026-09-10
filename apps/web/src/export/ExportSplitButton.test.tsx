@@ -250,10 +250,11 @@ it('opens the pricing modal from the Server Export item without exporting', asyn
   );
 
   // The menu closed and the pricing modal took its place — no print ran.
+  // Its paid CTAs now start the real upgrade flow (billing/01).
   expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   const dialog = screen.getByRole('dialog', { name: /plans and pricing/i });
   expect(dialog).toHaveTextContent('Premium');
-  expect(dialog).toHaveTextContent(/payments are launching soon/i);
+  expect(dialog).toHaveTextContent(/client export keeps working/i);
   expect(printStub.windows).toHaveLength(0);
 
   // Escape closes the modal and the button is ready for a Client Export.
