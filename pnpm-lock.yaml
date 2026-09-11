@@ -35,6 +35,9 @@ importers:
       '@node-rs/argon2':
         specifier: 2.2.0
         version: 2.2.0
+      '@perfectmarkd/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -44,6 +47,9 @@ importers:
       hono:
         specifier: ^4.13.5
         version: 4.13.5
+      playwright:
+        specifier: ^1.63.0
+        version: 1.63.0
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^9.6.0
@@ -54,6 +60,12 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      pdf-lib:
+        specifier: ^1.17.1
+        version: 1.17.1
       tsx:
         specifier: ^4.23.13
         version: 4.23.13

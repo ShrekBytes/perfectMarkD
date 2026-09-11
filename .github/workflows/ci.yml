@@ -41,6 +41,11 @@ jobs:
       - name: Engine golden tests (real Chromium)
         run: pnpm --filter @perfectmarkd/core test:golden
 
+      # Server Export e2e (server/03): same Chromium binary as the golden
+      # suite; the config serves a fixture /export page for the worker.
+      - name: Server Export e2e (real Chromium)
+        run: pnpm --filter @perfectmarkd/server test:e2e
+
       # Web E2E smoke suite (editor-app/10): same Chromium binary as the
       # golden suite; the config builds apps/web and serves the bundle itself.
       - name: Web E2E smoke tests (real Chromium)

@@ -4,7 +4,11 @@
     "noEmit": false,
     "outDir": "dist",
     "rootDir": "src",
-    "sourceMap": true
+    "sourceMap": true,
+    // Build against core's built package (pnpm -r build compiles core first),
+    // not the typecheck-time source alias — the alias would drag core's
+    // source outside rootDir into this program.
+    "paths": {}
   },
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/**/*.e2e.test.ts"]
 }

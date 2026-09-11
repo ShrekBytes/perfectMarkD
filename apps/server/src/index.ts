@@ -12,6 +12,10 @@ import {
   userForSessionToken,
   type Clock,
 } from './auth/sessions.js';
+import { PayloadStore, ResultStore } from './export/queue.js';
+import { exportRoutes } from './export/routes.js';
+import { createPlaywrightRenderer } from './export/render.js';
+import { ExportWorker, type RenderPdf } from './export/worker.js';
 
 export interface AppEnv {
   Variables: {
@@ -20,6 +24,28 @@ export interface AppEnv {
     /** Raw session token from a verified cookie; null when absent. */
     sessionToken: string | null;
   };
+}
+
+/** Everything the Server Export pipeline (server/03) needs at boot. When
+ *  omitted, the export API is not mounted at all. */
+export interface ExportAppOptions {
+  /** Origin the worker loads the app's /export route from (ADR-0003) —
+   *  the web dev server in development, the same origin in production. */
+  origin: string;
+  /** Simultaneous renders (default 2, the ticket's number). */
+  concurrency?: number;
+  /** Max enqueues per user per rolling minute (default 10). */
+  burstPerMinute?: number;
+  /** Per-render deadline before the job fails as render_timeout. */
+  renderTimeoutMs?: number;
+  /**
+   * The render seam. Default: the real Chromium renderer (render.ts), built
+   * lazily so importing playwright never happens at app construction. Tests
+   * inject fakes here.
+   */
+  renderPdf?: RenderPdf;
+  /** Injectable job id (tests); default crypto.randomUUID(). */
+  newId?: () => string;
 }
 
 export interface CreateAppOptions {
@@ -39,6 +65,8 @@ export interface CreateAppOptions {
    * inject a recorder. Default: best-effort unlink of absolute paths.
    */
   removeStoredFile?: (storedPath: string) => void;
+  /** Mounts the Server Export API + in-process worker (server/03). */
+  export?: ExportAppOptions;
 }
 
 /**
@@ -53,9 +81,46 @@ export function createApp({
   now,
   log,
   removeStoredFile,
+  export: exportOptions,
 }: CreateAppOptions) {
   const clock: Clock = now ?? (() => new Date());
-  return new Hono<AppEnv>()
+
+  // The Server Export pipeline (server/03): memory stores, the in-process
+  // worker, and the /api/export routes. The worker's boot (stale-job
+  // recovery + first pump) runs at creation so a restarted process picks
+  // work up immediately.
+  let exportApp: ReturnType<typeof exportRoutes> | null = null;
+  if (exportOptions) {
+    const payloads = new PayloadStore();
+    const results = new ResultStore();
+    const renderer = exportOptions.renderPdf
+      ? { renderPdf: exportOptions.renderPdf, close: async () => {} }
+      : createPlaywrightRenderer({
+          origin: exportOptions.origin,
+          timeoutMs: exportOptions.renderTimeoutMs,
+        });
+    const worker = new ExportWorker({
+      db,
+      payloads,
+      results,
+      renderPdf: renderer.renderPdf,
+      concurrency: exportOptions.concurrency,
+      clock,
+      log,
+    });
+    worker.start();
+    exportApp = exportRoutes({
+      db,
+      payloads,
+      results,
+      worker,
+      burstPerMinute: exportOptions.burstPerMinute ?? 10,
+      now: clock,
+      newId: exportOptions.newId ?? (() => crypto.randomUUID()),
+    });
+  }
+
+  const app = new Hono<AppEnv>()
     .use('*', requestLogger(log))
     .use('*', async (c, next) => {
       c.set('db', db);
@@ -81,6 +146,8 @@ export function createApp({
     )
     .route('/api/orders', orderRoutes())
     .route('/api/admin', adminRoutes({ now: clock, removeStoredFile }));
+
+  return exportApp ? app.route('/api/export', exportApp) : app;
 }
 
 /** Typed-routes handle for hono clients (RPC type inference). */

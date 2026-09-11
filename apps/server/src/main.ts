@@ -14,6 +14,16 @@ const app = createApp({
   db,
   sessionSecret: env.sessionSecret,
   adminEmail: env.adminEmail,
+  // Server Export (server/03): the in-process worker drives Chromium against
+  // the app's /export route. In production the same origin serves the API and
+  // the built SPA (server/06); in development point EXPORT_ORIGIN at the web
+  // dev server (default http://localhost:5173).
+  export: {
+    origin: env.exportOrigin,
+    concurrency: env.exportConcurrency,
+    burstPerMinute: env.exportBurstPerMinute,
+    renderTimeoutMs: env.exportRenderTimeoutMs,
+  },
 });
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {

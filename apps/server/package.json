@@ -8,19 +8,24 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "test:e2e": "vitest run --config playwright.vitest.config.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@node-rs/argon2": "2.2.0",
+    "@perfectmarkd/core": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.13.5"
+    "hono": "^4.13.5",
+    "playwright": "^1.63.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.4.1",
     "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.28.2",
+    "pdf-lib": "^1.17.1",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3"
   }

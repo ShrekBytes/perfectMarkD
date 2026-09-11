@@ -46,6 +46,33 @@ export const AUDIT_ACTIONS = [
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
+/**
+ * Server Export job lifecycle (server/03). `queued` jobs carry their document
+ * payload only in the API process's memory; `done` jobs hold the rendered PDF
+ * the same way until Export History (server/05) moves it to encrypted disk.
+ */
+export const EXPORT_JOB_STATUSES = [
+  'queued',
+  'running',
+  'done',
+  'failed',
+] as const;
+export type ExportJobStatus = (typeof EXPORT_JOB_STATUSES)[number];
+
+/**
+ * Typed job failures (server/03): the client matches on the code, not the
+ * message. Enqueue-time rejections (auth, entitlement, burst limit, payload
+ * validation) never create a row — these codes are for jobs that were
+ * accepted and then failed.
+ */
+export const EXPORT_JOB_ERROR_CODES = [
+  'page_cap_exceeded',
+  'render_failed',
+  'render_timeout',
+  'worker_restart',
+] as const;
+export type ExportJobErrorCode = (typeof EXPORT_JOB_ERROR_CODES)[number];
+
 /** What an audit entry's action touched. */
 export const AUDIT_TARGET_TYPES = ['order', 'user', 'settings'] as const;
 export type AuditTargetType = (typeof AUDIT_TARGET_TYPES)[number];
@@ -186,6 +213,36 @@ export const settingsKv = sqliteTable('settings_kv', {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+/**
+ * The Server Export queue (server/03). The row is the durable, inspectable
+ * part of the job — status, plan, outcome — while the document payload
+ * (≤ 50 MB) lives only in the API process's memory: it is deleted the moment
+ * the render finishes or fails, and a restart loses it, which is why boot
+ * recovery fails every non-terminal row (worker_restart). The plan column
+ * snapshots the Entitlement at enqueue time so the priority and page-cap
+ * decision can't drift from the row a worker actually claims.
+ */
+export const exportJobs = sqliteTable('export_jobs', {
+  id: text('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  /** Plan at enqueue time (Plan); drives queue priority and the page cap. */
+  plan: text('plan').notNull(),
+  status: text('status').notNull().default('queued'), // ExportJobStatus
+  errorCode: text('error_code'), // ExportJobErrorCode, set on failure
+  errorMessage: text('error_message'),
+  /** Actual rendered page count, set on success. */
+  pages: integer('pages'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+  finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+});
+
+export type ExportJob = typeof exportJobs.$inferSelect;
 
 /**
  * Append-only record of every admin action (billing/02): Order verifications

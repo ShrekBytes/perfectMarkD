@@ -49,7 +49,10 @@ export default defineConfig({
     // its own config — packages/core/playwright.vitest.config.ts — via
     // `pnpm --filter @perfectmarkd/core test:golden` (CI runs it as its own
     // step after `pnpm test`). It needs Playwright's browser and a single
-    // process; keeping it out keeps this suite browser-independent.
-    exclude: ['**/node_modules/**', '**/dist/**', '**/src/golden/**'],
+    // process; keeping it out keeps this suite browser-independent. The
+    // server's export e2e (apps/server/playwright.vitest.config.ts) is
+    // excluded the same way and runs via `pnpm --filter @perfectmarkd/server
+    // test:e2e`.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/src/golden/**', '**/*.e2e.test.ts'],
   },
 });

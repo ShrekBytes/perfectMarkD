@@ -25,9 +25,9 @@ describe('routeForPath', () => {
     expect(routeForPath('/register')).toBe('register');
     expect(routeForPath('/admin')).toBe('admin');
     expect(routeForPath('/')).toBe('editor');
-    // /export is the hidden route the server loads (ADR-0003); until that
-    // ships, unknown paths fall back to the editor rather than a 404.
-    expect(routeForPath('/export')).toBe('editor');
+    // /export is the hidden route the server's worker loads (server/03,
+    // ADR-0003) — a real route, not the editor fallback.
+    expect(routeForPath('/export')).toBe('export');
   });
 });
 

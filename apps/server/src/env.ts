@@ -5,18 +5,50 @@ export interface ServerEnv {
   sessionSecret: string | null;
   /** First registered account with this email becomes the Admin. */
   adminEmail: string | null;
+  /**
+   * Origin the export worker loads the app's /export route from (server/03):
+   * the web dev server in development, the same origin in production once
+   * static serving lands (server/06). Defaults to this API's own port.
+   */
+  exportOrigin: string;
+  /** Simultaneous Server Export renders (the ticket's default: 2). */
+  exportConcurrency: number;
+  /** Max exports one user may enqueue per rolling minute. */
+  exportBurstPerMinute: number;
+  /** Per-render deadline before a job fails as render_timeout. */
+  exportRenderTimeoutMs: number;
 }
 
 const DEFAULT_DB_PATH = './data/perfectmarkd.db';
+const DEFAULT_EXPORT_CONCURRENCY = 2;
+const DEFAULT_EXPORT_BURST_PER_MINUTE = 10;
+const DEFAULT_EXPORT_RENDER_TIMEOUT_MS = 120_000;
 
 export function loadEnv(
   source: Record<string, string | undefined> = process.env,
 ): ServerEnv {
+  const port = parsePort(source.PORT);
   return {
-    port: parsePort(source.PORT),
+    port,
     dbPath: nonEmpty(source.DB_PATH) ?? DEFAULT_DB_PATH,
     sessionSecret: nonEmpty(source.SESSION_SECRET),
     adminEmail: nonEmpty(source.ADMIN_EMAIL),
+    exportOrigin: nonEmpty(source.EXPORT_ORIGIN) ?? `http://localhost:${port}`,
+    exportConcurrency: parsePositiveInt(
+      source.EXPORT_CONCURRENCY,
+      DEFAULT_EXPORT_CONCURRENCY,
+      'EXPORT_CONCURRENCY',
+    ),
+    exportBurstPerMinute: parsePositiveInt(
+      source.EXPORT_BURST_PER_MINUTE,
+      DEFAULT_EXPORT_BURST_PER_MINUTE,
+      'EXPORT_BURST_PER_MINUTE',
+    ),
+    exportRenderTimeoutMs: parsePositiveInt(
+      source.EXPORT_RENDER_TIMEOUT_MS,
+      DEFAULT_EXPORT_RENDER_TIMEOUT_MS,
+      'EXPORT_RENDER_TIMEOUT_MS',
+    ),
   };
 }
 
@@ -35,4 +67,19 @@ function parsePort(raw: string | undefined): number {
     );
   }
   return port;
+}
+
+function parsePositiveInt(
+  raw: string | undefined,
+  fallback: number,
+  name: string,
+): number {
+  if (!nonEmpty(raw)) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(
+      `Invalid ${name}: ${JSON.stringify(raw)} — expected an integer ≥ 1`,
+    );
+  }
+  return value;
 }
