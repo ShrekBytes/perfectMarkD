@@ -186,6 +186,18 @@ export function getPlanLimits(db: AppDatabase): PlanLimits {
 }
 
 /**
+ * The page cap a Server Export runs under. Planless jobs — comped users
+ * exporting without an active Entitlement (`free`, server/04) — have no plan
+ * to read a cap from, so they get the smallest paid cap: the safe default
+ * for someone the system knows nothing else about.
+ */
+export function pageCapFor(limits: PlanLimits, plan: string): number {
+  const smallest = Math.min(limits.pro.pageCap, limits.premium.pageCap);
+  if (plan === 'free') return smallest;
+  return limits[plan as Plan]?.pageCap ?? smallest;
+}
+
+/**
  * USDT per LTC captured into new Orders (ADR-0005). Absent until the Admin
  * sets it — like wallet addresses, nothing ships pointing at a placeholder
  * rate, and LTC orders are refused while it is unset.

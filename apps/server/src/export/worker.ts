@@ -21,7 +21,7 @@ import {
   type ExportJob,
   type ExportJobErrorCode,
 } from '../db/schema.js';
-import { getPlanLimits } from '../db/settings.js';
+import { getPlanLimits, pageCapFor } from '../db/settings.js';
 import { incrementExportUsage } from '../quota.js';
 import {
   PayloadStore,
@@ -164,7 +164,7 @@ export class ExportWorker {
 
     try {
       const { pdf, pages } = await this.renderPdf(payload);
-      const cap = getPlanLimits(this.db)[job.plan as 'pro' | 'premium'].pageCap;
+      const cap = pageCapFor(getPlanLimits(this.db), job.plan);
       if (pages > cap) {
         throw new RenderError(
           'page_cap_exceeded',

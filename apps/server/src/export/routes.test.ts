@@ -399,4 +399,72 @@ describe('quota enforcement (server/04)', () => {
       expect(res.status).toBe(402);
     }
   });
+
+  it('a comped user without a plan spends their comps, then needs a plan', async () => {
+    const { app, db } = makeApp();
+    setQuota(db, 1);
+    const { cookie, userId } = await grantEntitlement(app, db, { plan: 'pro' });
+    // Revoke the Entitlement: comps survive, the plan quota does not
+    // (billing/03: comping grants exports without a plan).
+    db.delete(entitlements).where(eq(entitlements.userId, userId)).run();
+    db.insert(exportUsage)
+      .values({ userId, period: usagePeriod(new Date()), count: 0, comps: 1 })
+      .run();
+
+    const first = await postJson(app, '/api/export', BODY, { cookie });
+    expect(first.status).toBe(202);
+    const { job } = (await first.json()) as { job: { id: string } };
+    const settled = await waitForJob(db, job.id);
+    expect(settled.status).toBe('done');
+    expect(settled.plan).toBe('free');
+
+    // Comps exhausted with no plan behind them → the 403, not the 402.
+    const second = await postJson(app, '/api/export', BODY, { cookie });
+    expect(second.status).toBe(403);
+    expect(await second.json()).toMatchObject({ code: 'entitlement_required' });
+  });
+
+  it('an expired entitlement with comps left can still spend them', async () => {
+    const { app, db } = makeApp();
+    setQuota(db, 1);
+    const { cookie, userId } = await grantEntitlement(app, db, {
+      plan: 'pro',
+      expiresInDays: -1,
+    });
+    db.insert(exportUsage)
+      .values({ userId, period: usagePeriod(new Date()), count: 0, comps: 1 })
+      .run();
+
+    const res = await postJson(app, '/api/export', BODY, { cookie });
+    expect(res.status).toBe(202);
+  });
+
+  it('a planless comped user gets the smallest page cap', async () => {
+    const { app, db } = makeApp();
+    const { cookie, userId } = await grantEntitlement(app, db, { plan: 'pro' });
+    db.delete(entitlements).where(eq(entitlements.userId, userId)).run();
+    db.insert(exportUsage)
+      .values({ userId, period: usagePeriod(new Date()), count: 0, comps: 5 })
+      .run();
+
+    // Pro's cap is 300; the planless user must not exceed the smallest cap.
+    const over = await postJson(
+      app,
+      '/api/export',
+      { ...BODY, pageCount: 301 },
+      { cookie },
+    );
+    expect(over.status).toBe(400);
+    expect(((await over.json()) as { error: string }).error).toContain(
+      'up to 300',
+    );
+
+    const ok = await postJson(
+      app,
+      '/api/export',
+      { ...BODY, pageCount: 300 },
+      { cookie },
+    );
+    expect(ok.status).toBe(202);
+  });
 });

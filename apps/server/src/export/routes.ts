@@ -21,8 +21,8 @@ import { eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
 import type { AppDatabase } from '../db/database.js';
-import { entitlements, type ExportJob } from '../db/schema.js';
-import { getPlanLimits } from '../db/settings.js';
+import { entitlements, type ExportJob, type Plan } from '../db/schema.js';
+import { getPlanLimits, pageCapFor } from '../db/settings.js';
 import { isEntitlementActive, quotaState } from '../quota.js';
 import { parseJson } from '../request-body.js';
 import { MAX_EXPORT_BODY_BYTES, parseExportPayload } from './payload.js';
@@ -98,39 +98,46 @@ export function exportRoutes(options: ExportRoutesOptions) {
     const user = c.var.user;
     if (!user) return c.json({ error: 'Not signed in.' }, 401);
 
-    // Entitlement gate: an active Entitlement unlocks Server Export. Expired
-    // attempts are a distinct typed error from over-quota ones (billing/04
-    // builds a different prompt for each).
-    const entitlement = db
+    // One clock read for every decision below — a fresh now() could straddle
+    // a UTC midnight and flip the usage period (the hazard admin/users.ts
+    // guards against).
+    const nowDate = options.now();
+    const row = db
       .select()
       .from(entitlements)
       .where(eq(entitlements.userId, user.id))
       .get();
-    if (!entitlement || !isEntitlementActive(entitlement, options.now())) {
-      return c.json(
-        {
-          error: 'Server Export needs an active paid plan.',
-          code: 'entitlement_required',
-        },
-        403,
-      );
-    }
-
-    // Monthly quota gate (server/04): the period's successful exports count
-    // against the plan quota plus comps. Checked before the burst window and
-    // before the payload is read, so a rejected request burns nothing — no
-    // burst slot, no job row, no half-parsed document.
+    const entitlement = row ?? null;
+    const activeEntitlement = isEntitlementActive(entitlement, nowDate)
+      ? entitlement
+      : null;
     const limits = getPlanLimits(db);
-    const quota = quotaState(db, user.id, entitlement, limits, options.now());
+    const quota = quotaState(db, user.id, activeEntitlement, limits, nowDate);
+
+    // The gate is exactly what /api/me and the admin panel display (server/04
+    // delegates both to quotaState): used against the plan quota plus comps.
+    // An active plan that hits its quota is the 402 the client's upgrade
+    // prompt matches on; without an active plan, spending comps is allowed
+    // (billing/03: comping grants exports without a plan) and only an
+    // exhausted allowance asks for a plan — the 403 billing/04 pairs with
+    // the same prompt.
     if (quota.used >= quota.limit) {
-      return c.json(
-        {
-          error:
-            'You have used all of this period’s Server Exports — it resets next period, or upgrade for a larger quota.',
-          code: 'quota_exceeded',
-        },
-        402,
-      );
+      return activeEntitlement
+        ? c.json(
+            {
+              error:
+                'You have used all of this period’s Server Exports — it resets next period, or upgrade for a larger quota.',
+              code: 'quota_exceeded',
+            },
+            402,
+          )
+        : c.json(
+            {
+              error: 'Server Export needs an active paid plan.',
+              code: 'entitlement_required',
+            },
+            403,
+          );
     }
 
     // The burst window only counts requests that will actually enqueue: a
@@ -138,7 +145,7 @@ export function exportRoutes(options: ExportRoutesOptions) {
     // consumes one of the user's N-per-minute slots.
     const parsed = parseExportPayload(
       parseJson(await c.req.text()),
-      limits[entitlement.plan as 'pro' | 'premium'].pageCap,
+      pageCapFor(limits, activeEntitlement?.plan ?? 'free'),
     );
     if (!parsed.ok) {
       return c.json({ error: parsed.error }, 400);
@@ -158,8 +165,11 @@ export function exportRoutes(options: ExportRoutesOptions) {
     const job = insertExportJob(db, {
       id,
       userId: user.id,
-      plan: entitlement.plan as 'pro' | 'premium',
-      now: options.now(),
+      // The queue's plan snapshot drives priority and the page cap; a comped
+      // user without an Entitlement exports as 'free' — lowest priority and
+      // the smallest page cap (db/settings.ts pageCapFor).
+      plan: (activeEntitlement?.plan ?? 'free') as Plan | 'free',
+      now: nowDate,
     });
     payloads.hold(id, parsed.payload);
     worker.notify();

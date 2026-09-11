@@ -172,19 +172,18 @@ describe('account step', () => {
     const createOrder = vi.fn(() =>
       Promise.resolve(jsonResponse(201, { order: USDT_ORDER })),
     );
-    const fetchMock = vi.fn(
-      (url: string | URL | Request, init?: RequestInit) =>
-        String(url).endsWith('/api/me')
-          ? Promise.resolve(
-              jsonResponse(200, {
-                email: 'a@b.co',
-                isAdmin: false,
-                plan: null,
-                expiresAt: null,
-                quota: { used: 0, limit: 0 },
-              }),
-            )
-          : createOrder(url, init),
+    const fetchMock = vi.fn((url: string | URL | Request) =>
+      String(url).endsWith('/api/me')
+        ? Promise.resolve(
+            jsonResponse(200, {
+              email: 'a@b.co',
+              isAdmin: false,
+              plan: null,
+              expiresAt: null,
+              quota: { used: 0, limit: 0 },
+            }),
+          )
+        : createOrder(),
     );
     vi.stubGlobal('fetch', fetchMock);
 

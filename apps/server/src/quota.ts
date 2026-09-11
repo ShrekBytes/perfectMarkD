@@ -23,9 +23,9 @@ export function usagePeriod(now: Date): string {
 
 /** An Entitlement expiring exactly now counts as expired. */
 export function isEntitlementActive(
-  entitlement: { expiresAt: Date } | null,
+  entitlement: { plan: string; expiresAt: Date } | null,
   now: Date,
-): boolean {
+): entitlement is { plan: string; expiresAt: Date } {
   return (
     entitlement !== null && entitlement.expiresAt.getTime() > now.getTime()
   );
@@ -56,8 +56,11 @@ export function quotaState(
     .get();
   const used = row?.count ?? 0;
   const comps = row?.comps ?? 0;
-  const planQuota = isEntitlementActive(entitlement, now)
-    ? (limits[entitlement!.plan as Plan]?.quotaMonthly ?? 0)
+  const activeEntitlement = isEntitlementActive(entitlement, now)
+    ? entitlement
+    : null;
+  const planQuota = activeEntitlement
+    ? (limits[activeEntitlement.plan as Plan]?.quotaMonthly ?? 0)
     : 0;
   return { used, comps, limit: planQuota + comps };
 }

@@ -8,9 +8,12 @@ import {
   type WalletAddresses,
 } from './schema.js';
 import {
+  getPlanLimits,
   getPlanPrices,
   getSetting,
   getWallets,
+  LIMITS_KEY,
+  pageCapFor,
   PRICES_KEY,
   setSetting,
   WALLETS_KEY,
@@ -114,5 +117,26 @@ describe('typed accessor', () => {
     };
     setSetting(db, PRICES_KEY, valid);
     expect(getPlanPrices(db)).toEqual(valid);
+  });
+});
+
+describe('pageCapFor', () => {
+  it('reads the cap for a known plan', () => {
+    setSetting(db, LIMITS_KEY, {
+      pro: { pageCap: 300, quotaMonthly: 300 },
+      premium: { pageCap: 1000, quotaMonthly: 1000 },
+    });
+    expect(pageCapFor(getPlanLimits(db), 'pro')).toBe(300);
+    expect(pageCapFor(getPlanLimits(db), 'premium')).toBe(1000);
+  });
+
+  it('gives planless (free) and unknown plans the smallest paid cap', () => {
+    setSetting(db, LIMITS_KEY, {
+      pro: { pageCap: 300, quotaMonthly: 300 },
+      premium: { pageCap: 1000, quotaMonthly: 1000 },
+    });
+    const limits = getPlanLimits(db);
+    expect(pageCapFor(limits, 'free')).toBe(300);
+    expect(pageCapFor(limits, 'mystery')).toBe(300);
   });
 });

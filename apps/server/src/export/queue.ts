@@ -99,11 +99,13 @@ export function findExportJob(db: AppDatabase, id: string): ExportJob | null {
 
 /**
  * Creates the queued row. The payload is NOT part of the row — callers hold
- * it in the PayloadStore under the same id.
+ * it in the PayloadStore under the same id. Planless exports (a comped user
+ * without an Entitlement, server/04) snapshot 'free': lowest queue priority
+ * and the smallest page cap via pageCapFor.
  */
 export function insertExportJob(
   db: AppDatabase,
-  input: { id: string; userId: number; plan: Plan; now: Date },
+  input: { id: string; userId: number; plan: Plan | 'free'; now: Date },
 ): ExportJob {
   return db
     .insert(exportJobs)

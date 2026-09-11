@@ -41,7 +41,7 @@ export async function logout(): Promise<void> {
 export interface MePayload {
   email: string;
   isAdmin: boolean;
-  /** The active Entitlement's plan; null on Free. */
+  /** The active Entitlement's plan; null without one (signed-in Free user). */
   plan: string | null;
   /** ISO expiry of the active Entitlement; null without one. */
   expiresAt: string | null;

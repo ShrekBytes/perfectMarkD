@@ -10,7 +10,7 @@ import { create } from 'zustand';
 import { logout, me, type MePayload } from './api';
 import type { AuthUser } from './api';
 
-/** The active Entitlement, as /api/me reports it; null on Free. */
+/** The active Entitlement, as /api/me reports it; null without one. */
 export interface EntitlementState {
   plan: string;
   /** ISO expiry of the Entitlement. */
@@ -44,7 +44,8 @@ function splitMe(payload: MePayload | null): {
   entitlement: EntitlementState | null;
 } {
   // The server pairs plan with a non-null expiry whenever an Entitlement is
-  // active; anything else is Free — no entitlement slice.
+  // active; anything else (signed out, or signed in without a plan) has no
+  // entitlement slice.
   const entitlement =
     payload?.plan && payload.expiresAt
       ? {
@@ -63,7 +64,7 @@ export const useAccountStore = create<AccountState>()((set) => {
   const applyMe = (payload: MePayload | null) =>
     set({ ...splitMe(payload), status: 'ready' });
 
-  const check = () => {
+  const recheck = () => {
     // A failed check (offline, server restarting) never breaks the shell:
     // the first load renders signed-out, and a refresh that hiccups keeps
     // whatever was on screen — the next refresh reconciles.
@@ -84,14 +85,14 @@ export const useAccountStore = create<AccountState>()((set) => {
       if (useAccountStore.getState().status === 'ready') {
         return Promise.resolve();
       }
-      return check();
+      return recheck();
     },
-    refresh: check,
+    refresh: recheck,
     signedIn: (user) => {
       set({ user, status: 'ready' });
       // Login/register carry identity only; the gates need /api/me, so
       // refresh in the background rather than showing a stale quota chip.
-      void check();
+      void recheck();
     },
     signOut: async () => {
       // Clear locally even if the request hiccups — a dead network should not
