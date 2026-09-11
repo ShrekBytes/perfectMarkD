@@ -15,6 +15,13 @@
       "when": 1789072658538,
       "tag": "0001_good_surge",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789108810967,
+      "tag": "0002_medical_the_hunter",
+      "breakpoints": true
     }
   ]
 }

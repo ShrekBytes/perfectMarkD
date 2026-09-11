@@ -144,7 +144,11 @@ function parseSubmission(body: unknown): SubmissionInput | { error: string } {
   };
 }
 
-function orderView(order: Order, walletAddress: string): OrderView {
+/**
+ * The client-facing Order view. Exported for the admin panel (billing/02),
+ * whose view adds the user's email and Entitlement on top of the same shape.
+ */
+export function orderView(order: Order, walletAddress: string): OrderView {
   return {
     id: order.id,
     referenceCode: order.referenceCode,

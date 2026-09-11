@@ -1,28 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { navigate } from '../router';
 import { Dialog } from '../shell/Dialog';
-import { listOrders, type Order, type OrderStatus } from './api';
+import { listOrders, type Order } from './api';
+import { orderDate, STATUS_BADGE, STATUS_LABEL } from './payment';
 import { PaymentForm } from './PaymentForm';
 import { PaymentInstructions } from './PaymentInstructions';
 
 interface UpgradeStatusDialogProps {
   onClose: () => void;
-}
-
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  pending: 'Pending',
-  verified: 'Verified',
-  rejected: 'Rejected',
-};
-
-const STATUS_BADGE: Record<OrderStatus, string> = {
-  pending: 'border-hairline bg-canvas text-ink-soft',
-  verified: 'border-accent/40 bg-accent-soft text-accent',
-  rejected: 'border-danger/30 bg-danger/10 text-danger',
-};
-
-function orderDate(iso: string): string {
-  return iso.slice(0, 10);
 }
 
 /**

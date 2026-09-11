@@ -23,6 +23,7 @@ describe('routeForPath', () => {
     expect(routeForPath('/pricing')).toBe('pricing');
     expect(routeForPath('/login')).toBe('login');
     expect(routeForPath('/register')).toBe('register');
+    expect(routeForPath('/admin')).toBe('admin');
     expect(routeForPath('/')).toBe('editor');
     // /export is the hidden route the server loads (ADR-0003); until that
     // ships, unknown paths fall back to the editor rather than a 404.

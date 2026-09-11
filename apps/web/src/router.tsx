@@ -1,15 +1,15 @@
 import { useEffect, useState, type AnchorHTMLAttributes } from 'react';
 
 /**
- * Minimal History-API routing for the SPA's two surfaces (PLAN.md §3: `/`
- * editor, `/pricing`). No router dependency — the surfaces are few and static.
- * Same-tab pushes fire a custom event because popstate only covers browser
- * navigation; deep links work wherever the host serves index.html as the SPA
- * fallback (Vite dev does by default; the server's static serving config
- * handles it in server/06).
+ * Minimal History-API routing for the SPA's few surfaces (PLAN.md §3: `/`
+ * editor, `/pricing`, and the admin panel). No router dependency — the
+ * surfaces are few and static. Same-tab pushes fire a custom event because
+ * popstate only covers browser navigation; deep links work wherever the host
+ * serves index.html as the SPA fallback (Vite dev does by default; the
+ * server's static serving config handles it in server/06).
  */
 
-export type Route = 'editor' | 'pricing' | 'login' | 'register';
+export type Route = 'editor' | 'pricing' | 'login' | 'register' | 'admin';
 
 const NAVIGATE_EVENT = 'perfectmarkd:navigate';
 
@@ -17,6 +17,7 @@ export function routeForPath(pathname: string): Route {
   if (pathname === '/pricing') return 'pricing';
   if (pathname === '/login') return 'login';
   if (pathname === '/register') return 'register';
+  if (pathname === '/admin') return 'admin';
   return 'editor';
 }
 

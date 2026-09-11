@@ -1,10 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Payment-method vocabulary for the upgrade UI (ADR-0005). Mirrors the
-// server's canonical sets — apps/server/src/db/schema.ts owns the truth; this
-// module only labels and validates it for display.
+// Display vocabulary for the billing surfaces — the upgrade flow, the user's
+// Upgrade status view, and the admin panel (billing/01, billing/02). Mirrors
+// the server's canonical sets — apps/server/src/db/schema.ts owns the truth;
+// this module only labels and validates it for display.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Coin, Network, PaymentMethod } from './api';
+import type { Coin, Network, OrderStatus, PaymentMethod } from './api';
+
+/** The `YYYY-MM-DD` an Order list shows for created/decided timestamps. */
+export function orderDate(iso: string): string {
+  return iso.slice(0, 10);
+}
 
 export const PAYMENT_METHODS = ['USDT-TRC20', 'USDT-BEP20', 'LTC'] as const;
 export { type PaymentMethod };
@@ -41,3 +47,20 @@ export function networkWarning(network: Network): string {
 export function isValidTxid(value: string): boolean {
   return /^[0-9a-f]{64}$/i.test(value.trim());
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Order-status display vocabulary, shared by the user's Upgrade status view
+// and the admin queue (billing/02) so both surfaces label states alike.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const STATUS_LABEL: Record<OrderStatus, string> = {
+  pending: 'Pending',
+  verified: 'Verified',
+  rejected: 'Rejected',
+};
+
+export const STATUS_BADGE: Record<OrderStatus, string> = {
+  pending: 'border-hairline bg-canvas text-ink-soft',
+  verified: 'border-accent/40 bg-accent-soft text-accent',
+  rejected: 'border-danger/30 bg-danger/10 text-danger',
+};

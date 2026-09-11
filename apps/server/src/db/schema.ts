@@ -33,6 +33,18 @@ export type Coin = 'USDT' | 'LTC';
 export const NETWORKS = ['TRC20', 'BEP20', 'mainnet'] as const;
 export type Network = (typeof NETWORKS)[number];
 
+/** Admin actions recorded in the audit log (billing/02). */
+export const AUDIT_ACTIONS = [
+  'order.verify',
+  'order.reject',
+  'settings.update',
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+/** What an audit entry's action touched. */
+export const AUDIT_TARGET_TYPES = ['order', 'settings'] as const;
+export type AuditTargetType = (typeof AUDIT_TARGET_TYPES)[number];
+
 export type WalletAddresses = Record<PaymentMethod, string>;
 
 export interface PlanPrice {
@@ -149,6 +161,29 @@ export const settingsKv = sqliteTable('settings_kv', {
   key: text('key').primaryKey(),
   value: text('value', { mode: 'json' }).notNull().$type<unknown>(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/**
+ * Append-only record of every admin action (billing/02): Order verifications
+ * and rejections now, settings changes when billing/03 adds them. The admin
+ * identity is snapshotted (`admin_user_id` is deliberately a plain integer,
+ * not a foreign key) so the trail survives the account it names — deleting a
+ * user must not be able to erase the record of what was done to others.
+ */
+export const auditLogs = sqliteTable('audit_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  adminUserId: integer('admin_user_id').notNull(),
+  adminEmail: text('admin_email').notNull(),
+  action: text('action').notNull(), // AuditAction
+  targetType: text('target_type').notNull(), // AuditTargetType
+  /** The Order id or settings key the action touched. */
+  targetId: text('target_id').notNull(),
+  /** JSON snapshots of the affected state before and after the action. */
+  before: text('before', { mode: 'json' }).$type<unknown>(),
+  after: text('after', { mode: 'json' }).$type<unknown>(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .$defaultFn(() => new Date()),
 });
