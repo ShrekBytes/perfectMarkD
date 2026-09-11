@@ -7,7 +7,9 @@
   },
   "include": [
     "src",
+    "e2e",
     "vite.config.ts",
+    "playwright.config.ts",
     // The base tsconfig aliases @perfectmarkd/core to its source; core's
     // ambient vendor declarations must join the program for those imports
     // to typecheck outside core's own project.

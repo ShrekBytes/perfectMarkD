@@ -40,3 +40,8 @@ jobs:
 
       - name: Engine golden tests (real Chromium)
         run: pnpm --filter @perfectmarkd/core test:golden
+
+      # Web E2E smoke suite (editor-app/10): same Chromium binary as the
+      # golden suite; the config builds apps/web and serves the bundle itself.
+      - name: Web E2E smoke tests (real Chromium)
+        run: pnpm --filter @perfectmarkd/web test:e2e

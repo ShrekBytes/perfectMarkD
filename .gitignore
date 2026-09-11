@@ -17,3 +17,7 @@ data/
 # OS / editor noise
 .DS_Store
 *.log
+
+# Playwright artifacts (web E2E; baselines under apps/web/e2e/*.snapshots are committed)
+apps/web/test-results/
+apps/web/playwright-report/
