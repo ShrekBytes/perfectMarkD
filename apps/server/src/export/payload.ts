@@ -48,8 +48,7 @@ const MAX_ASSETS = 200;
 const MAX_TITLE_LENGTH = 200;
 
 export type ParsedExportPayload =
-  | { ok: true; payload: ExportPayload }
-  | { ok: false; error: string };
+  { ok: true; payload: ExportPayload } | { ok: false; error: string };
 
 /**
  * Validates and normalizes an /api/export request body. `pageCap` is the

@@ -3,9 +3,9 @@
 //
 // Retention (30 days) is enforced by a daily sweep: expired rows are deleted
 // together with their encrypted files, so the history directory never grows
-// past a month of Premium exports and a downgraded user's rows age out
-// naturally. The schedule lives in the composition root (main.ts), which
-// owns timers the way it owns the process.
+// past a month of Premium users' Server Exports and a downgraded user's rows
+// age out naturally. The schedule lives in the composition root (main.ts),
+// which owns timers the way it owns the process.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { lte } from 'drizzle-orm';
@@ -23,34 +23,34 @@ export interface PurgeResult {
 }
 
 /**
- * Deletes every expired row and its encrypted file. A file that is already
- * gone counts as purged; one that refuses to be unlinked (or names a path
- * outside the history root) is counted in failedFiles while its row still
- * goes — retention means the row must not outlive its window.
+ * Deletes every expired row together with its encrypted file: one DELETE…
+ * RETURNING statement is the source of both the paths to unlink and the rows
+ * to remove, so a row can never be deleted past a file that wasn't seen.
+ * A file that is already gone counts as purged; one that refuses to be
+ * unlinked (or names a path outside the history root) is counted in
+ * failedFiles while its row still goes — retention means the row must not
+ * outlive its window.
  */
 export function purgeExpiredHistory(
   db: AppDatabase,
   store: HistoryStore,
   now: Date,
 ): PurgeResult {
-  const expired = db
-    .select({ storedPath: exportsHistory.storedPath })
-    .from(exportsHistory)
+  const deleted = db
+    .delete(exportsHistory)
     .where(lte(exportsHistory.expiresAt, now))
+    .returning({ storedPath: exportsHistory.storedPath })
     .all();
 
   let failedFiles = 0;
-  for (const row of expired) {
+  for (const row of deleted) {
     try {
       store.remove(row.storedPath);
     } catch {
       failedFiles += 1;
     }
   }
-  if (expired.length > 0) {
-    db.delete(exportsHistory).where(lte(exportsHistory.expiresAt, now)).run();
-  }
-  return { purged: expired.length, failedFiles };
+  return { purged: deleted.length, failedFiles };
 }
 
 export interface HistoryPurgeOptions {

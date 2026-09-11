@@ -7,12 +7,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
 import type { AppEnv } from './index.js';
 import type { Clock } from './auth/sessions.js';
-import { entitlements } from './db/schema.js';
 import { getPlanLimits } from './db/settings.js';
-import { isEntitlementActive, quotaState } from './quota.js';
+import { findActiveEntitlement, quotaState } from './quota.js';
 
 export interface MeRoutesOptions {
   /** Injectable clock (tests control expiry and the period boundary). */
@@ -28,19 +26,11 @@ export function meRoutes({ now = () => new Date() }: MeRoutesOptions = {}) {
 
     const db = c.var.db;
     const nowDate = now();
-    const entitlement =
-      db
-        .select()
-        .from(entitlements)
-        .where(eq(entitlements.userId, user.id))
-        .get() ?? null;
     // plan/expiresAt describe the ACTIVE Entitlement only: an expired row
     // reports both null, so the client re-locks without a second endpoint
     // (spec §Entitlement rules). The lapse date, if a future notice needs
     // it, lives in the user's Order history.
-    const activeEntitlement = isEntitlementActive(entitlement, nowDate)
-      ? entitlement
-      : null;
+    const activeEntitlement = findActiveEntitlement(db, user.id, nowDate);
     const state = quotaState(
       db,
       user.id,

@@ -10,6 +10,16 @@ interface HistoryDialogProps {
   onClose: () => void;
 }
 
+/** Any failure crossing the boundary becomes an ApiError the UI can render. */
+function toApiError(cause: unknown): ApiError {
+  return cause instanceof ApiError
+    ? cause
+    : new ApiError(
+        cause instanceof Error ? cause.message : 'Something went wrong.',
+        0,
+      );
+}
+
 /**
  * Export History (server/05): the user's Server Export PDFs from the last 30
  * days, re-downloadable. Reached from the account menu. A Premium gate
@@ -26,14 +36,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
     try {
       setEntries(await listHistory());
     } catch (cause) {
-      setError(
-        cause instanceof ApiError
-          ? cause
-          : new ApiError(
-              cause instanceof Error ? cause.message : 'Something went wrong.',
-              0,
-            ),
-      );
+      setError(toApiError(cause));
     }
   }, []);
 
@@ -48,14 +51,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
     try {
       await downloadHistoryPdf(entry);
     } catch (cause) {
-      setError(
-        cause instanceof ApiError
-          ? cause
-          : new ApiError(
-              cause instanceof Error ? cause.message : 'Something went wrong.',
-              0,
-            ),
-      );
+      setError(toApiError(cause));
     } finally {
       setDownloadingId(null);
     }

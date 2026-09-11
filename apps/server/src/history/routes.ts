@@ -12,11 +12,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
+import { Readable } from 'node:stream';
 import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
-import { entitlements } from '../db/schema.js';
-import { isEntitlementActive } from '../quota.js';
+import { findActiveEntitlement } from '../quota.js';
 import {
   HistoryExpiredError,
   HistoryNotFoundError,
@@ -46,18 +45,14 @@ export function historyRoutes({ store, now }: HistoryRoutesOptions) {
 
   // The Premium gate, applied to every route below: signed in, active
   // Entitlement, plan === premium. An expired Premium row reports as
-  // inactive (isEntitlementActive), so expiry re-locks History the same way
-  // it re-locks the Inspector's gated controls (billing/04).
+  // inactive (the same "active" every other gate reads), so expiry re-locks
+  // History the same way it re-locks the Inspector's gated controls
+  // (billing/04).
   app.use('*', async (c, next) => {
     const user = c.var.user;
     if (!user) return c.json({ error: 'Not signed in.' }, 401);
 
-    const row = c.var.db
-      .select()
-      .from(entitlements)
-      .where(eq(entitlements.userId, user.id))
-      .get();
-    const active = isEntitlementActive(row ?? null, now()) ? row : null;
+    const active = findActiveEntitlement(c.var.db, user.id, now());
     if (active?.plan !== 'premium') {
       return c.json(
         {
@@ -86,15 +81,20 @@ export function historyRoutes({ store, now }: HistoryRoutesOptions) {
       return c.json({ error: 'Export not found.' }, 404);
     }
     try {
-      const { bytes, row } = store.read({
+      // The ticket's "decrypt + stream": the ciphertext flows from disk
+      // through the decipher to the response, never buffered whole (up to
+      // 50 MB). content-length is the exact plaintext size (row.sizeBytes);
+      // a GCM integrity failure truncates the stream mid-flight rather than
+      // ever yielding a wrong file.
+      const { stream, row } = store.stream({
         userId: user.id,
         id,
         now: now(),
       });
-      return c.body(new Uint8Array(bytes), 200, {
+      return c.body(Readable.toWeb(stream) as ReadableStream<Uint8Array>, 200, {
         'content-type': 'application/pdf',
         'content-disposition': `attachment; filename="${pdfFilename(row.name)}"`,
-        'content-length': String(bytes.byteLength),
+        'content-length': String(row.sizeBytes),
       });
     } catch (error) {
       if (error instanceof HistoryExpiredError) {

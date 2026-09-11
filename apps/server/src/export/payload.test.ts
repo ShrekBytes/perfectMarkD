@@ -23,9 +23,7 @@ describe('parseExportPayload', () => {
     if (parsed.ok) {
       // Settings fall back to the engine defaults, repaired like the editor
       // would before persist.
-      expect(parsed.payload.settings.fontSize).toBe(
-        DEFAULT_SETTINGS.fontSize,
-      );
+      expect(parsed.payload.settings.fontSize).toBe(DEFAULT_SETTINGS.fontSize);
     }
   });
 
@@ -39,7 +37,9 @@ describe('parseExportPayload', () => {
 
   it('repairs out-of-range settings the same way the editor does', () => {
     const parsed = parseExportPayload(
-      basePayload({ settings: { ...DEFAULT_SETTINGS, fontSize: -5, preset: 'nope' } }),
+      basePayload({
+        settings: { ...DEFAULT_SETTINGS, fontSize: -5, preset: 'nope' },
+      }),
       PAGE_CAP,
     );
     if (!parsed.ok) throw new Error('expected ok');
@@ -50,17 +50,21 @@ describe('parseExportPayload', () => {
   it('rejects non-objects and missing markdown', () => {
     expect(parseExportPayload(null, PAGE_CAP).ok).toBe(false);
     expect(parseExportPayload('nope', PAGE_CAP).ok).toBe(false);
-    expect(parseExportPayload(basePayload({ markdown: '' }), PAGE_CAP).ok)
-      .toBe(false);
-    expect(parseExportPayload(basePayload({ markdown: '   ' }), PAGE_CAP).ok)
-      .toBe(false);
+    expect(parseExportPayload(basePayload({ markdown: '' }), PAGE_CAP).ok).toBe(
+      false,
+    );
+    expect(
+      parseExportPayload(basePayload({ markdown: '   ' }), PAGE_CAP).ok,
+    ).toBe(false);
   });
 
   it('rejects a bad page count and one over the plan cap', () => {
-    expect(parseExportPayload(basePayload({ pageCount: 0 }), PAGE_CAP).ok)
-      .toBe(false);
-    expect(parseExportPayload(basePayload({ pageCount: 1.5 }), PAGE_CAP).ok)
-      .toBe(false);
+    expect(parseExportPayload(basePayload({ pageCount: 0 }), PAGE_CAP).ok).toBe(
+      false,
+    );
+    expect(
+      parseExportPayload(basePayload({ pageCount: 1.5 }), PAGE_CAP).ok,
+    ).toBe(false);
     const over = parseExportPayload(basePayload({ pageCount: 11 }), PAGE_CAP);
     expect(over.ok).toBe(false);
     if (!over.ok) expect(over.error).toContain('up to 10');
@@ -68,14 +72,20 @@ describe('parseExportPayload', () => {
 
   it('rejects assets that are not data: URIs or exceed the count cap', () => {
     expect(
-      parseExportPayload(basePayload({ assets: { 'asset://a': 'https://x' } }), PAGE_CAP)
-        .ok,
+      parseExportPayload(
+        basePayload({ assets: { 'asset://a': 'https://x' } }),
+        PAGE_CAP,
+      ).ok,
     ).toBe(false);
     const tooMany = Object.fromEntries(
-      Array.from({ length: 201 }, (_, i) => [`asset://${i}`, 'data:image/png;base64,x']),
+      Array.from({ length: 201 }, (_, i) => [
+        `asset://${i}`,
+        'data:image/png;base64,x',
+      ]),
     );
-    expect(parseExportPayload(basePayload({ assets: tooMany }), PAGE_CAP).ok)
-      .toBe(false);
+    expect(
+      parseExportPayload(basePayload({ assets: tooMany }), PAGE_CAP).ok,
+    ).toBe(false);
     expect(
       parseExportPayload(
         basePayload({ assets: { 'asset://a': 'data:image/png;base64,x' } }),

@@ -16,7 +16,18 @@ import {
   hkdfSync,
   randomBytes,
 } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import type { DecipherGCM } from 'node:crypto';
+import {
+  mkdirSync,
+  openSync,
+  readSync,
+  closeSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createReadStream } from 'node:fs';
+import type { Readable } from 'node:stream';
 import { join, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, gt } from 'drizzle-orm';
@@ -89,8 +100,8 @@ export interface HistoryStoreOptions {
   db: AppDatabase;
   /** Root directory for the encrypted files (kept outside any web root). */
   dir: string;
-  /** Master key material — raw bytes or a parseMasterKey-compatible string. */
-  masterKey: Buffer | string;
+  /** Master key material — parseMasterKey's hex or base64 form. */
+  masterKey: string;
 }
 
 export class HistoryStore {
@@ -104,9 +115,7 @@ export class HistoryStore {
   constructor({ db, dir, masterKey }: HistoryStoreOptions) {
     this.db = db;
     this.dir = resolve(dir);
-    this.masterKey = Buffer.isBuffer(masterKey)
-      ? masterKey
-      : parseMasterKey(masterKey);
+    this.masterKey = parseMasterKey(masterKey);
     mkdirSync(this.dir, { recursive: true });
   }
 
@@ -114,7 +123,10 @@ export class HistoryStore {
    * Encrypts the PDF into the user's directory and records the row the
    * History modal lists. The caller decides who qualifies (Premium, server/05)
    * and treats failures as non-fatal — the export itself has already
-   * succeeded.
+   * succeeded. The row is inserted before the file is written (both
+   * synchronous, one call frame): a failed write leaves a row that reads as
+   * missing and ages out at its expiry, never an untracked file the purge
+   * can't see.
    */
   store(input: {
     userId: number;
@@ -127,18 +139,7 @@ export class HistoryStore {
     mkdirSync(userDir, { recursive: true });
     const storedPath = join(userDir, `${randomUUID()}.pdf`);
 
-    const iv = randomBytes(IV_BYTES);
-    const cipher = createCipheriv('aes-256-gcm', this.key(input.userId), iv);
-    const ciphertext = Buffer.concat([
-      cipher.update(input.pdf),
-      cipher.final(),
-    ]);
-    writeFileSync(
-      storedPath,
-      Buffer.concat([iv, cipher.getAuthTag(), ciphertext]),
-    );
-
-    return this.db
+    const row = this.db
       .insert(exportsHistory)
       .values({
         userId: input.userId,
@@ -153,26 +154,51 @@ export class HistoryStore {
       })
       .returning()
       .get();
+
+    const iv = randomBytes(IV_BYTES);
+    const cipher = createCipheriv('aes-256-gcm', this.key(input.userId), iv);
+    const ciphertext = Buffer.concat([
+      cipher.update(input.pdf),
+      cipher.final(),
+    ]);
+    writeFileSync(
+      storedPath,
+      Buffer.concat([iv, cipher.getAuthTag(), ciphertext]),
+    );
+
+    return row;
   }
 
   /**
-   * Decrypts the user's stored export, returning the bytes plus the row (the
-   * download's filename comes from `row.name`). Ownership and the retention
-   * window are checked here so every caller (route, future admin tooling)
-   * gets the same answer; a tampered path that escapes the history root reads
-   * as missing.
+   * Shared preflight for both read paths: ownership, retention window (the
+   * caller's clock decides — no default hides expiry), and path containment.
+   * A tampered path that escapes the history root reads as missing.
    */
-  read(input: { userId: number; id: number; now?: Date }): {
-    bytes: Uint8Array;
-    row: ExportHistoryRow;
-  } {
+  private preflight(input: {
+    userId: number;
+    id: number;
+    now: Date;
+  }): ExportHistoryRow {
     const row = this.rowFor(input.userId, input.id);
-    if (input.now && row.expiresAt.getTime() <= input.now.getTime()) {
+    if (row.expiresAt.getTime() <= input.now.getTime()) {
       throw new HistoryExpiredError();
     }
     if (!insideDir(join(this.dir, String(input.userId)), row.storedPath)) {
       throw new HistoryNotFoundError();
     }
+    return row;
+  }
+
+  /**
+   * Decrypts the user's stored export, returning the bytes plus the row (the
+   * download's filename comes from `row.name`). The buffered variant — the
+   * route streams instead (`stream`).
+   */
+  read(input: { userId: number; id: number; now: Date }): {
+    bytes: Uint8Array;
+    row: ExportHistoryRow;
+  } {
+    const row = this.preflight(input);
 
     let file: Buffer;
     try {
@@ -186,14 +212,7 @@ export class HistoryStore {
       throw new HistoryNotFoundError();
     }
 
-    const iv = file.subarray(0, IV_BYTES);
-    const tag = file.subarray(IV_BYTES, IV_BYTES + TAG_BYTES);
-    const decipher = createDecipheriv(
-      'aes-256-gcm',
-      this.key(input.userId),
-      iv,
-    );
-    decipher.setAuthTag(tag);
+    const decipher = this.decipherFor(input.userId, file);
     // A wrong key, rotated key material, or a corrupted file fails the GCM
     // tag check here and surfaces as a server fault (500), never as bytes.
     const bytes = new Uint8Array(
@@ -203,6 +222,56 @@ export class HistoryStore {
       ]),
     );
     return { bytes, row };
+  }
+
+  /**
+   * The streaming read the ticket asks the download route to serve: the
+   * ciphertext flows from disk through the decipher to the response without
+   * ever being buffered whole. `sizeBytes` is the exact plaintext length.
+   * The GCM tag verifies only at stream end — an integrity failure truncates
+   * the response (like any streaming AEAD), it never yields a wrong file.
+   */
+  stream(input: { userId: number; id: number; now: Date }): {
+    stream: Readable;
+    row: ExportHistoryRow;
+  } {
+    const row = this.preflight(input);
+
+    // The 28-byte header (IV + tag) must be known before the decipher is
+    // wired, so it is read directly; the rest of the file pipes through.
+    let header: Buffer;
+    try {
+      const fd = openSync(row.storedPath, 'r');
+      try {
+        header = Buffer.alloc(IV_BYTES + TAG_BYTES);
+        const read = readSync(fd, header, 0, header.length, 0);
+        if (read < header.length) throw new HistoryNotFoundError();
+      } finally {
+        closeSync(fd);
+      }
+    } catch (error) {
+      if (error instanceof HistoryNotFoundError) throw error;
+      // The row outlived its file (manual deletion, partial purge): gone is
+      // gone, whatever the reason.
+      throw new HistoryNotFoundError();
+    }
+
+    const decipher = this.decipherFor(input.userId, header);
+    const stream = createReadStream(row.storedPath, {
+      start: IV_BYTES + TAG_BYTES,
+    }).pipe(decipher);
+    return { stream, row };
+  }
+
+  /** The AES-256-GCM decipher for a stored file's header (IV ‖ tag). */
+  private decipherFor(userId: number, header: Buffer): DecipherGCM {
+    const decipher = createDecipheriv(
+      'aes-256-gcm',
+      this.key(userId),
+      header.subarray(0, IV_BYTES),
+    );
+    decipher.setAuthTag(header.subarray(IV_BYTES, IV_BYTES + TAG_BYTES));
+    return decipher;
   }
 
   /**

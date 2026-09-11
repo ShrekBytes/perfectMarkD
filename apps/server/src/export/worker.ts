@@ -64,9 +64,10 @@ export interface ExportWorkerOptions {
   /** Simultaneous renders; the ticket default is 2. */
   concurrency?: number;
   /**
-   * Export History storage (server/05). When set, a finished Premium render
-   * is copied to encrypted disk so it can be re-downloaded for 30 days; the
-   * in-memory result keeps serving the immediate download either way.
+   * Export History storage (server/05). When set, a finished render by a
+   * Premium user is copied to encrypted disk so it can be re-downloaded for
+   * 30 days; the in-memory result keeps serving the immediate download
+   * either way.
    */
   history?: HistoryStore;
   clock?: Clock;
@@ -196,12 +197,13 @@ export class ExportWorker {
   }
 
   /**
-   * Copies a finished Premium render into Export History (server/05). Best
-   * effort by design: the export itself has already succeeded and stays
-   * downloadable from memory, so a history failure must not fail the job —
-   * the user loses re-downloadability, not their PDF. Only the plan snapshot
-   * decides (Premium is the one tier with History); the payload title, read
-   * before the payload dies with this call frame, names the entry.
+   * Copies a finished render by a Premium user into Export History
+   * (server/05). Best effort by design: the export itself has already
+   * succeeded and stays downloadable from memory, so a history failure must
+   * not fail the job — the user loses re-downloadability, not their PDF.
+   * Only the plan snapshot decides (Premium is the one tier with History);
+   * the payload title, read before the payload dies with this call frame,
+   * names the entry.
    */
   private storeInHistory(
     job: ExportJob,

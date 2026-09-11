@@ -17,13 +17,12 @@
 
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
 import type { AppDatabase } from '../db/database.js';
-import { entitlements, type ExportJob, type Plan } from '../db/schema.js';
+import type { ExportJob, Plan } from '../db/schema.js';
 import { getPlanLimits, pageCapFor } from '../db/settings.js';
-import { isEntitlementActive, quotaState } from '../quota.js';
+import { findActiveEntitlement, quotaState } from '../quota.js';
 import { parseJson } from '../request-body.js';
 import { MAX_EXPORT_BODY_BYTES, parseExportPayload } from './payload.js';
 import {
@@ -102,15 +101,7 @@ export function exportRoutes(options: ExportRoutesOptions) {
     // a UTC midnight and flip the usage period (the hazard admin/users.ts
     // guards against).
     const nowDate = options.now();
-    const row = db
-      .select()
-      .from(entitlements)
-      .where(eq(entitlements.userId, user.id))
-      .get();
-    const entitlement = row ?? null;
-    const activeEntitlement = isEntitlementActive(entitlement, nowDate)
-      ? entitlement
-      : null;
+    const activeEntitlement = findActiveEntitlement(db, user.id, nowDate);
     const limits = getPlanLimits(db);
     const quota = quotaState(db, user.id, activeEntitlement, limits, nowDate);
 
@@ -191,8 +182,9 @@ export function exportRoutes(options: ExportRoutesOptions) {
     const pdf = results.get(job.id);
     if (!pdf) {
       // The process restarted after the job finished; the immediate download
-      // rides memory (server/03). Premium exports were also copied to Export
-      // History's encrypted disk (server/05) — re-download them from there.
+      // rides memory (server/03). Server Exports by Premium users were also
+      // copied to Export History's encrypted disk (server/05) — re-download
+      // them from there.
       return c.json(
         {
           error: 'This export is no longer available — please export again.',

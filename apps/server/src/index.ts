@@ -67,10 +67,11 @@ export interface CreateAppOptions {
    */
   removeStoredFile?: (storedPath: string) => void;
   /**
-   * Export History storage (server/05). When provided, finished Premium
-   * exports are copied to encrypted disk under it, `/api/history` is mounted,
-   * and the composition root (main.ts) owns the daily purge. Omitted: the
-   * routes don't exist and exports are memory-only (server/03 behavior).
+   * Export History storage (server/05). When provided, finished Server
+   * Exports by Premium users are copied to encrypted disk under it,
+   * `/api/history` is mounted, and the composition root (main.ts) owns the
+   * daily purge. Omitted: the routes don't exist and exports are
+   * memory-only (server/03 behavior).
    */
   history?: HistoryStore;
   /** Mounts the Server Export API + in-process worker (server/03). */

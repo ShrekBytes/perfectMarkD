@@ -13,7 +13,7 @@ if (!env.sessionSecret) {
 }
 if (!env.historyEncryptionKey) {
   throw new Error(
-    'HISTORY_ENCRYPTION_KEY is required — Premium Server Exports must land in Export History. Generate one with: openssl rand -hex 32',
+    'HISTORY_ENCRYPTION_KEY is required — Server Exports by Premium users must land in Export History. Generate one with: openssl rand -hex 32',
   );
 }
 const db = createDatabase(env.dbPath);
@@ -47,8 +47,9 @@ serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`PerfectMarkD API listening on http://localhost:${info.port}`);
 });
 
-// Graceful shutdown: release the purge timer. The worker's in-flight renders
-// settle on their own; the container runtime's stop timeout covers them.
+// Graceful shutdown: release the purge timer. In-flight Server Export
+// renders are abandoned at exit — the container runtime's stop timeout is
+// what bounds how long they can delay shutdown.
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.on(signal, () => {
     stopHistoryPurge();

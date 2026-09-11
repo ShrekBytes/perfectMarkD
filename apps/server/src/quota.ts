@@ -14,7 +14,13 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from './db/database.js';
-import { exportUsage, type PlanLimits, type Plan } from './db/schema.js';
+import {
+  entitlements,
+  exportUsage,
+  type Entitlement,
+  type PlanLimits,
+  type Plan,
+} from './db/schema.js';
 
 /** The usage period a timestamp falls in, UTC `YYYY-MM` (schema: export_usage). */
 export function usagePeriod(now: Date): string {
@@ -29,6 +35,25 @@ export function isEntitlementActive(
   return (
     entitlement !== null && entitlement.expiresAt.getTime() > now.getTime()
   );
+}
+
+/**
+ * The user's active Entitlement, or null — one shape shared by the export
+ * enforcement, GET /api/me, and the Export History gate so "active" can't
+ * drift between the places that decide (and display) it.
+ */
+export function findActiveEntitlement(
+  db: AppDatabase,
+  userId: number,
+  now: Date,
+): Entitlement | null {
+  const row =
+    db
+      .select()
+      .from(entitlements)
+      .where(eq(entitlements.userId, userId))
+      .get() ?? null;
+  return isEntitlementActive(row, now) ? row : null;
 }
 
 /** Everything the quota decision and the chip display need. */

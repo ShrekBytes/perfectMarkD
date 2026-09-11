@@ -58,13 +58,11 @@ export function createPlaywrightRenderer(
 
   async function renderPdf(payload: Parameters<RenderPdf>[0]) {
     const { chromium } = await import('playwright');
-    browserPromise ??= chromium
-      .launch()
-      .catch((error: unknown) => {
-        // A failed launch must not poison every later render.
-        browserPromise = null;
-        throw error;
-      });
+    browserPromise ??= chromium.launch().catch((error: unknown) => {
+      // A failed launch must not poison every later render.
+      browserPromise = null;
+      throw error;
+    });
     const browser = await browserPromise;
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -131,15 +129,12 @@ async function runInPage(
     { timeout: timeoutMs },
   );
 
-  await page.evaluate(
-    (p: unknown) => {
-      window.postMessage(
-        { type: 'pmd:export-render' as const, payload: p },
-        window.location.origin,
-      );
-    },
-    payload,
-  );
+  await page.evaluate((p: unknown) => {
+    window.postMessage(
+      { type: 'pmd:export-render' as const, payload: p },
+      window.location.origin,
+    );
+  }, payload);
 
   const timeout = setTimeout(() => {
     settleDone({
@@ -159,19 +154,30 @@ async function runInPage(
  *  boundary, so it is untrusted input like anything else. */
 function parseResult(raw: unknown): PageRenderResult {
   if (typeof raw !== 'object' || raw === null) {
-    return { ok: false, errorCode: 'render_failed', message: 'Bad render result.' };
+    return {
+      ok: false,
+      errorCode: 'render_failed',
+      message: 'Bad render result.',
+    };
   }
   const record = raw as Record<string, unknown>;
   if (record.ok === false) {
     return {
       ok: false,
       errorCode:
-        typeof record.errorCode === 'string' ? record.errorCode : 'render_failed',
-      message: typeof record.message === 'string' ? record.message : 'Render failed.',
+        typeof record.errorCode === 'string'
+          ? record.errorCode
+          : 'render_failed',
+      message:
+        typeof record.message === 'string' ? record.message : 'Render failed.',
     };
   }
   const pageCount = record.pageCount;
-  if (typeof pageCount !== 'number' || !Number.isInteger(pageCount) || pageCount < 1) {
+  if (
+    typeof pageCount !== 'number' ||
+    !Number.isInteger(pageCount) ||
+    pageCount < 1
+  ) {
     return {
       ok: false,
       errorCode: 'render_failed',
@@ -200,10 +206,15 @@ function parseOutlineEntry(raw: unknown): OutlineEntry | null {
   return {
     title: typeof title === 'string' ? title : '',
     level:
-      typeof level === 'number' && Number.isInteger(level) && level >= 1 && level <= 6
+      typeof level === 'number' &&
+      Number.isInteger(level) &&
+      level >= 1 &&
+      level <= 6
         ? level
         : 6,
     page:
-      typeof page === 'number' && Number.isInteger(page) && page >= 1 ? page : 1,
+      typeof page === 'number' && Number.isInteger(page) && page >= 1
+        ? page
+        : 1,
   };
 }

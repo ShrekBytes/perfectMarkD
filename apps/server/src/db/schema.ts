@@ -49,8 +49,8 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 /**
  * Server Export job lifecycle (server/03). `queued` jobs carry their document
  * payload only in the API process's memory; `done` jobs hold the rendered PDF
- * the same way for the immediate download, and the worker copies Premium
- * results to Export History's encrypted disk (server/05).
+ * the same way for the immediate download, and the worker copies results from
+ * Premium jobs to Export History's encrypted disk (server/05).
  */
 export const EXPORT_JOB_STATUSES = [
   'queued',
@@ -174,6 +174,8 @@ export const entitlements = sqliteTable('entitlements', {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+export type Entitlement = typeof entitlements.$inferSelect;
 
 /** Monthly Server Export usage keyed by period (`YYYY-MM`). */
 export const exportUsage = sqliteTable(

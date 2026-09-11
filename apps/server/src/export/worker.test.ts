@@ -52,7 +52,8 @@ function controllableRenderer(): {
     reject: (e: unknown) => void;
   }>;
 } {
-  const pending: Awaited<ReturnType<typeof controllableRenderer>>['pending'] = [];
+  const pending: Awaited<ReturnType<typeof controllableRenderer>>['pending'] =
+    [];
   const renderPdf: RenderPdf = (payload) =>
     new Promise((resolve, reject) => {
       pending.push({ payload, resolve, reject });
@@ -130,8 +131,10 @@ describe('ExportWorker', () => {
     // The ticket's "payload deleted (test asserts)".
     expect(payloads.size).toBe(0);
     expect(results.get('a')).toEqual(fakePdf(3));
-    expect(db.select().from(exportUsage).where(eq(exportUsage.userId, userId)).get()?.count)
-      .toBe(1);
+    expect(
+      db.select().from(exportUsage).where(eq(exportUsage.userId, userId)).get()
+        ?.count,
+    ).toBe(1);
     const done = job(db, 'a');
     expect(done?.status).toBe('done');
     expect(done?.pages).toBe(3);

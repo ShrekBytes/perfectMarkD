@@ -93,7 +93,9 @@ describe('HistoryStore', () => {
     expect(row.expiresAt.getTime()).toBe(
       NOW.getTime() + HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000,
     );
-    expect(store.read({ userId: userA, id: row.id }).bytes).toEqual(PDF);
+    expect(store.read({ userId: userA, id: row.id, now: NOW }).bytes).toEqual(
+      PDF,
+    );
   });
 
   it('encrypts at rest: the file never contains the plaintext', () => {
@@ -125,7 +127,7 @@ describe('HistoryStore', () => {
       now: NOW,
     });
     // The row belongs to user 1; user 2 cannot read it…
-    expect(() => store.read({ userId: userB, id: row.id })).toThrow(
+    expect(() => store.read({ userId: userB, id: row.id, now: NOW })).toThrow(
       HistoryNotFoundError,
     );
     // …and the file itself lives in user 1's directory only.
@@ -134,7 +136,7 @@ describe('HistoryStore', () => {
 
   it('throws HistoryNotFoundError for an unknown id', () => {
     const { store, userA } = makeStore();
-    expect(() => store.read({ userId: userA, id: 999 })).toThrow(
+    expect(() => store.read({ userId: userA, id: 999, now: NOW })).toThrow(
       HistoryNotFoundError,
     );
   });
@@ -211,11 +213,51 @@ describe('HistoryStore', () => {
       now: NOW,
     });
     const escaped = insertEscapedPathRow(db, userA, '/etc/passwd');
-    expect(() => store.read({ userId: userA, id: escaped })).toThrow(
+    expect(() => store.read({ userId: userA, id: escaped, now: NOW })).toThrow(
       HistoryNotFoundError,
     );
     expect(() => store.remove('/etc/passwd')).toThrow(HistoryNotFoundError);
     expect(existsSync(row.storedPath)).toBe(true);
+  });
+
+  it('streams the stored export without buffering the plaintext whole', async () => {
+    const { store, userA } = makeStore();
+    const row = store.store({
+      userId: userA,
+      name: 'Streamed',
+      pages: 1,
+      pdf: PDF,
+      now: NOW,
+    });
+    const { stream, row: meta } = store.stream({
+      userId: userA,
+      id: row.id,
+      now: NOW,
+    });
+    expect(meta.id).toBe(row.id);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+    expect(Buffer.concat(chunks)).toEqual(Buffer.from(PDF));
+  });
+
+  it('stream throws before any bytes flow for expired or foreign rows', async () => {
+    const { store, userA, userB } = makeStore();
+    const row = store.store({
+      userId: userA,
+      name: 'X',
+      pages: 1,
+      pdf: PDF,
+      now: NOW,
+    });
+    const afterRetention = new Date(
+      NOW.getTime() + HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+    );
+    expect(() =>
+      store.stream({ userId: userA, id: row.id, now: afterRetention }),
+    ).toThrow(HistoryExpiredError);
+    expect(() => store.stream({ userId: userB, id: row.id, now: NOW })).toThrow(
+      HistoryNotFoundError,
+    );
   });
 
   it('fails integrity when decrypted with a different master key', () => {
@@ -234,7 +276,9 @@ describe('HistoryStore', () => {
       dir: historyDir,
       masterKey: 'b'.repeat(64),
     });
-    expect(() => rotated.read({ userId: userA, id: row.id })).toThrow();
+    expect(() =>
+      rotated.read({ userId: userA, id: row.id, now: NOW }),
+    ).toThrow();
   });
 
   it('falls back to "Untitled" for a blank name', () => {
