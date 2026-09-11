@@ -484,7 +484,11 @@ export function createDocumentStore() {
 
       deleteDocument: async (id) => {
         if (!dbp) return;
-        if (id === get().activeId) cancelPendingSave();
+        // Land unflushed edits on the active document first: the toast and
+        // undo snapshot are built from the stored record, so deleting before
+        // the autosave (500ms) would surface the pre-edit name/content there.
+        // Same persist-first contract as exportDocument.
+        if (id === get().activeId) await flush();
         const record = await dbApi.getDocument(dbp, id);
         if (!record) return;
 
