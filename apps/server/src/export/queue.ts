@@ -15,10 +15,8 @@
 
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../db/database.js';
-import { usagePeriod } from '../admin/users.js';
 import {
   exportJobs,
-  exportUsage,
   type ExportJob,
   type ExportJobErrorCode,
   type Plan,
@@ -94,7 +92,9 @@ export function jobView(job: ExportJob): ExportJobView {
 }
 
 export function findExportJob(db: AppDatabase, id: string): ExportJob | null {
-  return db.select().from(exportJobs).where(eq(exportJobs.id, id)).get() ?? null;
+  return (
+    db.select().from(exportJobs).where(eq(exportJobs.id, id)).get() ?? null
+  );
 }
 
 /**
@@ -124,7 +124,10 @@ export function insertExportJob(
  * interleave in-process; the UPDATE still re-checks `queued` so a job can
  * never be claimed twice.
  */
-export function claimNextExportJob(db: AppDatabase, now: Date): ExportJob | null {
+export function claimNextExportJob(
+  db: AppDatabase,
+  now: Date,
+): ExportJob | null {
   const next = db
     .select({ id: exportJobs.id })
     .from(exportJobs)
@@ -154,7 +157,13 @@ export function finishExportJob(
 ): ExportJob {
   return db
     .update(exportJobs)
-    .set({ status: 'done', pages, errorCode: null, errorMessage: null, finishedAt: now })
+    .set({
+      status: 'done',
+      pages,
+      errorCode: null,
+      errorMessage: null,
+      finishedAt: now,
+    })
     .where(eq(exportJobs.id, id))
     .returning()
     .get();
@@ -169,7 +178,12 @@ export function failExportJob(
 ): ExportJob {
   return db
     .update(exportJobs)
-    .set({ status: 'failed', errorCode: code, errorMessage: message, finishedAt: now })
+    .set({
+      status: 'failed',
+      errorCode: code,
+      errorMessage: message,
+      finishedAt: now,
+    })
     .where(eq(exportJobs.id, id))
     .returning()
     .get();
@@ -194,24 +208,4 @@ export function failStaleExportJobs(db: AppDatabase, now: Date): number {
     .returning({ id: exportJobs.id })
     .all();
   return failed.length;
-}
-
-/**
- * The quota decrement from the ticket's acceptance: a successful Server
- * Export counts against the user's monthly usage (billing/04 turns the
- * counter into enforcement).
- */
-export function incrementExportUsage(
-  db: AppDatabase,
-  userId: number,
-  now: Date,
-): void {
-  const period = usagePeriod(now);
-  db.insert(exportUsage)
-    .values({ userId, period, count: 1 })
-    .onConflictDoUpdate({
-      target: [exportUsage.userId, exportUsage.period],
-      set: { count: sql`${exportUsage.count} + 1` },
-    })
-    .run();
 }

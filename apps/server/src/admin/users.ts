@@ -18,12 +18,12 @@ import {
   sessions,
   users,
   type Order,
-  type Plan,
   type User,
   type WalletAddresses,
 } from '../db/schema.js';
 import type { AppDatabase } from '../db/database.js';
 import { asRecord, parseJson } from '../request-body.js';
+import { quotaState, usagePeriod } from '../quota.js';
 import { expiryForGrant } from './entitlement.js';
 import { parseGrant } from './grant.js';
 
@@ -102,11 +102,6 @@ export interface AdminUserDetailView extends AdminUserView {
   orders: Array<OrderView & AdminOrderView>;
 }
 
-/** The usage period a timestamp falls in, UTC `YYYY-MM` (schema: export_usage). */
-export function usagePeriod(now: Date): string {
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
 export function entitlementFor(
   db: AppDatabase,
   userId: number,
@@ -162,25 +157,27 @@ function entitlementRow(db: AppDatabase, userId: number) {
 function usageFor(
   db: AppDatabase,
   userId: number,
-  period: string,
   limits: ReturnType<typeof getPlanLimits>,
   now: Date,
   entitlement: EntitlementView | null,
 ): UsageView {
-  const row = db
-    .select({ count: exportUsage.count, comps: exportUsage.comps })
-    .from(exportUsage)
-    .where(and(eq(exportUsage.userId, userId), eq(exportUsage.period, period)))
-    .get();
-  const used = row?.count ?? 0;
-  const comps = row?.comps ?? 0;
-  const active =
-    entitlement !== null &&
-    new Date(entitlement.expiresAt).getTime() > now.getTime();
-  const planQuota = active
-    ? (limits[entitlement.plan as Plan]?.quotaMonthly ?? 0)
-    : 0;
-  return { period, used, comps, allowance: planQuota + comps };
+  // The shared quota math (server/04) — the panel must show exactly what
+  // /api/me shows the user and what the export route enforces.
+  const state = quotaState(
+    db,
+    userId,
+    entitlement
+      ? { plan: entitlement.plan, expiresAt: new Date(entitlement.expiresAt) }
+      : null,
+    limits,
+    now,
+  );
+  return {
+    period: usagePeriod(now),
+    used: state.used,
+    comps: state.comps,
+    allowance: state.limit,
+  };
 }
 
 function userView(
@@ -188,7 +185,6 @@ function userView(
   user: User,
   now: Date,
   limits: ReturnType<typeof getPlanLimits>,
-  period: string,
 ): AdminUserView {
   const entitlement = entitlementFor(db, user.id);
   return {
@@ -197,7 +193,7 @@ function userView(
     isAdmin: user.isAdmin,
     createdAt: user.createdAt.toISOString(),
     entitlement,
-    usage: usageFor(db, user.id, period, limits, now, entitlement),
+    usage: usageFor(db, user.id, limits, now, entitlement),
   };
 }
 
@@ -221,7 +217,6 @@ export function usersRoutes({
     const db = c.var.db;
     const nowDate = now();
     const limits = getPlanLimits(db);
-    const period = usagePeriod(nowDate);
     const query = (c.req.query('query') ?? '').trim();
     const rows = (
       query === ''
@@ -239,7 +234,7 @@ export function usersRoutes({
       .limit(MAX_RESULTS)
       .all();
     return c.json({
-      users: rows.map((user) => userView(db, user, nowDate, limits, period)),
+      users: rows.map((user) => userView(db, user, nowDate, limits)),
     });
   });
 
@@ -253,7 +248,6 @@ export function usersRoutes({
 
     const nowDate = now();
     const limits = getPlanLimits(db);
-    const period = usagePeriod(nowDate);
     const wallets = getWallets(db);
     const orderRows = db
       .select()
@@ -261,7 +255,7 @@ export function usersRoutes({
       .where(eq(orders.userId, user.id))
       .orderBy(desc(orders.id))
       .all();
-    const view = userView(db, user, nowDate, limits, period);
+    const view = userView(db, user, nowDate, limits);
     return c.json({
       user: {
         ...view,
@@ -341,13 +335,7 @@ export function usersRoutes({
     // The response view uses the same instant the grant math and audit entry
     // used — a fresh now() could straddle a UTC midnight and flip the period.
     return c.json({
-      user: userView(
-        db,
-        user,
-        nowDate,
-        getPlanLimits(db),
-        usagePeriod(nowDate),
-      ),
+      user: userView(db, user, nowDate, getPlanLimits(db)),
     });
   });
 
@@ -387,13 +375,7 @@ export function usersRoutes({
     });
 
     return c.json({
-      user: userView(
-        db,
-        user,
-        nowDate,
-        getPlanLimits(db),
-        usagePeriod(nowDate),
-      ),
+      user: userView(db, user, nowDate, getPlanLimits(db)),
     });
   });
 
@@ -475,7 +457,7 @@ export function usersRoutes({
     }
 
     return c.json({
-      user: userView(db, user, nowDate, getPlanLimits(db), period),
+      user: userView(db, user, nowDate, getPlanLimits(db)),
     });
   });
 

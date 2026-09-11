@@ -1,6 +1,7 @@
 import { BookIcon } from './icons';
 import { AccountMenu } from './AccountMenu';
 import { DocName } from './DocName';
+import { QuotaChip } from './QuotaChip';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { ExportSplitButton } from '../export/ExportSplitButton';
 import type { Theme } from '../theme/theme';
@@ -61,6 +62,10 @@ export function TopBar({
         </button>
 
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+
+        {/* Quota chip (server/04): usage against the active plan's monthly
+            Server Export allowance; absent on Free. */}
+        <QuotaChip />
 
         {/* Client Export flow (editor-app/06): self-contained split button —
             print flow, one-time hint, and toasts all live inside it. */}

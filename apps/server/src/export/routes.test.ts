@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { createApp, type AppType } from '../index.js';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { entitlements, exportJobs, exportUsage, users } from '../db/schema.js';
+import { LIMITS_KEY, setSetting } from '../db/settings.js';
+import { usagePeriod } from '../quota.js';
+import type { PlanLimits } from '../db/schema.js';
 import type { RenderPdf } from './worker.js';
 import { findExportJob } from './queue.js';
 
@@ -24,11 +27,13 @@ function instantRenderer(pages = 2): RenderPdf {
   });
 }
 
-function makeApp(options: {
-  renderPdf?: RenderPdf;
-  burstPerMinute?: number;
-  withExport?: boolean;
-} = {}): { app: AppType; db: AppDatabase } {
+function makeApp(
+  options: {
+    renderPdf?: RenderPdf;
+    burstPerMinute?: number;
+    withExport?: boolean;
+  } = {},
+): { app: AppType; db: AppDatabase } {
   const { db, dir } = createTestDatabase();
   cleanup = () => removeTestDatabase(dir);
   const app = createApp({
@@ -151,12 +156,18 @@ describe('POST /api/export', () => {
 
     const res = await postJson(app, '/api/export', BODY, { cookie });
     expect(res.status).toBe(202);
-    const { job } = (await res.json()) as { job: { id: string; status: string } };
+    const { job } = (await res.json()) as {
+      job: { id: string; status: string };
+    };
     expect(job.status).toBe('queued');
 
     // Queue visible in DB (the plan snapshot is the part worth pinning; the
     // instant renderer may already have finished the row).
-    const row = db.select().from(exportJobs).where(eq(exportJobs.id, job.id)).get();
+    const row = db
+      .select()
+      .from(exportJobs)
+      .where(eq(exportJobs.id, job.id))
+      .get();
     expect(row?.plan).toBe('premium');
 
     const settled = await waitForJob(db, job.id);
@@ -189,8 +200,11 @@ describe('POST /api/export', () => {
 
     const { cookie: other } = await grantEntitlement(app, db, { plan: 'pro' });
     expect(
-      (await app.request(`/api/export/jobs/${job.id}`, { headers: { cookie: other } }))
-        .status,
+      (
+        await app.request(`/api/export/jobs/${job.id}`, {
+          headers: { cookie: other },
+        })
+      ).status,
     ).toBe(404);
     expect(
       (
@@ -226,7 +240,12 @@ describe('POST /api/export', () => {
     const { app, db } = makeApp();
     const { cookie } = await grantEntitlement(app, db, { plan: 'pro' });
 
-    const bad = await postJson(app, '/api/export', { markdown: '' }, { cookie });
+    const bad = await postJson(
+      app,
+      '/api/export',
+      { markdown: '' },
+      { cookie },
+    );
     expect(bad.status).toBe(400);
 
     const overCap = await postJson(
@@ -236,7 +255,9 @@ describe('POST /api/export', () => {
       { cookie },
     );
     expect(overCap.status).toBe(400);
-    expect(((await overCap.json()) as { error: string }).error).toContain('up to 300');
+    expect(((await overCap.json()) as { error: string }).error).toContain(
+      'up to 300',
+    );
   });
 
   it('enforces the per-minute burst limit', async () => {
@@ -258,7 +279,8 @@ describe('POST /api/export', () => {
     await waitForJob(db, job.id);
 
     expect(
-      db.select().from(exportUsage).where(eq(exportUsage.userId, userId)).get()?.count,
+      db.select().from(exportUsage).where(eq(exportUsage.userId, userId)).get()
+        ?.count,
     ).toBe(1);
   });
 
@@ -266,5 +288,115 @@ describe('POST /api/export', () => {
     const { app } = makeApp({ withExport: false });
     const res = await postJson(app, '/api/export', BODY);
     expect(res.status).toBe(404);
+  });
+});
+
+describe('quota enforcement (server/04)', () => {
+  /** Tight plan limits so a quota can be exhausted with one export. */
+  function setQuota(db: AppDatabase, proQuota: number): void {
+    const limits: PlanLimits = {
+      pro: { pageCap: 300, quotaMonthly: proQuota },
+      premium: { pageCap: 1000, quotaMonthly: 1000 },
+    };
+    setSetting(db, LIMITS_KEY, limits);
+  }
+
+  it('a successful export counts; the next one is a 402 with a typed code', async () => {
+    const { app, db } = makeApp();
+    setQuota(db, 1);
+    const { cookie, userId } = await grantEntitlement(app, db, { plan: 'pro' });
+
+    const first = await postJson(app, '/api/export', BODY, { cookie });
+    expect(first.status).toBe(202);
+    const { job } = (await first.json()) as { job: { id: string } };
+    await waitForJob(db, job.id);
+
+    const second = await postJson(app, '/api/export', BODY, { cookie });
+    expect(second.status).toBe(402);
+    expect(await second.json()).toMatchObject({ code: 'quota_exceeded' });
+
+    // Rejected before enqueueing: only the one accepted job exists.
+    const jobs = db
+      .select()
+      .from(exportJobs)
+      .where(eq(exportJobs.userId, userId))
+      .all();
+    expect(jobs).toHaveLength(1);
+  });
+
+  it('failed renders never consume quota', async () => {
+    const { app, db } = makeApp({
+      renderPdf: async () => {
+        throw new Error('render exploded');
+      },
+    });
+    setQuota(db, 1);
+    const { cookie } = await grantEntitlement(app, db, { plan: 'pro' });
+
+    const first = await postJson(app, '/api/export', BODY, { cookie });
+    const { job } = (await first.json()) as { job: { id: string } };
+    await waitForJob(db, job.id);
+
+    const second = await postJson(app, '/api/export', BODY, { cookie });
+    expect(second.status).toBe(202);
+  });
+
+  it('comps raise the ceiling for the period', async () => {
+    const { app, db } = makeApp();
+    setQuota(db, 1);
+    const { cookie, userId } = await grantEntitlement(app, db, { plan: 'pro' });
+
+    const first = await postJson(app, '/api/export', BODY, { cookie });
+    const { job } = (await first.json()) as { job: { id: string } };
+    await waitForJob(db, job.id);
+    expect((await postJson(app, '/api/export', BODY, { cookie })).status).toBe(
+      402,
+    );
+
+    // The Admin comps one extra export (billing/03's DB effect).
+    const period = usagePeriod(new Date());
+    db.update(exportUsage)
+      .set({ comps: 1 })
+      .where(
+        and(eq(exportUsage.userId, userId), eq(exportUsage.period, period)),
+      )
+      .run();
+
+    expect((await postJson(app, '/api/export', BODY, { cookie })).status).toBe(
+      202,
+    );
+  });
+
+  it('last period’s usage does not count against this period', async () => {
+    const { app, db } = makeApp();
+    setQuota(db, 1);
+    const { cookie, userId } = await grantEntitlement(app, db, { plan: 'pro' });
+
+    const lastMonth = new Date();
+    lastMonth.setUTCMonth(lastMonth.getUTCMonth() - 1);
+    db.insert(exportUsage)
+      .values({ userId, period: usagePeriod(lastMonth), count: 1 })
+      .run();
+
+    const res = await postJson(app, '/api/export', BODY, { cookie });
+    expect(res.status).toBe(202);
+  });
+
+  it('quota rejections do not consume burst slots', async () => {
+    const { app, db } = makeApp({ burstPerMinute: 2 });
+    setQuota(db, 1);
+    const { cookie } = await grantEntitlement(app, db, { plan: 'pro' });
+
+    // One accepted export (burst slot 1) plus quota exhaustion; the burst
+    // window holds 2, so a third 402 would be a 429 if rejections consumed
+    // slots. They must not.
+    const first = await postJson(app, '/api/export', BODY, { cookie });
+    const { job } = (await first.json()) as { job: { id: string } };
+    await waitForJob(db, job.id);
+
+    for (let i = 0; i < 3; i++) {
+      const res = await postJson(app, '/api/export', BODY, { cookie });
+      expect(res.status).toBe(402);
+    }
   });
 });

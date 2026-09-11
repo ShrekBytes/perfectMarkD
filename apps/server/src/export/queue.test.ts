@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { exportJobs, exportUsage, users } from '../db/schema.js';
+import { incrementExportUsage } from '../quota.js';
 import {
   PayloadStore,
   ResultStore,
@@ -10,7 +11,6 @@ import {
   failExportJob,
   failStaleExportJobs,
   finishExportJob,
-  incrementExportUsage,
   insertExportJob,
 } from './queue.js';
 
@@ -97,7 +97,13 @@ describe('finish / fail / stale recovery', () => {
     await enqueue(db, 'pro', 'a');
     claimNextExportJob(db, new Date());
 
-    const failed = failExportJob(db, 'a', 'render_timeout', 'Too slow.', new Date());
+    const failed = failExportJob(
+      db,
+      'a',
+      'render_timeout',
+      'Too slow.',
+      new Date(),
+    );
     expect(failed.status).toBe('failed');
     expect(failed.errorCode).toBe('render_timeout');
     expect(failed.errorMessage).toBe('Too slow.');
@@ -114,12 +120,21 @@ describe('finish / fail / stale recovery', () => {
 
     const failed = failStaleExportJobs(db, new Date());
     expect(failed).toBe(2);
-    expect(db.select().from(exportJobs).where(eq(exportJobs.id, 'done-1')).get()?.status)
-      .toBe('done');
-    expect(db.select().from(exportJobs).where(eq(exportJobs.id, 'mid-render')).get()?.errorCode)
-      .toBe('worker_restart');
-    expect(db.select().from(exportJobs).where(eq(exportJobs.id, 'still-queued')).get()?.errorCode)
-      .toBe('worker_restart');
+    expect(
+      db.select().from(exportJobs).where(eq(exportJobs.id, 'done-1')).get()
+        ?.status,
+    ).toBe('done');
+    expect(
+      db.select().from(exportJobs).where(eq(exportJobs.id, 'mid-render')).get()
+        ?.errorCode,
+    ).toBe('worker_restart');
+    expect(
+      db
+        .select()
+        .from(exportJobs)
+        .where(eq(exportJobs.id, 'still-queued'))
+        .get()?.errorCode,
+    ).toBe('worker_restart');
   });
 });
 

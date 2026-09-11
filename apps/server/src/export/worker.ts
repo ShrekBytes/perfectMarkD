@@ -16,8 +16,13 @@ import { eq } from 'drizzle-orm';
 import type { Clock } from '../auth/sessions.js';
 import type { LogSink } from '../request-logger.js';
 import type { AppDatabase } from '../db/database.js';
-import { exportJobs, type ExportJob, type ExportJobErrorCode } from '../db/schema.js';
+import {
+  exportJobs,
+  type ExportJob,
+  type ExportJobErrorCode,
+} from '../db/schema.js';
 import { getPlanLimits } from '../db/settings.js';
+import { incrementExportUsage } from '../quota.js';
 import {
   PayloadStore,
   ResultStore,
@@ -25,7 +30,6 @@ import {
   failExportJob,
   failStaleExportJobs,
   finishExportJob,
-  incrementExportUsage,
 } from './queue.js';
 import type { ExportPayload } from './payload.js';
 
@@ -40,7 +44,10 @@ export type RenderPdf = (payload: ExportPayload) => Promise<{
  *  should surface. Anything else a renderer throws becomes render_failed. */
 export class RenderError extends Error {
   constructor(
-    readonly code: Extract<ExportJobErrorCode, 'render_failed' | 'render_timeout' | 'page_cap_exceeded'>,
+    readonly code: Extract<
+      ExportJobErrorCode,
+      'render_failed' | 'render_timeout' | 'page_cap_exceeded'
+    >,
     message: string,
   ) {
     super(message);
@@ -89,7 +96,9 @@ export class ExportWorker {
   start(): number {
     const recovered = failStaleExportJobs(this.db, this.now());
     if (recovered > 0) {
-      this.log(`export worker: failed ${recovered} stale job(s) from a previous process`);
+      this.log(
+        `export worker: failed ${recovered} stale job(s) from a previous process`,
+      );
     }
     this.pump();
     return recovered;

@@ -100,17 +100,30 @@ describe('logout', () => {
 });
 
 describe('me', () => {
-  it('returns the user when the session is valid', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          jsonResponse({ user: { email: 'a@b.co', isAdmin: false } }),
-        ),
+  it('GETs /api/me and returns the identity + gates payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        email: 'a@b.co',
+        isAdmin: false,
+        plan: 'pro',
+        expiresAt: '2026-10-01T00:00:00.000Z',
+        quota: { used: 3, limit: 300 },
+      }),
     );
+    vi.stubGlobal('fetch', fetchMock);
 
-    expect(await me()).toEqual({ email: 'a@b.co', isAdmin: false });
+    const meUser = await me();
+
+    expect(meUser).toEqual({
+      email: 'a@b.co',
+      isAdmin: false,
+      plan: 'pro',
+      expiresAt: '2026-10-01T00:00:00.000Z',
+      quota: { used: 3, limit: 300 },
+    });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/me');
+    expect(init).toMatchObject({ credentials: 'include' });
   });
 
   it('returns null when not signed in', async () => {

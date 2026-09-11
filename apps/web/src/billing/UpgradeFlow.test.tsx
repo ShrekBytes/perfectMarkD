@@ -167,8 +167,24 @@ describe('account step', () => {
     const register = vi
       .spyOn(authApi, 'register')
       .mockResolvedValue({ email: 'a@b.co', isAdmin: false });
-    const fetchMock = vi.fn(() =>
+    // The flow fetches twice: the account store's post-sign-in /api/me
+    // refresh (server/04) and the order creation itself.
+    const createOrder = vi.fn(() =>
       Promise.resolve(jsonResponse(201, { order: USDT_ORDER })),
+    );
+    const fetchMock = vi.fn(
+      (url: string | URL | Request, init?: RequestInit) =>
+        String(url).endsWith('/api/me')
+          ? Promise.resolve(
+              jsonResponse(200, {
+                email: 'a@b.co',
+                isAdmin: false,
+                plan: null,
+                expiresAt: null,
+                quota: { used: 0, limit: 0 },
+              }),
+            )
+          : createOrder(url, init),
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -186,7 +202,9 @@ describe('account step', () => {
       email: 'a@b.co',
       isAdmin: false,
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Exactly one order-creation request — the /api/me refresh is the only
+    // other fetch the flow makes.
+    expect(createOrder).toHaveBeenCalledTimes(1);
   });
 
   it('can switch between register and sign-in in place', async () => {

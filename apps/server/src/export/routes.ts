@@ -1,18 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Server Export API (server/03).
 //
-// POST /api/export — validates (size, plan guard, burst limit, payload shape,
-// page cap), stores the payload in memory, and enqueues the job. The response
-// is 202 with the queued job; the client polls GET /api/export/jobs/:id and
-// finally fetches GET /api/export/jobs/:id/pdf. Errors on the enqueue path
-// carry a `code` the client can match on (billing/04 builds the upgrade
-// prompts on them); failures after acceptance surface as typed job failures
-// on the job row instead.
+// POST /api/export — validates (size, entitlement, monthly quota, burst limit,
+// payload shape, page cap), stores the payload in memory, and enqueues the
+// job. The response is 202 with the queued job; the client polls
+// GET /api/export/jobs/:id and finally fetches GET /api/export/jobs/:id/pdf.
+// Errors on the enqueue path carry a `code` the client can match on (billing/04
+// builds the upgrade prompts on them); failures after acceptance surface as
+// typed job failures on the job row instead.
 //
-// The plan guard here is deliberately a stub: any active Entitlement unlocks
-// Server Export, and nothing checks the monthly quota yet. billing/04
-// replaces it with the real entitlement + quota enforcement once server/04
-// exposes the usage endpoint.
+// The plan guard is the minimal server-side gate: an active Entitlement is
+// required, and usage is counted against the plan quota + comps (server/04).
+// billing/04 wires the client side — the upgrade prompts and the gated
+// feature flags from GET /api/me.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Hono } from 'hono';
@@ -23,6 +23,7 @@ import type { Clock } from '../auth/sessions.js';
 import type { AppDatabase } from '../db/database.js';
 import { entitlements, type ExportJob } from '../db/schema.js';
 import { getPlanLimits } from '../db/settings.js';
+import { isEntitlementActive, quotaState } from '../quota.js';
 import { parseJson } from '../request-body.js';
 import { MAX_EXPORT_BODY_BYTES, parseExportPayload } from './payload.js';
 import {
@@ -84,7 +85,8 @@ export function exportRoutes(options: ExportRoutesOptions) {
       onError: (c) =>
         c.json(
           {
-            error: 'This document is too large — Server Export accepts up to 50 MB.',
+            error:
+              'This document is too large — Server Export accepts up to 50 MB.',
             code: 'payload_too_large',
           },
           413,
@@ -96,14 +98,15 @@ export function exportRoutes(options: ExportRoutesOptions) {
     const user = c.var.user;
     if (!user) return c.json({ error: 'Not signed in.' }, 401);
 
-    // The stub plan guard (see module comment): an active Entitlement is the
-    // only gate until billing/04 adds quota enforcement.
+    // Entitlement gate: an active Entitlement unlocks Server Export. Expired
+    // attempts are a distinct typed error from over-quota ones (billing/04
+    // builds a different prompt for each).
     const entitlement = db
       .select()
       .from(entitlements)
       .where(eq(entitlements.userId, user.id))
       .get();
-    if (!entitlement || entitlement.expiresAt.getTime() <= options.now().getTime()) {
+    if (!entitlement || !isEntitlementActive(entitlement, options.now())) {
       return c.json(
         {
           error: 'Server Export needs an active paid plan.',
@@ -113,12 +116,29 @@ export function exportRoutes(options: ExportRoutesOptions) {
       );
     }
 
+    // Monthly quota gate (server/04): the period's successful exports count
+    // against the plan quota plus comps. Checked before the burst window and
+    // before the payload is read, so a rejected request burns nothing — no
+    // burst slot, no job row, no half-parsed document.
+    const limits = getPlanLimits(db);
+    const quota = quotaState(db, user.id, entitlement, limits, options.now());
+    if (quota.used >= quota.limit) {
+      return c.json(
+        {
+          error:
+            'You have used all of this period’s Server Exports — it resets next period, or upgrade for a larger quota.',
+          code: 'quota_exceeded',
+        },
+        402,
+      );
+    }
+
     // The burst window only counts requests that will actually enqueue: a
     // malformed or over-cap payload never reaches the queue, so it never
     // consumes one of the user's N-per-minute slots.
     const parsed = parseExportPayload(
       parseJson(await c.req.text()),
-      getPlanLimits(db)[entitlement.plan as 'pro' | 'premium'].pageCap,
+      limits[entitlement.plan as 'pro' | 'premium'].pageCap,
     );
     if (!parsed.ok) {
       return c.json({ error: parsed.error }, 400);

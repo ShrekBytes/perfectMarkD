@@ -37,11 +37,28 @@ export async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
 }
 
-/** The current session's user, or null when not signed in. */
-export async function me(): Promise<AuthUser | null> {
-  const res = await fetch('/api/auth/me', { credentials: 'include' });
+/** The GET /api/me payload (server/04): identity plus the entitlement gates. */
+export interface MePayload {
+  email: string;
+  isAdmin: boolean;
+  /** The active Entitlement's plan; null on Free. */
+  plan: string | null;
+  /** ISO expiry of the active Entitlement; null without one. */
+  expiresAt: string | null;
+  /** Monthly Server Export stance: used vs the plan quota plus comps. */
+  quota: { used: number; limit: number };
+}
+
+/**
+ * The session's identity and gates, or null when not signed in. The single
+ * source of truth for the quota chip (server/04) and — with billing/04's
+ * flags — the gated Inspector controls.
+ */
+export async function me(): Promise<MePayload | null> {
+  const res = await fetch('/api/me', { credentials: 'include' });
   if (res.status === 401) return null;
-  return readUserOrThrow(res);
+  if (!res.ok) throw await errorFrom(res);
+  return (await res.json()) as MePayload;
 }
 
 export async function changePassword(

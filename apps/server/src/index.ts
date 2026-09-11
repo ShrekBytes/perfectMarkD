@@ -16,6 +16,7 @@ import { PayloadStore, ResultStore } from './export/queue.js';
 import { exportRoutes } from './export/routes.js';
 import { createPlaywrightRenderer } from './export/render.js';
 import { ExportWorker, type RenderPdf } from './export/worker.js';
+import { meRoutes } from './me.js';
 
 export interface AppEnv {
   Variables: {
@@ -137,6 +138,7 @@ export function createApp({
       return next();
     })
     .get('/healthz', (c) => c.json({ ok: true }))
+    .route('/api/me', meRoutes({ now: clock }))
     .route(
       '/api/auth',
       authRoutes({ sessionSecret, adminEmail, authRateLimit, now: clock }),
