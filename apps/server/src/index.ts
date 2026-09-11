@@ -44,8 +44,6 @@ export interface ExportAppOptions {
    * inject fakes here.
    */
   renderPdf?: RenderPdf;
-  /** Injectable job id (tests); default crypto.randomUUID(). */
-  newId?: () => string;
 }
 
 export interface CreateAppOptions {
@@ -116,7 +114,6 @@ export function createApp({
       worker,
       burstPerMinute: exportOptions.burstPerMinute ?? 10,
       now: clock,
-      newId: exportOptions.newId ?? (() => crypto.randomUUID()),
     });
   }
 

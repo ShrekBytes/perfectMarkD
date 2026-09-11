@@ -21,7 +21,7 @@ import { eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
 import type { AppDatabase } from '../db/database.js';
-import { entitlements } from '../db/schema.js';
+import { entitlements, type ExportJob } from '../db/schema.js';
 import { getPlanLimits } from '../db/settings.js';
 import { parseJson } from '../request-body.js';
 import { MAX_EXPORT_BODY_BYTES, parseExportPayload } from './payload.js';
@@ -42,13 +42,14 @@ export interface ExportRoutesOptions {
   /** Max exports a single user may enqueue per rolling minute. */
   burstPerMinute: number;
   now: Clock;
-  /** Injectable for tests. */
-  newId: () => string;
 }
 
 /**
  * Rolling 60-second per-user window: at most `max` enqueues, so a runaway
- * client cannot flood the render queue (spec §Security posture).
+ * client cannot flood the render queue (spec §Security posture). Only
+ * accepted enqueues consume the window — rejected requests don't burn quota —
+ * and expired windows are dropped on touch, so the map never holds more than
+ * the users who exported within the last minute.
  */
 class BurstLimiter {
   private readonly hits = new Map<number, number[]>();
@@ -59,14 +60,14 @@ class BurstLimiter {
   ) {}
 
   tryAcquire(userId: number): boolean {
-    const cutoff = this.now().getTime() - 60_000;
-    const hits = (this.hits.get(userId) ?? []).filter((t) => t > cutoff);
-    if (hits.length >= this.max) {
-      this.hits.set(userId, hits);
-      return false;
-    }
-    hits.push(this.now().getTime());
-    this.hits.set(userId, hits);
+    const now = this.now().getTime();
+    const recent = (this.hits.get(userId) ?? []).filter(
+      (t) => t > now - 60_000,
+    );
+    if (recent.length === 0) this.hits.delete(userId);
+    if (recent.length >= this.max) return false;
+    recent.push(now);
+    this.hits.set(userId, recent);
     return true;
   }
 }
@@ -112,6 +113,17 @@ export function exportRoutes(options: ExportRoutesOptions) {
       );
     }
 
+    // The burst window only counts requests that will actually enqueue: a
+    // malformed or over-cap payload never reaches the queue, so it never
+    // consumes one of the user's N-per-minute slots.
+    const parsed = parseExportPayload(
+      parseJson(await c.req.text()),
+      getPlanLimits(db)[entitlement.plan as 'pro' | 'premium'].pageCap,
+    );
+    if (!parsed.ok) {
+      return c.json({ error: parsed.error }, 400);
+    }
+
     if (!burst.tryAcquire(user.id)) {
       return c.json(
         {
@@ -122,15 +134,7 @@ export function exportRoutes(options: ExportRoutesOptions) {
       );
     }
 
-    const parsed = parseExportPayload(
-      parseJson(await c.req.text()),
-      getPlanLimits(db)[entitlement.plan as 'pro' | 'premium'].pageCap,
-    );
-    if (!parsed.ok) {
-      return c.json({ error: parsed.error }, 400);
-    }
-
-    const id = options.newId();
+    const id = crypto.randomUUID();
     const job = insertExportJob(db, {
       id,
       userId: user.id,
@@ -143,20 +147,14 @@ export function exportRoutes(options: ExportRoutesOptions) {
   });
 
   app.get('/jobs/:id', (c) => {
-    const user = c.var.user;
-    const job = user ? findExportJob(db, c.req.param('id')) : null;
-    if (!job || job.userId !== user!.id) {
-      return c.json({ error: 'Export not found.' }, 404);
-    }
+    const job = ownedJob(db, c);
+    if (!job) return c.json({ error: 'Export not found.' }, 404);
     return c.json({ job: jobView(job) });
   });
 
   app.get('/jobs/:id/pdf', (c) => {
-    const user = c.var.user;
-    const job = user ? findExportJob(db, c.req.param('id')) : null;
-    if (!job || job.userId !== user!.id) {
-      return c.json({ error: 'Export not found.' }, 404);
-    }
+    const job = ownedJob(db, c);
+    if (!job) return c.json({ error: 'Export not found.' }, 404);
     if (job.status !== 'done') {
       return c.json({ error: 'The export is not finished yet.' }, 409);
     }
@@ -180,6 +178,20 @@ export function exportRoutes(options: ExportRoutesOptions) {
   });
 
   return app;
+}
+
+/**
+ * The job row only when it exists and belongs to the caller — another user's
+ * export is a 404, matching how Orders hide their existence.
+ */
+function ownedJob(
+  db: AppDatabase,
+  c: { req: { param: (name: string) => string }; var: AppEnv['Variables'] },
+): ExportJob | null {
+  const user = c.var.user;
+  if (!user) return null;
+  const job = findExportJob(db, c.req.param('id'));
+  return job && job.userId === user.id ? job : null;
 }
 
 /** The filename from the job id — stable and safe (the document title rode

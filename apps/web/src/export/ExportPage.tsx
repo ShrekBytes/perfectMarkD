@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { KATEX_EXPORT_CSS } from '../canvas/katex-css';
+import { renderMermaid } from '../canvas/mermaid';
 import {
   EXPORT_DONE_FUNCTION,
   EXPORT_READY_FLAG,
@@ -50,6 +51,7 @@ export function ExportPage() {
       }
       void renderServerExportDocument(event.data.payload, {
         mathCSS: KATEX_EXPORT_CSS,
+        renderMermaid,
       }).then((result) => {
         // The paint step replaces the document; this callback and the flag
         // live on `window`, which survives it.
