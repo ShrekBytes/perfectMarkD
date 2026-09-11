@@ -39,7 +39,13 @@ services:
     # Mirrors the Dockerfile HEALTHCHECK so the caddy dependency wait works on
     # every runtime (podman's compat API hides image-level healthchecks).
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 30s
       timeout: 5s
       start_period: 10s
@@ -48,8 +54,9 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required, see .env.example}
       HISTORY_ENCRYPTION_KEY: ${HISTORY_ENCRYPTION_KEY:?HISTORY_ENCRYPTION_KEY is required, see .env.example}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      # The worker's Chromium loads the SPA's /export page from Caddy — the
-      # same origin browsers use, so preview and PDF can never diverge.
+      # The worker's Chromium loads the SPA's /export page from Caddy over
+      # the internal network — the loopback origin (http://caddy) exists so
+      # the worker has one regardless of how the public site is served.
       EXPORT_ORIGIN: http://caddy
       # Both live on the api-data volume: SQLite db + encrypted history.
       DB_PATH: /data/perfectmarkd.db

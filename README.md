@@ -34,14 +34,14 @@ Pull requests run lint, typecheck, build, and tests via [.github/workflows/ci.ym
 
 ## Deployment
 
-Docker Compose runs the whole stack on one origin — Caddy serves the built app and reverse-proxies `/api` to the API container:
+Docker Compose runs the whole stack on one origin — Caddy serves the built app and reverse-proxies `/api` to the api container:
 
 ```sh
 cp .env.example .env    # fill in SESSION_SECRET + HISTORY_ENCRYPTION_KEY
 docker compose up -d --build
 ```
 
-Set `SITE_ADDRESS=<domain>` in `.env` to have Caddy provision TLS automatically.
+Set `SITE_ADDRESS=<domain>` in `.env` to have Caddy provision TLS automatically. Server Export (paid plans) additionally needs Chromium inside the api image — see [.scratch/launch/issues/04-deploy-production.md](.scratch/launch/issues/04-deploy-production.md).
 
 ## License
 
