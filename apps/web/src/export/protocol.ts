@@ -61,7 +61,9 @@ export interface ExportRenderMessage {
   payload: ExportRenderPayload;
 }
 
-export function isExportRenderMessage(data: unknown): data is ExportRenderMessage {
+export function isExportRenderMessage(
+  data: unknown,
+): data is ExportRenderMessage {
   return (
     typeof data === 'object' &&
     data !== null &&
@@ -94,10 +96,14 @@ export async function renderServerExportDocument(
     const title = payload.title.trim() || 'Untitled';
     const resolveAsset = (ref: string) => payload.assets[ref];
 
-    const result = await runDocumentPipeline(payload.markdown, payload.settings, {
-      title,
-      renderMermaid: options.renderMermaid,
-    });
+    const result = await runDocumentPipeline(
+      payload.markdown,
+      payload.settings,
+      {
+        title,
+        renderMermaid: options.renderMermaid,
+      },
+    );
 
     // Markdown images keep their asset:// refs through the render; swap in
     // the payload's data: URIs (dropping unresolvable ones) exactly like the
@@ -112,11 +118,16 @@ export async function renderServerExportDocument(
       }
     }
 
-    const html = buildExportHTML(result.layouts, payload.settings, resolveAsset, {
-      title,
-      mathCSS: options.mathCSS,
-      isRTL: result.isRTL,
-    });
+    const html = buildExportHTML(
+      result.layouts,
+      payload.settings,
+      resolveAsset,
+      {
+        title,
+        mathCSS: options.mathCSS,
+        isRTL: result.isRTL,
+      },
+    );
     paintExportDocument(html);
     await awaitFontsReady();
 
@@ -129,8 +140,7 @@ export async function renderServerExportDocument(
     return {
       ok: false,
       errorCode: 'render_failed',
-      message:
-        error instanceof Error ? error.message : 'Unknown render error.',
+      message: error instanceof Error ? error.message : 'Unknown render error.',
     };
   }
 }

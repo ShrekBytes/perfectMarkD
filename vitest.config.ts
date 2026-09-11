@@ -53,6 +53,11 @@ export default defineConfig({
     // server's export e2e (apps/server/playwright.vitest.config.ts) is
     // excluded the same way and runs via `pnpm --filter @perfectmarkd/server
     // test:e2e`.
-    exclude: ['**/node_modules/**', '**/dist/**', '**/src/golden/**', '**/*.e2e.test.ts'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/src/golden/**',
+      '**/*.e2e.test.ts',
+    ],
   },
 });

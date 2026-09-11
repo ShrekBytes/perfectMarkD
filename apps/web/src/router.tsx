@@ -9,7 +9,8 @@ import { useEffect, useState, type AnchorHTMLAttributes } from 'react';
  * server's static serving config handles it in server/06).
  */
 
-export type Route = 'editor' | 'pricing' | 'login' | 'register' | 'admin' | 'export';
+export type Route =
+  'editor' | 'pricing' | 'login' | 'register' | 'admin' | 'export';
 
 const NAVIGATE_EVENT = 'perfectmarkd:navigate';
 

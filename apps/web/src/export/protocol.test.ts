@@ -16,7 +16,9 @@ afterEach(() => {
   );
 });
 
-function payload(overrides: Partial<ExportRenderPayload> = {}): ExportRenderPayload {
+function payload(
+  overrides: Partial<ExportRenderPayload> = {},
+): ExportRenderPayload {
   return {
     title: 'Test Doc',
     markdown: '# Heading One\n\nSome text.',
@@ -29,9 +31,14 @@ function payload(overrides: Partial<ExportRenderPayload> = {}): ExportRenderPayl
 describe('isExportRenderMessage', () => {
   it('accepts only the agreed message shape', () => {
     expect(
-      isExportRenderMessage({ type: EXPORT_RENDER_MESSAGE, payload: payload() }),
+      isExportRenderMessage({
+        type: EXPORT_RENDER_MESSAGE,
+        payload: payload(),
+      }),
     ).toBe(true);
-    expect(isExportRenderMessage({ type: 'other', payload: payload() })).toBe(false);
+    expect(isExportRenderMessage({ type: 'other', payload: payload() })).toBe(
+      false,
+    );
     expect(isExportRenderMessage({ type: EXPORT_RENDER_MESSAGE })).toBe(false);
     expect(isExportRenderMessage('hello')).toBe(false);
   });
@@ -58,8 +65,7 @@ describe('renderServerExportDocument', () => {
   it('swaps asset refs to the provided data URIs and drops unresolvable ones', async () => {
     const result = await renderServerExportDocument(
       payload({
-        markdown:
-          '![known](asset://known)\n\n![unknown](asset://missing)\n',
+        markdown: '![known](asset://known)\n\n![unknown](asset://missing)\n',
         assets: { 'asset://known': 'data:image/png;base64,AAA' },
       }),
       { mathCSS: '' },
