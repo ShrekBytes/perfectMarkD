@@ -15,7 +15,10 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json ./
 COPY packages/core packages/core
 COPY apps/server apps/server
-RUN pnpm --filter @perfectmarkd/server build
+# Core first: the export pipeline (server/03) imports @perfectmarkd/core at
+# runtime, and its package entry points resolve to built dist/ files.
+RUN pnpm --filter @perfectmarkd/core build \
+	&& pnpm --filter @perfectmarkd/server build
 
 # Pruned, self-contained production tree: the server package plus only its
 # runtime dependencies (pnpm deploy resolves the workspace lockfile).
@@ -27,7 +30,13 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
 COPY apps/server/package.json apps/server/
 COPY packages/core/package.json packages/core/
-RUN pnpm --filter @perfectmarkd/server deploy --prod --legacy /out
+RUN pnpm install --frozen-lockfile
+COPY tsconfig.base.json ./
+COPY packages/core packages/core
+# Build core before deploying: the deployed server imports it at runtime
+# (PDF outline injection, settings validation).
+RUN pnpm --filter @perfectmarkd/core build \
+	&& pnpm --filter @perfectmarkd/server deploy --prod --legacy /out
 
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app

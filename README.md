@@ -32,6 +32,17 @@ pnpm --filter @perfectmarkd/server dev  # API dev server
 
 Pull requests run lint, typecheck, build, and tests via [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
+## Deployment
+
+Docker Compose runs the whole stack on one origin — Caddy serves the built app and reverse-proxies `/api` to the API container:
+
+```sh
+cp .env.example .env    # fill in SESSION_SECRET + HISTORY_ENCRYPTION_KEY
+docker compose up -d --build
+```
+
+Set `SITE_ADDRESS=<domain>` in `.env` to have Caddy provision TLS automatically.
+
 ## License
 
 [AGPL-3.0](LICENSE) — see [docs/adr/0001-agpl3-open-codebase.md](docs/adr/0001-agpl3-open-codebase.md) for why.

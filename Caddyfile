@@ -1,0 +1,47 @@
+# PerfectMarkD static serving (server/06): the Caddy container serves the
+# SPA baked into its image at /srv and reverse-proxies the API paths to the
+# api container. One config, imported by two site blocks:
+#
+#   {$SITE_ADDRESS} — the public origin; ":80" locally, a domain in
+#     production gets Caddy's automatic TLS (rollout docs: launch/04).
+#   http://caddy   — loopback origin on the compose network: the export
+#     worker loads the app's own /export page from here (EXPORT_ORIGIN),
+#     plain HTTP regardless of how the public site is served.
+#
+# The admin UI is just another SPA route; admin *API* calls ride /api/admin
+# through the same proxy, gated server-side by is_admin.
+
+(serve) {
+	encode zstd gzip
+
+	# Vite ships content-hashed filenames under /assets — cache forever.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# The hidden /export page is the worker's render surface, not content —
+	# keep it out of search indexes (spec: security posture).
+	header /export* X-Robots-Tag "noindex"
+
+	# API (auth, billing, admin, export, history) and the health probe go to
+	# the api container; everything else is the SPA.
+	@backend path /api /api/* /healthz
+	handle @backend {
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
+	# SPA fallback: deep links like /pricing, /login and /export all serve
+	# index.html; the router picks the page client-side.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+{$SITE_ADDRESS::80} {
+	import serve
+}
+
+http://caddy {
+	import serve
+}
