@@ -28,3 +28,12 @@ export const LOCKED_FLAGS: FeatureFlags = {
   backgroundImage: false,
   customFonts: false,
 };
+
+/** Every gate open — what an active Pro/Premium Entitlement reports. */
+export const OPEN_FLAGS: FeatureFlags = {
+  customPageSize: true,
+  customStylesheet: true,
+  bannerImages: true,
+  backgroundImage: true,
+  customFonts: true,
+};

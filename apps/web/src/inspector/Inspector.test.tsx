@@ -18,7 +18,7 @@ import {
 } from '../auth/account-store';
 import * as api from '../auth/api';
 import type { MePayload } from '../auth/api';
-import { LOCKED_FLAGS } from '../auth/flags';
+import { LOCKED_FLAGS, OPEN_FLAGS } from '../auth/flags';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
@@ -494,14 +494,6 @@ describe('canvas re-render on settings change', () => {
 });
 
 describe('unlocked gates (billing/04)', () => {
-  const OPEN_FLAGS = {
-    customPageSize: true,
-    customStylesheet: true,
-    bannerImages: true,
-    backgroundImage: true,
-    customFonts: true,
-  };
-
   afterEach(() => {
     resetAccountStoreForTests();
   });

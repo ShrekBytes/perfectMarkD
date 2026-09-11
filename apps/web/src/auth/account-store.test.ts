@@ -1,21 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as api from './api';
 import type { MePayload } from './api';
-import { LOCKED_FLAGS } from './flags';
+import { LOCKED_FLAGS, OPEN_FLAGS } from './flags';
 import { resetAccountStoreForTests, useAccountStore } from './account-store';
 
 afterEach(() => {
   resetAccountStoreForTests();
   vi.restoreAllMocks();
 });
-
-const OPEN_FLAGS = {
-  customPageSize: true,
-  customStylesheet: true,
-  bannerImages: true,
-  backgroundImage: true,
-  customFonts: true,
-};
 
 function mePayload(overrides: Partial<MePayload> = {}): MePayload {
   return {
@@ -212,7 +204,7 @@ describe('account store', () => {
       expect(useAccountStore.getState().planEndedNotice).toBe(false);
     });
 
-    it('no notice when a refresh finds a new plan (renewal, not a lapse)', async () => {
+    it('no notice when a refresh finds a new plan (extension, not a lapse)', async () => {
       vi.spyOn(api, 'me')
         .mockResolvedValueOnce(
           mePayload({

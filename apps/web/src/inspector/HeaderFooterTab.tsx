@@ -39,6 +39,45 @@ const pageNumberPositionOptions: {
 
 const FORMAT_HINT = 'Use {{current}}, {{total}}, {{title}}';
 
+/** The per-band banner gate: a live picker when the flag is open, the lock
+ *  otherwise. One shape for both bands so they can't drift apart. */
+function BannerImageField({
+  band,
+  bandLabel,
+  imageRef,
+  set,
+  onOpenPricing,
+  flags,
+  addImage,
+}: {
+  band: 'header' | 'footer';
+  bandLabel: string;
+  imageRef: string;
+  set: TabProps['set'];
+  onOpenPricing: () => void;
+  flags: TabProps['flags'];
+  addImage: TabProps['addImage'];
+}) {
+  const refKey = `${band}ImageRef` as const;
+  return flags.bannerImages ? (
+    <Field label="Banner image">
+      <GateImagePicker
+        ariaLabel={`${bandLabel} banner image`}
+        addImage={addImage}
+        value={imageRef}
+        onRef={(ref) => set({ [refKey]: ref })}
+        onRemove={() => set({ [refKey]: '' })}
+      />
+    </Field>
+  ) : (
+    <LockedRow
+      label="Banner image"
+      onOpenPricing={onOpenPricing}
+      control={<FauxUploadButton label="Upload…" />}
+    />
+  );
+}
+
 export function HeaderFooterTab({
   settings,
   set,
@@ -103,23 +142,15 @@ export function HeaderFooterTab({
             label="Bottom border"
           />
         </Field>
-        {flags.bannerImages ? (
-          <Field label="Banner image">
-            <GateImagePicker
-              ariaLabel="Header banner image"
-              addImage={addImage}
-              value={settings.headerImageRef}
-              onRef={(headerImageRef) => set({ headerImageRef })}
-              onRemove={() => set({ headerImageRef: '' })}
-            />
-          </Field>
-        ) : (
-          <LockedRow
-            label="Banner image"
-            onOpenPricing={onOpenPricing}
-            control={<FauxUploadButton label="Upload…" />}
-          />
-        )}
+        <BannerImageField
+          band="header"
+          bandLabel="Header"
+          imageRef={settings.headerImageRef}
+          set={set}
+          onOpenPricing={onOpenPricing}
+          flags={flags}
+          addImage={addImage}
+        />
       </Section>
 
       <Section title="Footer">
@@ -177,23 +208,15 @@ export function HeaderFooterTab({
             label="Top border"
           />
         </Field>
-        {flags.bannerImages ? (
-          <Field label="Banner image">
-            <GateImagePicker
-              ariaLabel="Footer banner image"
-              addImage={addImage}
-              value={settings.footerImageRef}
-              onRef={(footerImageRef) => set({ footerImageRef })}
-              onRemove={() => set({ footerImageRef: '' })}
-            />
-          </Field>
-        ) : (
-          <LockedRow
-            label="Banner image"
-            onOpenPricing={onOpenPricing}
-            control={<FauxUploadButton label="Upload…" />}
-          />
-        )}
+        <BannerImageField
+          band="footer"
+          bandLabel="Footer"
+          imageRef={settings.footerImageRef}
+          set={set}
+          onOpenPricing={onOpenPricing}
+          flags={flags}
+          addImage={addImage}
+        />
       </Section>
 
       <Section title="Page numbers">

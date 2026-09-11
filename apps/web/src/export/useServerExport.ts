@@ -1,10 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// The Server Export flow (billing/04), as a phase machine over the client in
-// serverExport.ts:
-//
-//   idle → building → uploading → rendering → downloading → idle
-//              │           │           │
-//              └───────────┴───────────┴── failure → idle (+ toast)
+// The Server Export flow (billing/04), driving the client in serverExport.ts:
+// build the payload → enqueue → poll the job → download the PDF.
 //
 // The dropdown's Server Export item starts it; the server is the enforcement
 // point, so the flow always attempts the export and turns the route's typed
@@ -27,14 +23,6 @@ import {
 } from './serverExport';
 import type { ExportToast } from './useClientExport';
 
-export type ServerExportPhase =
-  'idle' | 'building' | 'uploading' | 'rendering' | 'downloading';
-
-/** What runExport reports: ok, failed (with the upgrade-prompt flag), or
- *  null when the run never started (re-entry, no document). */
-export type ServerExportOutcome =
-  { ok: true } | { ok: false; upgrade: boolean } | null;
-
 const TOAST_MS = 6000;
 const RENDERING_NOTICE = 'Rendering on the server…';
 const EXPORT_COMPLETE = 'Server Export complete — the PDF is downloading.';
@@ -46,9 +34,14 @@ function exportErrorMessage(error: unknown): string {
   return 'Server Export failed. Please try again.';
 }
 
+/** What runExport reports: ok, failed (with the upgrade-prompt flag), or
+ *  null when the run never started (re-entry, no document). */
+export type ServerExportOutcome =
+  { ok: true } | { ok: false; upgrade: boolean } | null;
+
 export interface ServerExportState {
+  /** Any in-flight work — disables the split button. */
   busy: boolean;
-  phase: ServerExportPhase;
   toast: ExportToast | null;
   /** Runs the flow — see ServerExportOutcome. */
   runExport(): Promise<ServerExportOutcome>;
@@ -56,7 +49,7 @@ export interface ServerExportState {
 }
 
 export function useServerExport(): ServerExportState {
-  const [phase, setPhase] = useState<ServerExportPhase>('idle');
+  const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ExportToast | null>(null);
   /** Re-entry guard against double-clicks ahead of the re-render. */
   const busyRef = useRef(false);
@@ -86,12 +79,7 @@ export function useServerExport(): ServerExportState {
       return null;
     }
     busyRef.current = true;
-    setPhase('building');
-
-    const finish = () => {
-      busyRef.current = false;
-      setPhase('idle');
-    };
+    setBusy(true);
 
     try {
       const payload = await buildServerExportPayload({
@@ -100,14 +88,9 @@ export function useServerExport(): ServerExportState {
         settings: store.settings,
       });
 
-      setPhase('uploading');
       showToast({ kind: 'notice', text: RENDERING_NOTICE });
       const job = await queueServerExport(payload);
-
-      setPhase('rendering');
       const done = await waitForExportJob(job.id);
-
-      setPhase('downloading');
       await downloadExportPdf(done, store.name || 'Untitled document');
       showToast({ kind: 'notice', text: EXPORT_COMPLETE });
 
@@ -125,13 +108,13 @@ export function useServerExport(): ServerExportState {
       }
       return { ok: false, upgrade: isUpgradePrompt(error) } as const;
     } finally {
-      finish();
+      busyRef.current = false;
+      setBusy(false);
     }
   }, [showToast]);
 
   return {
-    busy: phase !== 'idle',
-    phase,
+    busy,
     toast,
     runExport,
     dismissToast,

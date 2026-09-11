@@ -7,7 +7,7 @@ import * as pipelineModule from '../canvas/pipeline';
 import { useAccountStore } from '../auth/account-store';
 import * as api from '../auth/api';
 import type { MePayload } from '../auth/api';
-import { LOCKED_FLAGS } from '../auth/flags';
+import { LOCKED_FLAGS, OPEN_FLAGS } from '../auth/flags';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
@@ -272,14 +272,6 @@ it('opens the pricing modal from the Server Export item without exporting', asyn
 });
 
 // ─── Server Export (billing/04) ──────────────────────────────────────────────
-
-const OPEN_FLAGS = {
-  customPageSize: true,
-  customStylesheet: true,
-  bannerImages: true,
-  backgroundImage: true,
-  customFonts: true,
-};
 
 function mePayload(overrides: Partial<MePayload> = {}): MePayload {
   return {
