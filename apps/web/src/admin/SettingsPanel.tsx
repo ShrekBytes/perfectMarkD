@@ -6,6 +6,7 @@ import {
   type PaymentMethod,
   type PlanLimits,
   type PlanPrices,
+  type SettingsKey,
   type WalletAddresses,
 } from './api';
 
@@ -78,6 +79,56 @@ export function SettingsPanel() {
 
 type OnSaved = (settings: AdminSettings) => void;
 
+/**
+ * The save loop every settings section shares: a draft edited against a
+ * baseline (what this section last saved, not the prop — a save in another
+ * section must never clobber a draft here), client validation, the PUT, and
+ * the flash/error states around it.
+ */
+function useSectionSave<D>({
+  initialDraft,
+  toPayload,
+  onSaved,
+}: {
+  initialDraft: D;
+  /** The request to make for the current draft, or why it can't be. */
+  toPayload: (
+    draft: D,
+  ) => { key: SettingsKey; payload: unknown; baseline: D } | { error: string };
+  onSaved: OnSaved;
+}) {
+  const [baseline, setBaseline] = useState(initialDraft);
+  const [draft, setDraft] = useState(initialDraft);
+  const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
+
+  const onSave = async () => {
+    if (saving) return;
+    const parsed = toPayload(draft);
+    if ('error' in parsed) {
+      setError(parsed.error);
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      onSaved(await updateAdminSetting(parsed.key, parsed.payload));
+      setBaseline(parsed.baseline);
+      setFlash(true);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Something went wrong.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return { draft, setDraft, dirty, saving, flash, error, onSave };
+}
+
 /** A save that succeeded; shared button/flash styling for every section. */
 function SectionFooter({
   dirty,
@@ -123,32 +174,16 @@ function WalletsSection({
   saved: WalletAddresses;
   onSaved: OnSaved;
 }) {
-  // The baseline is what this section last saved (or mounted with) — not the
-  // prop, so a save in another section never clobbers a draft here.
-  const [baseline, setBaseline] = useState(saved);
-  const [draft, setDraft] = useState<WalletAddresses>(saved);
-  const [saving, setSaving] = useState(false);
-  const [flash, setFlash] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
-
-  const onSave = async () => {
-    if (saving) return;
-    setError(null);
-    setSaving(true);
-    try {
-      onSaved(await updateAdminSetting('wallets', draft));
-      setBaseline(draft);
-      setFlash(true);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { draft, setDraft, dirty, saving, flash, error, onSave } =
+    useSectionSave<WalletAddresses>({
+      initialDraft: saved,
+      toPayload: (draft) => ({
+        key: 'wallets',
+        payload: draft,
+        baseline: draft,
+      }),
+      onSaved,
+    });
 
   return (
     <section className="rounded-pane border border-hairline bg-surface p-3">
@@ -245,43 +280,23 @@ function PricesSection({
   saved: PlanPrices;
   onSaved: OnSaved;
 }) {
-  const [baseline, setBaseline] = useState<PriceDraft>(() =>
-    toPriceDraft(saved),
-  );
-  const [draft, setDraft] = useState<PriceDraft>(() => toPriceDraft(saved));
-  const [saving, setSaving] = useState(false);
-  const [flash, setFlash] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
+  const { draft, setDraft, dirty, saving, flash, error, onSave } =
+    useSectionSave<PriceDraft>({
+      initialDraft: toPriceDraft(saved),
+      toPayload: (draft) => {
+        const prices = toPrices(draft);
+        return prices === null
+          ? { error: 'Every amount must be a number above zero.' }
+          : { key: 'prices', payload: prices, baseline: toPriceDraft(prices) };
+      },
+      onSaved,
+    });
 
   const onDraft = (plan: PaidPlan, field: string, value: string) => {
     setDraft((current) => ({
       ...current,
       [plan]: { ...current[plan], [field]: value },
     }));
-  };
-
-  const onSave = async () => {
-    const prices = toPrices(draft);
-    if (prices === null) {
-      setError('Every amount must be a number above zero.');
-      return;
-    }
-    if (saving) return;
-    setError(null);
-    setSaving(true);
-    try {
-      onSaved(await updateAdminSetting('prices', prices));
-      setBaseline(toPriceDraft(prices));
-      setFlash(true);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
-    } finally {
-      setSaving(false);
-    }
   };
 
   return (
@@ -363,37 +378,19 @@ function LimitsSection({
   saved: PlanLimits;
   onSaved: OnSaved;
 }) {
-  const [baseline, setBaseline] = useState<LimitsDraft>(() =>
-    toLimitsDraft(saved),
-  );
-  const [draft, setDraft] = useState<LimitsDraft>(() => toLimitsDraft(saved));
-  const [saving, setSaving] = useState(false);
-  const [flash, setFlash] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
-
-  const onSave = async () => {
-    const limits = toLimits(draft);
-    if (limits === null) {
-      setError('Page caps and quotas must be whole numbers above zero.');
-      return;
-    }
-    if (saving) return;
-    setError(null);
-    setSaving(true);
-    try {
-      onSaved(await updateAdminSetting('limits', limits));
-      setBaseline(toLimitsDraft(limits));
-      setFlash(true);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { draft, setDraft, dirty, saving, flash, error, onSave } =
+    useSectionSave<LimitsDraft>({
+      initialDraft: toLimitsDraft(saved),
+      toPayload: (draft) => {
+        const limits = toLimits(draft);
+        return limits === null
+          ? {
+              error: 'Page caps and quotas must be whole numbers above zero.',
+            }
+          : { key: 'limits', payload: limits, baseline: toLimitsDraft(limits) };
+      },
+      onSaved,
+    });
 
   return (
     <section className="rounded-pane border border-hairline bg-surface p-3">
@@ -455,39 +452,25 @@ function LtcRateSection({
   onSaved: OnSaved;
 }) {
   const savedText = saved === null ? '' : String(saved);
-  const [baseline, setBaseline] = useState(savedText);
-  const [draft, setDraft] = useState(savedText);
-  const [saving, setSaving] = useState(false);
-  const [flash, setFlash] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const dirty = draft !== baseline;
-
-  const onSave = async () => {
-    if (saving) return;
-    const trimmed = draft.trim();
-    let value: number | null = null;
-    if (trimmed !== '') {
-      value = Number(trimmed);
-      if (!Number.isFinite(value) || value <= 0) {
-        setError('The rate must be a number above zero, or empty to disable.');
-        return;
-      }
-    }
-    setError(null);
-    setSaving(true);
-    try {
-      onSaved(await updateAdminSetting('ltcRateUsdt', value));
-      setBaseline(trimmed);
-      setFlash(true);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { draft, setDraft, dirty, saving, flash, error, onSave } =
+    useSectionSave<string>({
+      initialDraft: savedText,
+      toPayload: (draft) => {
+        const trimmed = draft.trim();
+        if (trimmed === '') {
+          // Empty clears the key: LTC payments disabled.
+          return { key: 'ltcRateUsdt', payload: null, baseline: '' };
+        }
+        const value = Number(trimmed);
+        return Number.isFinite(value) && value > 0
+          ? { key: 'ltcRateUsdt', payload: value, baseline: trimmed }
+          : {
+              error:
+                'The rate must be a number above zero, or empty to disable.',
+            };
+      },
+      onSaved,
+    });
 
   return (
     <section className="rounded-pane border border-hairline bg-surface p-3">

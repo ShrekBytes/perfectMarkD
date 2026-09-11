@@ -288,7 +288,7 @@ export function adminRoutes({
   });
 
   app.route('/users', usersRoutes({ now, removeStoredFile }));
-  app.route('/settings', settingsRoutes());
+  app.route('/settings', settingsRoutes({ now }));
 
   return app;
 }

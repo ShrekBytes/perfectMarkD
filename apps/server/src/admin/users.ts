@@ -62,6 +62,9 @@ const MAX_RESULTS = 100;
 /** The largest single quota comp, in either direction. */
 const MAX_COMP_AMOUNT = 100_000;
 
+/** Thrown inside the comp transaction when comps would drop below zero. */
+class CompsFloorError extends Error {}
+
 /** The Entitlement state shown in the panel (shared with the queue). */
 export interface EntitlementView {
   plan: string;
@@ -335,8 +338,16 @@ export function usersRoutes({
         .run();
     });
 
+    // The response view uses the same instant the grant math and audit entry
+    // used — a fresh now() could straddle a UTC midnight and flip the period.
     return c.json({
-      user: userView(db, user, now(), getPlanLimits(db), usagePeriod(now())),
+      user: userView(
+        db,
+        user,
+        nowDate,
+        getPlanLimits(db),
+        usagePeriod(nowDate),
+      ),
     });
   });
 
@@ -353,12 +364,10 @@ export function usersRoutes({
 
     const previous = entitlementRow(db, user.id);
     if (!previous) {
-      return c.json(
-        { error: 'This user has no active entitlement to revoke.' },
-        409,
-      );
+      return c.json({ error: 'This user has no entitlement to revoke.' }, 409);
     }
 
+    const nowDate = now();
     db.transaction((tx) => {
       tx.delete(entitlements).where(eq(entitlements.userId, user.id)).run();
       tx.insert(auditLogs)
@@ -378,7 +387,13 @@ export function usersRoutes({
     });
 
     return c.json({
-      user: userView(db, user, now(), getPlanLimits(db), usagePeriod(now())),
+      user: userView(
+        db,
+        user,
+        nowDate,
+        getPlanLimits(db),
+        usagePeriod(nowDate),
+      ),
     });
   });
 
@@ -411,42 +426,53 @@ export function usersRoutes({
 
     const nowDate = now();
     const period = usagePeriod(nowDate);
-    const current = db
-      .select({ comps: exportUsage.comps })
-      .from(exportUsage)
-      .where(
-        and(eq(exportUsage.userId, user.id), eq(exportUsage.period, period)),
-      )
-      .get();
-    const currentComps = current?.comps ?? 0;
-    const comps = currentComps + (amount as number);
-    if (comps < 0) {
-      return c.json(
-        { error: 'Comps for this period cannot go below zero.' },
-        400,
-      );
-    }
 
-    db.transaction((tx) => {
-      tx.insert(exportUsage)
-        .values({ userId: user.id, period, count: 0, comps })
-        .onConflictDoUpdate({
-          target: [exportUsage.userId, exportUsage.period],
-          set: { comps },
-        })
-        .run();
-      tx.insert(auditLogs)
-        .values({
-          adminUserId: admin.id,
-          adminEmail: admin.email,
-          action: 'quota.comp',
-          targetType: 'user',
-          targetId: String(user.id),
-          before: { period, comps: currentComps },
-          after: { period, comps },
-        })
-        .run();
-    });
+    // Read, floor check, and write all happen inside the transaction so two
+    // concurrent comps can never lose one another's update.
+    try {
+      db.transaction((tx) => {
+        const current = tx
+          .select({ comps: exportUsage.comps })
+          .from(exportUsage)
+          .where(
+            and(
+              eq(exportUsage.userId, user.id),
+              eq(exportUsage.period, period),
+            ),
+          )
+          .get();
+        const currentComps = current?.comps ?? 0;
+        const comps = currentComps + (amount as number);
+        if (comps < 0) throw new CompsFloorError();
+
+        tx.insert(exportUsage)
+          .values({ userId: user.id, period, count: 0, comps })
+          .onConflictDoUpdate({
+            target: [exportUsage.userId, exportUsage.period],
+            set: { comps },
+          })
+          .run();
+        tx.insert(auditLogs)
+          .values({
+            adminUserId: admin.id,
+            adminEmail: admin.email,
+            action: 'quota.comp',
+            targetType: 'user',
+            targetId: String(user.id),
+            before: { period, comps: currentComps },
+            after: { period, comps },
+          })
+          .run();
+      });
+    } catch (error) {
+      if (error instanceof CompsFloorError) {
+        return c.json(
+          { error: 'Comps for this period cannot go below zero.' },
+          400,
+        );
+      }
+      throw error;
+    }
 
     return c.json({
       user: userView(db, user, nowDate, getPlanLimits(db), period),

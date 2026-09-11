@@ -113,7 +113,9 @@ const KV_KEYS: Record<SettingKey, string> = {
   ltcRateUsdt: LTC_RATE_KEY,
 };
 
-export function settingsRoutes() {
+export function settingsRoutes({
+  now = () => new Date(),
+}: { now?: () => Date } = {}) {
   const app = new Hono<AppEnv>();
 
   app.get('/', (c) => {
@@ -138,7 +140,7 @@ export function settingsRoutes() {
 
     const kvKey = KV_KEYS[key as SettingKey];
     const before = getSetting(db, kvKey) ?? null;
-    const nowDate = new Date();
+    const nowDate = now();
     db.transaction((tx) => {
       // settings_kv values are NOT NULL, so "clear" is a delete: the key
       // returns to absent, which the readers treat as the seeded/unset state.

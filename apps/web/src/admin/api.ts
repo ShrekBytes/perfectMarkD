@@ -5,11 +5,11 @@ import {
   postJson,
   putJson,
 } from '../api/client';
-import type { Order } from '../billing/api';
+import type { Order, PaymentMethod } from '../billing/api';
 
 export { ApiError };
 export type { Order };
-export type { OrderStatus } from '../billing/api';
+export type { OrderStatus, PaymentMethod } from '../billing/api';
 
 /** The Entitlement state the queue shows alongside each Order. */
 export interface EntitlementView {
@@ -164,7 +164,6 @@ export async function deleteAdminUser(userId: number): Promise<void> {
 // settings_kv on the server, editable without a redeploy.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PaymentMethod = 'USDT-TRC20' | 'USDT-BEP20' | 'LTC';
 export type WalletAddresses = Record<PaymentMethod, string>;
 
 export interface PlanPrice {

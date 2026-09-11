@@ -48,6 +48,10 @@ _Avoid_: paid user, subscriber
 The monthly number of Server Exports a paid plan allows.
 _Avoid_: credits, tokens
 
+**Comp**:
+Extra Server Export allowance the Admin grants a user for one period, on top of the plan's Quota. A negative comp retracts it; comps never drop below zero.
+_Avoid_: bonus, credit, freebie
+
 **Plan Expiry**:
 The date until which a paid plan's entitlement lasts. Nothing auto-renews.
 _Avoid_: subscription, renewal
