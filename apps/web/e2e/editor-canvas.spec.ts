@@ -21,8 +21,9 @@ test('typing text changes the page count after the render debounce', async ({
   await openApp(page);
   const before = await waitForMinPages(page, 2);
 
-  // `///` on its own line is the section-break syntax: three of them force
-  // new pages deterministically, regardless of font metrics.
+  // A `///` Page Break marker forces the next content onto a new page:
+  // three of them change the page count deterministically, regardless of
+  // font metrics.
   await typeAtEditorEnd(
     page,
     '\n\n///\n\nA brand-new section for the smoke suite.\n\n///\n\nAnd another page.\n\n///\n\nAnd a third.',

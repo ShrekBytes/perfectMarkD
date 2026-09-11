@@ -61,7 +61,7 @@ test('export builds the print document in a hidden iframe', async ({
   expect(html).toContain('<title>Welcome to PerfectMarkD</title>');
   expect(html).toContain('Made with PerfectMarkD'); // sample footer text
 
-  // Export page count matches what the preview paginated.
+  // Export page count matches what the Paper Canvas paginated.
   const exportPages = html.split('class="mpdf-export-page"').length - 1;
   expect(exportPages).toBe(canvasPages);
 

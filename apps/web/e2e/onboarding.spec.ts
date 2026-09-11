@@ -4,7 +4,7 @@
 // reload lands back on the same document without re-seeding.
 // ─────────────────────────────────────────────────────────────────────────────
 import { expect, test } from '@playwright/test';
-import { openApp, pageSlots, waitForMinPages } from './helpers';
+import { libraryOf, openApp, pageSlots, waitForMinPages } from './helpers';
 
 test('first run opens the sample document and renders multiple pages', async ({
   page,
@@ -21,10 +21,10 @@ test('first run opens the sample document and renders multiple pages', async ({
     'This is a sample',
   );
 
-  // The sample paginates beyond one page: markdown → KaTeX/Shiki/mermaid →
-  // paginate → shadow-DOM pages, the whole pipeline wired end to end.
+  // The sample paginates beyond one page (the ticket's bar): the whole
+  // pipeline is wired end to end — markdown → KaTeX/Shiki/mermaid →
+  // paginate → shadow-DOM pages.
   const pages = await waitForMinPages(page, 2);
-  expect(pages).toBeGreaterThan(1);
 
   // Labels advertise position within the document ("Page N of M").
   await expect(page.locator('.pm-page-label').last()).toHaveText(
@@ -45,8 +45,8 @@ test('a reload lands back on the sample without re-seeding it', async ({
   await waitForMinPages(page, 2);
 
   // The library holds exactly one document — the sample was created once.
+  const library = libraryOf(page);
   await page.getByRole('button', { name: 'Library' }).click();
-  const library = page.getByRole('dialog', { name: 'Library' });
   await expect(library).toBeVisible();
   await expect(library.getByRole('listitem')).toHaveCount(1);
   await expect(pageSlots(page)).not.toHaveCount(0);

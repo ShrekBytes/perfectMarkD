@@ -53,6 +53,19 @@ export async function openInspectorTab(
   await page.getByTestId(`inspector-tab-${tab}`).click();
 }
 
+/** The Library drawer (opens over the shell; role dialog named "Library"). */
+export function libraryOf(page: Page) {
+  return page.getByRole('dialog', { name: 'Library' });
+}
+
+/** Opens the Library drawer and returns it once visible. */
+export async function openLibrary(page: Page) {
+  await page.getByRole('button', { name: 'Library' }).click();
+  const library = libraryOf(page);
+  await expect(library).toBeVisible();
+  return library;
+}
+
 /** Appends text at the end of the markdown document via real keystrokes, so
  *  the editor's input path (and its debounced autosave) is what's exercised. */
 export async function typeAtEditorEnd(page: Page, text: string): Promise<void> {
@@ -90,15 +103,16 @@ export async function firstPageFrameWidth(page: Page): Promise<number> {
 
 /**
  * Overrides `window.print` in every frame (the main frame and the Client
- * Export's srcdoc iframe) with a recorder: the print dialog itself can't be
- * automated, but we can prove print() was invoked on the frame's window and
- * keep the exact document it would have printed.
+ * Export's srcdoc iframe) with a counter: the print dialog itself can't be
+ * automated, but we can prove print() was invoked on the frame's window.
+ * Headless no-ops print() anyway; this also keeps headed runs dialog-free.
+ * (The browser-print jsdom stub is a separate environment: src/testing/
+ * stub-print-iframe.ts.)
  */
 export const PRINT_STUB = `
   window.print = () => {
     try {
       window.parent.__pmPrintCalls = (window.parent.__pmPrintCalls || 0) + 1;
-      window.parent.__pmPrintHTML = document.documentElement.outerHTML;
     } catch (e) {}
   };
 `;
