@@ -148,7 +148,7 @@ export function VerificationQueue() {
                       {order.referenceCode}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-ink-soft">
-                      {order.userEmail}
+                      {order.userEmail ?? '(deleted account)'}
                     </p>
                   </div>
                   <span

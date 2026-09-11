@@ -1,20 +1,18 @@
 import { Hono } from 'hono';
 import { desc, eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
-import { orderView, type OrderView } from '../orders/routes.js';
-import { methodForCoinNetwork } from '../orders/payment.js';
 import { getWallets } from '../db/settings.js';
-import {
-  DURATION_MONTHS,
-  auditLogs,
-  entitlements,
-  orders,
-  users,
-  type Order,
-} from '../db/schema.js';
-import type { AppDatabase } from '../db/database.js';
+import { auditLogs, entitlements, orders, users } from '../db/schema.js';
 import { asRecord, parseJson } from '../request-body.js';
 import { expiryForGrant } from './entitlement.js';
+import { parseGrant } from './grant.js';
+import {
+  adminOrderView,
+  entitlementFor,
+  userEmailFor,
+  usersRoutes,
+} from './users.js';
+import { settingsRoutes } from './settings-routes.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin panel API (billing/02): the Verification queue and audit trail behind
@@ -23,89 +21,19 @@ import { expiryForGrant } from './entitlement.js';
 //
 // Verifications grant the Entitlement in the same transaction that decides
 // the Order and writes the audit entry, so the queue can never show a decided
-// Order whose grant failed to land (or the reverse).
+// Order whose grant failed to land (or the reverse). User management
+// (billing/03) and settings live in sibling sub-apps behind the same gate.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface AdminRoutesOptions {
   /** Injectable clock; expiry math and audit timestamps use it. */
   now?: () => Date;
+  /** Removes an Export History file on account deletion (see usersRoutes). */
+  removeStoredFile?: (storedPath: string) => void;
 }
 
 /** The largest reject reason a decision accepts; it is advisory text, not data. */
 const MAX_REASON_LENGTH = 1000;
-
-/** The Entitlement state shown alongside each Order in the queue. */
-export interface EntitlementView {
-  plan: string;
-  expiresAt: string;
-}
-
-export interface AdminOrderView {
-  userEmail: string;
-  /** The user's current Entitlement — what a duration grant stacks onto. */
-  entitlement: EntitlementView | null;
-}
-
-type GrantInput = { durationMonths: number } | { expiresAt: Date };
-
-/** The last millisecond of the given day, UTC. */
-function endOfUtcDay(date: Date): Date {
-  return new Date(
-    Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate(),
-      23,
-      59,
-      59,
-      999,
-    ),
-  );
-}
-
-/**
- * A verify request grants either a preset duration (stacked onto the current
- * Entitlement) or an exact custom expiry — never both. Date-only strings run
- * through the end of the chosen day: an admin picking "2027-01-05" means the
- * plan is good through January 5th, not that it dies at midnight going in.
- */
-function parseGrant(body: unknown, now: Date): GrantInput | { error: string } {
-  const record = asRecord(body);
-  if (!record) {
-    return { error: 'Expected a JSON object.' };
-  }
-  const hasDuration = record.durationMonths !== undefined;
-  const hasExpiresAt = record.expiresAt !== undefined;
-  if (hasDuration && hasExpiresAt) {
-    return { error: 'Choose either a duration or an expiry date, not both.' };
-  }
-  if (hasDuration) {
-    if (
-      typeof record.durationMonths !== 'number' ||
-      !DURATION_MONTHS.includes(record.durationMonths as 1 | 3 | 6 | 12)
-    ) {
-      return { error: 'Choose a duration of 1, 3, 6, or 12 months.' };
-    }
-    return { durationMonths: record.durationMonths };
-  }
-  if (hasExpiresAt) {
-    if (typeof record.expiresAt !== 'string') {
-      return { error: 'Enter an expiry date.' };
-    }
-    const value = record.expiresAt.trim();
-    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
-    const parsed = new Date(dateOnly ? `${value}T00:00:00Z` : value);
-    if (Number.isNaN(parsed.getTime())) {
-      return { error: 'Enter a valid expiry date.' };
-    }
-    const expiresAt = dateOnly ? endOfUtcDay(parsed) : parsed;
-    if (expiresAt.getTime() <= now.getTime()) {
-      return { error: 'The expiry date must be in the future.' };
-    }
-    return { expiresAt };
-  }
-  return { error: 'Choose a duration or an expiry date for the entitlement.' };
-}
 
 function parseReason(body: unknown): string | { error: string } {
   const record = asRecord(body);
@@ -128,47 +56,9 @@ function parseReason(body: unknown): string | { error: string } {
   return reason;
 }
 
-function entitlementFor(
-  db: AppDatabase,
-  userId: number,
-): EntitlementView | null {
-  const row = db
-    .select()
-    .from(entitlements)
-    .where(eq(entitlements.userId, userId))
-    .get();
-  return row
-    ? { plan: row.plan, expiresAt: row.expiresAt.toISOString() }
-    : null;
-}
-
-function adminOrderView(
-  db: AppDatabase,
-  wallets: ReturnType<typeof getWallets>,
-  order: Order,
-  userEmail: string,
-): OrderView & AdminOrderView {
-  const method = methodForCoinNetwork(order.coin, order.network);
-  return {
-    ...orderView(order, method ? wallets[method] : ''),
-    userEmail,
-    entitlement: entitlementFor(db, order.userId),
-  };
-}
-
-/** The Order owner's email — the queue shows who each Order belongs to. */
-function orderEmail(db: AppDatabase, userId: number): string {
-  const row = db
-    .select({ email: users.email })
-    .from(users)
-    .where(eq(users.id, userId))
-    .get();
-  if (!row) throw new Error(`order ${userId} references a missing user`);
-  return row.email;
-}
-
 export function adminRoutes({
   now = () => new Date(),
+  removeStoredFile,
 }: AdminRoutesOptions = {}) {
   const app = new Hono<AppEnv>();
 
@@ -183,10 +73,12 @@ export function adminRoutes({
 
   app.get('/orders', (c) => {
     const db = c.var.db;
+    // Left join: Orders whose account was deleted (anonymized) stay in the
+    // queue with a null email — the Admin sees them and can reject them.
     const rows = db
       .select({ order: orders, userEmail: users.email })
       .from(orders)
-      .innerJoin(users, eq(orders.userId, users.id))
+      .leftJoin(users, eq(orders.userId, users.id))
       .orderBy(desc(orders.id))
       .all();
     const wallets = getWallets(db);
@@ -228,11 +120,23 @@ export function adminRoutes({
         409,
       );
     }
+    if (order.userId === null) {
+      return c.json(
+        {
+          error:
+            'The account that placed this order was deleted — reject it instead.',
+        },
+        409,
+      );
+    }
+    // Captured narrowed: the transaction callback sees the column type
+    // (number | null), not this route's guarantees.
+    const orderUserId: number = order.userId;
 
     const previous = db
       .select()
       .from(entitlements)
-      .where(eq(entitlements.userId, order.userId))
+      .where(eq(entitlements.userId, orderUserId))
       .get();
     const nowDate = now();
     const expiresAt =
@@ -248,7 +152,7 @@ export function adminRoutes({
       const entitlement = tx
         .insert(entitlements)
         .values({
-          userId: order.userId,
+          userId: orderUserId,
           plan: order.plan,
           expiresAt,
           updatedAt: nowDate,
@@ -299,9 +203,9 @@ export function adminRoutes({
         db,
         wallets,
         decided,
-        orderEmail(db, decided.userId),
+        userEmailFor(db, decided.userId),
       ),
-      entitlement: entitlementFor(db, decided.userId),
+      entitlement: entitlementFor(db, orderUserId),
     });
   });
 
@@ -358,7 +262,7 @@ export function adminRoutes({
         db,
         wallets,
         decided,
-        orderEmail(db, decided.userId),
+        userEmailFor(db, decided.userId),
       ),
     });
   });
@@ -382,6 +286,9 @@ export function adminRoutes({
       })),
     });
   });
+
+  app.route('/users', usersRoutes({ now, removeStoredFile }));
+  app.route('/settings', settingsRoutes());
 
   return app;
 }

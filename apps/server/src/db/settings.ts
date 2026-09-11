@@ -6,16 +6,24 @@ import {
   PLANS,
   settingsKv,
   type Plan,
+  type PlanLimits,
   type PlanPrices,
   type WalletAddresses,
 } from './schema.js';
 
 export const WALLETS_KEY = 'wallets';
 export const PRICES_KEY = 'prices';
+export const LIMITS_KEY = 'limits';
 export const LTC_RATE_KEY = 'ltc_rate_usdt';
 
 const MONTHLY_PRICE_USDT: Record<Plan, number> = { pro: 3, premium: 7 };
 const TWELVE_MONTH_MULTIPLIER = 10;
+
+/** The tier table's quota and page-cap numbers, seeded until the Admin edits. */
+const DEFAULT_LIMITS: PlanLimits = {
+  pro: { pageCap: 300, quotaMonthly: 300 },
+  premium: { pageCap: 1000, quotaMonthly: 1000 },
+};
 
 function defaultWalletAddresses(): WalletAddresses {
   // Addresses go into admin settings at Phase 2 (PLAN §Launch checklist);
@@ -51,6 +59,7 @@ export function seedSettings(db: AppDatabase): void {
     .values([
       { key: WALLETS_KEY, value: defaultWalletAddresses() },
       { key: PRICES_KEY, value: defaultPlanPrices() },
+      { key: LIMITS_KEY, value: DEFAULT_LIMITS },
     ])
     .onConflictDoNothing()
     .run();
@@ -79,40 +88,74 @@ export function setSetting<T>(db: AppDatabase, key: string, value: T): void {
     .run();
 }
 
-function isWalletAddresses(value: unknown): value is WalletAddresses {
-  if (typeof value !== 'object' || value === null) return false;
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record);
-  return (
-    PAYMENT_METHODS.every((method) => typeof record[method] === 'string') &&
-    keys.every((key) => (PAYMENT_METHODS as readonly string[]).includes(key))
-  );
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Validators, shared by the typed accessors below and the admin settings
+// routes (billing/03), which must reject malformed values with the same rules
+// the readers assume. Each returns the validated value or null.
+// ─────────────────────────────────────────────────────────────────────────────
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function isPlanPrices(value: unknown): value is PlanPrices {
-  if (typeof value !== 'object' || value === null) return false;
+export function parseWalletAddresses(value: unknown): WalletAddresses | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record);
+  return PAYMENT_METHODS.every(
+    (method) => typeof record[method] === 'string',
+  ) && keys.every((key) => (PAYMENT_METHODS as readonly string[]).includes(key))
+    ? (value as WalletAddresses)
+    : null;
+}
+
+export function parsePlanPrices(value: unknown): PlanPrices | null {
+  if (typeof value !== 'object' || value === null) return null;
   const record = value as Record<string, unknown>;
   return PLANS.every((plan) => {
     const price = record[plan];
     if (typeof price !== 'object' || price === null) return false;
     const { monthly, durations } = price as Record<string, unknown>;
-    if (!isFiniteNumber(monthly)) return false;
+    if (!isFiniteNumber(monthly) || monthly <= 0) return false;
     if (typeof durations !== 'object' || durations === null) return false;
     const byDuration = durations as Record<string, unknown>;
-    return DURATION_MONTHS.every((months) =>
-      isFiniteNumber(byDuration[String(months)]),
+    return DURATION_MONTHS.every((months) => {
+      const amount = byDuration[String(months)];
+      return isFiniteNumber(amount) && amount > 0;
+    });
+  })
+    ? (value as PlanPrices)
+    : null;
+}
+
+export function parsePlanLimits(value: unknown): PlanLimits | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  return PLANS.every((plan) => {
+    const limit = record[plan];
+    if (typeof limit !== 'object' || limit === null) return false;
+    const { pageCap, quotaMonthly } = limit as Record<string, unknown>;
+    return (
+      Number.isInteger(pageCap) &&
+      (pageCap as number) > 0 &&
+      Number.isInteger(quotaMonthly) &&
+      (quotaMonthly as number) > 0
     );
-  });
+  })
+    ? (value as PlanLimits)
+    : null;
+}
+
+/** A positive USDT-per-LTC number, or null when unset. */
+export function parseLtcRate(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  return isFiniteNumber(value) && value > 0 ? value : null;
 }
 
 /** Receiving wallet address per payment method (ADR-0005). */
 export function getWallets(db: AppDatabase): WalletAddresses {
-  const value = getSetting(db, WALLETS_KEY);
-  if (!isWalletAddresses(value)) {
+  const value = parseWalletAddresses(getSetting(db, WALLETS_KEY));
+  if (!value) {
     throw new Error(
       'settings_kv: wallets setting is malformed — expected an address string per payment method',
     );
@@ -122,10 +165,21 @@ export function getWallets(db: AppDatabase): WalletAddresses {
 
 /** Total USDT per plan and duration option. */
 export function getPlanPrices(db: AppDatabase): PlanPrices {
-  const value = getSetting(db, PRICES_KEY);
-  if (!isPlanPrices(value)) {
+  const value = parsePlanPrices(getSetting(db, PRICES_KEY));
+  if (!value) {
     throw new Error(
       'settings_kv: prices setting is malformed — expected monthly and per-duration USDT amounts for every plan',
+    );
+  }
+  return value;
+}
+
+/** Page caps and monthly Server Export quotas per paid plan (billing/03). */
+export function getPlanLimits(db: AppDatabase): PlanLimits {
+  const value = parsePlanLimits(getSetting(db, LIMITS_KEY));
+  if (!value) {
+    throw new Error(
+      'settings_kv: limits setting is malformed — expected a page cap and monthly quota for every plan',
     );
   }
   return value;
@@ -134,13 +188,14 @@ export function getPlanPrices(db: AppDatabase): PlanPrices {
 /**
  * USDT per LTC captured into new Orders (ADR-0005). Absent until the Admin
  * sets it — like wallet addresses, nothing ships pointing at a placeholder
- * rate, and LTC orders are refused while it is unset (billing/03 adds the
- * admin UI that maintains it).
+ * rate, and LTC orders are refused while it is unset.
  */
 export function getLtcRate(db: AppDatabase): number | null {
-  const value = getSetting(db, LTC_RATE_KEY);
-  if (value === undefined || value === null) return null;
-  if (!isFiniteNumber(value) || value <= 0) {
+  const raw = getSetting(db, LTC_RATE_KEY);
+  // Absent and explicitly-null both mean "LTC payments disabled".
+  if (raw === undefined || raw === null) return null;
+  const value = parseLtcRate(raw);
+  if (value === null) {
     throw new Error(
       'settings_kv: ltc_rate_usdt setting is malformed — expected a positive USDT-per-LTC number',
     );

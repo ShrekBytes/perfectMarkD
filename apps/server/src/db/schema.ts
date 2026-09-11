@@ -33,16 +33,21 @@ export type Coin = 'USDT' | 'LTC';
 export const NETWORKS = ['TRC20', 'BEP20', 'mainnet'] as const;
 export type Network = (typeof NETWORKS)[number];
 
-/** Admin actions recorded in the audit log (billing/02). */
+/** Admin actions recorded in the audit log (billing/02, billing/03). */
 export const AUDIT_ACTIONS = [
   'order.verify',
   'order.reject',
+  'entitlement.grant',
+  'entitlement.revoke',
+  'quota.comp',
+  'user.password_reset',
+  'user.delete',
   'settings.update',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 /** What an audit entry's action touched. */
-export const AUDIT_TARGET_TYPES = ['order', 'settings'] as const;
+export const AUDIT_TARGET_TYPES = ['order', 'user', 'settings'] as const;
 export type AuditTargetType = (typeof AUDIT_TARGET_TYPES)[number];
 
 export type WalletAddresses = Record<PaymentMethod, string>;
@@ -54,6 +59,15 @@ export interface PlanPrice {
   durations: Record<DurationMonths, number>;
 }
 export type PlanPrices = Record<Plan, PlanPrice>;
+
+/** What a paid plan allows (PLAN.md §1 tiers table; billing/04 enforces). */
+export interface PlanLimit {
+  /** Hard page cap per Server Export. */
+  pageCap: number;
+  /** Monthly Server Export quota. */
+  quotaMonthly: number;
+}
+export type PlanLimits = Record<Plan, PlanLimit>;
 
 // ---------------------------------------------------------------------------
 // Tables — spec §Data model. Timestamps are unix ms.
@@ -88,9 +102,15 @@ export const sessions = sqliteTable('sessions', {
 export const orders = sqliteTable('orders', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   referenceCode: text('reference_code').notNull().unique(),
-  userId: integer('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+  /**
+   * Null after the account is deleted (billing/03): the Order stays as the
+   * financial record — amounts, txid, decision — detached from the person.
+   * The FK sets null rather than cascading so deleting a user anonymizes
+   * their Orders instead of erasing them.
+   */
+  userId: integer('user_id').references(() => users.id, {
+    onDelete: 'set null',
+  }),
   plan: text('plan').notNull(), // Plan
   /** Chosen duration in months (DurationMonths). */
   duration: integer('duration').notNull(),
@@ -127,7 +147,7 @@ export const entitlements = sqliteTable('entitlements', {
     .$defaultFn(() => new Date()),
 });
 
-/** Monthly Server Export quota usage keyed by period (`YYYY-MM`). */
+/** Monthly Server Export usage keyed by period (`YYYY-MM`). */
 export const exportUsage = sqliteTable(
   'export_usage',
   {
@@ -136,6 +156,8 @@ export const exportUsage = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     period: text('period').notNull(),
     count: integer('count').notNull().default(0),
+    /** Admin-granted extra allowance for the period (billing/03 comp quota). */
+    comps: integer('comps').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.userId, t.period] })],
 );

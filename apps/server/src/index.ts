@@ -34,6 +34,11 @@ export interface CreateAppOptions {
   now?: Clock;
   /** Defaults to console (see requestLogger); tests capture via a custom sink. */
   log?: LogSink;
+  /**
+   * Removes an Export History file on account deletion (billing/03); tests
+   * inject a recorder. Default: best-effort unlink of absolute paths.
+   */
+  removeStoredFile?: (storedPath: string) => void;
 }
 
 /**
@@ -47,6 +52,7 @@ export function createApp({
   authRateLimit,
   now,
   log,
+  removeStoredFile,
 }: CreateAppOptions) {
   const clock: Clock = now ?? (() => new Date());
   return new Hono<AppEnv>()
@@ -74,7 +80,7 @@ export function createApp({
       authRoutes({ sessionSecret, adminEmail, authRateLimit, now: clock }),
     )
     .route('/api/orders', orderRoutes())
-    .route('/api/admin', adminRoutes({ now: clock }));
+    .route('/api/admin', adminRoutes({ now: clock, removeStoredFile }));
 }
 
 /** Typed-routes handle for hono clients (RPC type inference). */

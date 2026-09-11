@@ -3,22 +3,27 @@ import { Link } from '../router';
 import { useTheme } from '../theme/theme';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { useAccountStore } from '../auth/account-store';
+import { UsersPanel } from './UsersPanel';
 import { VerificationQueue } from './VerificationQueue';
+import { SettingsPanel } from './SettingsPanel';
 import { AuditLog } from './AuditLog';
 
-type AdminTab = 'verification' | 'audit';
+type AdminTab = 'users' | 'verification' | 'settings' | 'audit';
 
 const TABS: Array<{ id: AdminTab; label: string }> = [
+  { id: 'users', label: 'Users' },
   { id: 'verification', label: 'Verification' },
+  { id: 'settings', label: 'Settings' },
   { id: 'audit', label: 'Audit log' },
 ];
 
 /**
- * `/admin` (billing/02): the Admin's panel — the Verification queue and the
- * audit trail. Utilitarian on purpose: dense lists, plain tables, the same
- * design tokens as the rest of the app. Gated client-side for a sane
- * experience; every `/api/admin` route enforces the same gate server-side,
- * which is the enforcement that actually counts.
+ * `/admin` (billing/02, billing/03): the Admin's panel — user management, the
+ * Verification queue, app settings, and the audit trail. Utilitarian on
+ * purpose: dense lists, plain tables, the same design tokens as the rest of
+ * the app. Gated client-side for a sane experience; every `/api/admin` route
+ * enforces the same gate server-side, which is the enforcement that actually
+ * counts.
  */ export function AdminPage() {
   const { theme, toggle } = useTheme();
   const { user, status } = useAccountStore();
@@ -109,7 +114,10 @@ const TABS: Array<{ id: AdminTab; label: string }> = [
               ))}
             </div>
             <div className="mt-4">
-              {tab === 'verification' ? <VerificationQueue /> : <AuditLog />}
+              {tab === 'users' && <UsersPanel />}
+              {tab === 'verification' && <VerificationQueue />}
+              {tab === 'settings' && <SettingsPanel />}
+              {tab === 'audit' && <AuditLog />}
             </div>
           </>
         )}

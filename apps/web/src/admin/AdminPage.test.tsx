@@ -17,6 +17,20 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+/** Minimal settings payload the Settings tab renders from. */
+const SEED_SETTINGS = {
+  wallets: { 'USDT-TRC20': '', 'USDT-BEP20': '', LTC: '' },
+  prices: {
+    pro: { monthly: 3, durations: { 1: 3, 3: 9, 6: 18, 12: 30 } },
+    premium: { monthly: 7, durations: { 1: 7, 3: 21, 6: 42, 12: 70 } },
+  },
+  limits: {
+    pro: { pageCap: 300, quotaMonthly: 300 },
+    premium: { pageCap: 1000, quotaMonthly: 1000 },
+  },
+  ltcRateUsdt: null,
+};
+
 beforeEach(() => {
   stubSystemTheme('light');
   resetAccountStoreForTests();
@@ -110,4 +124,38 @@ it('shows the Verification queue to the admin, with the audit log a tab away', a
 
   expect(await screen.findByTestId('audit-empty')).toBeInTheDocument();
   expect(screen.queryByTestId('admin-order-row')).not.toBeInTheDocument();
+});
+
+it('gives the admin Users and Settings tabs (billing/03)', async () => {
+  const user = userEvent.setup();
+  useAccountStore.setState({
+    user: { email: 'owner@example.com', isAdmin: true },
+    status: 'ready',
+  });
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === '/api/admin/orders') {
+      return Promise.resolve(jsonResponse(200, { orders: [] }));
+    }
+    if (url === '/api/admin/users') {
+      return Promise.resolve(jsonResponse(200, { users: [] }));
+    }
+    if (url === '/api/admin/settings') {
+      return Promise.resolve(jsonResponse(200, { settings: SEED_SETTINGS }));
+    }
+    return Promise.reject(new Error(`unexpected fetch: ${url}`));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  render(<AdminPage />);
+
+  // Users tab: the empty search list.
+  await user.click(screen.getByTestId('admin-tab-users'));
+  expect(await screen.findByTestId('users-empty')).toBeInTheDocument();
+
+  // Settings tab: the wallet section.
+  await user.click(screen.getByTestId('admin-tab-settings'));
+  expect(
+    await screen.findByTestId('wallet-input-USDT-TRC20'),
+  ).toBeInTheDocument();
 });

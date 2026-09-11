@@ -11,6 +11,18 @@ function snapshot(value: unknown): string {
   return JSON.stringify(value ?? null);
 }
 
+/** What each audit target type calls its id. */
+function targetLabel(entry: AuditEntry): string {
+  switch (entry.targetType) {
+    case 'order':
+      return `Order #${entry.targetId}`;
+    case 'user':
+      return `User #${entry.targetId}`;
+    default:
+      return `${entry.targetType}: ${entry.targetId}`;
+  }
+}
+
 /**
  * The admin audit trail (billing/02): every decision and settings change,
  * with the timestamp, who acted, and what changed. Append-only by design —
@@ -80,9 +92,7 @@ export function AuditLog() {
                 <p className="text-xs font-medium text-ink">
                   {entry.action}
                   <span className="ml-2 font-normal text-ink-soft">
-                    {entry.targetType === 'order'
-                      ? `Order #${entry.targetId}`
-                      : `${entry.targetType}: ${entry.targetId}`}
+                    {targetLabel(entry)}
                   </span>
                 </p>
                 <p className="shrink-0 font-mono text-xs text-ink-faint">
