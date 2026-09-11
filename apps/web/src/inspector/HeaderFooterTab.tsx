@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Inspector → Header/Footer tab: band show/hide, first-page suppression, text
 // + alignment, font size/color, borders, page numbers (position, format
-// template, start), and the locked banner image.
+// template, start), and the banner-image gate (live upload per band when the
+// entitlement flag is open — billing/04).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { DocumentSettings } from '@perfectmarkd/core';
@@ -10,6 +11,7 @@ import {
   ColorInput,
   Field,
   FauxUploadButton,
+  GateImagePicker,
   LockedRow,
   NumberInput,
   Section,
@@ -37,7 +39,13 @@ const pageNumberPositionOptions: {
 
 const FORMAT_HINT = 'Use {{current}}, {{total}}, {{title}}';
 
-export function HeaderFooterTab({ settings, set, onOpenPricing }: TabProps) {
+export function HeaderFooterTab({
+  settings,
+  set,
+  onOpenPricing,
+  flags,
+  addImage,
+}: TabProps) {
   return (
     <>
       <Section title="Header">
@@ -95,11 +103,23 @@ export function HeaderFooterTab({ settings, set, onOpenPricing }: TabProps) {
             label="Bottom border"
           />
         </Field>
-        <LockedRow
-          label="Banner image"
-          onOpenPricing={onOpenPricing}
-          control={<FauxUploadButton label="Upload…" />}
-        />
+        {flags.bannerImages ? (
+          <Field label="Banner image">
+            <GateImagePicker
+              ariaLabel="Header banner image"
+              addImage={addImage}
+              value={settings.headerImageRef}
+              onRef={(headerImageRef) => set({ headerImageRef })}
+              onRemove={() => set({ headerImageRef: '' })}
+            />
+          </Field>
+        ) : (
+          <LockedRow
+            label="Banner image"
+            onOpenPricing={onOpenPricing}
+            control={<FauxUploadButton label="Upload…" />}
+          />
+        )}
       </Section>
 
       <Section title="Footer">
@@ -157,11 +177,23 @@ export function HeaderFooterTab({ settings, set, onOpenPricing }: TabProps) {
             label="Top border"
           />
         </Field>
-        <LockedRow
-          label="Banner image"
-          onOpenPricing={onOpenPricing}
-          control={<FauxUploadButton label="Upload…" />}
-        />
+        {flags.bannerImages ? (
+          <Field label="Banner image">
+            <GateImagePicker
+              ariaLabel="Footer banner image"
+              addImage={addImage}
+              value={settings.footerImageRef}
+              onRef={(footerImageRef) => set({ footerImageRef })}
+              onRemove={() => set({ footerImageRef: '' })}
+            />
+          </Field>
+        ) : (
+          <LockedRow
+            label="Banner image"
+            onOpenPricing={onOpenPricing}
+            control={<FauxUploadButton label="Upload…" />}
+          />
+        )}
       </Section>
 
       <Section title="Page numbers">

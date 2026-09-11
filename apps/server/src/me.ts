@@ -1,14 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/me (server/04) — the signed-in user's identity and gates: who they
-// are, their active Entitlement, and where they stand against the monthly
-// Server Export quota. The single source of truth the web app's account store
-// consumes for the quota chip; billing/04 extends the payload with feature
-// flags for the gated Inspector controls.
+// GET /api/me (server/04 + billing/04) — the signed-in user's identity and
+// gates: who they are, their active Entitlement, where they stand against the
+// monthly Server Export quota, and which gated features their plan opens. The
+// single source of truth the web app's account store consumes: the quota chip
+// and the gated Inspector controls all read from this one payload.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Hono } from 'hono';
 import type { AppEnv } from './index.js';
 import type { Clock } from './auth/sessions.js';
+import { featureFlagsFor } from './flags.js';
 import { getPlanLimits } from './db/settings.js';
 import { findActiveEntitlement, quotaState } from './quota.js';
 
@@ -44,6 +45,9 @@ export function meRoutes({ now = () => new Date() }: MeRoutesOptions = {}) {
       plan: activeEntitlement?.plan ?? null,
       expiresAt: activeEntitlement?.expiresAt.toISOString() ?? null,
       quota: { used: state.used, limit: state.limit },
+      // The gated Inspector controls (billing/04): open exactly while an
+      // Entitlement is active — the same condition as plan/expiresAt above.
+      flags: featureFlagsFor(activeEntitlement?.plan ?? null),
     });
   });
 

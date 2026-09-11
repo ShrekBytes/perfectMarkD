@@ -2,39 +2,62 @@
 // The signed-in account (billing/01): one small store so the shell's account
 // menu, the upgrade flow, the quota chip, and anything else billing touches
 // agree on who is signed in. The session itself lives in the httpOnly cookie —
-// this store only mirrors what GET /api/me reports (server/04): the identity,
-// plus the entitlement slice the quota chip and gated features read.
+// this store only mirrors what GET /api/me reports (server/04 + billing/04):
+// the identity, the active Entitlement, the Server Export quota (top-level —
+// comps grant allowance without a plan, so quota is account state, not
+// entitlement state), and the feature flags the gated Inspector controls read.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
 import { logout, me, type MePayload } from './api';
 import type { AuthUser } from './api';
+import { LOCKED_FLAGS, type FeatureFlags } from './flags';
 
 /** The active Entitlement, as /api/me reports it; null without one. */
 export interface EntitlementState {
   plan: string;
   /** ISO expiry of the Entitlement. */
   expiresAt: string;
-  /** Monthly Server Export stance: used vs the plan quota plus comps. */
-  quota: { used: number; limit: number };
+}
+
+/** The account store's selector for the feature flags (billing/04). */
+export function useFeatureFlags(): FeatureFlags {
+  return useAccountStore((state) => state.flags);
 }
 
 interface AccountState {
   user: AuthUser | null;
   entitlement: EntitlementState | null;
+  /**
+   * Server Export usage vs allowance (plan quota + comps), or null signed
+   * out. Top-level, not inside the entitlement: a comped user without a
+   * plan (billing/03) has allowance while entitlement is null.
+   */
+  quota: { used: number; limit: number } | null;
+  /** The gated Inspector controls; locked until /api/me says otherwise. */
+  flags: FeatureFlags;
+  /**
+   * Set when a refresh re-locks a previously-active Entitlement (expiry or
+   * revocation) while the user is still signed in — the graceful re-lock's
+   * "clear notice": the shell shows it once, and dismissing clears it.
+   * Sign-out never sets it (there is nobody to tell).
+   */
+  planEndedNotice: boolean;
   /** 'loading' until the first check resolves; render nothing until then. */
   status: 'loading' | 'ready';
   /** Checks the session once; safe to call from several mounts. */
   load: () => Promise<void>;
   /**
    * Re-checks the session even after the first load — the refresh the shell
-   * and (billing/04) the upgrade flow call when the server state may have
+   * and (billing/04) the export flow call when the server state may have
    * moved: after a payment verification, after an export, after sign-in.
    */
   refresh: () => Promise<void>;
   /** Records a just-established session (login/register). */
   signedIn: (user: AuthUser) => void;
   signOut: () => Promise<void>;
+  /** Clears the plan-ended notice once the user has seen it. */
+  dismissPlanEndedNotice: () => void;
 }
 
 let inflight: Promise<void> | null = null;
@@ -42,27 +65,38 @@ let inflight: Promise<void> | null = null;
 function splitMe(payload: MePayload | null): {
   user: AuthUser | null;
   entitlement: EntitlementState | null;
+  quota: { used: number; limit: number } | null;
+  flags: FeatureFlags;
 } {
   // The server pairs plan with a non-null expiry whenever an Entitlement is
   // active; anything else (signed out, or signed in without a plan) has no
-  // entitlement slice.
+  // entitlement slice. Flags arrive for every signed-in caller; anyone else
+  // — and anyone the payload leaves undescribed — stays locked.
   const entitlement =
     payload?.plan && payload.expiresAt
-      ? {
-          plan: payload.plan,
-          expiresAt: payload.expiresAt,
-          quota: payload.quota,
-        }
+      ? { plan: payload.plan, expiresAt: payload.expiresAt }
       : null;
   return {
     user: payload ? { email: payload.email, isAdmin: payload.isAdmin } : null,
     entitlement,
+    quota: payload?.quota ?? null,
+    flags: payload?.flags ?? LOCKED_FLAGS,
   };
 }
 
 export const useAccountStore = create<AccountState>()((set) => {
-  const applyMe = (payload: MePayload | null) =>
-    set({ ...splitMe(payload), status: 'ready' });
+  const applyMe = (payload: MePayload | null) => {
+    const prev = useAccountStore.getState();
+    const next = splitMe(payload);
+    // Graceful re-lock (billing/04): had an Entitlement, now signed in
+    // without one — expiry or an admin revoke. The settings stay put; only
+    // the gates close, and the banner explains why.
+    const planEndedNotice =
+      prev.entitlement !== null &&
+      next.entitlement === null &&
+      next.user !== null;
+    set({ ...next, planEndedNotice, status: 'ready' });
+  };
 
   const recheck = () => {
     // A failed check (offline, server restarting) never breaks the shell:
@@ -80,6 +114,9 @@ export const useAccountStore = create<AccountState>()((set) => {
   return {
     user: null,
     entitlement: null,
+    quota: null,
+    flags: LOCKED_FLAGS,
+    planEndedNotice: false,
     status: 'loading',
     load: () => {
       if (useAccountStore.getState().status === 'ready') {
@@ -98,8 +135,15 @@ export const useAccountStore = create<AccountState>()((set) => {
       // Clear locally even if the request hiccups — a dead network should not
       // trap the user in a session the server has already destroyed.
       await logout().catch(() => undefined);
-      set({ user: null, entitlement: null });
+      set({
+        user: null,
+        entitlement: null,
+        quota: null,
+        flags: LOCKED_FLAGS,
+        planEndedNotice: false,
+      });
     },
+    dismissPlanEndedNotice: () => set({ planEndedNotice: false }),
   };
 });
 
@@ -108,6 +152,9 @@ export function resetAccountStoreForTests(): void {
   useAccountStore.setState({
     user: null,
     entitlement: null,
+    quota: null,
+    flags: LOCKED_FLAGS,
+    planEndedNotice: false,
     status: 'loading',
   });
 }

@@ -1,21 +1,28 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared Inspector primitives: section headings, field rows, the small inputs,
-// the color picker, the checkbox, the paid-feature lock, and the TabProps
-// contract every tab receives. Pure presentation — controls report edits
-// upward through `set`, and each input carries its own accessible name.
+// the color picker, the checkbox, the paid-feature lock, the unlocked image
+// picker, and the TabProps contract every tab receives. Pure presentation —
+// controls report edits upward through `set`, and each input carries its own
+// accessible name.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import type { DocumentSettings } from '@perfectmarkd/core';
 import { LockIcon, UploadIcon } from '../shell/icons';
+import { MAX_ASSET_BYTES } from '../assets/ingest';
+import type { AddAssetResult } from '../documents/store';
+import type { FeatureFlags } from '../auth/flags';
 
 /** What every tab receives: the live settings snapshot, the write-back
- *  channel (a partial settings patch the store merges), and the pricing-modal
- *  opener for locked controls. */
+ *  channel (a partial settings patch the store merges), the pricing-modal
+ *  opener for locked controls, the feature flags deciding which gates are
+ *  open (billing/04), and the image ingest for the unlocked upload gates. */
 export interface TabProps {
   settings: DocumentSettings;
   set: (patch: Partial<DocumentSettings>) => void;
   onOpenPricing: () => void;
+  flags: FeatureFlags;
+  addImage: (file: File) => Promise<AddAssetResult>;
 }
 
 /** A field row: label on the left, control on the right. The control names
@@ -313,5 +320,119 @@ export function LockedRow({
         <GateLock onClick={onOpenPricing} label={label} />
       </span>
     </div>
+  );
+}
+
+const MB = 1024 * 1024;
+
+const INGEST_ERRORS: Record<
+  Extract<AddAssetResult, { ok: false }>['error'],
+  string
+> = {
+  'too-large': `That image is over the ${Math.round(MAX_ASSET_BYTES / MB)} MB limit and was not added.`,
+  unsupported:
+    'That file is not an image — pick PNG, JPEG, WebP, SVG, or similar.',
+  'no-document': 'Open a document before adding images.',
+};
+
+const pickerButtonClass =
+  'flex h-6 items-center gap-1 rounded-control border border-hairline bg-page px-2 text-[11px] text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2 disabled:cursor-default disabled:opacity-50';
+
+/**
+ * An unlocked image gate's picker (billing/04): pick an image, store it as a
+ * local asset of the active document, and report the `asset://` ref upward —
+ * the engine renders the rest. A set image can be replaced or removed; ingest
+ * failures surface inline (the same messages the editor's paste path shows).
+ */
+export function GateImagePicker({
+  ariaLabel,
+  addImage,
+  onRef,
+  value,
+  onRemove,
+}: {
+  ariaLabel: string;
+  addImage: (file: File) => Promise<AddAssetResult>;
+  /** Receives the new asset ref after a successful ingest. */
+  onRef: (ref: string) => void;
+  /** The current image ref; '' (or any falsy) means none is set. */
+  value: string;
+  onRemove: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = (file: File) => {
+    setError(null);
+    setBusy(true);
+    void addImage(file)
+      .then((result) => {
+        if (result.ok) onRef(result.ref);
+        else setError(INGEST_ERRORS[result.error]);
+      })
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <span className="flex flex-col items-end gap-0.5">
+      <span className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+          className={pickerButtonClass}
+        >
+          <UploadIcon />
+          {value ? 'Replace…' : 'Upload…'}
+        </button>
+        {value && (
+          <button
+            type="button"
+            aria-label={`Remove ${ariaLabel}`}
+            onClick={onRemove}
+            className="h-6 rounded-control px-1.5 text-[11px] text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-danger focus-visible:outline-2"
+          >
+            Remove
+          </button>
+        )}
+      </span>
+      {error && (
+        <span
+          role="alert"
+          className="max-w-44 text-right text-[10px] text-danger"
+        >
+          {error}
+        </span>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          // Clear so picking the same file again fires change.
+          event.target.value = '';
+          if (file) handleFile(file);
+        }}
+      />
+    </span>
+  );
+}
+
+/**
+ * The unlocked state for gates whose real control billing/05 still builds
+ * (custom fonts, custom stylesheet): the lock is gone — the plan includes
+ * the feature — and there is nothing to edit here yet.
+ */
+export function IncludedNote() {
+  return (
+    <span data-testid="gate-included" className="text-[11px] text-ink-faint">
+      Included with your plan
+    </span>
   );
 }

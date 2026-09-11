@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { errorFrom, postJson, ApiError } from '../api/client';
+import type { FeatureFlags } from './flags';
 
 /** The auth client's name for the shared API error. */
 export { ApiError as AuthError };
@@ -37,7 +38,8 @@ export async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
 }
 
-/** The GET /api/me payload (server/04): identity plus the entitlement gates. */
+/** The GET /api/me payload (server/04 + billing/04): identity, entitlement
+ *  gates, and the feature flags the Inspector's gated controls read. */
 export interface MePayload {
   email: string;
   isAdmin: boolean;
@@ -47,12 +49,14 @@ export interface MePayload {
   expiresAt: string | null;
   /** Monthly Server Export stance: used vs the plan quota plus comps. */
   quota: { used: number; limit: number };
+  /** The gated Inspector controls (billing/04): which gates are open. */
+  flags: FeatureFlags;
 }
 
 /**
  * The session's identity and gates, or null when not signed in. The single
- * source of truth for the quota chip (server/04) and — with billing/04's
- * flags — the gated Inspector controls.
+ * source of truth for the quota chip (server/04) and the gated Inspector
+ * controls (billing/04's flags).
  */
 export async function me(): Promise<MePayload | null> {
   const res = await fetch('/api/me', { credentials: 'include' });

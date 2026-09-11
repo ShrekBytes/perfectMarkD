@@ -81,6 +81,7 @@ interface MeResponse {
   plan: string | null;
   expiresAt: string | null;
   quota: { used: number; limit: number };
+  flags: Record<string, boolean>;
 }
 
 async function getMe(app: AppType, cookie?: string): Promise<Response> {
@@ -109,6 +110,14 @@ describe('GET /api/me', () => {
       plan: null,
       expiresAt: null,
       quota: { used: 0, limit: 0 },
+      // billing/04: the gated Inspector controls — every flag locked.
+      flags: {
+        customPageSize: false,
+        customStylesheet: false,
+        bannerImages: false,
+        backgroundImage: false,
+        customFonts: false,
+      },
     });
   });
 
@@ -122,6 +131,27 @@ describe('GET /api/me', () => {
     expect(me.plan).toBe('pro');
     expect(me.expiresAt).toEqual(expect.any(String));
     expect(me.quota).toEqual({ used: 0, limit: 300 });
+    // Both paid plans open every gated feature (billing/spec.md §Gated
+    // features) — spot-check one flag per plan below.
+    expect(me.flags).toEqual({
+      customPageSize: true,
+      customStylesheet: true,
+      bannerImages: true,
+      backgroundImage: true,
+      customFonts: true,
+    });
+  });
+
+  it('a Premium Entitlement opens the same flags as Pro', async () => {
+    const { app, db } = makeApp();
+    const email = `u${Math.random().toString(36).slice(2)}@test.dev`;
+    const cookie = await registerViaApi(app, email);
+    grant(db, email, 'premium', 30);
+
+    const me = (await (await getMe(app, cookie)).json()) as MeResponse;
+    expect(me.plan).toBe('premium');
+    expect(me.flags.customPageSize).toBe(true);
+    expect(me.flags.customFonts).toBe(true);
   });
 
   it('an expired Entitlement re-locks: no plan, no plan quota', async () => {
@@ -134,6 +164,29 @@ describe('GET /api/me', () => {
     expect(me.plan).toBeNull();
     expect(me.expiresAt).toBeNull();
     expect(me.quota).toEqual({ used: 0, limit: 0 });
+    // Expiry re-locks the gates (billing/04 acceptance): no plan, no flags.
+    expect(Object.values(me.flags).every((open) => !open)).toBe(true);
+  });
+
+  it('comp allowance without a plan grants no feature flags', async () => {
+    const { app, db } = makeApp();
+    const email = `u${Math.random().toString(36).slice(2)}@test.dev`;
+    const cookie = await registerViaApi(app, email);
+    const userId = db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .get()!.id;
+    // billing/03: comping grants Server Exports without a plan — the flags
+    // stay locked, since the gate is the plan, not the allowance (server/04).
+    db.insert(exportUsage)
+      .values({ userId, period: usagePeriod(new Date()), count: 0, comps: 5 })
+      .run();
+
+    const me = (await (await getMe(app, cookie)).json()) as MeResponse;
+    expect(me.plan).toBeNull();
+    expect(me.quota).toEqual({ used: 0, limit: 5 });
+    expect(Object.values(me.flags).every((open) => !open)).toBe(true);
   });
 
   it('reports the period usage and includes comps in the limit', async () => {

@@ -181,6 +181,13 @@ describe('account step', () => {
               plan: null,
               expiresAt: null,
               quota: { used: 0, limit: 0 },
+              flags: {
+                customPageSize: false,
+                customStylesheet: false,
+                bannerImages: false,
+                backgroundImage: false,
+                customFonts: false,
+              },
             }),
           )
         : createOrder(),

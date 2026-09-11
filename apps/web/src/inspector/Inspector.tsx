@@ -2,14 +2,15 @@
 // The Inspector: the right-hand settings panel with its three tabs (Page /
 // Style / Header-Footer). Every edit flows through updateActive — the Paper
 // Canvas re-renders on the settings reference change (debounced there), and
-// the store autosaves. Locked controls (custom size, background image, banner
-// images) show a 🔒 that opens the pricing modal; in Phase 1 every gate is
-// locked for everyone.
+// the store autosaves. The paid-feature gates read the entitlement flags from
+// GET /api/me (billing/04): locked controls show a 🔒 that opens the pricing
+// modal; open ones are live — expiry re-locks them gracefully.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react';
 import type { DocumentSettings } from '@perfectmarkd/core';
 import { useDocumentStore } from '../documents/store';
+import { useFeatureFlags } from '../auth/account-store';
 import { EmptyState } from '../shell/EmptyState';
 import { SlidersIcon } from '../shell/icons';
 import { PricingModal } from '../pricing/PricingModal';
@@ -32,6 +33,8 @@ export function Inspector() {
   const activeId = useDocumentStore((state) => state.activeId);
   const settings = useDocumentStore((state) => state.settings);
   const updateActive = useDocumentStore((state) => state.updateActive);
+  const addAsset = useDocumentStore((state) => state.addAsset);
+  const flags = useFeatureFlags();
 
   const [tab, setTab] = useState<TabId>('Page');
   const [pricingOpen, setPricingOpen] = useState(false);
@@ -86,6 +89,8 @@ export function Inspector() {
           settings={settings}
           set={set}
           onOpenPricing={() => setPricingOpen(true)}
+          flags={flags}
+          addImage={addAsset}
         />
       </div>
 

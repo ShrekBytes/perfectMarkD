@@ -4,14 +4,16 @@ import { useAccountStore } from '../auth/account-store';
  * The top bar's quota chip (server/04): the signed-in paid user's Server
  * Export usage against their period allowance (plan quota + comps). Hidden
  * entirely for Free users and when signed out — the chip only ever describes
- * an active Entitlement. The account store refreshes it after sign-in and
- * whenever the server state may have moved (billing/04 calls refresh()).
+ * an active Entitlement; a comped user's allowance surfaces in the Export
+ * menu's Server Export item instead (billing/04). The account store refreshes
+ * it after sign-in, after exports, and on its expiry watchdog (billing/04).
  */
 export function QuotaChip() {
   const entitlement = useAccountStore((state) => state.entitlement);
-  if (!entitlement) return null;
+  const quota = useAccountStore((state) => state.quota);
+  if (!entitlement || !quota) return null;
 
-  const { used, limit } = entitlement.quota;
+  const { used, limit } = quota;
   const exhausted = used >= limit;
   return (
     <span

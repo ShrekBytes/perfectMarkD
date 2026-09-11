@@ -23,6 +23,7 @@ describe('QuotaChip', () => {
     useAccountStore.setState({
       user: { email: 'a@b.co', isAdmin: false },
       entitlement: null,
+      quota: { used: 0, limit: 0 },
       status: 'ready',
     });
 
@@ -33,11 +34,8 @@ describe('QuotaChip', () => {
   it('shows the used/allowance for a paid user', () => {
     useAccountStore.setState({
       user: { email: 'a@b.co', isAdmin: false },
-      entitlement: {
-        plan: 'pro',
-        expiresAt: '2026-10-01T00:00:00.000Z',
-        quota: { used: 27, limit: 300 },
-      },
+      entitlement: { plan: 'pro', expiresAt: '2026-10-01T00:00:00.000Z' },
+      quota: { used: 27, limit: 300 },
       status: 'ready',
     });
 
@@ -54,11 +52,8 @@ describe('QuotaChip', () => {
   it('flags the chip when the allowance is used up', () => {
     useAccountStore.setState({
       user: { email: 'a@b.co', isAdmin: false },
-      entitlement: {
-        plan: 'pro',
-        expiresAt: '2026-10-01T00:00:00.000Z',
-        quota: { used: 300, limit: 300 },
-      },
+      entitlement: { plan: 'pro', expiresAt: '2026-10-01T00:00:00.000Z' },
+      quota: { used: 300, limit: 300 },
       status: 'ready',
     });
 

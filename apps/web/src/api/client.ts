@@ -1,13 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// The fetch plumbing shared by the server API clients (auth, billing):
+// The fetch plumbing shared by the server API clients (auth, billing, export):
 // same-origin POSTs with credentials, and errors crossing the boundary as
-// ApiError carrying the server's `{ error }` message for display.
+// ApiError carrying the server's `{ error }` message for display — plus the
+// typed `code` the export route attaches to gate rejections (billing/04's
+// upgrade prompts match on it).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -44,5 +47,11 @@ export async function errorFrom(res: Response): Promise<ApiError> {
     typeof (body as { error?: unknown }).error === 'string'
       ? (body as { error: string }).error
       : 'Something went wrong.';
-  return new ApiError(message, res.status);
+  const code =
+    typeof body === 'object' &&
+    body !== null &&
+    typeof (body as { code?: unknown }).code === 'string'
+      ? (body as { code: string }).code
+      : undefined;
+  return new ApiError(message, res.status, code);
 }

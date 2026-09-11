@@ -10,8 +10,9 @@ import { BODY_FONTS, CODE_FONTS } from './fonts';
 import {
   Checkbox,
   ColorInput,
-  FauxUploadButton,
   Field,
+  FauxUploadButton,
+  IncludedNote,
   LockedRow,
   NumberInput,
   Section,
@@ -32,7 +33,7 @@ const codeThemeOptions = CODE_THEMES.map((theme) => ({
   label: theme === 'none' ? 'None (plain code)' : theme,
 }));
 
-export function StyleTab({ settings, set, onOpenPricing }: TabProps) {
+export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
   return (
     <>
       <Section title="Preset">
@@ -218,16 +219,31 @@ export function StyleTab({ settings, set, onOpenPricing }: TabProps) {
       </Section>
 
       <Section title="Custom (Pro)">
-        <LockedRow
-          label="Custom fonts"
-          onOpenPricing={onOpenPricing}
-          control={<FauxUploadButton label="Upload…" />}
-        />
-        <LockedRow
-          label="Custom stylesheet"
-          onOpenPricing={onOpenPricing}
-          control={<FauxUploadButton label="Upload…" />}
-        />
+        {/* The real gated UIs (font upload + stylesheet textarea) are
+            billing/05; until then the unlocked state says what the plan
+            includes instead of showing a lock a paying user can't act on. */}
+        {flags.customFonts ? (
+          <Field label="Custom fonts">
+            <IncludedNote />
+          </Field>
+        ) : (
+          <LockedRow
+            label="Custom fonts"
+            onOpenPricing={onOpenPricing}
+            control={<FauxUploadButton label="Upload…" />}
+          />
+        )}
+        {flags.customStylesheet ? (
+          <Field label="Custom stylesheet">
+            <IncludedNote />
+          </Field>
+        ) : (
+          <LockedRow
+            label="Custom stylesheet"
+            onOpenPricing={onOpenPricing}
+            control={<FauxUploadButton label="Upload…" />}
+          />
+        )}
       </Section>
     </>
   );

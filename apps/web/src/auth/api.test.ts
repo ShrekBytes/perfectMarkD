@@ -108,6 +108,13 @@ describe('me', () => {
         plan: 'pro',
         expiresAt: '2026-10-01T00:00:00.000Z',
         quota: { used: 3, limit: 300 },
+        flags: {
+          customPageSize: true,
+          customStylesheet: true,
+          bannerImages: true,
+          backgroundImage: true,
+          customFonts: true,
+        },
       }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -120,6 +127,13 @@ describe('me', () => {
       plan: 'pro',
       expiresAt: '2026-10-01T00:00:00.000Z',
       quota: { used: 3, limit: 300 },
+      flags: {
+        customPageSize: true,
+        customStylesheet: true,
+        bannerImages: true,
+        backgroundImage: true,
+        customFonts: true,
+      },
     });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('/api/me');

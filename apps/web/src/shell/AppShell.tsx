@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TopBar } from './TopBar';
 import { StaleBanner } from './StaleBanner';
+import { PlanEndedBanner } from './PlanEndedBanner';
 import { CollapsedPaneToggle, PaneDivider } from './PaneDivider';
 import { WelcomeStrip } from './WelcomeStrip';
 import { UploadIcon } from './icons';
@@ -21,8 +22,9 @@ import { Inspector } from '../inspector/Inspector';
  * The app shell: top bar + three panes (editor · Paper Canvas · inspector).
  * Panes collapse via their divider toggles; with both collapsed the shell is in
  * fullscreen-canvas mode. Document state lives in the document store; the
- * Library drawer, delete-undo toast, staleness banner, and .md drag-drop
- * import mount here.
+ * Library drawer, delete-undo toast, staleness banner, plan-ended banner, and
+ * .md drag-drop import mount here. The account store refreshes on a watchdog
+ * so Plan Expiry re-locks the gates in a long-lived tab (billing/04).
  */
 export function AppShell() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,6 +56,18 @@ export function AppShell() {
     void useDocumentStore.getState().init();
     // The account menu (billing/01) needs to know who is signed in.
     void useAccountStore.getState().load();
+  }, []);
+
+  // Expiry watchdog (billing/04): Plan Expiry is a date, not a session event,
+  // so a tab left open would keep its gates open forever without a periodic
+  // re-check. Once a minute (while signed in) the refresh re-locks the gates
+  // and raises the plan-ended banner when /api/me reports the plan gone.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const account = useAccountStore.getState();
+      if (account.user) void account.refresh();
+    }, 60_000);
+    return () => clearInterval(id);
   }, []);
 
   // With no documents at all there is nothing to open — land the user in the
@@ -92,6 +106,7 @@ export function AppShell() {
       />
 
       <StaleBanner />
+      <PlanEndedBanner />
 
       <div
         ref={containerRef}

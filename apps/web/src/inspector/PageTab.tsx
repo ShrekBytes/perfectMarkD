@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Inspector → Page tab: size (locked Custom), orientation, margins, frame,
-// and the locked background-image controls.
+// Inspector → Page tab: size (custom unlocked by the entitlement flags,
+// billing/04), orientation, margins, frame, and the background-image gate —
+// upload + fit/scope/opacity go live when the flag is open.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { PAGE_SIZES, type DocumentSettings } from '@perfectmarkd/core';
@@ -10,6 +11,7 @@ import {
   ColorInput,
   Field,
   FauxUploadButton,
+  GateImagePicker,
   LockedRow,
   NumberInput,
   Section,
@@ -21,14 +23,6 @@ import {
 type PageSize = DocumentSettings['pageSize'];
 type Orientation = DocumentSettings['orientation'];
 type FrameStyle = DocumentSettings['frameStyle'];
-
-const PAGE_SIZE_OPTIONS: SelectOption<PageSize>[] = [
-  ...Object.keys(PAGE_SIZES).map((size) => ({
-    value: size as PageSize,
-    label: size,
-  })),
-  { value: 'Custom', label: 'Custom…', disabled: true },
-];
 
 const FRAME_STYLES: { value: FrameStyle; label: string }[] = [
   { value: 'solid', label: 'Solid' },
@@ -44,7 +38,23 @@ const orientationOptions: { value: Orientation; label: string }[] = [
   { value: 'landscape', label: 'Landscape' },
 ];
 
-export function PageTab({ settings, set, onOpenPricing }: TabProps) {
+export function PageTab({
+  settings,
+  set,
+  onOpenPricing,
+  flags,
+  addImage,
+}: TabProps) {
+  // The Custom option is present either way (a persisted Custom document
+  // must never render a blank select); it selects only when the gate is open.
+  const pageSizeOptions: SelectOption<PageSize>[] = [
+    ...Object.keys(PAGE_SIZES).map((size) => ({
+      value: size as PageSize,
+      label: size,
+    })),
+    { value: 'Custom', label: 'Custom…', disabled: !flags.customPageSize },
+  ];
+
   return (
     <>
       <Section title="Size">
@@ -52,36 +62,56 @@ export function PageTab({ settings, set, onOpenPricing }: TabProps) {
           <Select<PageSize>
             ariaLabel="Page size"
             value={settings.pageSize}
-            options={PAGE_SIZE_OPTIONS}
+            options={pageSizeOptions}
             onChange={(pageSize) => set({ pageSize })}
           />
         </Field>
-        <LockedRow
-          label="Custom size"
-          onOpenPricing={onOpenPricing}
-          control={
-            <span
-              aria-hidden="true"
-              className="flex items-center gap-1 opacity-50"
-            >
+        {flags.customPageSize ? (
+          <Field label="Custom size (mm)">
+            <span className="flex items-center gap-1">
               <NumberInput
                 ariaLabel="Custom width"
                 value={settings.customPageWidth}
-                onChange={() => {}}
+                onChange={(customPageWidth) => set({ customPageWidth })}
                 className="w-14"
-                disabled
               />
               <span className="text-[11px] text-ink-faint">×</span>
               <NumberInput
                 ariaLabel="Custom height"
                 value={settings.customPageHeight}
-                onChange={() => {}}
+                onChange={(customPageHeight) => set({ customPageHeight })}
                 className="w-14"
-                disabled
               />
             </span>
-          }
-        />
+          </Field>
+        ) : (
+          <LockedRow
+            label="Custom size"
+            onOpenPricing={onOpenPricing}
+            control={
+              <span
+                aria-hidden="true"
+                className="flex items-center gap-1 opacity-50"
+              >
+                <NumberInput
+                  ariaLabel="Custom width"
+                  value={settings.customPageWidth}
+                  onChange={() => {}}
+                  className="w-14"
+                  disabled
+                />
+                <span className="text-[11px] text-ink-faint">×</span>
+                <NumberInput
+                  ariaLabel="Custom height"
+                  value={settings.customPageHeight}
+                  onChange={() => {}}
+                  className="w-14"
+                  disabled
+                />
+              </span>
+            }
+          />
+        )}
         <Field label="Orientation">
           <Select<Orientation>
             ariaLabel="Orientation"
@@ -176,13 +206,29 @@ export function PageTab({ settings, set, onOpenPricing }: TabProps) {
       </Section>
 
       <Section title="Background image">
-        <LockedRow
-          label="Background image"
-          onOpenPricing={onOpenPricing}
-          control={<FauxUploadButton />}
-        />
-        {/* Sub-controls exist (billing/05 unlocks them with the gate) but
-            stay disabled until then; the single lock above covers the gate. */}
+        {flags.backgroundImage ? (
+          <Field label="Image">
+            <GateImagePicker
+              ariaLabel="Background image"
+              addImage={addImage}
+              value={settings.backgroundImageRef}
+              onRef={(ref) =>
+                set({ backgroundImageRef: ref, backgroundImageEnabled: true })
+              }
+              onRemove={() =>
+                set({ backgroundImageRef: '', backgroundImageEnabled: false })
+              }
+            />
+          </Field>
+        ) : (
+          <LockedRow
+            label="Background image"
+            onOpenPricing={onOpenPricing}
+            control={<FauxUploadButton />}
+          />
+        )}
+        {/* Sub-controls ride the same gate: previews while locked (billing/05
+            needs no further UI here), live with the flag open. */}
         <Field label="Fit">
           <Select<DocumentSettings['backgroundImageSize']>
             ariaLabel="Background image fit"
@@ -193,8 +239,8 @@ export function PageTab({ settings, set, onOpenPricing }: TabProps) {
               { value: 'fill', label: 'Fill' },
               { value: 'tile', label: 'Tile' },
             ]}
-            onChange={() => onOpenPricing()}
-            disabled
+            onChange={(backgroundImageSize) => set({ backgroundImageSize })}
+            disabled={!flags.backgroundImage}
           />
         </Field>
         <Field label="Scope">
@@ -205,8 +251,8 @@ export function PageTab({ settings, set, onOpenPricing }: TabProps) {
               { value: 'full-page', label: 'Full page' },
               { value: 'content-only', label: 'Content only' },
             ]}
-            onChange={() => onOpenPricing()}
-            disabled
+            onChange={(backgroundImageScope) => set({ backgroundImageScope })}
+            disabled={!flags.backgroundImage}
           />
         </Field>
         <Field label="Opacity (%)">
@@ -214,9 +260,11 @@ export function PageTab({ settings, set, onOpenPricing }: TabProps) {
             ariaLabel="Background image opacity"
             value={Math.round(settings.backgroundImageOpacity * 100)}
             min={0}
-            onChange={() => onOpenPricing()}
+            onChange={(percent) =>
+              set({ backgroundImageOpacity: Math.min(100, percent) / 100 })
+            }
             className="w-16"
-            disabled
+            disabled={!flags.backgroundImage}
           />
         </Field>
       </Section>

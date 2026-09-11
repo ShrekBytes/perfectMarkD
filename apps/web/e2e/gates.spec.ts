@@ -1,7 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Gated controls (ticket editor-app/10): the paid-feature controls show their
-// locks in every Inspector tab, and a lock opens the pricing modal (the
-// Phase-1 inert gate billing/04 will later wire to real entitlements).
+// locks in every Inspector tab, and a lock opens the pricing modal. billing/04
+// wired the locks to the entitlement flags from GET /api/me — this run is
+// signed out, and signed-out users never gain gates, so the locked view is
+// still the standing one here.
 // ─────────────────────────────────────────────────────────────────────────────
 import { expect, test } from '@playwright/test';
 import { openApp, openInspectorTab, waitForMinPages } from './helpers';

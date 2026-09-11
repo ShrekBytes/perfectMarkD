@@ -13,6 +13,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '@perfectmarkd/core';
 import { Inspector } from './Inspector';
 import {
+  resetAccountStoreForTests,
+  useAccountStore,
+} from '../auth/account-store';
+import * as api from '../auth/api';
+import type { MePayload } from '../auth/api';
+import { LOCKED_FLAGS } from '../auth/flags';
+import {
   resetDocumentStoreForTests,
   useDocumentStore,
 } from '../documents/store';
@@ -31,6 +38,19 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+
+/** A free signed-in /api/me payload — used by the re-lock tests. */
+function mePayload(overrides: Partial<MePayload> = {}): MePayload {
+  return {
+    email: 'a@b.co',
+    isAdmin: false,
+    plan: null,
+    expiresAt: null,
+    quota: { used: 0, limit: 0 },
+    flags: LOCKED_FLAGS,
+    ...overrides,
+  };
+}
 
 const activeSettings = () => useDocumentStore.getState().settings;
 
@@ -470,5 +490,258 @@ describe('canvas re-render on settings change', () => {
     expect(after).not.toBe(before); // new object identity = canvas re-render
     expect(after.preset).toBe('minimal');
     void DEFAULT_SETTINGS; // shape reference
+  });
+});
+
+describe('unlocked gates (billing/04)', () => {
+  const OPEN_FLAGS = {
+    customPageSize: true,
+    customStylesheet: true,
+    bannerImages: true,
+    backgroundImage: true,
+    customFonts: true,
+  };
+
+  afterEach(() => {
+    resetAccountStoreForTests();
+  });
+
+  /** Seeds a signed-in Pro account — the flags /api/me reported. */
+  function unlockAsPro(): void {
+    useAccountStore.setState({
+      user: { email: 'a@b.co', isAdmin: false },
+      entitlement: { plan: 'pro', expiresAt: '2026-10-01T00:00:00.000Z' },
+      quota: { used: 3, limit: 300 },
+      flags: OPEN_FLAGS,
+      status: 'ready',
+    });
+  }
+
+  /** The hidden file input a GateImagePicker's button drives. */
+  function fileInputBehind(button: HTMLElement): HTMLInputElement {
+    const input =
+      button.parentElement?.parentElement?.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error('no file input behind picker');
+    }
+    return input;
+  }
+
+  it('no locks remain while the flags are open', async () => {
+    unlockAsPro();
+    render(<Inspector />);
+
+    expect(
+      screen.queryByRole('button', { name: /paid feature/i }),
+    ).not.toBeInTheDocument();
+
+    // Style tab: fonts and stylesheet are included, not locked.
+    fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
+    expect(screen.getAllByTestId('gate-included')).toHaveLength(2);
+    expect(screen.queryByTestId('faux-upload')).not.toBeInTheDocument();
+
+    // Page tab: Custom… is selectable.
+    fireEvent.click(screen.getByRole('tab', { name: 'Page' }));
+    expect(screen.getByRole('option', { name: 'Custom…' })).toBeEnabled();
+
+    // Header/Footer tab: one live picker per band.
+    fireEvent.click(screen.getByRole('tab', { name: 'Header/Footer' }));
+    expect(
+      screen.getByRole('button', { name: 'Header banner image' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Footer banner image' }),
+    ).toBeInTheDocument();
+  });
+
+  it('unlocks the custom page size and edits it end to end', async () => {
+    unlockAsPro();
+    const user = userEvent.setup();
+    render(<Inspector />);
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Page size' }),
+      'Custom',
+    );
+    expect(activeSettings().pageSize).toBe('Custom');
+
+    const width = screen.getByRole('spinbutton', { name: 'Custom width' });
+    const height = screen.getByRole('spinbutton', { name: 'Custom height' });
+    expect(width).toBeEnabled();
+    expect(height).toBeEnabled();
+    await user.clear(width);
+    await user.type(width, '148');
+    await user.clear(height);
+    await user.type(height, '210');
+    expect(activeSettings().customPageWidth).toBe(148);
+    expect(activeSettings().customPageHeight).toBe(210);
+  });
+
+  it('the unlocked background image uploads through the asset store', async () => {
+    unlockAsPro();
+    const user = userEvent.setup();
+    const addAsset = vi
+      .fn()
+      .mockResolvedValue({ ok: true, ref: 'asset://bg1', alt: 'bg' });
+    act(() => {
+      useDocumentStore.setState({ addAsset });
+    });
+    render(<Inspector />);
+
+    const picker = screen.getByRole('button', { name: 'Background image' });
+    expect(picker).toHaveTextContent('Upload…');
+    const input = fileInputBehind(picker);
+    const file = new File(['x'], 'bg.png', { type: 'image/png' });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    expect(addAsset).toHaveBeenCalledWith(file);
+    expect(activeSettings().backgroundImageRef).toBe('asset://bg1');
+    // The engine only paints the layer when enabled — uploading turns it on.
+    expect(activeSettings().backgroundImageEnabled).toBe(true);
+
+    // A set image can be replaced or removed.
+    expect(picker).toHaveTextContent('Replace…');
+    await user.click(
+      screen.getByRole('button', { name: 'Remove Background image' }),
+    );
+    expect(activeSettings().backgroundImageRef).toBe('');
+    expect(activeSettings().backgroundImageEnabled).toBe(false);
+  });
+
+  it('background sub-controls go live with the gate', async () => {
+    unlockAsPro();
+    const user = userEvent.setup();
+    render(<Inspector />);
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Background image fit' }),
+      'tile',
+    );
+    expect(activeSettings().backgroundImageSize).toBe('tile');
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Background image scope' }),
+      'content-only',
+    );
+    expect(activeSettings().backgroundImageScope).toBe('content-only');
+
+    const opacity = screen.getByRole('spinbutton', {
+      name: 'Background image opacity',
+    });
+    await user.clear(opacity);
+    await user.type(opacity, '40');
+    expect(activeSettings().backgroundImageOpacity).toBe(0.4);
+  });
+
+  it('surfaces an ingest failure inline instead of writing a broken ref', async () => {
+    unlockAsPro();
+    const addAsset = vi
+      .fn()
+      .mockResolvedValue({ ok: false as const, error: 'too-large' as const });
+    act(() => {
+      useDocumentStore.setState({ addAsset });
+    });
+    render(<Inspector />);
+
+    const input = fileInputBehind(
+      screen.getByRole('button', { name: 'Background image' }),
+    );
+    await act(async () => {
+      fireEvent.change(input, {
+        target: { files: [new File(['x'], 'huge.png', { type: 'image/png' })] },
+      });
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /over the 20 MB limit/i,
+    );
+    expect(activeSettings().backgroundImageRef).toBe('');
+  });
+
+  it('banner uploads set the band refs', async () => {
+    unlockAsPro();
+    render(<Inspector />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Header/Footer' }));
+
+    const addAsset = vi.fn().mockImplementation(async (file: File) => ({
+      ok: true as const,
+      ref: `asset://${file.name}`,
+      alt: file.name,
+    }));
+    act(() => {
+      useDocumentStore.setState({ addAsset });
+    });
+
+    // The header picker is the first picker in the tab's DOM order.
+    const headerPicker = screen.getByRole('button', {
+      name: 'Header banner image',
+    });
+    await act(async () => {
+      fireEvent.change(fileInputBehind(headerPicker), {
+        target: {
+          files: [new File(['x'], 'header.png', { type: 'image/png' })],
+        },
+      });
+    });
+    expect(activeSettings().headerImageRef).toBe('asset://header.png');
+    expect(activeSettings().footerImageRef).toBe('');
+
+    const footerPicker = screen.getByRole('button', {
+      name: 'Footer banner image',
+    });
+    await act(async () => {
+      fireEvent.change(fileInputBehind(footerPicker), {
+        target: {
+          files: [new File(['x'], 'footer.png', { type: 'image/png' })],
+        },
+      });
+    });
+    expect(activeSettings().footerImageRef).toBe('asset://footer.png');
+    // Removing clears the ref without touching the other band.
+    await userEvent
+      .setup()
+      .click(
+        screen.getByRole('button', { name: 'Remove Header banner image' }),
+      );
+    expect(activeSettings().headerImageRef).toBe('');
+    expect(activeSettings().footerImageRef).toBe('asset://footer.png');
+  });
+
+  it('expiry re-locks the gates gracefully and keeps the settings', async () => {
+    unlockAsPro();
+    // A gated setting the user set while the plan was active.
+    act(() => {
+      useDocumentStore
+        .getState()
+        .updateActive({ settings: { headerImageRef: 'asset://banner' } });
+    });
+    render(<Inspector />);
+    expect(
+      screen.queryByRole('button', { name: /paid feature/i }),
+    ).not.toBeInTheDocument();
+
+    // The next /api/me reports the Entitlement gone (expiry or revoke).
+    vi.spyOn(api, 'me').mockResolvedValue(
+      mePayload({ quota: { used: 3, limit: 0 } }),
+    );
+    await act(async () => {
+      await useAccountStore.getState().refresh();
+    });
+
+    // The locks are back…
+    fireEvent.click(screen.getByRole('tab', { name: 'Header/Footer' }));
+    expect(
+      screen.getAllByRole('button', { name: 'Banner image (paid feature)' }),
+    ).toHaveLength(2);
+    fireEvent.click(screen.getByRole('tab', { name: 'Page' }));
+    expect(screen.getByRole('option', { name: 'Custom…' })).toBeDisabled();
+    // …no data was lost — the setting persists, just gated again…
+    expect(useDocumentStore.getState().settings.headerImageRef).toBe(
+      'asset://banner',
+    );
+    // …and the shell gets its clear notice.
+    expect(useAccountStore.getState().planEndedNotice).toBe(true);
   });
 });
