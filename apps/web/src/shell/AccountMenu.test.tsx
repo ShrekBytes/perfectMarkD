@@ -11,6 +11,7 @@ import {
 } from '../auth/account-store';
 
 const onOpenUpgradeStatus = vi.fn();
+const onOpenHistory = vi.fn();
 
 beforeEach(() => {
   resetAccountStoreForTests();
@@ -23,7 +24,10 @@ afterEach(() => {
 
 it('renders nothing until the session check resolves', () => {
   const { container } = render(
-    <AccountMenu onOpenUpgradeStatus={onOpenUpgradeStatus} />,
+    <AccountMenu
+      onOpenUpgradeStatus={onOpenUpgradeStatus}
+      onOpenHistory={onOpenHistory}
+    />,
   );
 
   expect(container).toBeEmptyDOMElement();
@@ -32,34 +36,52 @@ it('renders nothing until the session check resolves', () => {
 it('offers sign-in when signed out', async () => {
   useAccountStore.setState({ user: null, status: 'ready' });
 
-  render(<AccountMenu onOpenUpgradeStatus={onOpenUpgradeStatus} />);
+  render(
+    <AccountMenu
+      onOpenUpgradeStatus={onOpenUpgradeStatus}
+      onOpenHistory={onOpenHistory}
+    />,
+  );
 
   const link = screen.getByRole('link', { name: 'Sign in' });
   expect(link).toHaveAttribute('href', '/login');
 });
 
-it('signed in: opens a menu with upgrade status and sign-out', async () => {
+it('signed in: opens a menu with upgrade status, history, and sign-out', async () => {
   const user = userEvent.setup();
   useAccountStore.setState({
     user: { email: 'reader@example.com', isAdmin: false },
     status: 'ready',
   });
 
-  render(<AccountMenu onOpenUpgradeStatus={onOpenUpgradeStatus} />);
+  render(
+    <AccountMenu
+      onOpenUpgradeStatus={onOpenUpgradeStatus}
+      onOpenHistory={onOpenHistory}
+    />,
+  );
 
   await user.click(screen.getByRole('button', { name: 'Account menu' }));
 
   const menu = screen.getByRole('menu', { name: 'Account' });
   expect(menu).toHaveTextContent('reader@example.com');
   expect(
-    screen.getByRole('menuitem', { name: 'Upgrade status' }),
+    screen.getByRole('menuitem', { name: /Upgrade status/ }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('menuitem', { name: /Export history/ }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole('menuitem', { name: 'Sign out' }),
   ).toBeInTheDocument();
 
-  await user.click(screen.getByRole('menuitem', { name: 'Upgrade status' }));
+  await user.click(screen.getByRole('menuitem', { name: /Upgrade status/ }));
   expect(onOpenUpgradeStatus).toHaveBeenCalledTimes(1);
+
+  // Opening the status dialog closed the menu; open it again for History.
+  await user.click(screen.getByRole('button', { name: 'Account menu' }));
+  await user.click(screen.getByRole('menuitem', { name: /Export history/ }));
+  expect(onOpenHistory).toHaveBeenCalledTimes(1);
 });
 
 it('signs out from the menu — clearing the account', async () => {
@@ -70,7 +92,12 @@ it('signs out from the menu — clearing the account', async () => {
   });
   const logout = vi.spyOn(authApi, 'logout').mockResolvedValue(undefined);
 
-  render(<AccountMenu onOpenUpgradeStatus={onOpenUpgradeStatus} />);
+  render(
+    <AccountMenu
+      onOpenUpgradeStatus={onOpenUpgradeStatus}
+      onOpenHistory={onOpenHistory}
+    />,
+  );
   await user.click(screen.getByRole('button', { name: 'Account menu' }));
   await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
 

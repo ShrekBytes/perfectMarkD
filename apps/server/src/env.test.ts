@@ -12,6 +12,8 @@ describe('loadEnv', () => {
       exportConcurrency: 2,
       exportBurstPerMinute: 10,
       exportRenderTimeoutMs: 120_000,
+      historyDir: './data/history',
+      historyEncryptionKey: null,
     });
   });
 
@@ -26,6 +28,8 @@ describe('loadEnv', () => {
         EXPORT_CONCURRENCY: '4',
         EXPORT_BURST_PER_MINUTE: '30',
         EXPORT_RENDER_TIMEOUT_MS: '60000',
+        HISTORY_DIR: '/var/lib/pmd/history',
+        HISTORY_ENCRYPTION_KEY: 'a'.repeat(64),
       }),
     ).toEqual({
       port: 8080,
@@ -36,6 +40,8 @@ describe('loadEnv', () => {
       exportConcurrency: 4,
       exportBurstPerMinute: 30,
       exportRenderTimeoutMs: 60_000,
+      historyDir: '/var/lib/pmd/history',
+      historyEncryptionKey: 'a'.repeat(64),
     });
   });
 
@@ -44,6 +50,10 @@ describe('loadEnv', () => {
     expect(loadEnv({ PORT: '' }).port).toBe(3000);
     expect(loadEnv({ EXPORT_ORIGIN: '' }).exportOrigin).toBe(
       'http://localhost:3000',
+    );
+    expect(loadEnv({ HISTORY_DIR: ' ' }).historyDir).toBe('./data/history');
+    expect(loadEnv({ HISTORY_ENCRYPTION_KEY: '' }).historyEncryptionKey).toBe(
+      null,
     );
   });
 

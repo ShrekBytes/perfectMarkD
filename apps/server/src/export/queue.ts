@@ -9,8 +9,11 @@
 // - The document payload (≤ 50 MB) and the rendered PDF live only in this
 //   process's memory. Payloads are deleted the moment a render settles
 //   (success or failure — asserted by tests); results stay until the process
-//   exits. Export History (server/05) moves finished PDFs to encrypted disk;
-//   until then a restart loses results and the download endpoint says so.
+//   exits, and the immediate download is served from memory. Export History
+//   (server/05) additionally copies Premium results to encrypted disk, but
+//   the in-memory copy is still what the download endpoint serves — a
+//   restart therefore loses any not-yet-downloaded result, and the download
+//   endpoint says so.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';

@@ -5,15 +5,21 @@ import { useAccountStore } from '../auth/account-store';
 interface AccountMenuProps {
   /** Opens the Upgrade status dialog (owned by the shell). */
   onOpenUpgradeStatus: () => void;
+  /** Opens the Export History dialog (server/05, owned by the shell). */
+  onOpenHistory: () => void;
 }
 
 /**
  * The top bar's account control (billing/01): a sign-in link when signed out,
  * and when signed in a menu with the account email, the Upgrade status entry
- * point, and sign-out. Until the first session check resolves it renders
- * nothing — flashing the wrong state is worse than a beat of nothing.
+ * point, Export History (Premium's re-downloadable exports), and sign-out.
+ * Until the first session check resolves it renders nothing — flashing the
+ * wrong state is worse than a beat of nothing.
  */
-export function AccountMenu({ onOpenUpgradeStatus }: AccountMenuProps) {
+export function AccountMenu({
+  onOpenUpgradeStatus,
+  onOpenHistory,
+}: AccountMenuProps) {
   const user = useAccountStore((state) => state.user);
   const status = useAccountStore((state) => state.status);
   const signOut = useAccountStore((state) => state.signOut);
@@ -88,6 +94,18 @@ export function AccountMenu({ onOpenUpgradeStatus }: AccountMenuProps) {
             className="flex w-full items-center px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
           >
             Upgrade status
+          </button>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onOpenHistory();
+            }}
+            className="flex w-full items-center px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
+          >
+            Export history
+            <span className="ml-auto text-xs text-ink-faint">30 days</span>
           </button>
           <button
             role="menuitem"

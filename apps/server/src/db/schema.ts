@@ -49,7 +49,8 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 /**
  * Server Export job lifecycle (server/03). `queued` jobs carry their document
  * payload only in the API process's memory; `done` jobs hold the rendered PDF
- * the same way until Export History (server/05) moves it to encrypted disk.
+ * the same way for the immediate download, and the worker copies Premium
+ * results to Export History's encrypted disk (server/05).
  */
 export const EXPORT_JOB_STATUSES = [
   'queued',
@@ -197,6 +198,12 @@ export const exportsHistory = sqliteTable('exports_history', {
     .references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   pages: integer('pages').notNull(),
+  /**
+   * The plaintext PDF's size in bytes, captured at store time — the download
+   * is the decrypted file, so the encrypted file's stat would lie by the
+   * encryption envelope's overhead (server/05).
+   */
+  sizeBytes: integer('size_bytes').notNull().default(0),
   storedPath: text('stored_path').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
@@ -204,6 +211,8 @@ export const exportsHistory = sqliteTable('exports_history', {
   /** History retention (30 days) — purge target. */
   expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+export type ExportHistory = typeof exportsHistory.$inferSelect;
 
 /** Admin-editable app settings as JSON per key (wallets, prices). */
 export const settingsKv = sqliteTable('settings_kv', {

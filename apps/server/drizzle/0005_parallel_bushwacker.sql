@@ -1,0 +1,1 @@
+ALTER TABLE `exports_history` ADD `size_bytes` integer DEFAULT 0 NOT NULL;

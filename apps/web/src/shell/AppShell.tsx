@@ -9,6 +9,7 @@ import { useTheme } from '../theme/theme';
 import { useDocumentStore } from '../documents/store';
 import { useAccountStore } from '../auth/account-store';
 import { UpgradeStatusDialog } from '../billing/UpgradeStatusDialog';
+import { HistoryDialog } from '../history/HistoryDialog';
 import { EditorPane } from '../editor/EditorPane';
 import { DeleteToast } from '../library/DeleteToast';
 import { LibraryPanel } from '../library/LibraryPanel';
@@ -43,6 +44,7 @@ export function AppShell() {
 
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [upgradeStatusOpen, setUpgradeStatusOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   /** The canvas exposes its API through this ref so the editor's Ctrl/Cmd+Enter
    *  and scroll events reach it without threading through re-renders. */
@@ -86,6 +88,7 @@ export function AppShell() {
         theme={theme}
         onToggleTheme={toggle}
         onOpenUpgradeStatus={() => setUpgradeStatusOpen(true)}
+        onOpenHistory={() => setHistoryOpen(true)}
       />
 
       <StaleBanner />
@@ -191,6 +194,7 @@ export function AppShell() {
       {upgradeStatusOpen && (
         <UpgradeStatusDialog onClose={() => setUpgradeStatusOpen(false)} />
       )}
+      {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
       <DeleteToast />
     </div>
   );

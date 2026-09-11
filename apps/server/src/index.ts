@@ -16,6 +16,8 @@ import { PayloadStore, ResultStore } from './export/queue.js';
 import { exportRoutes } from './export/routes.js';
 import { createPlaywrightRenderer } from './export/render.js';
 import { ExportWorker, type RenderPdf } from './export/worker.js';
+import { historyRoutes } from './history/routes.js';
+import type { HistoryStore } from './history/store.js';
 import { meRoutes } from './me.js';
 
 export interface AppEnv {
@@ -64,6 +66,13 @@ export interface CreateAppOptions {
    * inject a recorder. Default: best-effort unlink of absolute paths.
    */
   removeStoredFile?: (storedPath: string) => void;
+  /**
+   * Export History storage (server/05). When provided, finished Premium
+   * exports are copied to encrypted disk under it, `/api/history` is mounted,
+   * and the composition root (main.ts) owns the daily purge. Omitted: the
+   * routes don't exist and exports are memory-only (server/03 behavior).
+   */
+  history?: HistoryStore;
   /** Mounts the Server Export API + in-process worker (server/03). */
   export?: ExportAppOptions;
 }
@@ -80,6 +89,7 @@ export function createApp({
   now,
   log,
   removeStoredFile,
+  history,
   export: exportOptions,
 }: CreateAppOptions) {
   const clock: Clock = now ?? (() => new Date());
@@ -104,6 +114,7 @@ export function createApp({
       results,
       renderPdf: renderer.renderPdf,
       concurrency: exportOptions.concurrency,
+      history,
       clock,
       log,
     });
@@ -146,7 +157,14 @@ export function createApp({
     .route('/api/orders', orderRoutes())
     .route('/api/admin', adminRoutes({ now: clock, removeStoredFile }));
 
-  return exportApp ? app.route('/api/export', exportApp) : app;
+  // Export History (server/05) mounts whenever storage is configured; the
+  // Server Export API additionally needs its worker options. A composition
+  // without history (some tests) simply has no /api/history routes.
+  const withHistory = history
+    ? app.route('/api/history', historyRoutes({ store: history, now: clock }))
+    : app;
+
+  return exportApp ? withHistory.route('/api/export', exportApp) : withHistory;
 }
 
 /** Typed-routes handle for hono clients (RPC type inference). */

@@ -18,6 +18,8 @@ interface TopBarProps {
   onToggleTheme: () => void;
   /** Opens the Upgrade status dialog (billing/01). */
   onOpenUpgradeStatus: () => void;
+  /** Opens the Export History dialog (server/05). */
+  onOpenHistory: () => void;
 }
 
 export function TopBar({
@@ -29,6 +31,7 @@ export function TopBar({
   theme,
   onToggleTheme,
   onOpenUpgradeStatus,
+  onOpenHistory,
 }: TopBarProps) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-surface px-3">
@@ -71,7 +74,10 @@ export function TopBar({
             print flow, one-time hint, and toasts all live inside it. */}
         <ExportSplitButton />
 
-        <AccountMenu onOpenUpgradeStatus={onOpenUpgradeStatus} />
+        <AccountMenu
+          onOpenUpgradeStatus={onOpenUpgradeStatus}
+          onOpenHistory={onOpenHistory}
+        />
       </div>
     </header>
   );

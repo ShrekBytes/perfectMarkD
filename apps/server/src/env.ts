@@ -17,9 +17,21 @@ export interface ServerEnv {
   exportBurstPerMinute: number;
   /** Per-render deadline before a job fails as render_timeout. */
   exportRenderTimeoutMs: number;
+  /**
+   * Root directory for Export History's encrypted PDFs (server/05) — kept
+   * outside any web root; the Compose history volume mounts here (server/06).
+   */
+  historyDir: string;
+  /**
+   * Export History master key (server/05): 32 bytes as hex or base64. The
+   * composition root (main.ts) requires it — Premium exports are supposed to
+   * land in History, so a deployment without the key must not boot quietly.
+   */
+  historyEncryptionKey: string | null;
 }
 
 const DEFAULT_DB_PATH = './data/perfectmarkd.db';
+const DEFAULT_HISTORY_DIR = './data/history';
 const DEFAULT_EXPORT_CONCURRENCY = 2;
 const DEFAULT_EXPORT_BURST_PER_MINUTE = 10;
 const DEFAULT_EXPORT_RENDER_TIMEOUT_MS = 120_000;
@@ -49,6 +61,8 @@ export function loadEnv(
       DEFAULT_EXPORT_RENDER_TIMEOUT_MS,
       'EXPORT_RENDER_TIMEOUT_MS',
     ),
+    historyDir: nonEmpty(source.HISTORY_DIR) ?? DEFAULT_HISTORY_DIR,
+    historyEncryptionKey: nonEmpty(source.HISTORY_ENCRYPTION_KEY),
   };
 }
 

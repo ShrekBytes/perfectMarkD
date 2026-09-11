@@ -190,8 +190,9 @@ export function exportRoutes(options: ExportRoutesOptions) {
     }
     const pdf = results.get(job.id);
     if (!pdf) {
-      // The process restarted after the job finished; results are memory-only
-      // until Export History (server/05) persists them.
+      // The process restarted after the job finished; the immediate download
+      // rides memory (server/03). Premium exports were also copied to Export
+      // History's encrypted disk (server/05) — re-download them from there.
       return c.json(
         {
           error: 'This export is no longer available — please export again.',

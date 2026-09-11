@@ -23,6 +23,7 @@ import {
 } from '../db/schema.js';
 import { getPlanLimits, pageCapFor } from '../db/settings.js';
 import { incrementExportUsage } from '../quota.js';
+import type { HistoryStore } from '../history/store.js';
 import {
   PayloadStore,
   ResultStore,
@@ -62,6 +63,12 @@ export interface ExportWorkerOptions {
   renderPdf: RenderPdf;
   /** Simultaneous renders; the ticket default is 2. */
   concurrency?: number;
+  /**
+   * Export History storage (server/05). When set, a finished Premium render
+   * is copied to encrypted disk so it can be re-downloaded for 30 days; the
+   * in-memory result keeps serving the immediate download either way.
+   */
+  history?: HistoryStore;
   clock?: Clock;
   log?: LogSink;
 }
@@ -71,6 +78,7 @@ export class ExportWorker {
   private readonly payloads: PayloadStore;
   private readonly results: ResultStore;
   private readonly renderPdf: RenderPdf;
+  private readonly history: HistoryStore | null;
   private readonly concurrency: number;
   private readonly now: Clock;
   private readonly log: LogSink;
@@ -84,6 +92,7 @@ export class ExportWorker {
     this.payloads = options.payloads;
     this.results = options.results;
     this.renderPdf = options.renderPdf;
+    this.history = options.history ?? null;
     this.concurrency = Math.max(1, options.concurrency ?? 2);
     this.now = options.clock ?? (() => new Date());
     this.log = options.log ?? (() => {});
@@ -174,6 +183,7 @@ export class ExportWorker {
       this.results.put(job.id, pdf);
       incrementExportUsage(this.db, job.userId, this.now());
       finishExportJob(this.db, job.id, pages, this.now());
+      this.storeInHistory(job, payload, pdf, pages);
     } catch (error) {
       if (error instanceof RenderError) {
         this.fail(job, error.code, error.message);
@@ -182,6 +192,38 @@ export class ExportWorker {
       const message =
         error instanceof Error ? error.message : 'Unknown render error.';
       this.fail(job, 'render_failed', message);
+    }
+  }
+
+  /**
+   * Copies a finished Premium render into Export History (server/05). Best
+   * effort by design: the export itself has already succeeded and stays
+   * downloadable from memory, so a history failure must not fail the job —
+   * the user loses re-downloadability, not their PDF. Only the plan snapshot
+   * decides (Premium is the one tier with History); the payload title, read
+   * before the payload dies with this call frame, names the entry.
+   */
+  private storeInHistory(
+    job: ExportJob,
+    payload: ExportPayload,
+    pdf: Uint8Array,
+    pages: number,
+  ): void {
+    if (!this.history || job.plan !== 'premium') return;
+    try {
+      this.history.store({
+        userId: job.userId,
+        name: payload.title,
+        pages,
+        pdf,
+        now: this.now(),
+      });
+    } catch (error) {
+      this.log(
+        `export worker: history storage failed for job ${job.id} — the export itself is unaffected (${
+          error instanceof Error ? error.message : String(error)
+        })`,
+      );
     }
   }
 

@@ -36,8 +36,10 @@ COPY --from=build /repo/apps/server/dist ./dist
 COPY --from=build /repo/apps/server/drizzle ./drizzle
 ENV NODE_ENV=production \
     PORT=3000 \
-    DB_PATH=/data/perfectmarkd.db
-# Database (SQLite WAL) lives on a volume so it survives container upgrades.
+    DB_PATH=/data/perfectmarkd.db \
+    HISTORY_DIR=/data/history
+# Database (SQLite WAL) and Export History's encrypted files (server/05) live
+# on a volume so they survive container upgrades.
 RUN mkdir -p /data && chown node:node /data
 VOLUME /data
 EXPOSE 3000
