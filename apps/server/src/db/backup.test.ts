@@ -7,14 +7,14 @@ import { createTestDatabase, removeTestDatabase } from './testing.js';
 import { createDatabase } from './database.js';
 import { vacuumInto } from './backup.js';
 
-let scratch: { dir: string };
+let scratchDir: string;
 let sourcePath: string;
 
 beforeAll(() => {
   // A real migrated, WAL-mode database with data in its write-ahead log —
   // the state the nightly backup runs against.
   const test = createTestDatabase();
-  scratch = { dir: test.dir };
+  scratchDir = test.dir;
   sourcePath = test.path;
   test.db.run(
     sql`insert into users (email, password_hash, is_admin, created_at) values ('backup@example.com', 'x', 1, 0)`,
@@ -23,12 +23,12 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  removeTestDatabase(scratch.dir);
+  removeTestDatabase(scratchDir);
 });
 
 describe('vacuumInto', () => {
   it('writes a standalone database file containing the source rows', () => {
-    const target = join(scratch.dir, 'dump-1.db');
+    const target = join(scratchDir, 'dump-1.db');
     const result = vacuumInto(sourcePath, target);
 
     expect(existsSync(target)).toBe(true);
@@ -63,12 +63,14 @@ describe('vacuumInto', () => {
       )
       .run();
 
-    const target = join(scratch.dir, 'dump-2.db');
-    const before = existsSync(`${sourcePath}-wal`)
+    const target = join(scratchDir, 'dump-2.db');
+    // Small databases never hit the 1000-page auto-checkpoint, so the
+    // inserted row lives in the -wal file when the dump runs.
+    const walSize = existsSync(`${sourcePath}-wal`)
       ? statSync(`${sourcePath}-wal`).size
-      : 0;
+      : -1;
     vacuumInto(sourcePath, target);
-    expect(before).toBeGreaterThanOrEqual(0); // wal present or not — either way
+    expect(walSize).toBeGreaterThan(0); // the premise: content sits in the WAL
 
     const dump = new Database(target, { readonly: true });
     try {
@@ -84,15 +86,15 @@ describe('vacuumInto', () => {
     }
   });
   it('fails loudly when the source does not exist', () => {
-    const missing = join(scratch.dir, 'no-such.db');
-    expect(() => vacuumInto(missing, join(scratch.dir, 'out.db'))).toThrow(
+    const missing = join(scratchDir, 'no-such.db');
+    expect(() => vacuumInto(missing, join(scratchDir, 'out.db'))).toThrow(
       /unable to open database file/i,
     );
-    expect(existsSync(join(scratch.dir, 'out.db'))).toBe(false);
+    expect(existsSync(join(scratchDir, 'out.db'))).toBe(false);
   });
 
   it('refuses to overwrite an existing target', () => {
-    const target = join(scratch.dir, 'dump-3.db');
+    const target = join(scratchDir, 'dump-3.db');
     vacuumInto(sourcePath, target);
     const firstMtime = statSync(target).mtimeMs;
 
@@ -101,7 +103,7 @@ describe('vacuumInto', () => {
   });
 
   it('overwrites an existing target when asked (the nightly latest.db path)', () => {
-    const target = join(scratch.dir, 'dump-4.db');
+    const target = join(scratchDir, 'dump-4.db');
     vacuumInto(sourcePath, target);
     const firstMtime = statSync(target).mtimeMs;
 
@@ -122,7 +124,7 @@ describe('vacuumInto', () => {
   it('produces a target that still passes a fresh restore-style open', () => {
     // What restore.sh does: open the dump with the app's own createDatabase.
     // Migrations are a no-op on an up-to-date dump; the data must survive.
-    const target = join(scratch.dir, 'dump-5.db');
+    const target = join(scratchDir, 'dump-5.db');
     vacuumInto(sourcePath, target);
     const restored = createDatabase(target);
     try {

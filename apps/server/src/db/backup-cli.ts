@@ -11,7 +11,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { mkdirSync } from 'node:fs';
-import { dumpParentDir, vacuumInto } from './backup.js';
+import { dirname, resolve } from 'node:path';
+import { vacuumInto } from './backup.js';
 
 function usage(): never {
   console.error(
@@ -25,10 +26,10 @@ function main(): void {
   const args = process.argv.slice(2);
   const force = args.includes('--force');
   const positional = args.filter((arg) => arg !== '--force');
-  if (positional.length !== 2 || args.length === 0) usage();
+  if (positional.length !== 2) usage();
 
   const [sourcePath, targetPath] = positional as [string, string];
-  mkdirSync(dumpParentDir(targetPath), { recursive: true });
+  mkdirSync(dirname(resolve(targetPath)), { recursive: true });
 
   const result = vacuumInto(sourcePath, targetPath, { overwrite: force });
   console.log(

@@ -46,8 +46,8 @@ command -v docker >/dev/null || die "docker not found on PATH"
 
 # Restoring under a running api is a race: the live process would re-create
 # and re-write the database files we are replacing.
-docker compose ps --status running api 2>/dev/null | grep -q api \
-  && die "the api container is running — stop it first (docker compose stop api)"
+running="$(docker compose ps --status running api --format '{{.Name}}' 2>/dev/null)"
+[[ -z "$running" ]] || die "the api container is running — stop it first (docker compose stop api)"
 
 # Read the remote from .env before (possibly) restoring .env itself.
 if [[ -f .env ]]; then

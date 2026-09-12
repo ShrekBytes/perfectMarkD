@@ -56,8 +56,11 @@ DUMP_NAME="perfectmarkd-${STAMP}.db"
 command -v rclone >/dev/null || die "rclone not found on PATH (see docs/ops/restore.md §prerequisites)"
 command -v docker >/dev/null || die "docker not found on PATH"
 
-# The api container must be up: the dump runs inside it.
-docker compose ps --status running api | grep -q api \
+# The api container must be up: the dump runs inside it. (Format the name
+# and require a non-empty line — a plain `ps` prints its header even with
+# no matches, which would fool a grep for "api".)
+running="$(docker compose ps --status running api --format '{{.Name}}')"
+[[ -n "$running" ]] \
   || die "api container is not running — start the stack before backing up (docker compose up -d)"
 
 mkdir -p "$BACKUP_STAGE/db" "$BACKUP_STAGE/history"
@@ -94,5 +97,8 @@ if rclone lsf "$BACKUP_REMOTE/history-prev" >/dev/null 2>&1; then
   rclone delete --min-age 30d "$BACKUP_REMOTE/history-prev"
   rclone rmdirs --leave-root "$BACKUP_REMOTE/history-prev" || true
 fi
+# The same retention on the local staging dir — otherwise the host
+# accumulates one full dump per night forever.
+find "$BACKUP_STAGE/db" -name 'perfectmarkd-*.db' -mtime +30 -delete
 
 echo "backup: done (db=$DUMP_NAME, remote=$BACKUP_REMOTE)"

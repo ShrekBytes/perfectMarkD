@@ -23,6 +23,11 @@ command has been executed against the Compose stack as part of launch/03.
 | `history-prev/YYYYmmdd-HHMMSS/` | history files deleted since the previous run (the 30-day retention purge puts expired exports here) | pruned at 30 days |
 | `env/.env` | the deployment's keys | overwritten each night |
 
+The same 30-day retention applies to the host staging dir
+(`$BACKUP_STAGE`, default `/var/backups/perfectmarkd`) — old dumps are
+deleted there too, so it stays bounded at roughly one month of dumps plus
+the current history mirror.
+
 The dump is produced inside the running api container (`node
 dist/db/backup-cli.js`), which reads the live WAL database under a consistent
 snapshot and verifies the result with `PRAGMA quick_check` before it is
@@ -163,11 +168,18 @@ export BACKUP_REMOTE=/tmp/pmd-backup-rehearsal   # in .env, not just exported!
 cp .env.example .env && printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nBACKUP_REMOTE=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
 
-docker compose up -d --build          # seed: register a user, grant premium,
-ops/backup.sh                        # … store history via the api
+docker compose up -d --build
+# Seed a premium user + an encrypted-history entry through the app's own
+# code paths — login and post-restore decryption are what §verify asserts:
+docker compose cp ops/seed-rehearsal.mjs api:/seed.mjs
+docker compose exec -T api node /seed.mjs
+ops/backup.sh
 docker compose down -v                # the "clean machine"
+rm .env && cp .env.example .env       # …placeholder secrets, real ones restored
+printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nBACKUP_REMOTE=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
 ops/restore.sh && docker compose up -d
-# …then §verify
+# …then §verify with the seed facts the seeder printed (email, password, id)
 ```
 
 This exact rehearsal is what launch/03 executed for its acceptance; keep it

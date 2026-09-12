@@ -11,9 +11,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { rmSync, statSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import Database from 'better-sqlite3';
-
 export interface VacuumIntoResult {
   /** Absolute path of the produced dump. */
   targetPath: string;
@@ -78,9 +77,4 @@ export function vacuumInto(
   }
 
   return { targetPath: target, sizeBytes: statSync(target).size };
-}
-
-/** The parent of a dump path, for callers that create output directories. */
-export function dumpParentDir(targetPath: string): string {
-  return dirname(resolve(targetPath));
 }
