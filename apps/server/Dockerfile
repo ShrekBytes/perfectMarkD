@@ -47,6 +47,18 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DB_PATH=/data/perfectmarkd.db \
     HISTORY_DIR=/data/history
+# Server Export's renderer (launch/04, pulled forward): the worker lazily
+# imports Playwright, and every deployment — the Admin's VPS, a local test
+# stack, a self-hoster's copy — runs the same image, so local testing is
+# production parity for the whole feature (the AGPL pitch is "self-host a
+# full copy", which includes working exports). --only-shell keeps the
+# browser to the headless build the worker actually launches.
+# Browsers live outside /app (and outside the app's node_modules) so they
+# are never pruned by package installs and the cache-mount story stays
+# simple: one layer, shared by every future build via BuildKit cache.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN corepack enable \
+	&& npx --yes playwright install --with-deps --only-shell chromium
 # Database (SQLite WAL) and Export History's encrypted files (server/05) live
 # on a volume so they survive container upgrades.
 RUN mkdir -p /data && chown node:node /data
