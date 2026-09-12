@@ -13,7 +13,13 @@ import {
 import { openDatabase } from '../documents/db';
 import { useDocumentStore } from '../documents/store';
 import { EmptyState } from '../shell/EmptyState';
-import { ExpandIcon, MinusIcon, PagesIcon, PlusIcon } from '../shell/icons';
+import {
+  CloseIcon,
+  ExpandIcon,
+  MinusIcon,
+  PagesIcon,
+  PlusIcon,
+} from '../shell/icons';
 import { KATEX_LAYOUT_CSS } from './katex-css';
 import { renderMermaid } from './mermaid';
 import { buildPage, createPageSheets } from './pageBuilder';
@@ -199,6 +205,9 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       // Large documents: pause instead of hammering the main thread uninvited.
       if (result.layouts.length > LARGE_DOC_PAGES && !ackRef.current) {
         setLargeDocCount(result.layouts.length);
+        // Pagination has already run, so the count escapes the guard: the
+        // Library knows the true size without "Render anyway".
+        useDocumentStore.getState().recordPageCount(result.layouts.length);
         return;
       }
       setLargeDocCount(null);
@@ -225,6 +234,9 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       // Keep the reader's place across re-renders (same doc, similar height).
       scrollEl.scrollTop = Math.min(prevScroll, scrollEl.scrollHeight);
       setPageCount(result.layouts.length);
+      // Every successful render reports its total so the record (and the
+      // top-bar gauge) carries the same number the page labels show.
+      useDocumentStore.getState().recordPageCount(result.layouts.length);
       setRenderFailed(false);
     } catch (error) {
       // A failed render keeps the previous pages on screen — and now says so:
@@ -461,9 +473,9 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
               type="button"
               aria-label="Dismiss"
               onClick={() => setLargeDocCount(null)}
-              className="shrink-0 rounded-control px-1 text-ink-faint transition-colors duration-150 hover:text-ink"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
             >
-              ×
+              <CloseIcon />
             </button>
           </div>
         </div>

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_SETTINGS, type DocumentSettings } from '@perfectmarkd/core';
 import {
   exportFileName,
+  formatPageCount,
   formatRelativeTime,
   nameFromFile,
+  proofGaugeLabel,
   uniqueName,
 } from './text';
 
@@ -96,5 +99,58 @@ describe('formatRelativeTime', () => {
 
   it('includes the year for dates in another year', () => {
     expect(formatRelativeTime(Date.UTC(2025, 0, 15), now)).toBe('Jan 15, 2025');
+  });
+});
+
+describe('formatPageCount', () => {
+  it('pluralizes beyond one page', () => {
+    expect(formatPageCount(12)).toBe('12 pages');
+  });
+
+  it('keeps one page singular', () => {
+    expect(formatPageCount(1)).toBe('1 page');
+  });
+});
+
+describe('proofGaugeLabel', () => {
+  const settingsWith = (over: Partial<DocumentSettings>): DocumentSettings => ({
+    ...DEFAULT_SETTINGS,
+    ...over,
+  });
+
+  it('labels paper size with the count', () => {
+    expect(proofGaugeLabel(settingsWith({ pageSize: 'A4' }), 12)).toBe(
+      'A4 · 12 pages',
+    );
+    expect(proofGaugeLabel(settingsWith({ pageSize: 'A4' }), 1)).toBe(
+      'A4 · 1 page',
+    );
+  });
+
+  it('appends landscape when set', () => {
+    expect(
+      proofGaugeLabel(
+        settingsWith({ pageSize: 'A4', orientation: 'landscape' }),
+        3,
+      ),
+    ).toBe('A4 landscape · 3 pages');
+    expect(
+      proofGaugeLabel(
+        settingsWith({ pageSize: 'A4', orientation: 'landscape' }),
+        null,
+      ),
+    ).toBe('A4 landscape');
+  });
+
+  it('reads custom sizes as "Custom"', () => {
+    expect(proofGaugeLabel(settingsWith({ pageSize: 'Custom' }), 3)).toBe(
+      'Custom · 3 pages',
+    );
+  });
+
+  it('shows the paper size alone before the canvas has reported', () => {
+    expect(proofGaugeLabel(settingsWith({ pageSize: 'Letter' }), null)).toBe(
+      'Letter',
+    );
   });
 });

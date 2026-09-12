@@ -292,3 +292,13 @@ chrome *specific*, not louder.
 - Design-detector provenance: this feature was shaped with the design-skill
   flow; after implementation, run the mechanical design detector once over
   the changed files (the shape brief's step 6) — not during.
+- Detector page-level findings, dispositioned during the polish pass:
+  - `flat-type-hierarchy` (h3 11px / body 12px / h2 14px): false positive.
+    The 11px step is the DESIGN.md Micro style — 600 weight, uppercase,
+    tracked — deliberately distinct from 12px Label by weight and case, not
+    size alone. Documented hierarchy, not a defect.
+  - `dark-glow` (zero-offset `#ffba00` glow): false positive. The only amber
+    in the system is `.mpdf-doc mark { background: #ffe066 }`
+    (`packages/core/src/css-builder.ts`) — the document's `==highlight==`
+    fill, a solid paper fact per the document-data doctrine, not a chrome
+    shadow. No zero-offset amber glow exists in any shipped source.

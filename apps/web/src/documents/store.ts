@@ -72,6 +72,11 @@ export interface DocumentStore {
   name: string;
   markdown: string;
   settings: DocumentSettings;
+  /** Pages the Paper Canvas last reported for the active document this
+   *  session — the top-bar gauge reads it. Null until the canvas reports,
+   *  and on every document switch (the gauge never shows a count the
+   *  canvas has not produced). */
+  pageCount: number | null;
   saveState: SaveState;
   /** A peer's newer version of the active document we chose not to apply. */
   remotePending: DocumentRecord | null;
@@ -91,6 +96,12 @@ export interface DocumentStore {
     markdown?: string;
     settings?: Partial<DocumentSettings>;
   }): void;
+  /** Reports the active document's total page count from a successful
+   *  Paper Canvas render (including the large-document guard path, where
+   *  pagination has run but mounting is deferred). Merges into the record
+   *  so it rides the existing debounced autosave and its doc-saved
+   *  broadcast; the Library row updates immediately. */
+  recordPageCount(count: number): void;
   renameDocument(id: string, name: string): Promise<void>;
   duplicateDocument(id: string): Promise<void>;
   deleteDocument(id: string): Promise<void>;
@@ -121,6 +132,7 @@ const INITIAL_STATE = {
   name: '',
   markdown: '',
   settings: { ...DEFAULT_SETTINGS },
+  pageCount: null,
   saveState: 'saved' as SaveState,
   remotePending: null,
   deleteToast: null,
@@ -146,11 +158,18 @@ function newRecord(
     assetIds: [],
     createdAt: now,
     updatedAt: now,
+    pageCount: null,
   };
 }
 
 function toSummary(doc: DocumentRecord): DocumentSummary {
-  return { id: doc.id, name: doc.name, updatedAt: doc.updatedAt };
+  return {
+    id: doc.id,
+    name: doc.name,
+    updatedAt: doc.updatedAt,
+    pageCount: doc.pageCount,
+    settings: doc.settings,
+  };
 }
 
 /** Replaces or inserts the record's row and keeps recency order. */
@@ -218,6 +237,7 @@ export function createDocumentStore() {
           activeId: null,
           name: '',
           markdown: '',
+          pageCount: null,
           remotePending: null,
         });
     }
@@ -280,6 +300,9 @@ export function createDocumentStore() {
         name: record.name,
         markdown: record.markdown,
         settings: { ...record.settings },
+        // The gauge's count is canvas-produced, not record-carried: it
+        // joins when this document's first render lands.
+        pageCount: null,
         saveState: 'saved',
         remotePending: null,
         docs: upsertDoc(get().docs, record),
@@ -449,6 +472,31 @@ export function createDocumentStore() {
         scheduleFlush();
       },
 
+      recordPageCount: (count) => {
+        if (!savedRecord) return;
+        const updated =
+          savedRecord.pageCount === count
+            ? null
+            : { ...savedRecord, pageCount: count };
+        if (updated) {
+          savedRecord = updated;
+          // Same merge-and-ride contract as addAsset: an edit-driven render's
+          // count rides the autosave that edit already scheduled; a render
+          // without pending edits (first open, the guard path, a manual
+          // render) schedules one flush so the Library learns the true size.
+          // No save-state churn — the gauge is a readout, not an edit.
+          dirty = true;
+          if (!saveTimer) scheduleFlush();
+        }
+        // The live readout joins even when the record already carries this
+        // count (a reopen whose first render re-reports it): the gauge and
+        // the canvas's "Page N of M" may never disagree.
+        set((state) => ({
+          pageCount: count,
+          docs: updated ? upsertDoc(state.docs, updated) : state.docs,
+        }));
+      },
+
       renameDocument: async (id, name) => {
         if (id === get().activeId) {
           get().updateActive({ name });
@@ -477,6 +525,9 @@ export function createDocumentStore() {
           ),
           createdAt: now,
           updatedAt: now,
+          // Counts come only from this record's own renders; the copy
+          // reports when the writer first opens it.
+          pageCount: null,
         };
         await persistAndBroadcast(copy);
         set((state) => ({ docs: upsertDoc(state.docs, copy) }));

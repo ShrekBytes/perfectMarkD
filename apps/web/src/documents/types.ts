@@ -15,6 +15,10 @@ export interface DocumentRecord {
   assetIds: string[];
   createdAt: number;
   updatedAt: number;
+  /** Total Pages from the last successful Paper Canvas render of this
+   *  Document; null (legacy records, never-rendered documents) shows no
+   *  count anywhere — absence, not an estimate. */
+  pageCount: number | null;
 }
 
 /** A binary asset owned by whichever documents reference its id. Stored as
@@ -29,5 +33,9 @@ export interface AssetRecord {
   createdAt: number;
 }
 
-/** Row shape for the Library list: id + name + recency. */
-export type DocumentSummary = Pick<DocumentRecord, 'id' | 'name' | 'updatedAt'>;
+/** Row shape for the Library list: id, name, recency, page count, and the
+ *  settings snapshot the row's miniature-sheet thumbnail sketches from. */
+export type DocumentSummary = Pick<
+  DocumentRecord,
+  'id' | 'name' | 'updatedAt' | 'pageCount' | 'settings'
+>;

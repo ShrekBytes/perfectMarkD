@@ -1,17 +1,21 @@
 import { useRef, useState } from 'react';
-import { formatRelativeTime } from '../documents/text';
+import { formatPageCount, formatRelativeTime } from '../documents/text';
 import { useDocumentStore } from '../documents/store';
+import { PresetThumb } from '../inspector/PresetThumb';
 import {
   CloseIcon,
   CopyIcon,
   DownloadIcon,
+  PagesIcon,
   PencilIcon,
   PlusIcon,
   TrashIcon,
   UploadIcon,
 } from '../shell/icons';
+import { EmptyState } from '../shell/EmptyState';
 import { useEscapeLayer, useModalFocus } from '../shell/focus';
 import { downloadMarkdown } from './download';
+import { thumbFootprint } from './thumb';
 
 interface LibraryPanelProps {
   onClose: () => void;
@@ -138,6 +142,14 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
                   isActive ? 'bg-accent-soft' : 'hover:bg-surface-hover'
                 }`}
               >
+                {/* The leading miniature sheet: a sketch from the document's
+                    own settings snapshot, its aspect from its paper. Leading
+                    the row (not inside the name block) so it stays put while
+                    the name becomes a rename input. */}
+                <PresetThumb
+                  style={row.settings}
+                  {...thumbFootprint(row.settings)}
+                />
                 {renaming ? (
                   <input
                     autoFocus
@@ -172,8 +184,13 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
                     <span className="max-w-full truncate text-sm font-medium text-ink">
                       {row.name}
                     </span>
-                    <span className="text-xs text-ink-faint">
+                    <span
+                      data-testid="row-meta"
+                      className="text-xs text-ink-faint tabular-nums"
+                    >
                       {formatRelativeTime(row.updatedAt)}
+                      {row.pageCount !== null &&
+                        ` · ${formatPageCount(row.pageCount)}`}
                     </span>
                   </button>
                 )}
@@ -233,8 +250,14 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
             );
           })}
           {docs.length === 0 && (
-            <li className="px-3 py-8 text-center text-xs text-ink-faint">
-              No documents yet. Create one or import a .md file.
+            <li className="pt-6">
+              {/* The shell's empty-state pattern, not a bare line: the drawer
+                  at zero documents is a first-run moment, not an afterthought. */}
+              <EmptyState
+                icon={<PagesIcon />}
+                title="No documents yet"
+                hint="Create a new document or import a .md file."
+              />
             </li>
           )}
         </ul>

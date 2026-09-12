@@ -34,8 +34,10 @@ describe('PlanEndedBanner', () => {
       '/pricing',
     );
 
-    // Dismissing is the only way it goes away — no false alarms later.
-    await user.click(screen.getByRole('button', { name: /dismiss/i }));
+    // Dismissal is the shared icon idiom — no text "Dismiss" button.
+    await user.click(
+      screen.getByRole('button', { name: 'Dismiss plan-ended notice' }),
+    );
     expect(useAccountStore.getState().planEndedNotice).toBe(false);
   });
 });

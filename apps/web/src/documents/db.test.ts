@@ -26,6 +26,7 @@ function makeDoc(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
     assetIds: [],
     createdAt: 1000,
     updatedAt: 1000,
+    pageCount: null,
     ...overrides,
   };
 }

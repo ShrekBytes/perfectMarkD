@@ -2,166 +2,186 @@
 name: PerfectMarkD
 description: Markdown → print-perfect PDFs. The chrome recedes; the paper is the product.
 colors:
-  accent-violet: "#7c6af7"
-  accent-violet-deep: "#6a55f2"
-  accent-violet-deeper: "#5b46d9"
-  accent-violet-soft: "rgb(124 106 247 / 0.11)"
-  accent-ink: "#ffffff"
-  canvas-warm-gray: "#f1efe9"
-  canvas-dark: "#232227"
-  surface-chrome: "#faf9f7"
-  surface-chrome-dark: "#2b2a30"
-  surface-hover: "#efede7"
-  surface-hover-dark: "#36353c"
-  document-page: "#ffffff"
-  field-surface: "#ffffff"
-  field-surface-dark: "#232227"
-  ink-full: "#232220"
-  ink-soft: "#5f5b53"
-  ink-faint: "#6e6a60"
-  ink-full-dark: "#ecebe8"
-  ink-soft-dark: "#b4b1aa"
-  ink-faint-dark: "#a5a197"
-  hairline: "#e7e3da"
-  hairline-strong: "#d5d0c4"
-  hairline-dark: "#3c3b41"
-  hairline-strong-dark: "#4b4a52"
-  danger: "#dc2626"
-  danger-dark: "#f87171"
+  accent-violet: '#7c6af7'
+  accent-violet-deep: '#6a55f2'
+  accent-violet-deeper: '#5b46d9'
+  accent-violet-soft: 'rgb(124 106 247 / 0.11)'
+  accent-ink: '#ffffff'
+  canvas-warm-gray: '#f1efe9'
+  canvas-dark: '#232227'
+  surface-chrome: '#faf9f7'
+  surface-chrome-dark: '#2b2a30'
+  surface-hover: '#efede7'
+  surface-hover-dark: '#36353c'
+  document-page: '#ffffff'
+  field-surface: '#ffffff'
+  field-surface-dark: '#232227'
+  ink-full: '#232220'
+  ink-soft: '#5f5b53'
+  ink-faint: '#6e6a60'
+  ink-full-dark: '#ecebe8'
+  ink-soft-dark: '#b4b1aa'
+  ink-faint-dark: '#a5a197'
+  hairline: '#e7e3da'
+  hairline-strong: '#d5d0c4'
+  hairline-dark: '#3c3b41'
+  hairline-strong-dark: '#4b4a52'
+  danger: '#dc2626'
+  danger-dark: '#f87171'
 typography:
   wordmark:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "15px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '15px'
     fontWeight: 600
-    letterSpacing: "-0.025em"
+    letterSpacing: '-0.025em'
     lineHeight: 1.2
   headline:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "24px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '24px'
     fontWeight: 600
-    letterSpacing: "-0.025em"
+    letterSpacing: '-0.025em'
     lineHeight: 1.25
   subhead:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "18px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '18px'
     fontWeight: 600
-    letterSpacing: "-0.025em"
+    letterSpacing: '-0.025em'
     lineHeight: 1.4
   section-head:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "16px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '16px'
     fontWeight: 600
     lineHeight: 1.4
   title:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "14px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '14px'
     fontWeight: 600
     lineHeight: 1.4
   body:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "14px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '14px'
     fontWeight: 400
     lineHeight: 1.5
   label:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "12px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '12px'
     fontWeight: 500
     lineHeight: 1.4
   micro:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "11px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '11px'
     fontWeight: 600
-    letterSpacing: "0.025em"
+    letterSpacing: '0.025em'
     lineHeight: 1.3
   footnote:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "10px"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '10px'
     fontWeight: 400
     lineHeight: 1.4
   editor-code:
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
-    fontSize: "13.5px"
+    fontSize: '13.5px'
     fontWeight: 400
     lineHeight: 1.7
 rounded:
-  control: "8px"
-  pane: "10px"
-  micro: "4px"
-  thumb: "3px"
+  control: '8px'
+  pane: '10px'
+  micro: '4px'
+  thumb: '3px'
 spacing:
-  hair: "2px"
-  xs: "4px"
-  sm: "6px"
-  md: "8px"
-  control-x: "10px"
-  lg: "12px"
-  xl: "16px"
-  panel: "20px"
-  section: "24px"
-  block: "32px"
-  page: "40px"
+  hair: '2px'
+  xs: '4px'
+  sm: '6px'
+  md: '8px'
+  control-x: '10px'
+  lg: '12px'
+  xl: '16px'
+  panel: '20px'
+  section: '24px'
+  block: '32px'
+  page: '40px'
 components:
   button-primary:
-    backgroundColor: "{colors.accent-violet-deep}"
-    textColor: "{colors.accent-ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.control}"
-    padding: "0 12px"
-    height: "32px"
+    backgroundColor: '{colors.accent-violet-deep}'
+    textColor: '{colors.accent-ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.control}'
+    padding: '0 12px'
+    height: '32px'
   button-primary-hover:
-    backgroundColor: "{colors.accent-violet-deeper}"
+    backgroundColor: '{colors.accent-violet-deeper}'
   button-ghost:
-    textColor: "{colors.ink-soft}"
-    typography: "{typography.body}"
-    rounded: "{rounded.control}"
-    padding: "0 12px"
-    height: "32px"
+    textColor: '{colors.ink-soft}'
+    typography: '{typography.body}'
+    rounded: '{rounded.control}'
+    padding: '0 12px'
+    height: '32px'
   button-ghost-hover:
-    backgroundColor: "{colors.surface-hover}"
-    textColor: "{colors.ink-full}"
+    backgroundColor: '{colors.surface-hover}'
+    textColor: '{colors.ink-full}'
   chip-quota:
-    textColor: "{colors.ink-soft}"
-    typography: "{typography.label}"
-    rounded: "{rounded.control}"
-    padding: "0 10px"
-    height: "32px"
+    textColor: '{colors.ink-soft}'
+    typography: '{typography.label}'
+    rounded: '{rounded.control}'
+    padding: '0 10px'
+    height: '32px'
   field-input:
-    backgroundColor: "{colors.field-surface}"
-    textColor: "{colors.ink-full}"
-    typography: "{typography.label}"
-    rounded: "{rounded.control}"
-    padding: "4px 8px"
+    backgroundColor: '{colors.field-surface}'
+    textColor: '{colors.ink-full}'
+    typography: '{typography.label}'
+    rounded: '{rounded.control}'
+    padding: '4px 8px'
   form-input:
-    backgroundColor: "{colors.canvas-warm-gray}"
-    textColor: "{colors.ink-full}"
-    typography: "{typography.body}"
-    rounded: "{rounded.control}"
-    padding: "0 10px"
-    height: "36px"
+    backgroundColor: '{colors.canvas-warm-gray}'
+    textColor: '{colors.ink-full}'
+    typography: '{typography.body}'
+    rounded: '{rounded.control}'
+    padding: '0 10px'
+    height: '36px'
   dialog-panel:
-    backgroundColor: "{colors.surface-chrome}"
-    textColor: "{colors.ink-full}"
-    rounded: "{rounded.pane}"
-    padding: "20px"
+    backgroundColor: '{colors.surface-chrome}'
+    textColor: '{colors.ink-full}'
+    rounded: '{rounded.pane}'
+    padding: '20px'
   dropdown-menu:
-    backgroundColor: "{colors.surface-chrome}"
-    textColor: "{colors.ink-full}"
-    rounded: "{rounded.pane}"
-    padding: "4px 0"
+    backgroundColor: '{colors.surface-chrome}'
+    textColor: '{colors.ink-full}'
+    rounded: '{rounded.pane}'
+    padding: '4px 0'
   banner-strip:
-    backgroundColor: "{colors.accent-violet-soft}"
-    textColor: "{colors.ink-full}"
-    typography: "{typography.body}"
-    height: "40px"
+    backgroundColor: '{colors.accent-violet-soft}'
+    textColor: '{colors.ink-full}'
+    typography: '{typography.body}'
+    minHeight: '40px'
+    borderBottom: '1px {colors.hairline}'
+    slots:
+      copy: 'wraps, never truncates'
+      primaryAction: '28px filled (button-primary rules)'
+      secondaryAction: '28px ghost; danger ghost where the copy warns of loss'
+      dismiss: '28px icon close with an accessible label; conflict strip omits it'
+  top-bar-gauge:
+    textColor: '{colors.ink-faint}'
+    typography: '{typography.label}'
+    numerals: 'tabular'
+    height: 'inherits the 48px top bar'
+    format: '"<paper size>[ landscape] · <N> pages"; the count joins once the canvas reports'
+  library-row:
+    thumbnail: "28px-wide PresetThumb; aspect from the document's page size and orientation"
+    name: '{typography.title}, Ink Full, truncated'
+    meta:
+      typography: '{typography.label}'
+      textColor: '{colors.ink-faint}'
+      numerals: 'tabular'
+      format: '"<relative time>[ · <N> pages]"; no count until a render has produced one'
   inspector-tab:
-    textColor: "{colors.ink-soft}"
-    typography: "{typography.label}"
-    rounded: "{rounded.control}"
-    padding: "0 10px"
-    height: "28px"
+    textColor: '{colors.ink-soft}'
+    typography: '{typography.label}'
+    rounded: '{rounded.control}'
+    padding: '0 10px'
+    height: '28px'
   inspector-tab-active:
-    backgroundColor: "{colors.accent-violet-soft}"
-    textColor: "{colors.accent-violet}"
+    backgroundColor: '{colors.accent-violet-soft}'
+    textColor: '{colors.accent-violet}'
 ---
 
 # Design System: PerfectMarkD
@@ -170,11 +190,11 @@ components:
 
 **Creative North Star: "The Proofing Desk"**
 
-The screen is a warm-gray desk. On it sits a single sheet of white paper, lit softly enough to read as an object with edges — the paper carries a two-part shadow (a 1px contact shadow and a wide ambient one) so it reads as lying *on* the desk rather than floating above it. Every instrument you need is at the edges of the desk, thin and neutral, waiting. Nothing on the desk competes with the sheet.
+The screen is a warm-gray desk. On it sits a single sheet of white paper, lit softly enough to read as an object with edges — the paper carries a two-part shadow (a 1px contact shadow and a wide ambient one) so it reads as lying _on_ the desk rather than floating above it. Every instrument you need is at the edges of the desk, thin and neutral, waiting. Nothing on the desk competes with the sheet.
 
 This is an instrument, not an ornament. The chrome has no gradients, no illustration, no decorative flourish, and no color that isn't doing a job. Its craft shows up in restraint and in precision: a 1px hairline where a 2px rule would be easier, 8px corners where 12px would be friendlier, a violet that appears on perhaps a tenth of any screen, and tabular numerals wherever a number might change. The reward for all that restraint is the one thing the product promises — the page you see is the page you get, so the interface must never be the thing you notice.
 
-The system runs on three inks and two hairlines. Depth is declared once per surface, either a border or a shadow, never both stacked as decoration. Dark mode darkens the desk and the instruments but deliberately *not* the paper: `--page` stays `#ffffff` in both themes, because the document's paper is a fact about the exported PDF, not a theme choice. That single decision is the clearest statement of what this system believes — the artifact outranks the interface.
+The system runs on three inks and two hairlines. Depth is declared once per surface, either a border or a shadow, never both stacked as decoration. Dark mode darkens the desk and the instruments but deliberately _not_ the paper: `--page` stays `#ffffff` in both themes, because the document's paper is a fact about the exported PDF, not a theme choice. That single decision is the clearest statement of what this system believes — the artifact outranks the interface.
 
 **Key Characteristics:**
 
@@ -191,7 +211,7 @@ A neutral, paper-warm workspace with a single saturated violet reserved for acti
 
 ### Primary
 
-- **Reserved Violet** (`#7c6af7`): the identity color, inherited from the originating plugin and binding. It appears on the active inspector tab and active library row (as an 11% tint), the "Mark" in the wordmark, links in the editor, the caret, text selection, the focus ring, and decorative accents (the divider hover line, the page frame). It is never under white text — `#ffffff` on it measures 3.99:1, below the AA floor the product commits to — never used for large fills, never for backgrounds at full strength, and never decoratively *behind copy*.
+- **Reserved Violet** (`#7c6af7`): the identity color, inherited from the originating plugin and binding. It appears on the active inspector tab and active library row (as an 11% tint), the "Mark" in the wordmark, links in the editor, the caret, text selection, the focus ring, and decorative accents (the divider hover line, the page frame). It is never under white text — `#ffffff` on it measures 3.99:1, below the AA floor the product commits to — never used for large fills, never for backgrounds at full strength, and never decoratively _behind copy_.
 - **Reserved Violet, Fill** (`#6a55f2`): the fill of every violet-filled control, one step deeper than the identity violet so Accent Ink passes AA (4.8:1) in both themes. White-on-violet contrast is theme-independent, so this value no longer lifts in dark mode; the desk's separation comes from the control's shadow.
 - **Reserved Violet, Pressed** (`#5b46d9`): the hover and active state of every violet-filled control (6.3:1 with Accent Ink).
 - **Reserved Violet, Tint** (`rgb(124 106 247 / 0.11)` light, `/ 0.2` dark): the wash behind selected rows, active tabs, and informational banner strips. The dark value is deliberately stronger; a light tint on a dark surface reads as dirt rather than as selection.
@@ -217,7 +237,7 @@ A neutral, paper-warm workspace with a single saturated violet reserved for acti
 
 **The Three Inks Rule.** Text is `ink`, `ink-soft`, or `ink-faint`. Never an ad-hoc gray, never a `text-black/60`, never an opacity on a text node. The three steps are the whole hierarchy.
 
-**The Paper Is Fixed Rule.** `--page` is `#ffffff` in light and dark. It represents the exported sheet, not the app theme. A dark-mode document preset changes the *document's* page color through document settings; the token never flips.
+**The Paper Is Fixed Rule.** `--page` is `#ffffff` in light and dark. It represents the exported sheet, not the app theme. A dark-mode document preset changes the _document's_ page color through document settings; the token never flips.
 
 **The Field Flips Rule.** Anything a user types into sits on `--field`, never on `--page`. `--page` is pinned white on purpose; text follows `--ink`, which lifts in dark mode. Reusing the paper as a field surface is how dark mode ends up with light text on white. The full-width form fields use the Warm Desk surface for the same reason.
 
@@ -227,7 +247,7 @@ A neutral, paper-warm workspace with a single saturated violet reserved for acti
 **Body Font:** Inter Variable (same stack)
 **Editor/Mono Font:** `ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace`
 
-**Character:** One interface face, set small and set tightly. Inter carries every piece of chrome, with the overwhelming majority of it at 11–14px. Tightening (`-0.025em`) is reserved for the larger sizes — the 15px wordmark and the 18px and 24px page headings — and everything else runs at normal tracking. The narrow range is the point: this is a tool, and the type should read as instrumentation, not as editorial voice. Monospace is used only where the content *is* machine data — transaction IDs, wallet addresses, hex color readouts, quotas, and the markdown source itself.
+**Character:** One interface face, set small and set tightly. Inter carries every piece of chrome, with the overwhelming majority of it at 11–14px. Tightening (`-0.025em`) is reserved for the larger sizes — the 15px wordmark and the 18px and 24px page headings — and everything else runs at normal tracking. The narrow range is the point: this is a tool, and the type should read as instrumentation, not as editorial voice. Monospace is used only where the content _is_ machine data — transaction IDs, wallet addresses, hex color readouts, quotas, and the markdown source itself.
 
 ### Hierarchy
 
@@ -254,10 +274,10 @@ A neutral, paper-warm workspace with a single saturated violet reserved for acti
 
 A three-pane workspace with a fixed-height chrome bar and a full-bleed paper region.
 
-- **Top bar:** 48px tall (`h-12`), hairline bottom border, containing the wordmark, a divider, the inline-editable document name, the autosave indicator, and a right-aligned cluster (Library, theme toggle, quota chip, Export split button, account menu).
+- **Top bar:** 48px tall (`h-12`), hairline bottom border, containing the wordmark, a divider, the inline-editable document name, the autosave indicator, the proofing gauge, and a right-aligned cluster (Library, theme toggle, quota chip, Export split button, account menu).
 - **Panes:** editor defaults to **38%** of the shell width (min 280px); the Paper Canvas is flex and never drops below 320px; the Inspector is a fixed **320px** column (min 260px). Dividers are 16px drag targets straddling a 1px hairline, with a 24px circular collapse chevron that appears on hover or focus. Double-clicking a divider resets that pane's width.
 - **Collapse:** each pane collapses independently in one click; with both collapsed the shell enters fullscreen-canvas mode and a floating 28px restore button sits at the canvas edge.
-- **Stacked strips:** banner strips and the welcome strip are 40px tall and sit directly under the top bar, pushing the pane row down rather than overlaying it.
+- **Stacked strips:** every notice is an instance of the one banner-strip pattern and mounts at shell level directly under the top bar — never inside a pane — pushing the pane row down rather than overlaying it. They stack in a fixed urgency order: staleness conflict, plan-ended, welcome.
 - **Library:** a 336px slide-in drawer from the left, over a 25%-black scrim.
 - **Canvas rhythm:** pages are stacked vertically with a 24px gap (`gap-6`), inside 24px horizontal and 32px vertical padding. Each page carries its frame plus a centered "Page N of M" label in Ink Faint with 8px above and 2px below.
 - **Zoom:** 0.35–1.00 in 0.05 steps, defaulting to 1.00 (true page pixels), with fit-to-width computed against a 24px gutter per side.
@@ -272,7 +292,7 @@ A three-pane workspace with a fixed-height chrome bar and a full-bleed paper reg
 
 ## Elevation & Depth
 
-Depth is **declared once per surface** — a border *or* a shadow, matched to how far the surface is from the desk. Flat surfaces in the same plane get a 1px hairline and no shadow. Surfaces that lift off the desk get a shadow and no border.
+Depth is **declared once per surface** — a border _or_ a shadow, matched to how far the surface is from the desk. Flat surfaces in the same plane get a 1px hairline and no shadow. Surfaces that lift off the desk get a shadow and no border.
 
 The paper is the one element that earns both, and it earns them because it is a physical object: a 1px contact shadow plus a wide ambient shadow, so it reads as resting on the desk. Chrome never imitates that.
 
@@ -303,7 +323,7 @@ Soft, small, and consistent: the system rounds just enough to feel built rather 
 - **Panels** — dialogs, dropdowns, cards, preset tiles, the Library drawer: **10px** (`--radius-pane`).
 - **Circles** — the zoom pill, the account avatar, and the pane dividers' chevron buttons: fully round, reserved for these small floating controls.
 - **Micro** — the checkbox (4px) and the preset thumbnail (3px). These sit at document scale, not chrome scale, so they round less.
-- **Borders** are always 1px hairlines. The single exception is the 2px dashed accent outline on the file-drop overlay. `hairline-strong` is a *value* change, not a weight change: it appears on the pricing table's header underline, the preset-thumbnail frame, the preset tile's hover border, and the edges of toasts.
+- **Borders** are always 1px hairlines. The single exception is the 2px dashed accent outline on the file-drop overlay. `hairline-strong` is a _value_ change, not a weight change: it appears on the pricing table's header underline, the preset-thumbnail frame, the preset tile's hover border, and the edges of toasts.
 - There is no clipping, no cut-corner, no chamfer, and no asymmetry anywhere in the system.
 
 ## Components
@@ -312,7 +332,7 @@ Soft, small, and consistent: the system rounds just enough to feel built rather 
 
 - **Shape:** 8px radius; heights are 28px (compact, inside the Inspector and Library rows), 32px (top bar and primary actions), or 36px (full-width form submits).
 - **Primary:** Reserved Violet Fill (the deep step, `#6a55f2` — see the Colors section), Accent Ink text, 12px horizontal padding, `font-medium` at 14px, `shadow-sm`. Hover and active darken to `#5b46d9`.
-- **Ghost:** transparent fill, 1px hairline border, Ink Soft text. Hover fills with Chrome Surface Hover and lifts the text to Ink Full. This is the default for secondary actions ("Import .md", "Keep mine").
+- **Ghost:** transparent fill, 1px hairline border, Ink Soft text. Hover fills with Chrome Surface Hover and lifts the text to Ink Full. This is the default for secondary actions ("Import .md"). Actions that warn of loss take the danger ghost instead (see the Banner Strip entry), and a conflict's keep-mine choice is a filled primary, not a ghost.
 - **Quiet (no border):** transparent fill, Ink Soft text, transparent border. Hover fills with Chrome Surface Hover and lifts to Ink Full. This is the top bar's default for Library, Sign in, and theme toggle.
 - **Icon button:** 28px or 32px square, 8px radius, Ink Soft glyph at 1em, same hover as quiet. Appears at reduced opacity until row hover or focus inside list rows.
 - **Disabled:** `opacity-40` to `opacity-60`, `cursor-not-allowed` or `cursor-default`. Never a color change — the shape stays intact.
@@ -342,9 +362,10 @@ Soft, small, and consistent: the system rounds just enough to feel built rather 
 
 ### Navigation
 
-- **Top bar:** the primary navigation is a single 48px bar. Left: wordmark, a 1px vertical divider, then the document name. Right: actions in a 6px-gapped cluster. There is no nav menu, no breadcrumb, and no sidebar of links.
+- **Top bar:** the primary navigation is a single 48px bar. Left: wordmark, a 1px vertical divider, then the document name, the autosave indicator, and the proofing gauge. Right: actions in a 6px-gapped cluster. There is no nav menu, no breadcrumb, and no sidebar of links.
+- **Proofing gauge:** a readout, never a control — no border, no chip, no hover state. 12px Label in Ink Faint with tabular numerals, stating the document's paper facts beside its name ("A4 · 12 pages", "A4 landscape", "Custom · 3 pages"). The count is the value the Paper Canvas reported for the same render the page labels show, so the two cannot disagree; before the first render it shows the paper size alone, and with no document open it is absent.
 - **Inspector tabs:** a 36px row of 28px pills. Inactive: Ink Soft text, hover fills Chrome Surface Hover. Active: accent tint fill with Reserved Violet text — the same active treatment as a selected Library row.
-- **Library rows:** 12px vertical rhythm, Ink Full name at 14px with a 12px Ink Faint timestamp beneath. Active row gets the accent tint; hover gets the surface hover. Row actions stay at zero opacity until hover or focus-within.
+- **Library rows:** 12px vertical rhythm, led by a miniature-sheet thumbnail (see Preset Thumbnail) at drawer-row scale, then the Ink Full name at 14px with a 12px Ink Faint meta line beneath — relative time, then the true page count in tabular numerals when the document has one. Active row gets the accent tint; hover gets the surface hover. Row actions stay at zero opacity until hover or focus-within.
 - **Dropdown menus:** 10px radius, Chrome Surface, 1px hairline, `shadow-lg`, 4px vertical padding, 8px/12px item padding at 14px. Dismiss on outside pointer-down or Escape.
 
 ### Gate Lock
@@ -352,16 +373,20 @@ Soft, small, and consistent: the system rounds just enough to feel built rather 
 The signature component: a paid control that explains itself instead of blocking.
 
 - **Shape:** 24px tall, 8px radius, 11px Ink Faint text, 6px padding, a lock glyph, and the word "Pro".
-- **Behaviour:** the gated control beside it renders *disabled but visible* (a dimmed input, a faux upload button at 50% opacity) so the user can see exactly what they would get. Clicking the lock opens the pricing modal. It never opens a signup wall, and it never hides the feature behind a blur.
+- **Behaviour:** the gated control beside it renders _disabled but visible_ (a dimmed input, a faux upload button at 50% opacity) so the user can see exactly what they would get. Clicking the lock opens the pricing modal. It never opens a signup wall, and it never hides the feature behind a blur.
 - **Unlocked state:** the lock disappears and the real control takes its place. Where the real control does not exist yet, the row shows a quiet 11px "Included with your plan" note rather than an empty field.
 
 ### Tinted Notice
 
 The system's informational panel, and the one place a border carries alpha rather than a token value: a 40%-alpha accent border over the 11% accent tint, with Reserved Violet text. It appears wherever the app explains a state the user must act on — the upgrade flow's payment instructions, the admin verify/grant dialogs, the export-history note, and the "Open the editor" CTA on the pricing table. The danger twin (`border-danger/40 bg-danger/10 text-danger`) covers the exhausted quota chip and admin settings warnings. Both use the 8px control radius and 12px Label type. Because the border and the fill are the same hue at two alphas, the notice reads as one tinted object rather than as a bordered box with a fill poured into it.
 
+### Banner Strip
+
+The one notice pattern, and the only full-width chrome under the top bar. All shell notices (staleness conflict, plan-ended, first-run welcome) are instances of it, mounted at shell level in a fixed stacking order — conflict, plan-ended, welcome — so the most urgent is always topmost and a collapsed pane can never hide one. Shape: the 11% accent tint, a 1px bottom hairline, resting at 40px, growing when the copy wraps — copy always wraps, never truncates, because a consequence hidden at a narrow width is a consequence denied. Slots: wrapping copy, a 28px filled primary action, a 28px ghost secondary (danger ghost where the copy warns of loss, as the conflict strip's "Load changes" does), and a 28px icon close with an accessible label. An instance fills the slots it needs; the conflict strip offers no dismiss (a version conflict is resolved, never cleared), and the secondary slot is reserved for real actions — dismissal is always the icon. Roles carry the urgency: `alert` for conflict and plan notices, `status` for the welcome.
+
 ### Preset Thumbnail
 
-The one place the system draws a picture, and it draws it from data. An 84×112px miniature page (A4's aspect) sketched in plain CSS from the preset's own `DocStyle` values: a heading bar, two body lines at 55% and 40% opacity, a quote block with its own bar and fill, a code strip, and a small accent mark at the foot. Every color comes from the preset, never from the chrome palette — a thumbnail must be able to show a dark preset on a light desk.
+The one place the system draws a picture, and it draws it from data. A miniature page sketched in plain CSS from the document's own `DocStyle` values: a heading bar, two body lines at 55% and 40% opacity, a quote block with its own bar and fill, a code strip, and a small accent mark at the foot. Every color comes from the document, never from the chrome palette — a thumbnail must be able to show a dark preset on a light desk. One drawing serves all footprints: it is drawn at the 84×112px base (A4's aspect) and scaled to the requested size — the preset gallery at full size, Library rows at 28px wide with the height following that document's page size and orientation, so a Letter row and a landscape row read as different sheets. It is a sketch, never an engine run: no pagination happens to draw a row.
 
 ## Do's and Don'ts
 

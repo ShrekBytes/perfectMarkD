@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as dbApi from '../documents/db';
 import {
@@ -179,5 +180,64 @@ describe('LibraryPanel', () => {
     const reader = await dbApi.openDatabase();
     expect((await dbApi.getDocument(reader, secondId))?.name).toBe('Persisted');
     reader.close();
+  });
+
+  it('keeps the thumbnail in place while the name becomes a rename input', async () => {
+    await seedDocs();
+    render(<LibraryPanel onClose={onClose} />);
+    const firstRow = screen
+      .getAllByTestId('row-meta')[0]!
+      .closest('li') as HTMLElement;
+    const thumbBefore = firstRow.querySelector('div[aria-hidden="true"]');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rename First' }));
+
+    const input = screen.getByLabelText('Rename document');
+    expect(input).toBeInTheDocument();
+    const thumbAfter = firstRow.querySelector('div[aria-hidden="true"]');
+    expect(thumbAfter).toBe(thumbBefore);
+  });
+
+  it('shows no count on rows the canvas has not reported', async () => {
+    await seedDocs();
+    render(<LibraryPanel onClose={onClose} />);
+
+    for (const meta of screen.getAllByTestId('row-meta')) {
+      // Absence, not an estimate.
+      expect(meta.textContent).not.toMatch(/page/);
+    }
+  });
+
+  it('shows the true page count on the meta line once reported', async () => {
+    await seedDocs();
+    act(() => {
+      useDocumentStore.getState().recordPageCount(12);
+    });
+    render(<LibraryPanel onClose={onClose} />);
+
+    expect(screen.getAllByTestId('row-meta')[0]).toHaveTextContent(
+      'just now · 12 pages',
+    );
+
+    act(() => {
+      useDocumentStore.getState().recordPageCount(1);
+    });
+    expect(screen.getAllByTestId('row-meta')[0]).toHaveTextContent(
+      'just now · 1 page',
+    );
+  });
+
+  it('draws a leading miniature sheet on every row', async () => {
+    await seedDocs();
+    render(<LibraryPanel onClose={onClose} />);
+
+    // Each row leads with the sketch; the footprint geometry (page size,
+    // orientation, custom sizes) is the footprint's own unit test
+    // (library/thumb.test.ts).
+    for (const meta of screen.getAllByTestId('row-meta')) {
+      expect(
+        meta.closest('li')!.querySelector('div[aria-hidden="true"]'),
+      ).toBeInTheDocument();
+    }
   });
 });

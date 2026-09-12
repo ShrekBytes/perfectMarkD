@@ -46,18 +46,26 @@ export function putMeta(
   return db.put(META, value, key).then(() => undefined);
 }
 
+/** Legacy records predate the page-count field; they read as null so the
+ *  Library shows no count until the next render lands (additive schema —
+ *  no database version bump; the keyPath is unchanged). */
+function withPageCount(doc: DocumentRecord): DocumentRecord {
+  return { ...doc, pageCount: doc.pageCount ?? null };
+}
+
 export async function getDocument(
   db: IDBPDatabase,
   id: string,
 ): Promise<DocumentRecord | undefined> {
-  return db.get(DOCS, id);
+  const doc = await db.get(DOCS, id);
+  return doc ? withPageCount(doc) : undefined;
 }
 
 export async function listDocuments(
   db: IDBPDatabase,
 ): Promise<DocumentRecord[]> {
   const docs = await db.getAll(DOCS);
-  return docs.sort((a, b) => b.updatedAt - a.updatedAt);
+  return docs.map(withPageCount).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export function putDocument(

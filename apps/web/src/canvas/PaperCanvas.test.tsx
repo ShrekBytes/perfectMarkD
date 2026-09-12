@@ -182,6 +182,17 @@ describe('PaperCanvas rendering', () => {
     expect(content.children).toHaveLength(0);
   });
 
+  it('reports the render total to the document store', async () => {
+    mountCanvas();
+    setMarkdown('# One\n\n///\n\nTwo\n\n///\n\nThree');
+    await flushRender();
+
+    // The store value the top-bar gauge reads, and the Library row's
+    // persisted count, both come from this one number.
+    expect(useDocumentStore.getState().pageCount).toBe(3);
+    expect(useDocumentStore.getState().docs[0]?.pageCount).toBe(3);
+  });
+
   it('clears the previous document and renders the new one on doc switch', async () => {
     mountCanvas();
     setMarkdown('# First doc');
@@ -372,6 +383,23 @@ describe('PaperCanvas large-document guard', () => {
       await flushRender(0);
       expect(screen.queryByTestId('large-doc-toast')).not.toBeInTheDocument();
       expect(pageHosts()).toHaveLength(101);
+    },
+  );
+
+  it(
+    'records the count even when the guard defers mounting',
+    { timeout: 20_000 },
+    async () => {
+      mountCanvas();
+      setMarkdown(hugeDoc(101));
+      await flushRender();
+
+      expect(screen.getByTestId('large-doc-toast')).toBeInTheDocument();
+      expect(pageHosts()).toHaveLength(0);
+      // Pagination already ran, so the Library learns the true size
+      // without "Render anyway".
+      expect(useDocumentStore.getState().pageCount).toBe(101);
+      expect(useDocumentStore.getState().docs[0]?.pageCount).toBe(101);
     },
   );
 

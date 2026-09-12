@@ -49,7 +49,9 @@ export function DocName({ name, onRename }: DocNameProps) {
       onBlur={commit}
       onKeyDown={handleKeyDown}
       spellCheck={false}
-      size={Math.max(draft.length, 8)}
+      /* Sized to the committed name, not the draft: per-keystroke resizing
+         would shift the whole top bar's right cluster while typing. */
+      size={Math.max(name.length, 8)}
       className="min-w-0 rounded-control border border-transparent px-2 py-1 text-sm text-ink transition-colors duration-150 outline-none placeholder:text-ink-faint hover:border-hairline focus:border-accent focus:bg-field"
     />
   );

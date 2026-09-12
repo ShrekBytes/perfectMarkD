@@ -12,6 +12,9 @@ interface TopBarProps {
   onRename: (name: string) => void;
   /** Autosave affordance; null hides the indicator (no active document). */
   saveState: SaveState | null;
+  /** The proofing gauge: the document's paper facts ("A4 · 12 pages"),
+   *  or null when no document is active. A readout, not a control. */
+  gauge: string | null;
   libraryOpen: boolean;
   onOpenLibrary: () => void;
   theme: Theme;
@@ -26,6 +29,7 @@ export function TopBar({
   docName,
   onRename,
   saveState,
+  gauge,
   libraryOpen,
   onOpenLibrary,
   theme,
@@ -35,9 +39,11 @@ export function TopBar({
 }: TopBarProps) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-surface px-3">
-      <span className="select-none px-1 text-[15px] font-semibold tracking-tight">
+      {/* h1: the wordmark is the workspace's top-level heading (critique:
+          heading order previously started at h2 inside drawers). */}
+      <h1 className="select-none px-1 text-[15px] font-semibold tracking-tight">
         Perfect<span className="text-accent">Mark</span>D
-      </span>
+      </h1>
 
       <span aria-hidden="true" className="h-5 w-px bg-hairline" />
 
@@ -46,9 +52,19 @@ export function TopBar({
         <span
           aria-live="polite"
           data-testid="save-state"
-          className="select-none text-xs text-ink-faint"
+          /* Fixed minimum width: Saving… and Saved are different lengths, and
+             a shifting readout would nudge the whole right cluster. */
+          className="inline-block min-w-14 text-left select-none text-xs text-ink-faint"
         >
           {saveState === 'saving' ? 'Saving…' : 'Saved'}
+        </span>
+      )}
+      {gauge && (
+        <span
+          data-testid="proof-gauge"
+          className="select-none whitespace-nowrap text-xs text-ink-faint tabular-nums"
+        >
+          {gauge}
         </span>
       )}
 

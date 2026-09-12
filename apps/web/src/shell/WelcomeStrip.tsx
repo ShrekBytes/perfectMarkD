@@ -1,12 +1,12 @@
 import { useDocumentStore } from '../documents/store';
-import { CloseIcon } from './icons';
+import { BannerButton, BannerStrip } from './BannerStrip';
 
 /**
- * First-run welcome strip, pinned above the editor: the active document is
- * the auto-created sample. "Start blank" swaps in a fresh empty document;
- * the × just hides the strip. Both choices mark the sample dismissed
- * (persisted), so it never auto-loads again — the document itself stays in
- * the Library either way.
+ * First-run welcome strip, mounted at shell level with the other notices:
+ * the active document is the auto-created sample. "Start blank" swaps in a
+ * fresh empty document; the × just hides the strip. Both choices mark the
+ * sample dismissed (persisted), so it never auto-loads again — the document
+ * itself stays in the Library either way.
  */
 export function WelcomeStrip() {
   const visible = useDocumentStore((state) =>
@@ -25,31 +25,20 @@ export function WelcomeStrip() {
   if (!visible) return null;
 
   return (
-    <div
+    <BannerStrip
+      testid="welcome-strip"
       role="status"
-      data-testid="welcome-strip"
-      className="flex shrink-0 items-center gap-2 border-b border-hairline bg-accent-soft px-3 py-1.5 text-sm text-ink"
+      copy="This is a sample — edit or clear it."
+      onDismiss={() => void dismissSample()}
+      dismissLabel="Dismiss sample notice"
     >
-      <p className="min-w-0 flex-1 truncate">
-        This is a sample — edit or clear it.
-      </p>
-      <button
-        type="button"
-        data-testid="start-blank"
+      <BannerButton
+        variant="primary"
+        testid="start-blank"
         onClick={() => void startBlankDocument()}
-        className="shrink-0 rounded-control bg-accent-strong px-2.5 py-1 text-xs font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-deep"
       >
         Start blank
-      </button>
-      <button
-        type="button"
-        aria-label="Dismiss sample notice"
-        title="Dismiss"
-        onClick={() => void dismissSample()}
-        className="shrink-0 rounded-control p-1 text-ink-faint transition-colors duration-150 hover:bg-surface-hover hover:text-ink"
-      >
-        <CloseIcon />
-      </button>
-    </div>
+      </BannerButton>
+    </BannerStrip>
   );
 }

@@ -74,7 +74,13 @@ describe('init', () => {
     const { store, id } = await readyStore();
 
     expect(store.getState().docs).toEqual([
-      { id, name: SAMPLE_NAME, updatedAt: T0 },
+      {
+        id,
+        name: SAMPLE_NAME,
+        updatedAt: T0,
+        pageCount: null,
+        settings: sampleSettings(),
+      },
     ]);
     expect(store.getState().activeId).toBe(id);
     expect(store.getState().markdown).toBe(SAMPLE_MARKDOWN);
@@ -166,6 +172,8 @@ describe('sample onboarding', () => {
 
   it('does not seed the sample for profiles that predate it', async () => {
     const writer = await dbApi.openDatabase();
+    // Deliberately legacy-shaped: a record written before the page-count
+    // field existed.
     await dbApi.putDocument(writer, {
       id: 'old-1',
       name: 'Old notes',
@@ -174,7 +182,7 @@ describe('sample onboarding', () => {
       assetIds: [],
       createdAt: T0,
       updatedAt: T0,
-    });
+    } as unknown as DocumentRecord);
     writer.close();
 
     const { store } = await readyStore();
@@ -593,6 +601,7 @@ describe('multi-tab sync', () => {
       assetIds: [],
       createdAt: T0,
       updatedAt: T0 - 5_000,
+      pageCount: null,
     };
     stubBroadcastChannel().peers('perfectmarkd')[0]!.postMessage({
       type: 'doc-saved',
@@ -615,6 +624,7 @@ describe('multi-tab sync', () => {
       assetIds: [],
       createdAt: T0,
       updatedAt: T0 - 5_000,
+      pageCount: null,
     };
     stubBroadcastChannel().peers('perfectmarkd')[0]!.postMessage({
       type: 'doc-saved',
@@ -693,5 +703,120 @@ describe('multi-tab sync', () => {
     expect(await dbApi.getDocument(reader, seedId)).toBeUndefined();
     expect(await dbApi.getDocument(reader, secondId)).toBeUndefined();
     reader.close();
+  });
+
+  it('carries the page count to peer tabs on the doc-saved broadcast', async () => {
+    const { a, b } = await twoTabs();
+    const seedId = a.getState().activeId!;
+
+    a.getState().recordPageCount(9);
+    await a.getState().flush();
+
+    // The broadcast carries the full record, so the peer's Library rows
+    // learn the count without rendering anything themselves.
+    expect(b.getState().docs.find((row) => row.id === seedId)?.pageCount).toBe(
+      9,
+    );
+  });
+});
+
+describe('page counts', () => {
+  it('records the canvas-reported count, persists it, and churns no save state', async () => {
+    const { store, id } = await readyStore();
+
+    store.getState().recordPageCount(12);
+    expect(store.getState().pageCount).toBe(12);
+    // A readout, not an edit: recording a count never flips the indicator.
+    expect(store.getState().saveState).toBe('saved');
+    expect(store.getState().docs[0]).toMatchObject({ pageCount: 12 });
+
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
+    const reader = await dbApi.openDatabase();
+    expect((await dbApi.getDocument(reader, id))?.pageCount).toBe(12);
+    reader.close();
+  });
+
+  it('rides the autosave already scheduled by the edit that caused the render', async () => {
+    const { store, id } = await readyStore();
+
+    store.getState().updateActive({ markdown: '# Edited' });
+    store.getState().recordPageCount(3);
+    await store.getState().flush();
+
+    const reader = await dbApi.openDatabase();
+    const doc = await dbApi.getDocument(reader, id);
+    expect(doc?.markdown).toBe('# Edited');
+    expect(doc?.pageCount).toBe(3);
+    reader.close();
+  });
+
+  it('reads legacy records with no count as null', async () => {
+    const writer = await dbApi.openDatabase();
+    await dbApi.putDocument(writer, {
+      id: 'old-1',
+      name: 'Old notes',
+      markdown: '# Old',
+      settings: { ...DEFAULT_SETTINGS },
+      assetIds: [],
+      createdAt: T0,
+      updatedAt: T0,
+    } as unknown as DocumentRecord);
+    writer.close();
+
+    const { store } = await readyStore();
+
+    expect(
+      store.getState().docs.find((row) => row.name === 'Old notes')?.pageCount,
+    ).toBeNull();
+  });
+
+  it('resets the live count when another document opens', async () => {
+    const { store } = await readyStore();
+
+    store.getState().recordPageCount(5);
+    expect(store.getState().pageCount).toBe(5);
+
+    await store.getState().createDocument();
+    expect(store.getState().pageCount).toBeNull();
+  });
+
+  it('joins the live count on reopen even when the record already carries it', async () => {
+    const { store } = await readyStore();
+    const renderedId = store.getState().activeId!;
+    store.getState().recordPageCount(4);
+
+    // Opening another document, then returning: the render re-reports the
+    // count already on the record, and the gauge must still join it —
+    // gauge and "Page N of M" may never disagree.
+    await store.getState().createDocument();
+    expect(store.getState().pageCount).toBeNull();
+
+    await store.getState().openDocument(renderedId);
+    expect(store.getState().pageCount).toBeNull();
+    store.getState().recordPageCount(4);
+    expect(store.getState().pageCount).toBe(4);
+  });
+
+  it('defaults created, imported, and duplicated records to no count', async () => {
+    const { store } = await readyStore();
+    const seedId = store.getState().activeId!;
+    store.getState().recordPageCount(4);
+
+    await store.getState().createDocument();
+    await store.getState().importDocument('imported.md', '# Imported');
+    await store.getState().duplicateDocument(seedId);
+
+    const rows = store.getState().docs;
+    // Counts come only from a record's own renders; a duplicate has rendered
+    // nothing yet, and fresh documents have rendered nothing at all.
+    expect(rows.find((row) => row.id === seedId)?.pageCount).toBe(4);
+    expect(
+      rows.find((row) => row.name === 'Welcome to PerfectMarkD copy')
+        ?.pageCount,
+    ).toBeNull();
+    expect(
+      rows.find((row) => row.name === 'Untitled document')?.pageCount,
+    ).toBeNull();
+    expect(rows.find((row) => row.name === 'imported')?.pageCount).toBeNull();
   });
 });

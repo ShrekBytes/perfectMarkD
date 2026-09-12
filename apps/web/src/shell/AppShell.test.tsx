@@ -9,13 +9,14 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act } from 'react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from './AppShell';
 import { STORAGE_KEY } from '../theme/theme';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
 } from '../documents/store';
+import { useAccountStore } from '../auth/account-store';
 import { stubBroadcastChannel } from '../testing/stub-broadcast-channel';
 import { stubClientRects } from '../testing/stub-client-rects';
 import { stubIndexedDB } from '../testing/stub-idb';
@@ -101,7 +102,7 @@ it('renders the three panes with the sample experience on first run', async () =
   // The Paper Canvas mounts live: the pages area is present, shimmering
   // until the first render lands (PaperCanvas.test.tsx covers the render).
   expect(screen.getByTestId('canvas-loading')).toBeInTheDocument();
-  // The welcome strip sits above the editor for the auto-created sample.
+  // The welcome strip mounts at shell level with the other notices.
   expect(screen.getByTestId('welcome-strip')).toBeInTheDocument();
   expect(
     screen.getByText('This is a sample — edit or clear it.'),
@@ -181,6 +182,7 @@ function makeRemotePending() {
     assetIds: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    pageCount: null,
   };
 }
 
@@ -209,6 +211,110 @@ it('loads the remote version from the staleness banner', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Load changes' }));
   expect(useDocumentStore.getState().name).toBe('From elsewhere');
   expect(screen.queryByTestId('stale-banner')).not.toBeInTheDocument();
+});
+
+it('stacks the notice strips under the top bar in urgency order', async () => {
+  await renderReadyShell();
+
+  act(() => {
+    useDocumentStore.setState({ remotePending: makeRemotePending() });
+    useAccountStore.setState({ planEndedNotice: true });
+  });
+
+  const [stale, plan, welcome] = [
+    'stale-banner',
+    'plan-ended-banner',
+    'welcome-strip',
+  ].map((testid) => screen.getByTestId(testid)) as [
+    HTMLElement,
+    HTMLElement,
+    HTMLElement,
+  ];
+  // Conflict and plan notices first, welcome last: DOM order is visual order.
+  expect(
+    stale.compareDocumentPosition(plan) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    plan.compareDocumentPosition(welcome) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});
+
+it('keeps the welcome strip visible with the editor pane collapsed', async () => {
+  await renderReadyShell();
+
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Collapse editor pane' }),
+  );
+  expect(
+    screen.queryByRole('complementary', { name: 'Editor pane' }),
+  ).not.toBeInTheDocument();
+  // Shell-level chrome: a collapsed pane can never hide a notice.
+  expect(screen.getByTestId('welcome-strip')).toBeInTheDocument();
+});
+
+describe('proofing gauge', () => {
+  it('reads the canvas-reported count and updates live on edit', async () => {
+    await renderReadyShell();
+
+    // Before the canvas has reported, the paper size alone — never a
+    // fabricated count.
+    expect(screen.getByTestId('proof-gauge').textContent).toMatch(
+      /^A4( · \d+ pages)?$/,
+    );
+
+    const file = new File(
+      ['one\n\n///\n\ntwo\n\n///\n\nthree'],
+      'three-pages.md',
+      { type: 'text/markdown' },
+    );
+    fireEvent.dragEnter(window, {
+      dataTransfer: { types: ['Files'], files: [file] },
+    });
+    fireEvent.drop(window, {
+      dataTransfer: { types: ['Files'], files: [file] },
+    });
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('proof-gauge')).toHaveTextContent(
+          'A4 · 3 pages',
+        );
+      },
+      { timeout: 10_000 },
+    );
+  });
+
+  it('disappears when no document is active', async () => {
+    await renderReadyShell();
+
+    await act(async () => {
+      const { activeId } = useDocumentStore.getState();
+      if (activeId) await useDocumentStore.getState().deleteDocument(activeId);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('proof-gauge')).not.toBeInTheDocument();
+    });
+  });
+});
+
+it('shows Library rows with a thumbnail sketch and a counted meta line', async () => {
+  await renderReadyShell();
+
+  // The count exists once the Paper Canvas has rendered the document.
+  await waitFor(
+    () => {
+      expect(useDocumentStore.getState().pageCount).not.toBeNull();
+    },
+    { timeout: 10_000 },
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Library' }));
+
+  const row = screen.getByTestId('row-meta').closest('li')!;
+  // The leading miniature sheet, sketched from the document's own page —
+  // its geometry is the footprint's own unit test (library/thumb.test.ts).
+  expect(row.querySelector('div[aria-hidden="true"]')).toBeInTheDocument();
+  expect(screen.getByTestId('row-meta')).toHaveTextContent(/· \d+ pages?$/);
 });
 
 it('imports dropped .md files anywhere in the window', async () => {

@@ -114,6 +114,18 @@
     color-scheme: light;
   }
 
+  /* Reduced motion: the vocabulary is short color/opacity fades, but users
+     who ask for stillness get stillness — loops included (shimmer, spinner). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   [data-theme='dark'] {
     color-scheme: dark;
   }

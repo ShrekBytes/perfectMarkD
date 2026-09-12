@@ -1,7 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Text helpers around document names: import/export file names, collision-free
-// copies, and relative timestamps for the Library list.
+// Text helpers around document facts: names, relative timestamps for the
+// Library list, page-count phrasing, and the top-bar gauge's paper label.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import type { DocumentSettings } from '@perfectmarkd/core';
 
 /** Returns `base`, or the first free `base copy`, `base copy 2`, … variant. */
 export function uniqueName(existing: readonly string[], base: string): string {
@@ -62,4 +64,27 @@ export function formatRelativeTime(
       ? shortDate
       : shortDateWithYear;
   return format.format(date);
+}
+
+/** Page-count phrasing shared by the Library meta line and the top-bar
+ *  gauge: "12 pages", "1 page". */
+export function formatPageCount(count: number): string {
+  return `${count} page${count === 1 ? '' : 's'}`;
+}
+
+/** The gauge's text from the document's own settings and the canvas-reported
+ *  count: "A4 · 12 pages", "A4 landscape", "Custom · 3 pages". Landscape
+ *  appends when set; custom sizes read "Custom". A null count renders the
+ *  paper size alone — the count joins once the Paper Canvas reports. */
+export function proofGaugeLabel(
+  settings: DocumentSettings,
+  pageCount: number | null,
+): string {
+  const paper =
+    settings.orientation === 'landscape'
+      ? `${settings.pageSize} landscape`
+      : settings.pageSize;
+  return pageCount === null
+    ? paper
+    : `${paper} · ${formatPageCount(pageCount)}`;
 }

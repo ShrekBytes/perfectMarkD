@@ -15,6 +15,7 @@ import { EditorPane } from '../editor/EditorPane';
 import { DeleteToast } from '../library/DeleteToast';
 import { LibraryPanel } from '../library/LibraryPanel';
 import { useFileDrop } from '../library/useFileDrop';
+import { proofGaugeLabel } from '../documents/text';
 import { PaperCanvas, type PaperCanvasApi } from '../canvas/PaperCanvas';
 import { Inspector } from '../inspector/Inspector';
 
@@ -22,10 +23,12 @@ import { Inspector } from '../inspector/Inspector';
  * The app shell: top bar + three panes (editor · Paper Canvas · inspector).
  * Panes collapse via their divider toggles; with both collapsed the shell is in
  * fullscreen-canvas mode. Document state lives in the document store; the
- * Library drawer, delete-undo toast, staleness banner, plan-ended banner, and
- * .md drag-drop import (with a rejection toast for non-Markdown files) mount
- * here. The account store refreshes on a watchdog so Plan Expiry re-locks the
- * gates in a long-lived tab (billing/04).
+ * Library drawer, delete-undo toast, and .md drag-drop import (with a
+ * rejection toast for non-Markdown files) mount here. The three notice
+ * strips (staleness conflict, plan-ended, first-run welcome) mount at shell
+ * level under the top bar in that fixed order, so a collapsed pane can never
+ * hide a notice. The account store refreshes on a watchdog so Plan Expiry
+ * re-locks the gates in a long-lived tab (billing/04).
  */
 export function AppShell() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,6 +42,12 @@ export function AppShell() {
   );
   const saveState = useDocumentStore((state) =>
     state.activeId ? state.saveState : null,
+  );
+  // The proofing gauge (proof-desk-chrome): the active document's paper
+  // facts beside its name. Null when no document is open — no readout with
+  // nothing to read about.
+  const gauge = useDocumentStore((state) =>
+    state.activeId ? proofGaugeLabel(state.settings, state.pageCount) : null,
   );
   const ready = useDocumentStore((state) => state.status === 'ready');
   const docCount = useDocumentStore((state) => state.docs.length);
@@ -111,6 +120,7 @@ export function AppShell() {
           if (activeId) void renameDocument(activeId, name);
         }}
         saveState={saveState}
+        gauge={gauge}
         libraryOpen={libraryOpen}
         onOpenLibrary={() => setLibraryOpen(true)}
         theme={theme}
@@ -121,6 +131,7 @@ export function AppShell() {
 
       <StaleBanner />
       <PlanEndedBanner />
+      <WelcomeStrip />
 
       <div
         ref={containerRef}
@@ -144,19 +155,16 @@ export function AppShell() {
                   `${PANE_LIMITS.editorDefaultRatio * 100}%`,
                 minWidth: PANE_LIMITS.editorMin,
               }}
-              className="flex flex-col bg-surface"
+              className="flex min-h-0 flex-col bg-surface"
             >
-              <WelcomeStrip />
-              <div className="flex min-h-0 flex-1 flex-col">
-                {/* Ctrl/Cmd+Enter and scroll events route to the Paper Canvas
-                    via the shell's canvas API ref. */}
-                <EditorPane
-                  onRequestRender={() => canvasApiRef.current?.renderNow()}
-                  onEditorScroll={(fraction) =>
-                    canvasApiRef.current?.setScrollFraction(fraction)
-                  }
-                />
-              </div>
+              {/* Ctrl/Cmd+Enter and scroll events route to the Paper Canvas
+                  via the shell's canvas API ref. */}
+              <EditorPane
+                onRequestRender={() => canvasApiRef.current?.renderNow()}
+                onEditorScroll={(fraction) =>
+                  canvasApiRef.current?.setScrollFraction(fraction)
+                }
+              />
             </aside>
             <PaneDivider
               side="editor"
@@ -228,7 +236,7 @@ export function AppShell() {
         <div
           role="status"
           data-testid="drop-rejected-toast"
-          className="pointer-events-none fixed inset-x-0 bottom-5 z-[60] flex justify-center"
+          className="pointer-events-none fixed inset-x-0 bottom-16 z-[60] flex justify-center"
         >
           <div className="animate-fade-in pointer-events-auto flex items-center gap-3 rounded-pane border border-hairline-strong bg-surface px-4 py-2.5 shadow-lg">
             <p className="text-sm text-ink">
