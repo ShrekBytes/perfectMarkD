@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '../router';
 import { useAccountStore } from '../auth/account-store';
+import { useEscapeLayer, useMenuKeyboard } from './focus';
 
 interface AccountMenuProps {
   /** Opens the Upgrade status dialog (owned by the shell). */
@@ -25,9 +26,10 @@ export function AccountMenu({
   const signOut = useAccountStore((state) => state.signOut);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Dropdown dismissal: outside pointer press or Escape (same pattern as the
-  // Export split button's dropdown).
+  // Dropdown dismissal on outside pointer press.
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -35,16 +37,17 @@ export function AccountMenu({
         setOpen(false);
       }
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
     document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
+    return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [open]);
+
+  // Escape resolves the topmost layer only and returns focus to the trigger;
+  // the menu itself roves with the arrow keys (focus.ts).
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  });
+  useMenuKeyboard(menuRef, open, () => setOpen(false));
 
   if (status !== 'ready') return null;
 
@@ -64,19 +67,21 @@ export function AccountMenu({
   return (
     <div ref={containerRef} data-testid="account-menu" className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-label="Account menu"
         aria-haspopup="menu"
         aria-expanded={open}
         title={user.email}
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-xs font-semibold text-accent transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent hover:text-accent-ink focus-visible:outline-2"
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-xs font-semibold text-accent transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong hover:text-accent-ink focus-visible:outline-2"
       >
         {initial}
       </button>
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Account"
           className="absolute right-0 top-full z-50 mt-1.5 w-48 overflow-hidden rounded-pane border border-hairline bg-surface py-1 shadow-lg"

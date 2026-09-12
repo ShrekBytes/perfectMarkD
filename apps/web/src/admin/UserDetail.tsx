@@ -106,7 +106,7 @@ export function UserDetail({
             type="button"
             data-testid="user-grant"
             onClick={() => setDialog('grant')}
-            className="h-8 rounded-control bg-accent px-3 text-xs font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2"
+            className="h-8 rounded-control bg-accent-strong px-3 text-xs font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
           >
             {entitlement ? 'Extend' : 'Grant entitlement'}
           </button>

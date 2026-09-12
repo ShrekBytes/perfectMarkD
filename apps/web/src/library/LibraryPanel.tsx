@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { formatRelativeTime } from '../documents/text';
 import { useDocumentStore } from '../documents/store';
 import {
@@ -10,6 +10,7 @@ import {
   TrashIcon,
   UploadIcon,
 } from '../shell/icons';
+import { useEscapeLayer, useModalFocus } from '../shell/focus';
 import { downloadMarkdown } from './download';
 
 interface LibraryPanelProps {
@@ -40,14 +41,12 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
   const [draft, setDraft] = useState('');
   const cancelled = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  // Modal-layer plumbing: Escape resolves the topmost layer only, Tab stays
+  // inside the drawer, and closing returns focus to what opened it.
+  useEscapeLayer(true, onClose);
+  useModalFocus(panelRef, true);
 
   const commitRename = (id: string, currentName: string) => {
     const name = draft.trim();
@@ -76,10 +75,13 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
         className="animate-fade-in fixed inset-0 z-40 bg-black/25"
       />
       <aside
+        ref={panelRef}
         role="dialog"
+        aria-modal="true"
         aria-label="Library"
         data-testid="library-panel"
-        className="animate-slide-in-left fixed inset-y-0 left-0 z-50 flex w-84 flex-col border-r border-hairline bg-surface shadow-xl"
+        tabIndex={-1}
+        className="animate-slide-in-left fixed inset-y-0 left-0 z-50 flex w-84 flex-col border-r border-hairline bg-surface shadow-xl outline-none"
       >
         <header className="flex h-12 shrink-0 items-center justify-between border-b border-hairline pl-4 pr-2">
           <h2 className="text-sm font-semibold">Library</h2>
@@ -98,7 +100,7 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
           <button
             type="button"
             onClick={() => void createDocument().then(onClose)}
-            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-control bg-accent px-3 text-sm font-medium text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2"
+            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-control bg-accent-strong px-3 text-sm font-medium text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
           >
             <PlusIcon />
             New document
@@ -146,11 +148,14 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') event.currentTarget.blur();
                       else if (event.key === 'Escape') {
+                        // Shield the layer stack: Escape here cancels the
+                        // rename; it must not also close the Library.
+                        event.stopPropagation();
                         cancelled.current = true;
                         event.currentTarget.blur();
                       }
                     }}
-                    className="min-w-0 flex-1 rounded-control border border-accent bg-page px-2 py-1.5 text-sm text-ink outline-none"
+                    className="min-w-0 flex-1 rounded-control border border-accent bg-field px-2 py-1.5 text-sm text-ink outline-none"
                   />
                 ) : (
                   <button

@@ -129,7 +129,7 @@ function PlanCta({
       <button
         type="button"
         onClick={onOpenEditor}
-        className={`${base} border border-accent/40 bg-accent-soft text-accent hover:bg-accent hover:text-accent-ink`}
+        className={`${base} border border-accent/40 bg-accent-soft text-accent hover:bg-accent-strong hover:text-accent-ink`}
       >
         Open the editor
       </button>
@@ -143,7 +143,7 @@ function PlanCta({
     <button
       type="button"
       onClick={() => onUpgrade(paidPlanId)}
-      className={`${base} border border-accent bg-accent text-accent-ink hover:bg-accent-strong`}
+      className={`${base} border border-accent bg-accent-strong text-accent-ink hover:bg-accent-deep`}
     >
       Upgrade
     </button>

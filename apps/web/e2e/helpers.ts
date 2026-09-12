@@ -94,11 +94,14 @@ export async function pageBoxStyle(
     );
 }
 
-/** Outer width of the first page's zoom frame (page pixels × zoom). */
-export async function firstPageFrameWidth(page: Page): Promise<number> {
-  const box = await page.locator('.pm-page-frame').first().boundingBox();
-  expect(box).not.toBeNull();
-  return box!.width;
+/** True page width in CSS px: the shadow host's layout box, unscaled by
+ *  zoom. (The visible frame is page px × zoom, and the canvas fits the page
+ *  to its width until the user zooms manually.) */
+export async function firstPageBoxWidth(page: Page): Promise<number> {
+  return page
+    .locator('.pm-page-host')
+    .first()
+    .evaluate((host) => (host as HTMLElement).offsetWidth);
 }
 
 /**

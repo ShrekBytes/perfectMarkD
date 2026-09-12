@@ -6,7 +6,7 @@
 import { expect, test } from '@playwright/test';
 import {
   RENDER_TIMEOUT,
-  firstPageFrameWidth,
+  firstPageBoxWidth,
   openApp,
   openInspectorTab,
   pageBoxStyle,
@@ -58,13 +58,14 @@ test('changing the page size re-lays out the mounted pages', async ({
   await openApp(page);
   await waitForMinPages(page, 2);
 
-  // Default is A4 (794 CSS px at zoom 1); Letter is 816px wide.
-  expect(await firstPageFrameWidth(page)).toBeCloseTo(794, 0);
+  // True page pixels, independent of the canvas's fit-on-load zoom:
+  // A4 is 794 CSS px wide, Letter is 816px.
+  expect(await firstPageBoxWidth(page)).toBeCloseTo(794, 0);
 
   await openInspectorTab(page, 'Page');
   await page
     .getByRole('combobox', { name: 'Page size' })
     .selectOption('Letter');
 
-  await expect.poll(() => firstPageFrameWidth(page)).toBeCloseTo(816, 0);
+  await expect.poll(() => firstPageBoxWidth(page)).toBeCloseTo(816, 0);
 });

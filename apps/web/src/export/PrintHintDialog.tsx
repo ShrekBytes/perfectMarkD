@@ -65,7 +65,7 @@ export function PrintHintDialog({
               type="button"
               autoFocus
               onClick={onConfirm}
-              className="flex h-8 items-center rounded-control bg-accent px-3 text-sm font-medium text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2"
+              className="flex h-8 items-center rounded-control bg-accent-strong px-3 text-sm font-medium text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
             >
               Continue to print
             </button>

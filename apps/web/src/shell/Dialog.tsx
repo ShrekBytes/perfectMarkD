@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { CloseIcon } from './icons';
+import { useEscapeLayer, useModalFocus } from './focus';
 
 interface DialogProps {
   /** The accessible dialog name — rendered as the panel heading. */
@@ -17,8 +18,8 @@ interface DialogProps {
 /**
  * The dialog chrome shared by the pricing modal, the upgrade flow, and
  * upgrade status (billing/01): fixed backdrop, centered panel, heading row
- * with a close button, Escape-to-close. One implementation so the dialogs
- * can never drift apart.
+ * with a close button, Escape-to-close, focus trap and focus restore. One
+ * implementation so the dialogs can never drift apart.
  */
 export function Dialog({
   label,
@@ -29,13 +30,11 @@ export function Dialog({
   onClose,
   children,
 }: DialogProps) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Escape resolves the topmost open layer only; Tab stays inside the panel;
+  // closing returns focus to whatever opened the dialog.
+  useEscapeLayer(true, onClose);
+  useModalFocus(dialogRef, true);
 
   return (
     <>
@@ -46,11 +45,13 @@ export function Dialog({
         className="animate-fade-in fixed inset-0 z-[60] bg-black/25"
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={label}
         data-testid={testId}
-        className="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center p-6"
+        tabIndex={-1}
+        className="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center p-6 outline-none"
       >
         <div
           className={`rounded-pane border border-hairline bg-surface p-5 shadow-xl ${panelClassName}`}

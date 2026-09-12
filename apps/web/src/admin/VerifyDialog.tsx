@@ -103,7 +103,7 @@ export function VerifyDialog({
               onClick={() => chooseDuration(months)}
               className={`h-8 rounded-control border px-3 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                 duration === months && customDate === ''
-                  ? 'border-accent bg-accent text-accent-ink'
+                  ? 'border-accent bg-accent-strong text-accent-ink'
                   : 'border-hairline bg-canvas text-ink-soft hover:bg-surface-hover hover:text-ink'
               }`}
             >
@@ -147,7 +147,7 @@ export function VerifyDialog({
           data-testid="confirm-verify"
           disabled={(!duration && !customDate) || submitting}
           onClick={() => void onVerify()}
-          className="h-9 flex-1 rounded-control bg-accent text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2 disabled:opacity-60"
+          className="h-9 flex-1 rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
         >
           {submitting ? 'Granting…' : 'Verify & grant'}
         </button>

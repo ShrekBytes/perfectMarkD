@@ -1,0 +1,478 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-01-01T00:00:00.000Z",
+  "title": "Design System: PerfectMarkD",
+  "extensions": {
+    "colorMeta": {
+      "accent-violet": {
+        "role": "primary",
+        "displayName": "Reserved Violet",
+        "canonical": "#7c6af7",
+        "tonalRamp": [
+          "#1c1338",
+          "#2f2260",
+          "#453187",
+          "#5b41ae",
+          "#7c6af7",
+          "#9b8cfa",
+          "#bcb1fc",
+          "#ded8fe"
+        ]
+      },
+      "accent-violet-deep": {
+        "role": "primary",
+        "displayName": "Reserved Violet, Pressed",
+        "canonical": "#6a55f2",
+        "tonalRamp": [
+          "#180f33",
+          "#291b58",
+          "#3c277e",
+          "#4e33a5",
+          "#6a55f2",
+          "#8a79f5",
+          "#ab9df8",
+          "#ccc3fb"
+        ]
+      },
+      "accent-violet-lift": {
+        "role": "primary",
+        "displayName": "Reserved Violet, Lifted",
+        "canonical": "#8e7ef9",
+        "tonalRamp": [
+          "#1e1636",
+          "#33265c",
+          "#483683",
+          "#5d46aa",
+          "#8e7ef9",
+          "#a79afa",
+          "#c0b6fc",
+          "#dad3fd"
+        ]
+      },
+      "canvas-warm-gray": {
+        "role": "neutral",
+        "displayName": "Warm Desk",
+        "canonical": "#f1efe9",
+        "tonalRamp": [
+          "#26251f",
+          "#403f36",
+          "#5a584d",
+          "#757264",
+          "#918d7e",
+          "#aca896",
+          "#c8c4b5",
+          "#e2dfd6"
+        ]
+      },
+      "surface-chrome": {
+        "role": "neutral",
+        "displayName": "Chrome Surface",
+        "canonical": "#faf9f7",
+        "tonalRamp": [
+          "#262524",
+          "#403f3d",
+          "#5a5956",
+          "#75736f",
+          "#918e89",
+          "#aca9a3",
+          "#c8c5bf",
+          "#e3e1dc"
+        ]
+      },
+      "document-page": {
+        "role": "neutral",
+        "displayName": "Document Page",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#262626",
+          "#404040",
+          "#595959",
+          "#737373",
+          "#8c8c8c",
+          "#a6a6a6",
+          "#bfbfbf",
+          "#d9d9d9"
+        ]
+      },
+      "field-surface": {
+        "role": "neutral",
+        "displayName": "Field Surface",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#262626",
+          "#404040",
+          "#595959",
+          "#737373",
+          "#8c8c8c",
+          "#a6a6a6",
+          "#bfbfbf",
+          "#d9d9d9"
+        ]
+      },
+      "ink-full": {
+        "role": "neutral",
+        "displayName": "Ink Full",
+        "canonical": "#232220",
+        "tonalRamp": [
+          "#232220",
+          "#3c3b37",
+          "#55534e",
+          "#6e6c65",
+          "#87847c",
+          "#a09d93",
+          "#b9b6aa",
+          "#d2cfc1"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Ink Soft",
+        "canonical": "#5f5b53",
+        "tonalRamp": [
+          "#232220",
+          "#3c3b37",
+          "#55534e",
+          "#6e6c65",
+          "#87847c",
+          "#a09d93",
+          "#b9b6aa",
+          "#d2cfc1"
+        ]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Ink Faint",
+        "canonical": "#918c81",
+        "tonalRamp": [
+          "#232220",
+          "#3c3b37",
+          "#55534e",
+          "#6e6c65",
+          "#87847c",
+          "#a09d93",
+          "#b9b6aa",
+          "#d2cfc1"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e7e3da",
+        "tonalRamp": [
+          "#26251f",
+          "#403f36",
+          "#5a584d",
+          "#757264",
+          "#918d7e",
+          "#aca896",
+          "#c8c4b5",
+          "#e7e3da"
+        ]
+      },
+      "hairline-strong": {
+        "role": "neutral",
+        "displayName": "Hairline Strong",
+        "canonical": "#d5d0c4",
+        "tonalRamp": [
+          "#26251f",
+          "#403f36",
+          "#5a584d",
+          "#757264",
+          "#918d7e",
+          "#aca896",
+          "#d5d0c4",
+          "#eae6dc"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Danger",
+        "canonical": "#dc2626",
+        "tonalRamp": [
+          "#2b0a0a",
+          "#4d1212",
+          "#701a1a",
+          "#932222",
+          "#dc2626",
+          "#e75c5c",
+          "#f09393",
+          "#f9c9c9"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "The product name in the top bar, on /pricing, and on /admin. 'Mark' is set in Reserved Violet. The only branded typographic moment."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The pricing page's h1 only. The workspace's largest text is the 15px wordmark; this size exists for one marketing heading."
+      },
+      "subhead": {
+        "displayName": "Subhead",
+        "purpose": "The auth page's h1, and the glyph inside an empty-state's 44px tinted tile."
+      },
+      "section-head": {
+        "displayName": "Section Head",
+        "purpose": "The h3 inside the upgrade flow's step panels, and the plan name in the pricing table's column header."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Dialog and panel headings, and document names in Library rows."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Buttons, menu items, form inputs, banner copy, and plan-table body."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "The workhorse at 12px: field labels, tab labels, table cells, chips, and most metadata."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Inspector section headings (uppercase, tracked) and the Pro gate label (normal case, 11px)."
+      },
+      "footnote": {
+        "displayName": "Footnote",
+        "purpose": "Two instances only, each attached to the control it explains: the page-number format hint and the image-ingest error under a gate's picker. A floor, not a scale step."
+      },
+      "editor-code": {
+        "displayName": "Editor Code",
+        "purpose": "Markdown source in CodeMirror, in the mono stack."
+      }
+    },
+    "shadows": [
+      {
+        "name": "paper",
+        "value": "0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.12)",
+        "purpose": "The document page only. A 1px contact shadow plus a wide ambient shadow so the sheet reads as resting on the desk. The system's signature shadow and the only two-part one."
+      },
+      {
+        "name": "raised-control",
+        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "purpose": "The primary export button and the pane-divider chevrons. A single subtle lift to separate a filled control from the surface behind it."
+      },
+      {
+        "name": "floating-layer",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Dropdown menus and toast notices."
+      },
+      {
+        "name": "modal-layer",
+        "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+        "purpose": "Dialogs, the Library drawer, and the large-document notice."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0, 0, 0.2, 1)",
+        "purpose": "The system's only curve, set as the Tailwind default transition timing function so components cannot drift."
+      },
+      {
+        "name": "duration-fast",
+        "value": "150ms",
+        "purpose": "The only duration in the shipped interface. Hover, focus, active, and surface-entrance transitions all use it."
+      },
+      {
+        "name": "duration-base",
+        "value": "200ms",
+        "purpose": "Unused headroom declared in the theme. No shipped component uses it; do not reach for it without a reason."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The system's one filled action — Export, Start blank, Upgrade, New document, form submits. Reserved Violet is used here and almost nowhere else.",
+      "html": "<button class=\"ds-btn-primary\">Export</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; background: var(--accent, #7c6af7); color: var(--accent-ink, #fff); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 500; line-height: 1.5; border: none; border-radius: var(--radius-control, 8px); box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); cursor: pointer; transition: background-color 150ms cubic-bezier(0, 0, 0.2, 1), color 150ms cubic-bezier(0, 0, 0.2, 1); } .ds-btn-primary:hover { background: var(--accent-strong, #6a55f2); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #7c6af7); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.6; cursor: default; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "The default secondary action — 'Import .md', 'Keep mine', 'Load changes'. Hairline border, no fill at rest.",
+      "html": "<button class=\"ds-btn-ghost\">Import .md</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; background: transparent; color: var(--ink-soft, #5f5b53); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 400; line-height: 1.5; border: 1px solid var(--hairline, #e7e3da); border-radius: var(--radius-control, 8px); cursor: pointer; transition: background-color 150ms cubic-bezier(0, 0, 0.2, 1), color 150ms cubic-bezier(0, 0, 0.2, 1); } .ds-btn-ghost:hover { background: var(--surface-hover, #efede7); color: var(--ink, #232220); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--accent, #7c6af7); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Borderless top-bar control — Library, Sign in, theme toggle. Fills only on hover.",
+      "html": "<button class=\"ds-btn-quiet\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20\"/></svg>Library</button>",
+      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; background: transparent; color: var(--ink-soft, #5f5b53); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; border: none; border-radius: var(--radius-control, 8px); cursor: pointer; transition: background-color 150ms cubic-bezier(0, 0, 0.2, 1), color 150ms cubic-bezier(0, 0, 0.2, 1); } .ds-btn-quiet:hover { background: var(--surface-hover, #efede7); color: var(--ink, #232220); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--accent, #7c6af7); outline-offset: 2px; }"
+    },
+    {
+      "name": "Inspector Tab",
+      "kind": "chip",
+      "refersTo": "inspector-tab",
+      "description": "The active-state treatment shared by the Inspector tabs and selected Library rows: accent tint fill with Reserved Violet text.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">Page</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Style</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Header/Footer</button></div>",
+      "css": ".ds-tabs { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 8px; border-bottom: 1px solid var(--hairline, #e7e3da); } .ds-tab { height: 28px; padding: 0 10px; background: transparent; color: var(--ink-soft, #5f5b53); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 500; line-height: 1.4; border: none; border-radius: var(--radius-control, 8px); cursor: pointer; transition: background-color 150ms cubic-bezier(0, 0, 0.2, 1), color 150ms cubic-bezier(0, 0, 0.2, 1); } .ds-tab:hover { background: var(--surface-hover, #efede7); color: var(--ink, #232220); } .ds-tab[aria-selected='true'] { background: var(--accent-soft, rgb(124 106 247 / 0.11)); color: var(--accent, #7c6af7); } .ds-tab:focus-visible { outline: 2px solid var(--accent, #7c6af7); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quota Chip",
+      "kind": "chip",
+      "refersTo": "chip-quota",
+      "description": "The top bar's usage chip — hairline outline, tabular numerals, and a danger state at exhaustion. Renders nothing when there is no entitlement.",
+      "html": "<span class=\"ds-chip\">247/300</span><span class=\"ds-chip ds-chip-exhausted\">300/300</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; height: 32px; padding: 0 10px; background: transparent; color: var(--ink-soft, #5f5b53); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; border: 1px solid var(--hairline, #e7e3da); border-radius: var(--radius-control, 8px); } .ds-chip-exhausted { border-color: rgb(220 38 38 / 0.4); background: rgb(220 38 38 / 0.1); color: var(--danger, #dc2626); }"
+    },
+    {
+      "name": "Inspector Field Row",
+      "kind": "input",
+      "refersTo": "field-input",
+      "description": "The Inspector's compact field: 12px Ink Soft label on the left, control on the right, 12px gap. The workhorse of the settings panel.",
+      "html": "<div class=\"ds-field\"><span class=\"ds-field-label\">Page size</span><select class=\"ds-field-control\"><option>A4</option></select></div>",
+      "css": ".ds-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; } .ds-field-label { flex-shrink: 0; color: var(--ink-soft, #5f5b53); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 500; line-height: 1.4; } .ds-field-control { padding: 4px 8px; background: var(--field, #fff); color: var(--ink, #232220); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 12px; line-height: 1.4; border: 1px solid var(--hairline, #e7e3da); border-radius: var(--radius-control, 8px); transition: border-color 150ms cubic-bezier(0, 0, 0.2, 1); } .ds-field-control:focus { border-color: var(--accent, #7c6af7); outline: none; } .ds-field-control:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Form Input",
+      "kind": "input",
+      "refersTo": "form-input",
+      "description": "The full-width input for auth and payment flows: 36px tall, inset on the Warm Desk surface so it reads as recessed into the form.",
+      "html": "<label class=\"ds-form-label\">Transaction ID (txid)<input class=\"ds-form-input\" placeholder=\"64-character hexadecimal string\"></label>",
+      "css": ".ds-form-label { display: block; color: var(--ink-soft, #5f5b53); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 500; line-height: 1.4; } .ds-form-input { display: block; width: 100%; height: 36px; margin-top: 4px; padding: 0 10px; background: var(--canvas, #f1efe9); color: var(--ink, #232220); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; border: 1px solid var(--hairline, #e7e3da); border-radius: var(--radius-control, 8px); } .ds-form-input:focus-visible { outline: 2px solid var(--accent, #7c6af7); outline-offset: 2px; }"
+    },
+    {
+      "name": "Gate Lock",
+      "kind": "custom",
+      "refersTo": "inspector-tab",
+      "description": "The signature component: a paid control that explains itself. The gated control renders disabled but visible beside a lock that opens the pricing modal — never a signup wall, never a blur.",
+      "html": "<div class=\"ds-gate\"><span class=\"ds-gate-control\">Upload…</span><button class=\"ds-gate-lock\"><svg viewBox=\"0 0 24 24\" width=\"12\" height=\"12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/></svg>Pro</button></div>",
+      "css": ".ds-gate { display: flex; align-items: center; gap: 8px; padding: 6px 0; } .ds-gate-control { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; color: var(--ink-faint, #918c81); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 11px; line-height: 1.3; background: var(--field, #fff); border: 1px solid var(--hairline, #e7e3da); border-radius: var(--radius-control, 8px); opacity: 0.5; } .ds-gate-lock { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 6px; background: transparent; color: var(--ink-faint, #918c81); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 500; line-height: 1.3; border: none; border-radius: var(--radius-control, 8px); cursor: pointer; transition: background-color 150ms cubic-bezier(0, 0, 0.2, 1), color 150ms cubic-bezier(0, 0, 0.2, 1); } .ds-gate-lock:hover { background: var(--surface-hover, #efede7); color: var(--ink, #232220); } .ds-gate-lock:focus-visible { outline: 2px solid var(--accent, #7c6af7); outline-offset: 2px; }"
+    },
+    {
+      "name": "Preset Thumbnail",
+      "kind": "custom",
+      "refersTo": "dialog-panel",
+      "description": "The one place the system draws a picture, and it draws it from data. An 84×112px miniature page sketched in CSS from the preset's own DocStyle values — every color comes from the preset, so a dark preset can show on a light desk.",
+      "html": "<div class=\"ds-thumb\" aria-hidden=\"true\"><div class=\"ds-thumb-h1\"></div><div class=\"ds-thumb-line\"></div><div class=\"ds-thumb-line ds-thumb-line-2\"></div><div class=\"ds-thumb-quote\"></div><div class=\"ds-thumb-code\"></div><div class=\"ds-thumb-mark\"></div></div>",
+      "css": ".ds-thumb { display: flex; flex-direction: column; gap: 6px; width: 84px; height: 112px; padding: 8px; overflow: hidden; background: #fff; border: 1px solid #d5d0c4; border-radius: 3px; } .ds-thumb-h1 { width: 75%; height: 10px; background: #111; border-bottom: 2px solid #1a3a6b; border-radius: 2px; } .ds-thumb-line { width: 100%; height: 4px; background: #000; opacity: 0.55; border-radius: 2px; } .ds-thumb-line-2 { width: 83%; opacity: 0.4; } .ds-thumb-quote { width: 100%; height: 14px; background: #f8f8f8; border-left: 3px solid #ccc; border-radius: 0 2px 2px 0; } .ds-thumb-code { width: 100%; height: 16px; background: #f9f9f9; border-radius: 2px; } .ds-thumb-mark { width: 33%; height: 4px; margin-top: auto; align-self: flex-end; background: #1a3a6b; border-radius: 2px; }"
+    },
+    {
+      "name": "Tinted Notice",
+      "kind": "custom",
+      "refersTo": "banner-strip",
+      "description": "The system's informational panel: a 40%-alpha accent border over the 11% accent tint with Reserved Violet text. Used wherever the app explains a state the user must act on — payment instructions, admin dialogs, export-history notes. The danger twin covers quota exhaustion and admin warnings.",
+      "html": "<div class=\"ds-notice\">Send the payment, then submit the transaction ID below.</div><div class=\"ds-notice ds-notice-danger\">All 300 of this period's exports are used — it resets next period.</div>",
+      "css": ".ds-notice { padding: 8px 10px; background: var(--accent-soft, rgb(124 106 247 / 0.11)); color: var(--accent, #7c6af7); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 400; line-height: 1.4; border: 1px solid rgb(124 106 247 / 0.4); border-radius: var(--radius-control, 8px); } .ds-notice-danger { background: rgb(220 38 38 / 0.1); color: var(--danger, #dc2626); border-color: rgb(220 38 38 / 0.4); }"
+    },
+    {
+      "name": "Dialog Panel",
+      "kind": "card",
+      "refersTo": "dialog-panel",
+      "description": "The shared dialog chrome — pricing modal, upgrade flow, export history, admin dialogs. Fixed scrim, centered panel, heading row with a close button, Escape to close.",
+      "html": "<div class=\"ds-scrim\"><div class=\"ds-dialog\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Plans and pricing\"><div class=\"ds-dialog-head\"><h2>Plans and pricing</h2><button class=\"ds-dialog-close\" aria-label=\"Close\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/></svg></button></div><p class=\"ds-dialog-body\">Paid plans only add one-click Server Export and convenience features.</p></div></div>",
+      "css": ".ds-scrim { display: flex; align-items: center; justify-content: center; padding: 24px; background: rgb(0 0 0 / 0.25); } .ds-dialog { width: 100%; max-width: 576px; padding: 20px; background: var(--surface, #faf9f7); color: var(--ink, #232220); font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif; border: 1px solid var(--hairline, #e7e3da); border-radius: var(--radius-pane, 10px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); } .ds-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; } .ds-dialog-head h2 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; } .ds-dialog-close { display: inline-flex; align-items: center; justify-content: center; margin: -4px; padding: 4px; background: transparent; color: var(--ink-faint, #918c81); line-height: 1; border: none; border-radius: var(--radius-control, 8px); cursor: pointer; transition: background-color 150ms cubic-bezier(0, 0, 0.2, 1), color 150ms cubic-bezier(0, 0, 0.2, 1); } .ds-dialog-close:hover { background: var(--surface-hover, #efede7); color: var(--ink, #232220); } .ds-dialog-close:focus-visible { outline: 2px solid var(--accent, #7c6af7); outline-offset: 2px; } .ds-dialog-body { margin: 12px 0 0; color: var(--ink-soft, #5f5b53); font-size: 12px; line-height: 1.4; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Proofing Desk",
+    "overview": "The screen is a warm-gray desk. On it sits a single sheet of white paper, lit softly enough to read as an object with edges — the paper carries a two-part shadow (a 1px contact shadow and a wide ambient one) so it reads as lying on the desk rather than floating above it. Every instrument you need is at the edges of the desk, thin and neutral, waiting. Nothing on the desk competes with the sheet.\n\nThis is an instrument, not an ornament. The chrome has no gradients, no illustration, no decorative flourish, and no color that isn't doing a job. Its craft shows up in restraint and in precision: a 1px hairline where a 2px rule would be easier, 8px corners where 12px would be friendlier, a violet that appears on perhaps a tenth of any screen, and tabular numerals wherever a number might change. The reward for all that restraint is the one thing the product promises — the page you see is the page you get, so the interface must never be the thing you notice.\n\nThe system runs on three inks and two hairlines. Depth is declared once per surface, either a border or a shadow, never both stacked as decoration. Dark mode darkens the desk and the instruments but deliberately not the paper: --page stays #ffffff in both themes, because the document's paper is a fact about the exported PDF, not a theme choice. That single decision is the clearest statement of what this system believes — the artifact outranks the interface.",
+    "keyCharacteristics": [
+      "Warm-gray proofing surface; white paper as the only high-value element on screen.",
+      "Violet #7c6af7 held in reserve: primary actions, active state, focus, and one brand mark — nothing else.",
+      "1px hairlines over fills for all structural separation; 8px control radius, 10px panel radius.",
+      "One motion curve (ease-out) and two durations (150ms, 200ms), applied to color and opacity, not to layout.",
+      "Desktop-first three-pane workspace that collapses to fullscreen canvas in one click per pane.",
+      "Light and dark share one token set; only the desk and instruments flip."
+    ],
+    "rules": [
+      {
+        "name": "The Reserved Violet Rule",
+        "body": "The accent appears on at most ~10% of any screen. Its rarity is what makes it read as \"this is the action.\" If two violet elements compete in one viewport, one of them is wrong — demote it to an ink or a hairline.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Inks Rule",
+        "body": "Text is ink, ink-soft, or ink-faint. Never an ad-hoc gray, never a text-black/60, never an opacity on a text node. The three steps are the whole hierarchy.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paper Is Fixed Rule",
+        "body": "--page is #ffffff in light and dark. It represents the exported sheet, not the app theme. A dark-mode document preset changes the document's page color through document settings; the token never flips.",
+        "section": "colors"
+      },
+      {
+        "name": "The Field Flips Rule",
+        "body": "Anything a user types into sits on --field, never on --page. --page is pinned white on purpose; text follows --ink, which lifts in dark mode. Reusing the paper as a field surface is how dark mode ends up with light text on white. The full-width form fields use the Warm Desk surface for the same reason.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Face Rule",
+        "body": "Inter for all chrome, monospace for machine data, and the document's own font only inside the rendered page. No third typeface enters the interface.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Numerals Rule",
+        "body": "Any number that can change in place — quotas, zoom percentage, hex readouts, page counts — is set tabular-nums. Digits that jitter as they update are a defect, not a style choice.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tiny-Text Earns-It Rule",
+        "body": "Nothing in the interface is set below 11px except the two 10px footnotes, and each of those sits directly beneath the control it explains. Small text must be attached to something the user is already looking at; it is never a place to park copy you could not fit.",
+        "section": "typography"
+      },
+      {
+        "name": "The Chrome Height Rule",
+        "body": "Chrome elements are 28px (icon buttons, tabs), 32px (controls in the top bar), 36px (form inputs), 40px (strips), 48px (the top bar). Pick from that set; a 30px or 34px control is a bug.",
+        "section": "layout"
+      },
+      {
+        "name": "The Canvas Gutter Rule",
+        "body": "The Paper Canvas keeps at least 24px of breathing room on every side of the paper. Fit-to-width always subtracts that gutter before computing scale, so the sheet never touches the pane edge.",
+        "section": "layout"
+      },
+      {
+        "name": "The 150ms Rule",
+        "body": "Every state transition is 150ms on the ease-out curve, and no transition touches a layout property. If a change needs longer to feel right, the change is too large — reduce it rather than extending the duration.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One Declaration Rule",
+        "body": "A surface has a hairline or a shadow, not both. The exceptions are the paper (a physical object) and floating layers that must be separated from arbitrary content behind them.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No Ambient Glow Rule",
+        "body": "Shadows carry an offset and a soft blur. No zero-offset colored halos, no shadows used as emphasis, no shadow that a hairline could have done.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep the paper the brightest thing on screen. If any chrome element out-values #ffffff, it has gone too far.",
+      "Do use 1px hairlines for structure and reach for a shadow only when a surface genuinely lifts off the desk.",
+      "Do keep the accent under ~10% of any viewport, and use it for action, active state, focus, and the wordmark's \"Mark\" — nothing else.",
+      "Do draw the 2px accent focus outline on every interactive element, and never suppress it.",
+      "Do show locked paid controls as visibly disabled rather than hidden, with the lock opening the pricing modal.",
+      "Do set tabular-nums on any value that updates in place.",
+      "Do pick control heights from 28 / 32 / 36 / 40 / 48px.",
+      "Do keep the caret, text selection, and scrollbars in the palette — caret-color: var(--accent), selection in the accent tint.",
+      "Do attach small text to the control it explains, as the page-number format hint does. Nothing sits below 11px except those two 10px footnotes.",
+      "Do write error copy that names the problem and the recovery, in the product's own plain voice."
+    ],
+    "donts": [
+      "Don't add gradients — not on buttons, not on banners, not as text fills. The one sanctioned exception is a translucent bg-surface/95 plus backdrop-blur on the floating zoom pill, which exists so page content stays readable behind it.",
+      "Don't introduce a second accent hue. One violet, one danger red, and neutrals. Nothing else is a color.",
+      "Don't use a shadow and a border on the same surface to make it look more important.",
+      "Don't build card grids, dashboard tiles, or metric blocks. This is a workspace, not an admin panel; the panes are the layout.",
+      "Don't theme the document paper. It is #ffffff in both themes and only a document preset may change it.",
+      "Don't set interface text below 10px, or above 24px, and don't open a new size between the steps above — the ramp is 10 / 11 / 12 / 14 / 15 / 16 / 18 / 24.",
+      "Don't use monospace for anything that is not code, an identifier, or a measurement.",
+      "Don't add a second motion curve or a second duration. Everything is 150ms ease-out, and no transition touches a layout property.",
+      "Don't use Unicode glyphs or emoji as icons. Every icon is an authored SVG in the 24px viewBox at 1.75 stroke, stroke-linecap: round, stroke-linejoin: round, inheriting currentColor."
+    ]
+  }
+}

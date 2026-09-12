@@ -30,7 +30,7 @@ export function StaleBanner() {
         <button
           type="button"
           onClick={() => void loadRemoteVersion()}
-          className="flex h-7 items-center rounded-control bg-accent px-2.5 text-sm font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-strong"
+          className="flex h-7 items-center rounded-control bg-accent-strong px-2.5 text-sm font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-deep"
         >
           Load changes
         </button>

@@ -175,7 +175,7 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
             type="button"
             onClick={onContinue}
             disabled={busy}
-            className="mt-4 h-9 w-full rounded-control bg-accent text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2 disabled:opacity-60"
+            className="mt-4 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
           >
             {busy
               ? 'Creating order…'
@@ -237,7 +237,7 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
           <button
             type="button"
             onClick={() => setStep('payment')}
-            className="mt-4 h-9 w-full rounded-control bg-accent text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2"
+            className="mt-4 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
           >
             I've sent the payment
           </button>
@@ -291,7 +291,7 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
             type="button"
             onClick={onClose}
             autoFocus
-            className="mt-4 h-9 w-full rounded-control bg-accent text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2"
+            className="mt-4 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
           >
             Done
           </button>

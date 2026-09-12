@@ -50,7 +50,7 @@ export function DocName({ name, onRename }: DocNameProps) {
       onKeyDown={handleKeyDown}
       spellCheck={false}
       size={Math.max(draft.length, 8)}
-      className="min-w-0 rounded-control border border-transparent px-2 py-1 text-sm text-ink transition-colors duration-150 outline-none placeholder:text-ink-faint hover:border-hairline focus:border-accent focus:bg-page"
+      className="min-w-0 rounded-control border border-transparent px-2 py-1 text-sm text-ink transition-colors duration-150 outline-none placeholder:text-ink-faint hover:border-hairline focus:border-accent focus:bg-field"
     />
   );
 }

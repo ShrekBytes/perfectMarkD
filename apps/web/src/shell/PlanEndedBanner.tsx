@@ -29,7 +29,7 @@ export function PlanEndedBanner() {
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         <Link
           to="/pricing"
-          className="flex h-7 items-center rounded-control bg-accent px-2.5 text-sm font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-strong"
+          className="flex h-7 items-center rounded-control bg-accent-strong px-2.5 text-sm font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-deep"
         >
           See plans
         </Link>

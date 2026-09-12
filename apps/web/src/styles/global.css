@@ -15,13 +15,18 @@
   --surface: #faf9f7; /* chrome surfaces: top bar + side panes */
   --surface-hover: #efede7;
   --page: #ffffff; /* document paper — white in both themes */
+  --field: #ffffff; /* compact field surface — one step off its panel, dark-safe */
   --ink: #232220;
   --ink-soft: #5f5b53;
-  --ink-faint: #918c81;
+  /* Tertiary text still carries real information (page labels, timestamps,
+     helper notes), so the faint step holds WCAG AA (≥4.5:1) on every surface
+     it can sit on — the warmest one included. */
+  --ink-faint: #6e6a60;
   --hairline: #e7e3da;
   --hairline-strong: #d5d0c4;
-  --accent: #7c6af7;
-  --accent-strong: #6a55f2;
+  --accent: #7c6af7; /* the identity violet: text, rings, caret, tints — never under white text */
+  --accent-strong: #6a55f2; /* filled-control fill: 4.8:1 with white text, both themes */
+  --accent-deep: #5b46d9; /* filled-control hover/active */
   --accent-soft: rgb(124 106 247 / 0.11);
   --accent-ink: #ffffff;
   --danger: #dc2626; /* destructive actions (delete) */
@@ -32,13 +37,21 @@
   --surface: #2b2a30;
   --surface-hover: #36353c;
   --page: #ffffff;
+  /* Fields must flip with the theme (unlike --page) or their text — which
+     follows --ink — lands light-on-white and becomes unreadable. */
+  --field: #232227;
   --ink: #ecebe8;
   --ink-soft: #b4b1aa;
-  --ink-faint: #827e76;
+  /* AA like its light twin: the faint step clears 4.5:1 against every dark
+     surface it touches (the hover fill is the worst case). */
+  --ink-faint: #a5a197;
   --hairline: #3c3b41;
   --hairline-strong: #4b4a52;
   --accent: #7c6af7;
-  --accent-strong: #8e7ef9;
+  /* White-on-violet contrast is theme-independent, so fills no longer lift
+     in dark mode — lifting to #8e7ef9 measured 3.2:1, a hard AA failure. */
+  --accent-strong: #6a55f2;
+  --accent-deep: #5b46d9;
   --accent-soft: rgb(124 106 247 / 0.2);
   --accent-ink: #ffffff;
   --danger: #f87171;
@@ -50,6 +63,7 @@
   --color-surface: var(--surface);
   --color-surface-hover: var(--surface-hover);
   --color-page: var(--page);
+  --color-field: var(--field);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-ink-faint: var(--ink-faint);
@@ -57,6 +71,7 @@
   --color-hairline-strong: var(--hairline-strong);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-accent-deep: var(--accent-deep);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
   --color-danger: var(--danger);

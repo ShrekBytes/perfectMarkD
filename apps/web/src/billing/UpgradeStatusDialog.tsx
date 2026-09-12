@@ -79,7 +79,7 @@ export function UpgradeStatusDialog({ onClose }: UpgradeStatusDialogProps) {
               onClose();
               navigate('/pricing');
             }}
-            className="mt-3 h-8 rounded-control border border-accent/40 bg-accent-soft px-3 text-xs font-medium text-accent outline-offset-2 outline-accent hover:bg-accent hover:text-accent-ink focus-visible:outline-2"
+            className="mt-3 h-8 rounded-control border border-accent/40 bg-accent-soft px-3 text-xs font-medium text-accent outline-offset-2 outline-accent hover:bg-accent-strong hover:text-accent-ink focus-visible:outline-2"
           >
             View plans
           </button>

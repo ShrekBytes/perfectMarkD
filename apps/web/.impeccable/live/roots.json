@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "appRoot": "/home/samy/Documents/GitHub/perfectMarkD/apps/web",
+  "repoRoot": "/home/samy/Documents/GitHub/perfectMarkD",
+  "contextRoot": "/home/samy/Documents/GitHub/perfectMarkD/apps/web",
+  "sessionRoot": "/home/samy/Documents/GitHub/perfectMarkD/apps/web/.impeccable/live",
+  "productPath": "/home/samy/Documents/GitHub/perfectMarkD/apps/web/PRODUCT.md",
+  "designPath": "/home/samy/Documents/GitHub/perfectMarkD/apps/web/DESIGN.md",
+  "resolvedFrom": "cwd"
+}

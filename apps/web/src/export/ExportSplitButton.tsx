@@ -7,6 +7,7 @@ import {
   SpinnerIcon,
 } from '../shell/icons';
 import { useAccountStore } from '../auth/account-store';
+import { useEscapeLayer, useMenuKeyboard } from '../shell/focus';
 import { PricingModal } from '../pricing/PricingModal';
 import { PrintHintDialog } from './PrintHintDialog';
 import { useClientExport, type ExportToast } from './useClientExport';
@@ -42,8 +43,10 @@ export function ExportSplitButton() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pricingOpen, setPricingOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Dropdown dismissal: outside pointer press or Escape.
+  // Dropdown dismissal on outside pointer press.
   useEffect(() => {
     if (!menuOpen) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -51,16 +54,17 @@ export function ExportSplitButton() {
         setMenuOpen(false);
       }
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
-    };
     document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
+    return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [menuOpen]);
+
+  // Escape resolves the topmost layer only and returns focus to the trigger;
+  // the menu itself roves with the arrow keys (focus.ts).
+  useEscapeLayer(menuOpen, () => {
+    setMenuOpen(false);
+    triggerRef.current?.focus();
+  });
+  useMenuKeyboard(menuRef, menuOpen, () => setMenuOpen(false));
 
   const busy = flow.busy || server.busy;
 
@@ -84,7 +88,7 @@ export function ExportSplitButton() {
   };
 
   const busyButton =
-    'transition-colors duration-150 hover:bg-accent-strong disabled:cursor-default disabled:opacity-80';
+    'transition-colors duration-150 hover:bg-accent-deep disabled:cursor-default disabled:opacity-80';
 
   const toast = flow.toast ?? server.toast;
 
@@ -94,7 +98,7 @@ export function ExportSplitButton() {
         ref={containerRef}
         data-testid="export-split"
         aria-busy={busy}
-        className="relative flex items-stretch rounded-control bg-accent text-accent-ink shadow-sm"
+        className="relative flex items-stretch rounded-control bg-accent-strong text-accent-ink shadow-sm"
       >
         <button
           type="button"
@@ -108,6 +112,7 @@ export function ExportSplitButton() {
         </button>
         <span aria-hidden="true" className="my-2 w-px bg-accent-ink/30" />
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
           disabled={busy || !flow.canExport}
@@ -121,6 +126,7 @@ export function ExportSplitButton() {
 
         {menuOpen && (
           <div
+            ref={menuRef}
             role="menu"
             aria-label="Export options"
             className="absolute right-0 top-full z-50 mt-1.5 overflow-hidden rounded-pane border border-hairline bg-surface py-1 shadow-lg"

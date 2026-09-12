@@ -37,7 +37,7 @@ export function WelcomeStrip() {
         type="button"
         data-testid="start-blank"
         onClick={() => void startBlankDocument()}
-        className="shrink-0 rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-strong"
+        className="shrink-0 rounded-control bg-accent-strong px-2.5 py-1 text-xs font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-deep"
       >
         Start blank
       </button>

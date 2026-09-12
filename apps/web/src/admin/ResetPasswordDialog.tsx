@@ -74,7 +74,7 @@ export function ResetPasswordDialog({
           data-testid="temp-password-done"
           onClick={onClose}
           autoFocus
-          className="mt-4 h-9 w-full rounded-control bg-accent text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2"
+          className="mt-4 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
         >
           Done
         </button>
@@ -108,7 +108,7 @@ export function ResetPasswordDialog({
           data-testid="confirm-reset"
           disabled={submitting}
           onClick={() => void onReset()}
-          className="h-9 flex-1 rounded-control bg-accent text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2 disabled:opacity-60"
+          className="h-9 flex-1 rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
         >
           {submitting ? 'Generating…' : 'Generate temp password'}
         </button>

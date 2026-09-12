@@ -150,7 +150,7 @@ function SectionFooter({
         data-testid={testId}
         disabled={!dirty || saving}
         onClick={onSave}
-        className="h-8 rounded-control bg-accent px-3 text-xs font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2 disabled:opacity-60"
+        className="h-8 rounded-control bg-accent-strong px-3 text-xs font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
       >
         {saving ? 'Saving…' : 'Save'}
       </button>

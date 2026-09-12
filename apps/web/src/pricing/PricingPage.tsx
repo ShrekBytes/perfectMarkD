@@ -82,7 +82,7 @@ export function PricingPage() {
       <footer className="flex flex-wrap items-center gap-3 border-t border-hairline bg-surface px-4 py-4 text-xs text-ink-soft">
         <a
           href={LICENSE_URL}
-          className="rounded-control bg-accent-soft px-2 py-0.5 font-medium text-accent transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent hover:text-accent-ink focus-visible:outline-2"
+          className="rounded-control bg-accent-soft px-2 py-0.5 font-medium text-accent transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong hover:text-accent-ink focus-visible:outline-2"
         >
           AGPL-3.0
         </a>

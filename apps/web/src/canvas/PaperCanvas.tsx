@@ -47,6 +47,15 @@ interface PaperCanvasProps {
 const clampZoom = (value: number): number =>
   Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
 
+/** Zoom that fits the page width between 24px gutters; falls back to the
+ *  current zoom when the canvas has no measurable width yet (first paint,
+ *  jsdom). */
+function fitZoomFor(pageWidth: number, clientWidth: number, fallback: number) {
+  const available = clientWidth - FIT_GUTTER_PX * 2;
+  if (available <= 0) return fallback;
+  return clampZoom(available / pageWidth);
+}
+
 /** Applies zoom to one mounted page slot: the frame wrapper takes the scaled
  *  box (and keeps layout flowing), the host inside scales from its top-left
  *  corner (set in buildPage) to stay aligned with the frame. */
@@ -150,6 +159,9 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   const headingIndexRef = useRef(new Map<string, number>());
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  /** The user has taken over the zoom (pill buttons); auto-fit stands down
+   *  for the rest of the session once they have. */
+  const userZoomedRef = useRef(false);
 
   const runRenderRef = useRef<() => Promise<void>>(async () => {});
   runRenderRef.current = async () => {
@@ -192,13 +204,20 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       const pagesEl = pagesRef.current;
       const scrollEl = scrollRef.current;
       if (!pagesEl || !scrollEl) return;
+      // "The preview is the contract": until the user takes over the zoom,
+      // every render lands at a width that keeps the whole page on the desk —
+      // first paint included, so the contract is never shown torn.
+      const zoom = userZoomedRef.current
+        ? zoomRef.current
+        : fitZoomFor(result.geometry.pw, scrollEl.clientWidth, zoomRef.current);
+      if (zoom !== zoomRef.current) setZoom(zoom);
       const prevScroll = scrollEl.scrollTop;
       headingIndexRef.current = mountPageSlots(
         pagesEl,
         result,
         docSettings,
         resolver,
-        zoomRef.current,
+        zoom,
       );
       geometryRef.current = result.geometry;
       // Keep the reader's place across re-renders (same doc, similar height).
@@ -308,6 +327,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   }, []);
 
   const zoomBy = useCallback((delta: number) => {
+    userZoomedRef.current = true;
     setZoom((current) => clampZoom(current + delta));
   }, []);
 
@@ -315,10 +335,25 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
     const geometry = geometryRef.current;
     const el = scrollRef.current;
     if (!geometry || !el) return;
-    const available = el.clientWidth - FIT_GUTTER_PX * 2;
-    if (available <= 0) return;
-    setZoom(clampZoom(available / geometry.pw));
+    userZoomedRef.current = true;
+    setZoom(fitZoomFor(geometry.pw, el.clientWidth, zoomRef.current));
   }, []);
+
+  // Until the user takes over the zoom, canvas resizes (pane drags, collapse,
+  // window resize) re-fit so the page never slips off the desk. The observer
+  // also fires on observe; fitting to the same value is a no-op.
+  const canvasReady = status === 'ready' && activeId !== null;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!canvasReady || !el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      const geometry = geometryRef.current;
+      if (!geometry || userZoomedRef.current) return;
+      setZoom(fitZoomFor(geometry.pw, el.clientWidth, zoomRef.current));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [canvasReady]);
 
   const ackLargeDoc = useCallback(() => {
     ackRef.current = true;
@@ -386,7 +421,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
               type="button"
               data-testid="render-anyway"
               onClick={ackLargeDoc}
-              className="shrink-0 rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-strong"
+              className="shrink-0 rounded-control bg-accent-strong px-2.5 py-1 text-xs font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-deep"
             >
               Render anyway
             </button>

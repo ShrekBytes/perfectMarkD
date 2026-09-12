@@ -97,7 +97,7 @@ export function VerificationQueue() {
               onClick={() => setFilter(id)}
               className={`h-8 rounded-control border px-3 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                 filter === id
-                  ? 'border-accent bg-accent text-accent-ink'
+                  ? 'border-accent bg-accent-strong text-accent-ink'
                   : 'border-hairline bg-canvas text-ink-soft hover:bg-surface-hover hover:text-ink'
               }`}
             >
@@ -235,7 +235,7 @@ export function VerificationQueue() {
                       type="button"
                       data-testid="verify-button"
                       onClick={() => setVerifying(order)}
-                      className="h-8 rounded-control bg-accent px-3 text-xs font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2"
+                      className="h-8 rounded-control bg-accent-strong px-3 text-xs font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
                     >
                       Verify
                     </button>

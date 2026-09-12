@@ -83,7 +83,7 @@ export function CompQuotaDialog({
           data-testid="confirm-comp"
           disabled={!valid || submitting}
           onClick={() => void onSubmit()}
-          className="h-9 flex-1 rounded-control bg-accent text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2 disabled:opacity-60"
+          className="h-9 flex-1 rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
         >
           {submitting ? 'Applying…' : 'Apply comp'}
         </button>

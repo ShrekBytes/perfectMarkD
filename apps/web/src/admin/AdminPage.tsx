@@ -69,7 +69,7 @@ const TABS: Array<{ id: AdminTab; label: string }> = [
             <Link
               to="/login"
               data-testid="admin-signin"
-              className="mt-4 inline-flex h-9 items-center rounded-control bg-accent px-4 text-sm font-medium text-accent-ink outline-offset-2 outline-accent hover:bg-accent-strong focus-visible:outline-2"
+              className="mt-4 inline-flex h-9 items-center rounded-control bg-accent-strong px-4 text-sm font-medium text-accent-ink outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
             >
               Sign in
             </Link>
@@ -105,7 +105,7 @@ const TABS: Array<{ id: AdminTab; label: string }> = [
                   onClick={() => setTab(id)}
                   className={`h-8 rounded-control border px-3 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                     tab === id
-                      ? 'border-accent bg-accent text-accent-ink'
+                      ? 'border-accent bg-accent-strong text-accent-ink'
                       : 'border-hairline bg-canvas text-ink-soft hover:bg-surface-hover hover:text-ink'
                   }`}
                 >

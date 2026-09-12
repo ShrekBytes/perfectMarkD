@@ -1,13 +1,16 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { useRef, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from './icons';
-import type { PaneId } from './pane-layout';
+import { PANE_LIMITS, type PaneId } from './pane-layout';
+
+/** Keyboard resize step (Shift multiplies it), in px. */
+const RESIZE_STEP = 16;
 
 interface PaneDividerProps {
   /** Which pane this divider collapses/restores; also its accessible name. */
   side: PaneId;
-  /** Current pane width in px, read once when a drag starts. */
+  /** Current pane width in px, read live (drag start, keyboard, aria). */
   getStartWidth: () => number;
-  /** Called while dragging with the pane's desired width in px. */
+  /** Called while dragging or keyboard-resizing with the pane's desired width in px. */
   onResize: (width: number) => void;
   onToggle: () => void;
   onReset: () => void;
@@ -15,7 +18,9 @@ interface PaneDividerProps {
 
 /**
  * The 1px hairline between two panes: a drag handle for resizing plus a
- * chevron toggle that collapses the adjacent pane.
+ * chevron toggle that collapses the adjacent pane. The separator is a real
+ * ARIA splitter — focusable, with Arrow-key resize and Enter to reset — and
+ * the chevron sits off-center so the middle of the line stays a drag zone.
  */
 export function PaneDivider({
   side,
@@ -26,6 +31,10 @@ export function PaneDivider({
 }: PaneDividerProps) {
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
 
+  /** The editor's divider sits at the editor's right edge (drag right =
+   *  wider); the inspector's sits at its left edge (drag left = wider). */
+  const dragSign = side === 'editor' ? 1 : -1;
+
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     drag.current = { startX: event.clientX, startWidth: getStartWidth() };
@@ -35,7 +44,10 @@ export function PaneDivider({
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!drag.current) return;
-    onResize(drag.current.startWidth + (event.clientX - drag.current.startX));
+    onResize(
+      drag.current.startWidth +
+        dragSign * (event.clientX - drag.current.startX),
+    );
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -45,6 +57,26 @@ export function PaneDivider({
     }
   };
 
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? RESIZE_STEP * 4 : RESIZE_STEP;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowUp':
+        onResize(getStartWidth() + step);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        onResize(getStartWidth() - step);
+        break;
+      case 'Enter':
+        onReset();
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+  };
+
   const CollapseIcon = side === 'editor' ? ChevronLeftIcon : ChevronRightIcon;
 
   return (
@@ -52,13 +84,18 @@ export function PaneDivider({
       role="separator"
       aria-orientation="vertical"
       aria-label={`Resize ${side} pane`}
-      className="group relative z-10 -mx-2 w-4 shrink-0 cursor-col-resize touch-none select-none"
+      aria-valuenow={Math.round(getStartWidth())}
+      aria-valuemin={side === 'editor' ? PANE_LIMITS.editorMin : PANE_LIMITS.inspectorMin}
+      title="Drag to resize — double-click or press Enter to reset"
+      tabIndex={0}
+      className="group relative z-10 -mx-2 w-4 shrink-0 cursor-col-resize touch-none select-none rounded-control outline-offset-2 outline-accent focus-visible:outline-2"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onDoubleClick={onReset}
+      onKeyDown={handleKeyDown}
     >
-      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-hairline transition-colors duration-150 group-hover:bg-accent" />
+      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-hairline transition-colors duration-150 group-focus-visible:bg-accent group-hover:bg-accent" />
       <button
         type="button"
         aria-label={`Collapse ${side} pane`}
@@ -66,7 +103,7 @@ export function PaneDivider({
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
         onClick={onToggle}
-        className="absolute left-1/2 top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-hairline bg-surface text-ink-faint opacity-0 shadow-sm transition-opacity duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 group-hover:opacity-100"
+        className="absolute left-1/2 top-6 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border border-hairline bg-surface text-ink-faint opacity-0 shadow-sm transition-opacity duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 group-focus-within:opacity-100 group-hover:opacity-100"
       >
         <CollapseIcon />
       </button>

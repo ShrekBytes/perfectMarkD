@@ -63,7 +63,7 @@ export function Section({
 }
 
 const inputClass =
-  'rounded-control border border-hairline bg-page px-2 py-1 text-xs text-ink transition-colors duration-150 outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-50';
+  'rounded-control border border-hairline bg-field px-2 py-1 text-xs text-ink transition-colors duration-150 outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-50';
 
 /** Small text input. */
 export function TextInput({
@@ -216,7 +216,7 @@ export function ColorInput({
         value={pickerHex(value)}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-6 w-8 cursor-pointer rounded-control border border-hairline bg-page p-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-6 w-8 cursor-pointer rounded-control border border-hairline bg-field p-0.5 disabled:cursor-not-allowed disabled:opacity-50"
       />
       <span className="font-mono text-[11px] text-ink-faint tabular-nums select-none">
         {value}
@@ -290,7 +290,7 @@ export function FauxUploadButton({ label = 'Upload…' }: { label?: string }) {
     <span
       aria-hidden="true"
       data-testid="faux-upload"
-      className="flex h-6 items-center gap-1 rounded-control border border-hairline bg-page px-2 text-[11px] text-ink-faint opacity-50"
+      className="flex h-6 items-center gap-1 rounded-control border border-hairline bg-field px-2 text-[11px] text-ink-faint opacity-50"
     >
       <UploadIcon />
       {label}
@@ -336,7 +336,7 @@ const INGEST_ERRORS: Record<
 };
 
 const pickerButtonClass =
-  'flex h-6 items-center gap-1 rounded-control border border-hairline bg-page px-2 text-[11px] text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2 disabled:cursor-default disabled:opacity-50';
+  'flex h-6 items-center gap-1 rounded-control border border-hairline bg-field px-2 text-[11px] text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2 disabled:cursor-default disabled:opacity-50';
 
 /**
  * An unlocked image gate's picker (billing/04): pick an image, store it as a
