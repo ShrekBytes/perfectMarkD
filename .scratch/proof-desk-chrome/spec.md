@@ -1,6 +1,6 @@
 # proof-desk-chrome — The shell joins the Proofing Desk
 
-Status: ready-for-agent
+Status: resolved (shipped in commit 36aa0e9; this line is the record)
 
 Spun from the 2026-09 design critique's verdict: "lean in further" — the Paper
 Canvas already carries "The Proofing Desk" world; the top bar, the banner

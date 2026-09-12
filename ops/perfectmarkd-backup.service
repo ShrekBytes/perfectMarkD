@@ -1,0 +1,20 @@
+[Unit]
+Description=PerfectMarkD nightly backup (db VACUUM INTO + history + env → object storage)
+Documentation=file://repo/docs/ops/restore.md
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# Install next to the repo checkout this belongs to, then edit the path:
+#   sudo cp ops/perfectmarkd-backup.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now perfectmarkd-backup.timer
+WorkingDirectory=/opt/perfectmarkd
+ExecStart=/opt/perfectmarkd/ops/backup.sh
+# The api container must be up; if it is not, the job fails loudly here and
+# journald records it (monitor the timer — see docs/ops/restore.md).
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

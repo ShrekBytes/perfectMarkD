@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the PerfectMarkD backup nightly at 03:00
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+# Catch up after downtime/hibernation instead of skipping the night.
+Persistent=true
+# RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,188 @@
+# Restore runbook (launch/03)
+
+How to bring a PerfectMarkD deployment back from backups onto a clean
+machine, and how the nightly backup that feeds it is set up. Written for the
+Admin's VPS deployment (Hetzner + Compose stack from the README); every
+command has been executed against the Compose stack as part of launch/03.
+
+> **Secrets reminder**: the backup bucket contains `.env` — which contains
+> `SESSION_SECRET` and `HISTORY_ENCRYPTION_KEY`. Treat the bucket's
+> credentials as password-grade. Without `HISTORY_ENCRYPTION_KEY` a restored
+> database's Export History files remain ciphertext forever (each download
+> fails the GCM tag check and returns a 500).
+
+## What a backup contains
+
+`ops/backup.sh` (nightly, via systemd timer) writes this layout to
+`$BACKUP_REMOTE` (an rclone remote:path, e.g. `b2:perfectmarkd-backups`):
+
+| Path | What | Retention |
+|---|---|---|
+| `db/perfectmarkd-YYYYmmdd-HHMMSS.db` | one `VACUUM INTO` snapshot per night — a standalone SQLite file (no WAL sidecars) | pruned at 30 days |
+| `history/` | exact mirror of the api container's `/data/history` (encrypted PDFs) | mirrors deletions after 30 days of grace (see below) |
+| `history-prev/YYYYmmdd-HHMMSS/` | history files deleted since the previous run (the 30-day retention purge puts expired exports here) | pruned at 30 days |
+| `env/.env` | the deployment's keys | overwritten each night |
+
+The dump is produced inside the running api container (`node
+dist/db/backup-cli.js`), which reads the live WAL database under a consistent
+snapshot and verifies the result with `PRAGMA quick_check` before it is
+uploaded. Backups run online; the API never pauses.
+
+Retention mechanics: `rclone sync --backup-dir` never *destroys* remote
+history files when they vanish locally — it moves them into that night's
+`history-prev/` directory. Both the dated db dumps and the `history-prev`
+trees are pruned at 30 days with `rclone delete --min-age 30d`.
+
+## Prerequisites (once per VPS)
+
+1. The stack from the README: `git clone` this repo, `cp .env.example .env`,
+   fill in `SESSION_SECRET` + `HISTORY_ENCRYPTION_KEY`, `docker compose up -d`.
+2. `rclone` on the host (`apt install rclone` or the single binary).
+3. An object-storage bucket (Backblaze B2 or any rclone-supported backend —
+   "~€1/mo" at this project's scale) and an rclone remote configured on the
+   host: `rclone config create b2backup b2 account=... key=...`.
+4. In `.env`: `BACKUP_REMOTE=b2backup:perfectmarkd-backups` (and optionally
+   `BACKUP_STAGE=/var/backups/perfectmarkd`).
+
+## Installing the nightly timer
+
+```sh
+sudo cp ops/perfectmarkd-backup.service ops/perfectmarkd-backup.timer /etc/systemd/system/
+# Edit WorkingDirectory= in the service to your repo checkout (default
+# /opt/perfectmarkd), then:
+sudo systemctl daemon-reload
+sudo systemctl enable --now perfectmarkd-backup.timer
+systemctl list-timers perfectmarkd-backup.timer   # next run at 03:00
+```
+
+Run it once by hand and watch it succeed before you trust it:
+
+```sh
+sudo systemctl start perfectmarkd-backup.service
+journalctl -u perfectmarkd-backup.service -n 50
+# or, without systemd: ops/backup.sh
+```
+
+## From nothing: a clean-machine restore
+
+The order matters: compose refuses to even parse without
+`SESSION_SECRET`/`HISTORY_ENCRYPTION_KEY` in `.env`, but the real `.env` is
+*inside the backup* — so bootstrap with placeholder secrets, pull the real
+`.env` from the backup, then restore data.
+
+1. **Fresh VPS, repo checked out** (`git clone` at e.g. `/opt/perfectmarkd`),
+   `rclone` installed, the same rclone remote configured (`rclone config
+   create b2backup b2 account=... key=...` — the credentials live in your
+   password manager, not in the backup).
+2. **Bootstrap `.env`** with placeholders (values are about to be replaced):
+
+   ```sh
+   cp .env.example .env
+   printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\n' \
+     "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" >> .env
+   printf 'BACKUP_REMOTE=b2backup:perfectmarkd-backups\n' >> .env
+   ```
+
+3. **Restore everything** (db + history + the real `.env`):
+
+   ```sh
+   ops/restore.sh
+   ```
+
+   It fetches the newest db dump by default; pass `--db
+   perfectmarkd-YYYYmmdd-HHMMSS.db` to pick a specific night, `--skip-env`
+   to keep the current `.env`, `--skip-history` for a db-only restore. The
+   script populates the `api-data` volume through a one-off api container —
+   the stack has not booted yet, so there is no fresh database to clobber,
+   and the restored dump gets any pending migrations applied by the first
+   real boot.
+
+4. **Boot the stack**: `docker compose up -d --build`.
+
+## §verify: proving the restore worked
+
+The point of a restore is not "containers are green" — it is that the data
+came back *decryptable*. Check in this order (all through the published Caddy
+origin, i.e. the same path users take):
+
+```sh
+BASE=http://localhost            # or https://your-domain in production
+curl -fsS "$BASE/healthz" && echo " — app up"
+
+# 1. Log in as a pre-existing user (proves users + password hashes + sessions):
+curl -fsS -c /tmp/pmd.jar "$BASE/api/auth/login" \
+  -H 'content-type: application/json' \
+  -d '{"email":"you@example.com","password":"..."}' >/dev/null
+
+# 2. List Export History (proves history rows survived):
+curl -fsS -b /tmp/pmd.jar "$BASE/api/history"
+
+# 3. Download one export and check its bytes (proves db row + encrypted file
+#    + HISTORY_ENCRYPTION_KEY all line up — GCM fails loudly if they don't):
+curl -fsS -b /tmp/pmd.jar -o /tmp/restored.pdf "$BASE/api/history/<id>"
+head -c 5 /tmp/restored.pdf   # %PDF-
+```
+
+If step 3 returns 500 on a file that exists, the restored
+`HISTORY_ENCRYPTION_KEY` does not match the one that encrypted the files —
+find the `.env` that did (the backup's, or your password manager).
+
+**Verifying Server Export end-to-end** additionally needs Chromium inside the
+api image (`npx playwright install --with-deps chromium`, launch/04 — not yet
+in the image). After launch/04: enqueue a Server Export from the app (or
+`POST /api/export`), poll `GET /api/export/jobs/<id>` until `done`, download
+the PDF. Until then, a restore is fully verified by the three steps above.
+
+## Recovering a purged history file
+
+Files the 30-day retention removed live on for 30 more days under
+`history-prev/`:
+
+```sh
+rclone lsf b2backup:perfectmarkd-backups/history-prev/
+rclone lsf b2backup:perfectmarkd-backups/history-prev/20260901-030000/
+# put it back for one user (re-encrypting is impossible; the original key
+# decrypted it — dropping it into the user's history dir restores it):
+rclone copyto b2backup:perfectmarkd-backups/history-prev/20260901-030000/<uuid>.pdf \
+  /tmp/<uuid>.pdf   # then docker compose cp api:/data/history/<userId>/ …
+```
+
+The database row for a purged file no longer exists (it was purged too), so a
+file restored this way is not listed in the UI — it is an emergency dig-out,
+not a rollback.
+
+## Testing the restore (rehearsal on a workstation)
+
+The full cycle — backup a seeded stack, wipe it, restore onto "clean
+machinery", verify — can be rehearsed without any cloud account by pointing
+`BACKUP_REMOTE` at a local directory (rclone treats absolute paths as the
+local backend):
+
+```sh
+export BACKUP_REMOTE=/tmp/pmd-backup-rehearsal   # in .env, not just exported!
+cp .env.example .env && printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nBACKUP_REMOTE=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
+
+docker compose up -d --build          # seed: register a user, grant premium,
+ops/backup.sh                        # … store history via the api
+docker compose down -v                # the "clean machine"
+ops/restore.sh && docker compose up -d
+# …then §verify
+```
+
+This exact rehearsal is what launch/03 executed for its acceptance; keep it
+green when you touch the backup scripts.
+
+## Notes
+
+- Self-hosters: this runbook is the Admin's own deployment story. A
+  Self-Hosted Instance backs up its own data its own way (`db/` + `history/`
+  + keys are the complete state; `docker compose down -v` loses everything
+  not on your own disks).
+- Backups require the api container to be running (the dump runs inside it);
+  a stopped stack fails the job loudly rather than uploading a stale or
+  empty backup. Monitor the timer (`journalctl -u
+  perfectmarkd-backup.service`), and treat a failed night as an alert, not a
+  warning.
+- `BACKUP_REMOTE` accepting a local path is what makes the rehearsal above
+  possible — on the VPS it is a real remote, never a local path.
