@@ -1,3 +1,5 @@
+When working in frontend or with /impeccable skills, use vision, if browser not available, use headless chrome or playwright.
+
 ## Agent skills
 
 ### Issue tracker
