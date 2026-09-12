@@ -206,6 +206,35 @@ describe('PaperCanvas rendering', () => {
     // The render chain settles within the flush above; aria-busy settles with it.
     expect(scroll.getAttribute('aria-busy')).toBe('false');
   });
+
+  it('surfaces a failed render as a persistent notice and Retry recovers', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const spy = vi
+      .spyOn(pipelineModule, 'runDocumentPipeline')
+      .mockRejectedValueOnce(new Error('engine exploded'));
+
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+
+    // The failure is user-facing, not console-only: the notice names the
+    // stale-preview risk and offers the way out.
+    const notice = screen.getByTestId('canvas-error-notice');
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice).toHaveTextContent('may be out of date');
+    expect(consoleError).toHaveBeenCalled();
+
+    // Retry runs the render again (now against the real pipeline) and a
+    // success clears the notice and lands the pages.
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await flushRenderRaw(0);
+    await flushRender();
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('canvas-error-notice')).not.toBeInTheDocument();
+    expect(pageHosts()).toHaveLength(1);
+  });
 });
 
 describe('PaperCanvas zoom pill', () => {

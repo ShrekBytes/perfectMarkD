@@ -131,7 +131,7 @@ function mountPageSlots(
  * (debounced, plus manual renders) and mounts the result as one shadow-DOM
  * page per layout. Pages are imperative DOM — the engine hands over finished
  * subtrees, which React doesn't reconcile — while the zoom pill, labels,
- * shimmer, and toast are React-rendered chrome around them.
+ * shimmer, and floating notices are React-rendered chrome around them.
  */
 export function PaperCanvas({ ref }: PaperCanvasProps) {
   const status = useDocumentStore((state) => state.status);
@@ -143,6 +143,8 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   const [rendering, setRendering] = useState(false);
   const [pageCount, setPageCount] = useState(0);
   const [largeDocCount, setLargeDocCount] = useState<number | null>(null);
+  /** The last engine run threw: the preview may be stale until one succeeds. */
+  const [renderFailed, setRenderFailed] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
@@ -223,9 +225,13 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       // Keep the reader's place across re-renders (same doc, similar height).
       scrollEl.scrollTop = Math.min(prevScroll, scrollEl.scrollHeight);
       setPageCount(result.layouts.length);
+      setRenderFailed(false);
     } catch (error) {
-      // A failed render keeps the previous pages on screen.
+      // A failed render keeps the previous pages on screen — and now says so:
+      // the notice below is the user-facing half, the console the debugging
+      // half. Editing continues; the next successful render clears the notice.
       console.error('Paper Canvas render failed:', error);
+      setRenderFailed(true);
     } finally {
       if (token === tokenRef.current) setRendering(false);
     }
@@ -256,6 +262,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
     ackRef.current = false;
     setPageCount(0);
     setLargeDocCount(null);
+    setRenderFailed(false);
     return () => {
       tokenRef.current += 1;
       resolverRef.current?.resolver.dispose();
@@ -402,6 +409,31 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
           <div className="w-56 max-w-[60%] animate-pulse space-y-2">
             <div className="aspect-[1/1.414] w-full rounded-pane border border-hairline bg-surface-hover" />
             <div className="mx-auto h-2.5 w-20 rounded bg-surface-hover" />
+          </div>
+        </div>
+      )}
+
+      {renderFailed && (
+        <div
+          role="status"
+          data-testid="canvas-error-notice"
+          className="absolute inset-x-0 top-3 z-10 flex justify-center px-4"
+        >
+          {/* The danger twin of the Tinted Notice: the preview is the
+              contract, so a broken render is announced over the desk and
+              stays until a render succeeds — the user must never edit
+              against a stale preview they were not told about. */}
+          <div className="flex animate-fade-in items-center gap-3 rounded-control border border-danger/40 bg-danger/10 px-3 py-2 shadow-xl">
+            <p className="text-xs text-danger">
+              The preview failed to render — the pages shown may be out of date.
+            </p>
+            <button
+              type="button"
+              onClick={() => void runRenderRef.current()}
+              className="shrink-0 rounded-control border border-danger/30 px-2.5 py-1 text-xs font-medium text-danger transition-colors duration-150 outline-offset-2 outline-accent hover:bg-danger/20 focus-visible:outline-2"
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}

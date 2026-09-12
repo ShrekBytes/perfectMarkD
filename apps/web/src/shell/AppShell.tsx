@@ -4,7 +4,7 @@ import { StaleBanner } from './StaleBanner';
 import { PlanEndedBanner } from './PlanEndedBanner';
 import { CollapsedPaneToggle, PaneDivider } from './PaneDivider';
 import { WelcomeStrip } from './WelcomeStrip';
-import { UploadIcon } from './icons';
+import { CloseIcon, UploadIcon } from './icons';
 import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
 import { useDocumentStore } from '../documents/store';
@@ -23,8 +23,9 @@ import { Inspector } from '../inspector/Inspector';
  * Panes collapse via their divider toggles; with both collapsed the shell is in
  * fullscreen-canvas mode. Document state lives in the document store; the
  * Library drawer, delete-undo toast, staleness banner, plan-ended banner, and
- * .md drag-drop import mount here. The account store refreshes on a watchdog
- * so Plan Expiry re-locks the gates in a long-lived tab (billing/04).
+ * .md drag-drop import (with a rejection toast for non-Markdown files) mount
+ * here. The account store refreshes on a watchdog so Plan Expiry re-locks the
+ * gates in a long-lived tab (billing/04).
  */
 export function AppShell() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +48,8 @@ export function AppShell() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [upgradeStatusOpen, setUpgradeStatusOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /** Names of files from the last drop that were not Markdown. */
+  const [rejectedDrop, setRejectedDrop] = useState<string[] | null>(null);
 
   /** The canvas exposes its API through this ref so the editor's Ctrl/Cmd+Enter
    *  and scroll events reach it without threading through re-renders. */
@@ -86,7 +89,18 @@ export function AppShell() {
     },
     [importDocument],
   );
-  const draggingFiles = useFileDrop(importFiles);
+  const handleRejectedDrop = useCallback((files: File[]) => {
+    setRejectedDrop(files.map((file) => file.name));
+  }, []);
+  const draggingFiles = useFileDrop(importFiles, handleRejectedDrop);
+
+  // The rejected-drop toast leaves on its own — transient chrome for a
+  // transient mistake — and resets its window when another drop lands.
+  useEffect(() => {
+    if (!rejectedDrop) return;
+    const timer = setTimeout(() => setRejectedDrop(null), 6000);
+    return () => clearTimeout(timer);
+  }, [rejectedDrop]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-canvas text-ink">
@@ -210,6 +224,29 @@ export function AppShell() {
         <UpgradeStatusDialog onClose={() => setUpgradeStatusOpen(false)} />
       )}
       {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
+      {rejectedDrop && (
+        <div
+          role="status"
+          data-testid="drop-rejected-toast"
+          className="pointer-events-none fixed inset-x-0 bottom-5 z-[60] flex justify-center"
+        >
+          <div className="animate-fade-in pointer-events-auto flex items-center gap-3 rounded-pane border border-hairline-strong bg-surface px-4 py-2.5 shadow-lg">
+            <p className="text-sm text-ink">
+              {rejectedDrop.length === 1
+                ? `Only .md files can be imported. "${rejectedDrop[0]}" is not Markdown — convert it to .md or paste its text into the editor.`
+                : `Only .md files can be imported. ${rejectedDrop.length} of the dropped files are not Markdown — convert them to .md or paste their text into the editor.`}
+            </p>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setRejectedDrop(null)}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        </div>
+      )}
       <DeleteToast />
     </div>
   );

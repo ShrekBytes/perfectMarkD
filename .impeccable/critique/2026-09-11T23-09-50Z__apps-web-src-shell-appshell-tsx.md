@@ -10,6 +10,7 @@ target_fingerprint: "sha256:8634d8bd27036af037cdb1a1e702f1fa78874f6848f868c0a681
 target_path: /home/samy/Documents/GitHub/perfectMarkD/apps/web/src/shell/AppShell.tsx
 timestamp: 2026-09-11T23-09-50Z
 slug: apps-web-src-shell-appshell-tsx
+closed: true
 ---
 # Critique — AppShell (`apps/web/src/shell/AppShell.tsx`)
 

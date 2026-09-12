@@ -321,7 +321,7 @@ Soft, small, and consistent: the system rounds just enough to feel built rather 
 ### Chips
 
 - **Style:** 32px tall, 8px radius, 1px hairline border, Ink Soft text at 12px, `tabular-nums`, 10px horizontal padding, no fill.
-- **State:** the quota chip is the only chip. At exhaustion it swaps to a `danger` border and 10% danger tint with danger text. It renders nothing at all when there is no entitlement — absence, not an empty state.
+- **State:** the quota chip is the only chip. At exhaustion it swaps to a `danger` border and 10% danger tint with danger text, and stops being a readout: it becomes a button that opens the pricing modal — the ceiling's recovery path, the same route every gate lock takes. A live allowance renders nothing at all when there is no entitlement — absence, not an empty state.
 
 ### Cards / Containers
 

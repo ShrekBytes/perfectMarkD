@@ -191,7 +191,7 @@ it('shows the staleness banner when another tab changed the active document', as
     useDocumentStore.setState({ remotePending: makeRemotePending() });
   });
   expect(screen.getByTestId('stale-banner')).toHaveTextContent(
-    'This document was changed in another tab',
+    'This document changed in another tab',
   );
 
   await userEvent.click(screen.getByRole('button', { name: 'Keep mine' }));
@@ -226,6 +226,48 @@ it('imports dropped .md files anywhere in the window', async () => {
     expect(useDocumentStore.getState().name).toBe('dropped');
     expect(useDocumentStore.getState().markdown).toBe('# Dropped');
   });
+});
+
+it('rejects a non-.md drop with a toast naming the problem and recovery', async () => {
+  await renderReadyShell();
+  const before = useDocumentStore.getState().docs.length;
+
+  const file = new File(['%PDF'], 'resume.pdf', { type: 'application/pdf' });
+  fireEvent.dragEnter(window, {
+    dataTransfer: { types: ['Files'], files: [file] },
+  });
+  fireEvent.drop(window, { dataTransfer: { types: ['Files'], files: [file] } });
+
+  // The drop never disappears into a filter: the toast names the file, the
+  // rule, and the way out — and nothing was imported.
+  const toast = screen.getByTestId('drop-rejected-toast');
+  expect(toast).toHaveTextContent('Only .md files can be imported');
+  expect(toast).toHaveTextContent('resume.pdf');
+  expect(toast).toHaveTextContent('paste its text into the editor');
+  expect(useDocumentStore.getState().docs.length).toBe(before);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+  expect(screen.queryByTestId('drop-rejected-toast')).not.toBeInTheDocument();
+});
+
+it('imports the Markdown of a mixed drop and reports the rest', async () => {
+  await renderReadyShell();
+
+  const md = new File(['# Mixed'], 'mixed.md', { type: 'text/markdown' });
+  const pdf = new File(['%PDF'], 'poster.pdf', { type: 'application/pdf' });
+  fireEvent.dragEnter(window, {
+    dataTransfer: { types: ['Files'], files: [md, pdf] },
+  });
+  fireEvent.drop(window, {
+    dataTransfer: { types: ['Files'], files: [md, pdf] },
+  });
+
+  await waitFor(() => {
+    expect(useDocumentStore.getState().name).toBe('mixed');
+  });
+  expect(screen.getByTestId('drop-rejected-toast')).toHaveTextContent(
+    'poster.pdf',
+  );
 });
 
 it('edits settings in the Inspector and re-renders the canvas pages', async () => {

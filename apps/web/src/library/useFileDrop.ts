@@ -9,13 +9,20 @@ function isMarkdownFile(file: File): boolean {
 /**
  * Window-level drag-and-drop for .md import, active anywhere in the app.
  * Returns whether files are currently dragged over the window so callers can
- * show a drop affordance.
+ * show a drop affordance. Non-Markdown files never reach onFiles: they are
+ * reported through onRejected so the drop names the problem instead of
+ * failing silently (a mixed drop imports the Markdown and reports the rest).
  */
-export function useFileDrop(onFiles: (files: File[]) => void): boolean {
+export function useFileDrop(
+  onFiles: (files: File[]) => void,
+  onRejected?: (files: File[]) => void,
+): boolean {
   const [dragging, setDragging] = useState(false);
   const depth = useRef(0);
   const onFilesRef = useRef(onFiles);
   onFilesRef.current = onFiles;
+  const onRejectedRef = useRef(onRejected);
+  onRejectedRef.current = onRejected;
 
   useEffect(() => {
     const hasFiles = (event: DragEvent) =>
@@ -41,10 +48,11 @@ export function useFileDrop(onFiles: (files: File[]) => void): boolean {
       event.preventDefault();
       depth.current = 0;
       setDragging(false);
-      const files = Array.from(event.dataTransfer?.files ?? []).filter(
-        isMarkdownFile,
-      );
+      const dropped = Array.from(event.dataTransfer?.files ?? []);
+      const files = dropped.filter(isMarkdownFile);
+      const rejected = dropped.filter((file) => !isMarkdownFile(file));
       if (files.length > 0) onFilesRef.current(files);
+      if (rejected.length > 0) onRejectedRef.current?.(rejected);
     };
 
     window.addEventListener('dragenter', onDragEnter);
