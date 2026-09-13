@@ -1,13 +1,16 @@
 ## Browser Automation & Visual Verification
 
-For frontend, `/impeccable`, and any UI work — plus backend changes that affect rendered state — verify visually with vision in a real browser.
+For frontend, `/impeccable`, and any UI work — plus backend changes that affect rendered state — verify in a real browser. The loop branches on image-input support:
+
+- **Vision:** take `agent-browser screenshot`s and inspect the pixels directly.
+- **Text-only:** screenshots are unreadable to you — verify structure with `snapshot` and DOM/text extraction, and save screenshots for the user's aesthetic review. Report their verdict, never a sighting of your own. `pnpm test:e2e` guards the rendered paper and pane layout only — a pass says nothing about the app chrome's look.
 
 Prefer the `agent-browser` skill (run `agent-browser skills get core` for the full guide; `agent-browser --help` for commands). Use an isolated session: `export AGENT_BROWSER_SESSION="$(agent-browser session id --scope worktree --prefix task)"`
 
 Core loop:
 1. `agent-browser open <url>` — navigate
 2. `agent-browser snapshot -i` — get refs (`@e1`, `@e2`)
-3. `agent-browser click @e1` / `fill @e2 "text"` — interact via refs; `screenshot` to see pixels
+3. `agent-browser click @e1` / `fill @e2 "text"` — interact via refs; `screenshot` if you can read images
 4. Re-snapshot after any page change — refs expire
 
 If `agent-browser` is unavailable (not installed, `doctor` fails), fall back to whatever browser automation your current harness provides and note the fallback in your reply. Don't drive the user's visible browser without permission. Run `agent-browser close` when done.
