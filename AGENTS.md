@@ -1,4 +1,22 @@
-When working in frontend or with /impeccable skills, use vision, if browser not available, use headless chrome or playwright.
+## Browser Automation & Visual Verification
+
+For frontend, `/impeccable`, and any UI work — plus backend changes that affect rendered state — verify visually with vision in a real browser.
+
+Prefer the `agent-browser` skill (run `agent-browser skills get core` for the full guide; `agent-browser --help` for commands). Use an isolated session: `export AGENT_BROWSER_SESSION="$(agent-browser session id --scope worktree --prefix task)"`
+
+Core loop:
+1. `agent-browser open <url>` — navigate
+2. `agent-browser snapshot -i` — get refs (`@e1`, `@e2`)
+3. `agent-browser click @e1` / `fill @e2 "text"` — interact via refs; `screenshot` to see pixels
+4. Re-snapshot after any page change — refs expire
+
+If `agent-browser` is unavailable (not installed, `doctor` fails), fall back to whatever browser automation your current harness provides and note the fallback in your reply. Don't drive the user's visible browser without permission. Run `agent-browser close` when done.
+
+Existing `test:e2e` suite still uses Playwright — run it as-is. The agent-browser rule is for ad-hoc browsing/verification only.
+
+## Workspace
+pnpm@11.3.0, node >=22. `pnpm -r build` / `pnpm typecheck` / `pnpm test` / `pnpm lint`.
+Apps: `apps/web` (Vite + React, `pnpm --filter @perfectmarkd/web dev` → `http://localhost:5173`), `apps/server` (Hono + Drizzle, `http://localhost:3000`), `packages/core`. Web `/api` proxies to the API origin.
 
 ## Agent skills
 
