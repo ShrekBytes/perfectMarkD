@@ -14,7 +14,9 @@ import { PricingModal } from '../pricing/PricingModal';
  * path: a button that opens the pricing modal — the same route every gate
  * lock takes — because the only in-app fix for a used-up allowance is more
  * quota (the reset itself is explained in the title). A live allowance stays
- * a plain readout.
+ * a plain readout. Exhaustion is a state, not a failure: it renders as the
+ * graphite inversion (DESIGN.md Graphite Inversion Rule), keeping --danger
+ * for destructive actions and failure text only.
  */
 export function QuotaChip() {
   const entitlement = useAccountStore((state) => state.entitlement);
@@ -27,7 +29,7 @@ export function QuotaChip() {
   const exhausted = used >= limit;
   const chipClasses = `flex h-8 select-none items-center rounded-control border px-2.5 text-xs tabular-nums ${
     exhausted
-      ? 'border-danger/40 bg-danger/10 text-danger'
+      ? 'border-accent-strong bg-accent-strong text-accent-ink'
       : 'border-hairline text-ink-soft'
   }`;
 
@@ -41,7 +43,7 @@ export function QuotaChip() {
           title={`Server Export: all ${limit} of this period's exports are used — it resets next period`}
           aria-label={`Server Export quota used up (${used} of ${limit}) — open plans`}
           onClick={() => setPricingOpen(true)}
-          className={`${chipClasses} shrink-0 outline-offset-2 outline-accent transition-colors duration-150 hover:bg-danger/20 focus-visible:outline-2`}
+          className={`${chipClasses} shrink-0 outline-offset-2 outline-accent transition-colors duration-150 hover:bg-accent-deep focus-visible:outline-2`}
         >
           {used}/{limit}
         </button>

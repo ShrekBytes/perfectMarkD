@@ -3,8 +3,8 @@
 // Style / Header-Footer). Every edit flows through updateActive — the Paper
 // Canvas re-renders on the settings reference change (debounced there), and
 // the store autosaves. The paid-feature gates read the entitlement flags from
-// GET /api/me (billing/04): locked controls show a 🔒 that opens the pricing
-// modal; open ones are live — expiry re-locks them gracefully.
+// GET /api/me (billing/04): locked controls show a lock glyph that opens the
+// pricing modal; open ones are live — expiry re-locks them gracefully.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react';

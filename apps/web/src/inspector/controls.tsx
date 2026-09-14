@@ -260,9 +260,9 @@ export function Checkbox({
 }
 
 /**
- * The 🔒 on a paid control: inert-but-explaining. Clicking opens the pricing
- *  modal (never a signup wall); the control beside it is disabled so the gate
- *  reads as locked, not broken.
+ * The lock glyph on a paid control: inert-but-explaining. Clicking opens the
+ *  pricing modal (never a signup wall); the control beside it is disabled so
+ *  the gate reads as locked, not broken.
  */
 export function GateLock({
   onClick,

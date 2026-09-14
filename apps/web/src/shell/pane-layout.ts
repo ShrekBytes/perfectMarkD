@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 /** Sizing contract for the three-pane shell, per the editor-app layout spec. */
 export const PANE_LIMITS = {
@@ -58,6 +58,8 @@ export function clampPaneWidth(
  * and fullscreen canvas mode (both side panes collapsed).
  *
  * `containerRef` only needs `clientWidth` — React refs satisfy it structurally.
+ * Container-width changes (window resize) bump a `containerWidth` state so
+ * width-dependent readouts like the splitter's aria-valuemax re-render.
  */
 export function usePaneLayout(containerRef: {
   current: { clientWidth: number } | null;
@@ -66,6 +68,21 @@ export function usePaneLayout(containerRef: {
     editor: { collapsed: false, width: null },
     inspector: { collapsed: false, width: PANE_LIMITS.inspectorDefault },
   });
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Track the container's width so aria-valuemax stays live on window
+  // resizes (pane drags change layout state anyway; window resizes don't).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      setContainerWidth(el.clientWidth);
+    });
+    // The ref type is structural (clientWidth only) so tests can stub it;
+    // at runtime it is always the shell's div.
+    observer.observe(el as Element);
+    return () => observer.disconnect();
+  }, [containerRef]);
 
   const togglePane = useCallback((id: PaneId) => {
     setLayout((current) => ({
@@ -100,8 +117,30 @@ export function usePaneLayout(containerRef: {
 
   const fullscreen = layout.editor.collapsed && layout.inspector.collapsed;
 
+  /** The largest width the pane can take right now (aria-valuemax for the
+   *  splitter): the clamp's ceiling, floored at the pane minimum. Reads the
+   *  observed `containerWidth` so it re-renders on window resizes; the live
+   *  DOM width wins when they disagree (mid-drag frames). */
+  const maxPaneWidth = useCallback(
+    (id: PaneId) =>
+      clampPaneWidth(
+        id,
+        Number.POSITIVE_INFINITY,
+        containerRef.current?.clientWidth || containerWidth,
+        layout,
+      ),
+    [layout, containerRef, containerWidth],
+  );
+
   return useMemo(
-    () => ({ ...layout, fullscreen, togglePane, setPaneWidth, resetPaneWidth }),
-    [layout, fullscreen, togglePane, setPaneWidth, resetPaneWidth],
+    () => ({
+      ...layout,
+      fullscreen,
+      togglePane,
+      setPaneWidth,
+      maxPaneWidth,
+      resetPaneWidth,
+    }),
+    [layout, fullscreen, togglePane, setPaneWidth, maxPaneWidth, resetPaneWidth],
   );
 }

@@ -147,6 +147,8 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   const activeId = useDocumentStore((state) => state.activeId);
   const markdown = useDocumentStore((state) => state.markdown);
   const settings = useDocumentStore((state) => state.settings);
+  const docCount = useDocumentStore((state) => state.docs.length);
+  const createDocument = useDocumentStore((state) => state.createDocument);
 
   const [zoom, setZoom] = useState(1);
   const [rendering, setRendering] = useState(false);
@@ -392,6 +394,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   }, []);
 
   if (status !== 'ready' || !activeId) {
+    const emptyLibrary = status === 'ready' && docCount === 0;
     return (
       <EmptyState
         icon={<PagesIcon />}
@@ -399,7 +402,22 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
         hint={
           status === 'loading'
             ? 'Loading your documents…'
-            : 'Open a document from the Library to see its pages.'
+            : emptyLibrary
+              ? 'Create a document to see its pages here.'
+              : 'Open a document from the Library to see its pages.'
+        }
+        action={
+          status !== 'loading' ? (
+            <button
+              type="button"
+              data-testid="empty-canvas-new-doc"
+              onClick={() => void createDocument()}
+              className="flex h-8 items-center justify-center gap-1.5 rounded-control bg-accent-strong px-3 text-sm text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
+            >
+              <PlusIcon />
+              New document
+            </button>
+          ) : undefined
         }
       />
     );

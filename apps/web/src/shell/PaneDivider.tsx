@@ -10,6 +10,8 @@ interface PaneDividerProps {
   side: PaneId;
   /** Current pane width in px, read live (drag start, keyboard, aria). */
   getStartWidth: () => number;
+  /** Largest width the pane can take right now, read live for aria-valuemax. */
+  getMaxWidth: () => number;
   /** Called while dragging or keyboard-resizing with the pane's desired width in px. */
   onResize: (width: number) => void;
   onToggle: () => void;
@@ -25,6 +27,7 @@ interface PaneDividerProps {
 export function PaneDivider({
   side,
   getStartWidth,
+  getMaxWidth,
   onResize,
   onToggle,
   onReset,
@@ -86,6 +89,7 @@ export function PaneDivider({
       aria-label={`Resize ${side} pane`}
       aria-valuenow={Math.round(getStartWidth())}
       aria-valuemin={side === 'editor' ? PANE_LIMITS.editorMin : PANE_LIMITS.inspectorMin}
+      aria-valuemax={Math.round(getMaxWidth())}
       title="Drag to resize — double-click or press Enter to reset"
       tabIndex={0}
       className="group relative z-10 -mx-2 w-4 shrink-0 cursor-col-resize touch-none select-none rounded-control outline-offset-2 outline-accent focus-visible:outline-2"

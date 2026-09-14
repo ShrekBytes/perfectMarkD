@@ -49,8 +49,6 @@ export function AppShell() {
   const gauge = useDocumentStore((state) =>
     state.activeId ? proofGaugeLabel(state.settings, state.pageCount) : null,
   );
-  const ready = useDocumentStore((state) => state.status === 'ready');
-  const docCount = useDocumentStore((state) => state.docs.length);
   const renameDocument = useDocumentStore((state) => state.renameDocument);
   const importDocument = useDocumentStore((state) => state.importDocument);
 
@@ -81,12 +79,6 @@ export function AppShell() {
     }, 60_000);
     return () => clearInterval(id);
   }, []);
-
-  // With no documents at all there is nothing to open — land the user in the
-  // Library (the second-run "or Library if none" case).
-  useEffect(() => {
-    if (ready && docCount === 0) setLibraryOpen(true);
-  }, [ready, docCount]);
 
   const importFiles = useCallback(
     (files: File[]) => {
@@ -169,6 +161,7 @@ export function AppShell() {
             <PaneDivider
               side="editor"
               getStartWidth={() => editorRef.current?.offsetWidth ?? 0}
+              getMaxWidth={() => pane.maxPaneWidth('editor')}
               onResize={(width) => pane.setPaneWidth('editor', width)}
               onToggle={() => pane.togglePane('editor')}
               onReset={() => pane.resetPaneWidth('editor')}
@@ -194,6 +187,7 @@ export function AppShell() {
             <PaneDivider
               side="inspector"
               getStartWidth={() => inspectorRef.current?.offsetWidth ?? 0}
+              getMaxWidth={() => pane.maxPaneWidth('inspector')}
               onResize={(width) => pane.setPaneWidth('inspector', width)}
               onToggle={() => pane.togglePane('inspector')}
               onReset={() => pane.resetPaneWidth('inspector')}

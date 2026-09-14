@@ -67,6 +67,9 @@ describe('QuotaChip', () => {
     // whose name says what happened and where to go.
     expect(chip.tagName).toBe('BUTTON');
     expect(chip).toHaveAccessibleName(expect.stringContaining('open plans'));
+    // Exhaustion is a state, not a failure: graphite inversion, not danger.
+    expect(chip.className).toContain('bg-accent-strong');
+    expect(chip.className).not.toContain('danger');
   });
 
   it('opens the pricing modal from the exhausted chip', async () => {

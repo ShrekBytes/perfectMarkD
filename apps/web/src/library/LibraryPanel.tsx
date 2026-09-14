@@ -102,8 +102,8 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
 
         <div className="flex shrink-0 gap-2 border-b border-hairline p-3">
           {/* Ghost, not primary: the top-bar Export split button is the only
-              violet fill (DESIGN.md Reserved Violet Rule). Same ghost ladder
-              as the "Import .md" button below. */}
+              filled primary in the top bar (DESIGN.md Graphite Inversion
+              Rule). Same ghost ladder as the "Import .md" button below. */}
           <button
             type="button"
             onClick={() => void createDocument().then(onClose)}

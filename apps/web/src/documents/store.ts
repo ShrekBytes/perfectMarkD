@@ -92,8 +92,8 @@ export interface DocumentStore {
   /** Marks the sample document dismissed: the strip hides and the sample is
    *  never auto-loaded again. */
   dismissSample(): Promise<void>;
-  /** The welcome strip's "Start blank": dismiss the sample, then open a
-   *  fresh blank document. */
+  /** The welcome strip's "Start a blank document": dismiss the sample, then
+   *  open a fresh blank document. */
   startBlankDocument(): Promise<void>;
   updateActive(patch: {
     name?: string;

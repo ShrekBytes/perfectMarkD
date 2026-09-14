@@ -105,7 +105,7 @@ it('renders the three panes with the sample experience on first run', async () =
   // The welcome strip mounts at shell level with the other notices.
   expect(screen.getByTestId('welcome-strip')).toBeInTheDocument();
   expect(
-    screen.getByText('This is a sample — edit or clear it.'),
+    screen.getByText('This is a sample — edit it, or start a blank document.'),
   ).toBeInTheDocument();
   // The Inspector is live (editor-app/05): tabs render, not a placeholder.
   expect(screen.getByRole('tab', { name: 'Page' })).toBeInTheDocument();
@@ -141,7 +141,47 @@ it('opens the Library panel from the top bar and closes it with Escape', async (
   ).not.toBeInTheDocument();
 });
 
-it('lands in the Library when no documents exist', async () => {
+it('exposes aria-valuemax on the pane separators, live with layout', async () => {
+  // Widths must be stubbed before render: the max is computed at render
+  // time (jsdom has no layout and no ResizeObserver).
+  stubLayoutWidths();
+  await renderReadyShell();
+
+  const editorDivider = screen.getByRole('separator', {
+    name: 'Resize editor pane',
+  });
+  const inspectorDivider = screen.getByRole('separator', {
+    name: 'Resize inspector pane',
+  });
+
+  // jsdom stubs the container at 1200px: editor max = 1200 - 320 (canvas min)
+  // - 320 (inspector default); inspector max = 1200 - 320 - editor width.
+  // Editor width is its 38% default (456px rounded from 1200 * 0.38).
+  expect(editorDivider).toHaveAttribute(
+    'aria-valuemax',
+    String(1200 - 320 - 320),
+  );
+  expect(editorDivider).toHaveAttribute('aria-valuemin', '280');
+  expect(
+    Number(editorDivider.getAttribute('aria-valuemax')),
+  ).toBeGreaterThanOrEqual(Number(editorDivider.getAttribute('aria-valuemin')));
+  expect(Number(inspectorDivider.getAttribute('aria-valuemax'))).toBeGreaterThan(
+    0,
+  );
+  expect(inspectorDivider).toHaveAttribute('aria-valuemin', '260');
+
+  // Collapsing the inspector frees its width: the editor's max ceiling grows.
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Collapse inspector pane' }),
+  );
+  await waitFor(() => {
+    expect(editorDivider.getAttribute('aria-valuemax')).toBe(
+      String(1200 - 320),
+    );
+  });
+});
+
+it('shows the canvas empty state with a New document action when no documents exist', async () => {
   await renderReadyShell();
 
   expect(
@@ -154,8 +194,19 @@ it('lands in the Library when no documents exist', async () => {
   await waitFor(() => {
     expect(useDocumentStore.getState().docs).toHaveLength(0);
   });
+  // The desk stays visible: no drawer auto-opens over it — this is the
+  // regression guard; the button below alone would not catch it.
+  expect(
+    screen.queryByRole('dialog', { name: 'Library' }),
+  ).not.toBeInTheDocument();
+  // The empty canvas offers the single primary recovery action instead.
+  const newDoc = await screen.findByTestId('empty-canvas-new-doc');
+  expect(
+    screen.getByText('Create a document to see its pages here.'),
+  ).toBeInTheDocument();
+  await userEvent.click(newDoc);
   await waitFor(() => {
-    expect(screen.getByRole('dialog', { name: 'Library' })).toBeInTheDocument();
+    expect(useDocumentStore.getState().docs).toHaveLength(1);
   });
 });
 

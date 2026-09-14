@@ -31,7 +31,7 @@ it('shows the strip while the auto-created sample is open', () => {
 
   expect(screen.getByTestId('welcome-strip')).toBeInTheDocument();
   expect(
-    screen.getByText('This is a sample — edit or clear it.'),
+    screen.getByText('This is a sample — edit it, or start a blank document.'),
   ).toBeInTheDocument();
   expect(screen.getByTestId('start-blank')).toBeEnabled();
 });
@@ -44,7 +44,7 @@ it('hides while the store is loading', () => {
   expect(screen.queryByTestId('welcome-strip')).not.toBeInTheDocument();
 });
 
-it('Start blank dismisses and opens a fresh blank document', async () => {
+it('"Start a blank document" dismisses and opens a fresh blank document', async () => {
   render(<WelcomeStrip />);
   await userEvent.click(screen.getByTestId('start-blank'));
 
