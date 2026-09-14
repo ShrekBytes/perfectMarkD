@@ -101,10 +101,13 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
         </header>
 
         <div className="flex shrink-0 gap-2 border-b border-hairline p-3">
+          {/* Ghost, not primary: the top-bar Export split button is the only
+              violet fill (DESIGN.md Reserved Violet Rule). Same ghost ladder
+              as the "Import .md" button below. */}
           <button
             type="button"
             onClick={() => void createDocument().then(onClose)}
-            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-control bg-accent-strong px-3 text-sm font-medium text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
+            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
             <PlusIcon />
             New document

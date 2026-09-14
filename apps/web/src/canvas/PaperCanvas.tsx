@@ -350,6 +350,14 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
     setZoom((current) => clampZoom(current + delta));
   }, []);
 
+  /** The readout is the "true pixels" action: snap to 1.00 and take over.
+   *  A no-op when already there — no state change, no pill rhythm shift. */
+  const zoomToActual = useCallback(() => {
+    if (zoomRef.current === 1) return;
+    userZoomedRef.current = true;
+    setZoom(1);
+  }, []);
+
   const fitToWidth = useCallback(() => {
     const geometry = geometryRef.current;
     const el = scrollRef.current;
@@ -497,12 +505,19 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
           >
             <MinusIcon />
           </button>
-          <span
+          <button
+            type="button"
             data-testid="zoom-level"
-            className="w-11 text-center text-xs text-ink-soft tabular-nums select-none"
+            // The accessible name carries the current value so screen readers
+            // can read the zoom, not only change it (the span it replaced
+            // exposed the percentage as text).
+            aria-label={`Zoom to actual size, currently ${Math.round(zoom * 100)}%`}
+            title="Zoom to actual size"
+            onClick={zoomToActual}
+            className="w-11 rounded-full text-center text-xs text-ink-soft tabular-nums select-none transition-colors duration-150 hover:bg-surface-hover hover:text-ink outline-offset-2 outline-accent focus-visible:outline-2"
           >
             {Math.round(zoom * 100)}%
-          </span>
+          </button>
           <button
             type="button"
             aria-label="Zoom in"

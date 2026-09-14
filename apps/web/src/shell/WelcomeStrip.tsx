@@ -32,8 +32,10 @@ export function WelcomeStrip() {
       onDismiss={() => void dismissSample()}
       dismissLabel="Dismiss sample notice"
     >
+      {/* Ghost, not primary: the top-bar Export split button is the only
+          violet fill (DESIGN.md Reserved Violet Rule). */}
       <BannerButton
-        variant="primary"
+        variant="ghost"
         testid="start-blank"
         onClick={() => void startBlankDocument()}
       >

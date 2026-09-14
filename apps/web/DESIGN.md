@@ -280,7 +280,7 @@ A three-pane workspace with a fixed-height chrome bar and a full-bleed paper reg
 - **Stacked strips:** every notice is an instance of the one banner-strip pattern and mounts at shell level directly under the top bar — never inside a pane — pushing the pane row down rather than overlaying it. They stack in a fixed urgency order: staleness conflict, plan-ended, welcome.
 - **Library:** a 336px slide-in drawer from the left, over a 25%-black scrim.
 - **Canvas rhythm:** pages are stacked vertically with a 24px gap (`gap-6`), inside 24px horizontal and 32px vertical padding. Each page carries its frame plus a centered "Page N of M" label in Ink Faint with 8px above and 2px below.
-- **Zoom:** 0.35–1.00 in 0.05 steps, defaulting to 1.00 (true page pixels), with fit-to-width computed against a 24px gutter per side.
+- **Zoom:** 0.35–1.00 in 0.05 steps. The canvas owns the default: fit-to-width (computed against a 24px gutter per side, capped at 1.00 — fit never upscales) until the user takes over via any zoom control; after takeover the zoom is frozen across pane drags and resizes. The percentage readout in the zoom pill is itself the "true pixels" action: clicking it snaps to 1.00.
 - **Spacing scale:** 2 / 4 / 6 / 8 / 10 / 12 / 16 / 20 / 24 / 32 / 40px. 8px and 12px carry most layout, 10px is the standard control inset, 20px is a dialog's padding, 24px is the gap between pages, and 32px and 40px are page-level breathing room (a drop overlay, a form page's vertical padding).
 - **Responsive:** desktop-first by design. There is exactly one `sm:` breakpoint in the entire app (the admin page's content padding), and no CSS media queries at all. Tablet degrades acceptably; phone is functional but not composed for.
 

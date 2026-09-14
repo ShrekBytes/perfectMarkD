@@ -49,6 +49,7 @@ function BannerImageField({
   onOpenPricing,
   flags,
   addImage,
+  disabled,
 }: {
   band: 'header' | 'footer';
   bandLabel: string;
@@ -57,6 +58,8 @@ function BannerImageField({
   onOpenPricing: () => void;
   flags: TabProps['flags'];
   addImage: TabProps['addImage'];
+  /** Inert and dimmed when the owning band is switched off. */
+  disabled?: boolean;
 }) {
   const refKey = `${band}ImageRef` as const;
   return flags.bannerImages ? (
@@ -67,6 +70,7 @@ function BannerImageField({
         value={imageRef}
         onRef={(ref) => set({ [refKey]: ref })}
         onRemove={() => set({ [refKey]: '' })}
+        disabled={disabled}
       />
     </Field>
   ) : (
@@ -100,6 +104,7 @@ export function HeaderFooterTab({
             checked={settings.showHeaderOnFirstPage}
             onChange={(showHeaderOnFirstPage) => set({ showHeaderOnFirstPage })}
             label="Show header on first page"
+            disabled={!settings.showHeader}
           />
         </Field>
         <Field label="Text">
@@ -109,6 +114,7 @@ export function HeaderFooterTab({
             onChange={(headerText) => set({ headerText })}
             placeholder="Header text"
             className="w-40"
+            disabled={!settings.showHeader}
           />
         </Field>
         <Field label="Alignment">
@@ -117,6 +123,7 @@ export function HeaderFooterTab({
             value={settings.headerAlignment}
             options={alignmentOptions}
             onChange={(headerAlignment) => set({ headerAlignment })}
+            disabled={!settings.showHeader}
           />
         </Field>
         <Field label="Font size (px)">
@@ -126,6 +133,7 @@ export function HeaderFooterTab({
             min={1}
             onChange={(headerFontSize) => set({ headerFontSize })}
             className="w-16"
+            disabled={!settings.showHeader}
           />
         </Field>
         <Field label="Color">
@@ -133,6 +141,7 @@ export function HeaderFooterTab({
             ariaLabel="Header font color"
             value={settings.headerFontColor}
             onChange={(headerFontColor) => set({ headerFontColor })}
+            disabled={!settings.showHeader}
           />
         </Field>
         <Field label="Border">
@@ -140,6 +149,7 @@ export function HeaderFooterTab({
             checked={settings.showHeaderBorder}
             onChange={(showHeaderBorder) => set({ showHeaderBorder })}
             label="Bottom border"
+            disabled={!settings.showHeader}
           />
         </Field>
         <BannerImageField
@@ -150,6 +160,7 @@ export function HeaderFooterTab({
           onOpenPricing={onOpenPricing}
           flags={flags}
           addImage={addImage}
+          disabled={!settings.showHeader}
         />
       </Section>
 
@@ -166,6 +177,7 @@ export function HeaderFooterTab({
             checked={settings.showFooterOnFirstPage}
             onChange={(showFooterOnFirstPage) => set({ showFooterOnFirstPage })}
             label="Show footer on first page"
+            disabled={!settings.showFooter}
           />
         </Field>
         <Field label="Text">
@@ -175,6 +187,7 @@ export function HeaderFooterTab({
             onChange={(footerText) => set({ footerText })}
             placeholder="Footer text"
             className="w-40"
+            disabled={!settings.showFooter}
           />
         </Field>
         <Field label="Alignment">
@@ -183,6 +196,7 @@ export function HeaderFooterTab({
             value={settings.footerTextAlignment}
             options={alignmentOptions}
             onChange={(footerTextAlignment) => set({ footerTextAlignment })}
+            disabled={!settings.showFooter}
           />
         </Field>
         <Field label="Font size (px)">
@@ -192,6 +206,7 @@ export function HeaderFooterTab({
             min={1}
             onChange={(footerFontSize) => set({ footerFontSize })}
             className="w-16"
+            disabled={!settings.showFooter}
           />
         </Field>
         <Field label="Color">
@@ -199,6 +214,7 @@ export function HeaderFooterTab({
             ariaLabel="Footer font color"
             value={settings.footerFontColor}
             onChange={(footerFontColor) => set({ footerFontColor })}
+            disabled={!settings.showFooter}
           />
         </Field>
         <Field label="Border">
@@ -206,6 +222,7 @@ export function HeaderFooterTab({
             checked={settings.showFooterBorder}
             onChange={(showFooterBorder) => set({ showFooterBorder })}
             label="Top border"
+            disabled={!settings.showFooter}
           />
         </Field>
         <BannerImageField
@@ -216,6 +233,7 @@ export function HeaderFooterTab({
           onOpenPricing={onOpenPricing}
           flags={flags}
           addImage={addImage}
+          disabled={!settings.showFooter}
         />
       </Section>
 

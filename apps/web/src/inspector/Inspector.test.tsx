@@ -350,6 +350,20 @@ describe('Header-Footer tab', () => {
     ).toBeChecked();
   });
 
+  it("disables a band's fields when the band is switched off", async () => {
+    const user = userEvent.setup();
+    render(<Inspector />);
+    await user.click(screen.getByRole('tab', { name: 'Header/Footer' }));
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show header' }));
+    expect(screen.getByRole('textbox', { name: 'Header text' })).toBeDisabled();
+    expect(
+      screen.getByRole('checkbox', { name: 'Show header on first page' }),
+    ).toBeDisabled();
+    // The footer band stays editable.
+    expect(screen.getByRole('textbox', { name: 'Footer text' })).toBeEnabled();
+  });
+
   it('edits the page-number format template with placeholders', async () => {
     render(<Inspector />);
     fireEvent.click(screen.getByRole('tab', { name: 'Header/Footer' }));

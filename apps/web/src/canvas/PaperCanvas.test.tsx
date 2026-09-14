@@ -284,6 +284,68 @@ describe('PaperCanvas zoom pill', () => {
     expect(spy).toHaveBeenCalled();
   });
 
+  it('the readout snaps to 100% and takes over the zoom', async () => {
+    // The ResizeObserver drives the pre-takeover re-fit; jsdom lacks it, and
+    // the component receives its callback through the constructor.
+    const ResizeObserverMock = {
+      last: null as { fire: () => void } | null,
+      fire: () => {
+        act(() => ResizeObserverMock.last?.fire());
+      },
+    };
+    class FakeResizeObserver {
+      #cb: () => void;
+      constructor(cb: () => void) {
+        this.#cb = cb;
+      }
+      observe() {
+        ResizeObserverMock.last = { fire: () => this.#cb() };
+      }
+      disconnect() {}
+      unobserve() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get');
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+
+    // jsdom renders at 0 width, so the first paint falls back to 1.00.
+    expect(screen.getByTestId('zoom-level')).toHaveTextContent('100%');
+
+    // Pre-takeover: a canvas resize re-fits to the new width.
+    clientWidth.mockReturnValue(600);
+    ResizeObserverMock.fire();
+    // (600 − 2×24) / 794 (A4) = 69.5% → displayed rounded.
+    expect(screen.getByTestId('zoom-level')).toHaveTextContent('70%');
+
+    // Takeover: two manual steps, then the readout snap — and the zoom is
+    // frozen for the session even though the canvas "resizes" again.
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(screen.getByTestId('zoom-level')).toHaveTextContent('60%');
+
+    const readout = screen.getByTestId('zoom-level');
+    expect(readout).toHaveAccessibleName('Zoom to actual size, currently 60%');
+    fireEvent.click(readout);
+    expect(screen.getByTestId('zoom-level')).toHaveTextContent('100%');
+
+    clientWidth.mockReturnValue(1200);
+    ResizeObserverMock.fire();
+    await flushRenderRaw(0);
+    expect(screen.getByTestId('zoom-level')).toHaveTextContent('100%');
+  });
+
+  it('the readout is a no-op at 100%', async () => {
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+
+    const readout = screen.getByTestId('zoom-level');
+    fireEvent.click(readout);
+    expect(screen.getByTestId('zoom-level')).toHaveTextContent('100%');
+  });
+
   it('applies zoom to the mounted page slots', async () => {
     mountCanvas();
     setMarkdown('# Hello');

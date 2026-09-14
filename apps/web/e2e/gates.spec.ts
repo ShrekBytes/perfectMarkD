@@ -49,3 +49,39 @@ test('gated controls show locks that open the pricing modal', async ({
   await page.keyboard.press('Escape');
   await expect(modal).toBeHidden();
 });
+
+test('switching a band off disables and dims its fields', async ({ page }) => {
+  await openApp(page);
+  await waitForMinPages(page, 1);
+  await openInspectorTab(page, 'Header-Footer');
+
+  const headerText = page.getByRole('textbox', { name: 'Header text' });
+  const showHeader = page.getByRole('checkbox', {
+    name: 'Show header',
+    exact: true,
+  });
+
+  // Defaults: the header band is on and editable.
+  await expect(showHeader).toBeChecked();
+  await expect(headerText).toBeEnabled();
+
+  // Switching the band off disables its fields...
+  await showHeader.uncheck();
+  await expect(headerText).toBeDisabled();
+  await expect(
+    page.getByRole('checkbox', { name: 'Show header on first page' }),
+  ).toBeDisabled();
+
+  // ...dims them to the system's disabled opacity (0.5)...
+  await expect(headerText).toHaveCSS('opacity', '0.5');
+
+  // The footer band keeps its own independent state.
+  await expect(
+    page.getByRole('textbox', { name: 'Footer text' }),
+  ).toBeEnabled();
+
+  // Re-checking the band makes its fields editable again (values are
+  // preserved by the store; re-checking restores the band, not defaults).
+  await showHeader.check();
+  await expect(headerText).toBeEnabled();
+});

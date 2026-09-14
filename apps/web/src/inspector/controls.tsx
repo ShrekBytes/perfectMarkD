@@ -44,7 +44,8 @@ export function Field({
   );
 }
 
-/** A titled group of fields. */
+/** A titled group of fields. h2: the workspace h1 is the wordmark, so the
+ *  inspector's section headings start at level 2 (no h1→h3 skip). */
 export function Section({
   title,
   children,
@@ -54,9 +55,9 @@ export function Section({
 }) {
   return (
     <section className="border-t border-hairline px-3 py-3 first:border-t-0">
-      <h3 className="mb-1 text-[11px] font-semibold tracking-wide text-ink-faint uppercase">
+      <h2 className="mb-1 text-[11px] font-semibold tracking-wide text-ink-faint uppercase">
         {title}
-      </h3>
+      </h2>
       {children}
     </section>
   );
@@ -350,6 +351,7 @@ export function GateImagePicker({
   onRef,
   value,
   onRemove,
+  disabled,
 }: {
   ariaLabel: string;
   addImage: (file: File) => Promise<AddAssetResult>;
@@ -358,6 +360,8 @@ export function GateImagePicker({
   /** The current image ref; '' (or any falsy) means none is set. */
   value: string;
   onRemove: () => void;
+  /** Inert and dimmed (e.g. when the owning band is switched off). */
+  disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -380,7 +384,7 @@ export function GateImagePicker({
         <button
           type="button"
           aria-label={ariaLabel}
-          disabled={busy}
+          disabled={busy || disabled}
           onClick={() => inputRef.current?.click()}
           className={pickerButtonClass}
         >
@@ -391,6 +395,7 @@ export function GateImagePicker({
           <button
             type="button"
             aria-label={`Remove ${ariaLabel}`}
+            disabled={disabled}
             onClick={onRemove}
             className="h-6 rounded-control px-1.5 text-[11px] text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-danger focus-visible:outline-2"
           >
