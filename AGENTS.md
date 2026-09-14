@@ -13,6 +13,12 @@ Core loop:
 3. `agent-browser click @e1` / `fill @e2 "text"` — interact via refs; `screenshot` if you can read images
 4. Re-snapshot after any page change — refs expire
 
+When something's broken, check the browser's own signals before guessing from a screenshot — this applies to both the Vision and Text-only paths above:
+- `agent-browser console --errors-only` — recent console errors
+- `agent-browser errors` — uncaught JS exceptions
+- `agent-browser network route` — inspect/filter failing requests
+- `agent-browser inspect` — opens live DevTools on the active page for manual digging
+
 If `agent-browser` is unavailable (not installed, `doctor` fails), fall back to whatever browser automation your current harness provides and note the fallback in your reply. Don't drive the user's visible browser without permission. Run `agent-browser close` when done.
 
 Existing `test:e2e` suite still uses Playwright — run it as-is. The agent-browser rule is for ad-hoc browsing/verification only.
