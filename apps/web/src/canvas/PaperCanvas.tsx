@@ -99,9 +99,12 @@ function mountPageSlots(
 
     // The frame wrapper carries the zoom-scaled box and the ambient page
     // shadow; the shadow host inside stays at true page pixels and scales.
+    // Corner crop marks (the light-table signature) sit outside the sheet's
+    // own box, drawn by the frame's ::before/::after pseudo-elements — see
+    // global.css (.pm-page-frame).
     const frame = document.createElement('div');
     frame.className =
-      'pm-page-frame shadow-[0_1px_2px_rgb(0_0_0/0.06),0_10px_28px_rgb(0_0_0/0.12)]';
+      'pm-page-frame shadow-[0_1px_2px_rgb(0_0_0/0.10),0_12px_32px_rgb(0_0_0/0.16)] pm-crop-marks';
 
     const { host, contentRoot } = buildPage({
       layout,
@@ -403,7 +406,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   }
 
   const pillButton =
-    'flex h-7 w-7 items-center justify-center rounded-full text-ink-soft transition-colors duration-150 hover:bg-surface-hover hover:text-ink';
+    'flex h-7 w-7 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 hover:bg-surface-hover hover:text-ink';
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -494,7 +497,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
           role="group"
           aria-label="Zoom"
           data-testid="zoom-pill"
-          className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-hairline bg-surface/95 py-1 pr-1.5 pl-1.5 shadow-lg backdrop-blur"
+          className="pointer-events-auto flex items-center gap-0.5 rounded-control border border-hairline bg-surface/95 py-1 pr-1.5 pl-1.5 shadow-lg backdrop-blur"
         >
           <button
             type="button"
@@ -514,7 +517,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
             aria-label={`Zoom to actual size, currently ${Math.round(zoom * 100)}%`}
             title="Zoom to actual size"
             onClick={zoomToActual}
-            className="w-11 rounded-full text-center text-xs text-ink-soft tabular-nums select-none transition-colors duration-150 hover:bg-surface-hover hover:text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+            className="w-11 rounded-control text-center text-xs text-ink-soft tabular-nums select-none transition-colors duration-150 hover:bg-surface-hover hover:text-ink outline-offset-2 outline-accent focus-visible:outline-2"
           >
             {Math.round(zoom * 100)}%
           </button>

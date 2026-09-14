@@ -71,7 +71,7 @@ export function Inspector() {
             onClick={() => setTab(id)}
             className={`h-7 rounded-control px-2.5 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
               tab === id
-                ? 'bg-accent-soft text-accent'
+                ? 'bg-canvas text-ink font-semibold border border-hairline'
                 : 'text-ink-soft hover:bg-surface-hover hover:text-ink'
             }`}
           >

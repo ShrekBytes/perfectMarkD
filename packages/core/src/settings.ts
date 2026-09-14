@@ -135,7 +135,7 @@ const defaultStyle: DocStyle = {
   lineHeight: 1.85,
   paragraphSpacing: 0.65,
   headingScale: 1.0,
-  accentColor: '#7c6af7',
+  accentColor: '#1c1e21',
   bodyColor: '#1a1a2e',
   boldColor: '#1a1a2e',
   headingColor: '#0d0d1a',
@@ -143,12 +143,12 @@ const defaultStyle: DocStyle = {
   h2BorderBottom: true,
   centerH1: false,
   blockquoteBg: 'transparent',
-  blockquoteBorderColor: '#7c6af7',
-  codeBackground: '#f0f0f8',
+  blockquoteBorderColor: '#1c1e21',
+  codeBackground: '#f0f1f2',
   codeFontSize: 0.85,
   codeFontFamily: "'Courier New', monospace",
   codeTheme: 'github-light',
-  tableHeaderBg: '#f0f0f8',
+  tableHeaderBg: '#f0f1f2',
   tableStriped: true,
   pageBackground: '#ffffff',
   marginTop: 20,
@@ -355,7 +355,7 @@ export const DEFAULT_SETTINGS: DocumentSettings = {
   footerFontColor: '#aaaaaa',
   linkUnderline: true,
   frameEnabled: false,
-  frameColor: '#000000',
+  frameColor: '#1c1e21',
   frameThickness: 4,
   frameMargin: 8,
   frameStyle: 'solid',
@@ -439,6 +439,14 @@ export function extractDocStyle(s: DocumentSettings): DocStyle {
  *  invisible text, zero-size pages, or bad layout. */
 export function validate(settings: DocumentSettings): DocumentSettings {
   const s = { ...settings };
+
+  // Pre-light-table documents carry the old violet identity; graphite is the
+  // committed accent now (DESIGN.md rewrite). A migration-scoped repaint, not
+  // a general normalization: only the legacy hue is replaced, user-customized
+  // colors pass through untouched.
+  if (s.accentColor === '#7c6af7') s.accentColor = '#1c1e21';
+  if (s.blockquoteBorderColor === '#7c6af7')
+    s.blockquoteBorderColor = '#1c1e21';
 
   // Unknown preset key → fall back to default.
   if (!(s.preset in PRESETS)) {

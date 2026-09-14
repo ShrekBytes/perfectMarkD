@@ -16,8 +16,7 @@
 }
 
 .pm-editor .cm-scroller {
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 13.5px;
   line-height: 1.7;
 }

@@ -41,7 +41,7 @@ const TABS: Array<{ id: AdminTab; label: string }> = [
           aria-label="PerfectMarkD home"
           className="select-none px-1 text-[15px] font-semibold tracking-tight"
         >
-          Perfect<span className="text-accent">Mark</span>D
+          Perfect<span className="font-mono">Mark</span>D
         </Link>
         <span className="rounded-control border border-hairline bg-canvas px-1.5 py-0.5 text-xs font-medium text-ink-soft">
           Admin
@@ -105,7 +105,7 @@ const TABS: Array<{ id: AdminTab; label: string }> = [
                   onClick={() => setTab(id)}
                   className={`h-8 rounded-control border px-3 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                     tab === id
-                      ? 'border-accent bg-accent-strong text-accent-ink'
+                      ? 'border-ink bg-ink text-accent-ink'
                       : 'border-hairline bg-canvas text-ink-soft hover:bg-surface-hover hover:text-ink'
                   }`}
                 >

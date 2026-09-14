@@ -13,7 +13,7 @@ import { CloseIcon } from './icons';
 /** Resting height 40px (min-h-10); copy wraps instead of truncating, so the
  *  strip grows rather than hiding consequences at narrow widths. */
 const stripClasses =
-  'flex min-h-10 shrink-0 items-center gap-3 border-b border-hairline bg-accent-soft px-3 py-1.5 text-sm text-ink';
+  'flex min-h-10 shrink-0 items-center gap-3 border-b border-hairline bg-surface px-3 py-1.5 text-sm text-ink';
 
 /** The 28px action ladder shared by every strip control. */
 const primaryClasses =

@@ -13,7 +13,11 @@
 //   memory until the toast's Undo is dismissed.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { DEFAULT_SETTINGS, type DocumentSettings } from '@perfectmarkd/core';
+import {
+  DEFAULT_SETTINGS,
+  validate,
+  type DocumentSettings,
+} from '@perfectmarkd/core';
 import type { IDBPDatabase } from 'idb';
 import { create } from 'zustand';
 import { assetRef, prepareAsset, type AssetSource } from '../assets/ingest';
@@ -295,11 +299,14 @@ export function createDocumentStore() {
     function setWorkingCopy(record: DocumentRecord): void {
       savedRecord = record;
       dirty = false;
+      // validate() carries the settings migration (legacy violet → graphite)
+      // so documents persisted before a token rewrite re-render in the new
+      // world.
       set({
         activeId: record.id,
         name: record.name,
         markdown: record.markdown,
-        settings: { ...record.settings },
+        settings: validate({ ...record.settings }),
         // The gauge's count is canvas-produced, not record-carried: it
         // joins when this document's first render lands.
         pageCount: null,

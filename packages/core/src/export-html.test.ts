@@ -77,7 +77,7 @@ describe('buildExportHTML', () => {
     expect(html).toContain('data:image/png;base64,UEFQRVI='); // background
     expect(html).toContain('data:image/png;base64,SEVBREVS'); // header banner
     expect(html).toContain('data:image/png;base64,Rk9PVEVS'); // footer banner
-    expect(html).toContain('border:4px solid #000000;'); // frame
+    expect(html).toContain('border:4px solid #1c1e21;'); // frame
     expect(html).toContain('<title>Quarterly Report</title>');
   });
 

@@ -171,8 +171,8 @@ describe('buildPage', () => {
     const { host } = build(makeLayout({ hasHeader: true }), s);
     const header = layer(host, 'header-text')!;
     expect(header.style.borderBottomWidth).toBe('0.5px');
-    // #7c6af733 = the accent at 20% alpha.
-    expect(header.style.borderBottomColor).toBe('rgba(124, 106, 247, 0.2)');
+    // #1c1e2133 = the accent (graphite) at 20% alpha.
+    expect(header.style.borderBottomColor).toBe('rgba(28, 30, 33, 0.2)');
   });
 
   it('renders the footer band pinned to the bottom with page padding', () => {

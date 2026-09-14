@@ -103,7 +103,7 @@ export function PaneDivider({
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
         onClick={onToggle}
-        className="absolute left-1/2 top-6 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border border-hairline bg-surface text-ink-faint opacity-0 shadow-sm transition-opacity duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 group-focus-within:opacity-100 group-hover:opacity-100"
+        className="absolute left-1/2 top-6 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-control border border-hairline bg-surface text-ink-faint opacity-0 shadow-sm transition-opacity duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 group-focus-within:opacity-100 group-hover:opacity-100"
       >
         <CollapseIcon />
       </button>
@@ -126,7 +126,7 @@ export function CollapsedPaneToggle({
       aria-label={`Show ${side} pane`}
       title={`Show ${side} pane`}
       onClick={onToggle}
-      className={`absolute top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-hairline bg-surface text-ink-faint shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2 ${
+      className={`absolute top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-control border border-hairline bg-surface text-ink-faint shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2 ${
         side === 'editor' ? 'left-2' : 'right-2'
       }`}
     >

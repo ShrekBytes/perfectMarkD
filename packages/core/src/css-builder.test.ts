@@ -190,7 +190,7 @@ describe('font resolvers', () => {
 
 describe('frame helpers', () => {
   it('frameBorderCSS builds the shorthand border value', () => {
-    expect(frameBorderCSS(DEFAULT_SETTINGS)).toBe('4px solid #000000');
+    expect(frameBorderCSS(DEFAULT_SETTINGS)).toBe('4px solid #1c1e21');
     expect(
       frameBorderCSS(
         settings({
@@ -214,7 +214,7 @@ describe('frame helpers', () => {
     expect(html).toContain('right:8px');
     expect(html).toContain('bottom:8px');
     expect(html).toContain('pointer-events:none');
-    expect(html).toContain('border:4px solid #000000');
+    expect(html).toContain('border:4px solid #1c1e21');
   });
 });
 
@@ -284,15 +284,15 @@ describe('buildDocCSS', () => {
     expect(off).not.toContain('text-align: center');
 
     const on = buildDocCSS(settings({ h1BorderBottom: true, centerH1: true }));
-    expect(on).toContain('border-bottom: 2px solid #7c6af7');
+    expect(on).toContain('border-bottom: 2px solid #1c1e21');
     expect(on).toContain('text-align: center');
   });
 
   it('styles inline code from the settings', () => {
     const css = buildDocCSS(DEFAULT_SETTINGS);
     expect(css).toContain('.mpdf-doc code {');
-    expect(css).toContain('background: #f0f0f8');
-    expect(css).toContain('color: #7c6af7');
+    expect(css).toContain('background: #f0f1f2');
+    expect(css).toContain('color: #1c1e21');
   });
 
   it('uses white text on dark table headers and the heading color on light ones', () => {

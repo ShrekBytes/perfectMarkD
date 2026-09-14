@@ -97,7 +97,7 @@ export function VerificationQueue() {
               onClick={() => setFilter(id)}
               className={`h-8 rounded-control border px-3 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                 filter === id
-                  ? 'border-accent bg-accent-strong text-accent-ink'
+                  ? 'border-ink bg-ink text-accent-ink'
                   : 'border-hairline bg-canvas text-ink-soft hover:bg-surface-hover hover:text-ink'
               }`}
             >

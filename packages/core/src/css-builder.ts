@@ -384,7 +384,10 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
 
   /* GFM Alerts (GitHub-style > [!NOTE] blocks). One accent-styled design for
    * all five variants; the title band spans the full alert width via negative
-   * margins against the container's content gutter. */
+   * margins against the container's content gutter. Accent-driven: with the
+   * monochrome default style the alert is a graphite panel; presets and
+   * custom accents color it with their own hue. (Document content, not
+   * chrome — see DESIGN.md.) */
   .mpdf-doc .markdown-alert {
     border-inline-start: 4px solid ${s.accentColor};
     border-start-start-radius: 0;

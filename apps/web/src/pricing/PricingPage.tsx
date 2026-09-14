@@ -32,7 +32,7 @@ export function PricingPage() {
           aria-label="PerfectMarkD home"
           className="select-none px-1 text-[15px] font-semibold tracking-tight"
         >
-          Perfect<span className="text-accent">Mark</span>D
+          Perfect<span className="font-mono">Mark</span>D
         </Link>
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -82,7 +82,7 @@ export function PricingPage() {
       <footer className="flex flex-wrap items-center gap-3 border-t border-hairline bg-surface px-4 py-4 text-xs text-ink-soft">
         <a
           href={LICENSE_URL}
-          className="rounded-control bg-accent-soft px-2 py-0.5 font-medium text-accent transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong hover:text-accent-ink focus-visible:outline-2"
+          className="rounded-control border border-hairline bg-canvas px-2 py-0.5 font-medium text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
         >
           AGPL-3.0
         </a>

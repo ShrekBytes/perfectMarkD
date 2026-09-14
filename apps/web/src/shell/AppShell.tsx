@@ -218,7 +218,7 @@ export function AppShell() {
           data-testid="drop-overlay"
           className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-black/25 p-6"
         >
-          <div className="flex flex-col items-center gap-2 rounded-pane border-2 border-dashed border-accent bg-surface px-10 py-8 text-accent shadow-xl">
+          <div className="flex flex-col items-center gap-2 rounded-pane border-2 border-dashed border-ink bg-surface px-10 py-8 text-ink shadow-xl">
             <UploadIcon className="text-2xl" />
             <p className="text-sm font-medium text-ink">
               Drop .md files to import

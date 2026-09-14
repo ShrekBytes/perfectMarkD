@@ -142,7 +142,7 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
                 key={row.id}
                 aria-current={isActive ? 'true' : undefined}
                 className={`group flex items-center gap-1 rounded-control p-1 ${
-                  isActive ? 'bg-accent-soft' : 'hover:bg-surface-hover'
+                  isActive ? 'bg-canvas' : 'hover:bg-surface-hover'
                 }`}
               >
                 {/* The leading miniature sheet: a sketch from the document's

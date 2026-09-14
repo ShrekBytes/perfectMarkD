@@ -38,7 +38,7 @@ export function DeleteToast() {
         <button
           type="button"
           onClick={() => void undoDelete()}
-          className="rounded-control px-2 py-1 text-sm font-medium text-accent transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-soft focus-visible:outline-2"
+          className="rounded-control px-2 py-1 text-sm font-medium text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
         >
           Undo
         </button>

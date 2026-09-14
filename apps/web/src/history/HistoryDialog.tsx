@@ -78,7 +78,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
                 onClose();
                 navigate('/pricing');
               }}
-              className="mt-2 h-8 rounded-control border border-accent/40 bg-accent-soft px-3 text-xs font-medium text-accent outline-offset-2 outline-accent hover:bg-accent-strong hover:text-accent-ink focus-visible:outline-2"
+              className="mt-2 h-8 rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
             >
               View plans
             </button>

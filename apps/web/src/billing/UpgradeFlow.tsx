@@ -109,7 +109,7 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
                     onClick={() => setDurationMonths(months)}
                     className={`rounded-control border px-3 py-2 text-left transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                       selected
-                        ? 'border-accent bg-accent-soft'
+                        ? 'border-ink bg-canvas'
                         : 'border-hairline hover:bg-surface-hover'
                     }`}
                   >
@@ -140,7 +140,7 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
                     onClick={() => setPaymentMethod(method)}
                     className={`flex w-full items-center rounded-control border px-3 py-2 text-left transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                       selected
-                        ? 'border-accent bg-accent-soft'
+                        ? 'border-ink bg-canvas'
                         : 'border-hairline hover:bg-surface-hover'
                     }`}
                   >
@@ -148,7 +148,7 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
                       {METHOD_LABELS[method]}
                     </span>
                     {selected && (
-                      <span className="ml-auto text-xs text-accent">
+                      <span className="ml-auto text-xs font-medium text-ink">
                         Selected
                       </span>
                     )}

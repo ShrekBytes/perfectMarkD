@@ -42,7 +42,7 @@ export function TopBar({
       {/* h1: the wordmark is the workspace's top-level heading (critique:
           heading order previously started at h2 inside drawers). */}
       <h1 className="select-none px-1 text-[15px] font-semibold tracking-tight">
-        Perfect<span className="text-accent">Mark</span>D
+        Perfect<span className="font-mono">Mark</span>D
       </h1>
 
       <span aria-hidden="true" className="h-5 w-px bg-hairline" />

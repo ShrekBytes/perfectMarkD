@@ -55,7 +55,7 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
                 onClick={() => set(applyPreset(settings, key))}
                 className={`flex flex-col items-center gap-1.5 rounded-pane border p-2 transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                   active
-                    ? 'border-accent bg-accent-soft'
+                    ? 'border-ink bg-canvas'
                     : 'border-hairline hover:border-hairline-strong'
                 }`}
               >

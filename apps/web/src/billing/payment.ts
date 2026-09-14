@@ -61,6 +61,6 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
 
 export const STATUS_BADGE: Record<OrderStatus, string> = {
   pending: 'border-hairline bg-canvas text-ink-soft',
-  verified: 'border-accent/40 bg-accent-soft text-accent',
+  verified: 'border-ink bg-canvas text-ink font-semibold',
   rejected: 'border-danger/30 bg-danger/10 text-danger',
 };

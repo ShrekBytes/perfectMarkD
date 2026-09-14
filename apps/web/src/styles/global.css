@@ -11,50 +11,54 @@
  * [data-theme='dark']. Chrome darkens; --page (the paper) stays white in both.
  */
 :root {
-  --canvas: #f1efe9; /* warm-gray Paper Canvas backdrop */
-  --surface: #faf9f7; /* chrome surfaces: top bar + side panes */
-  --surface-hover: #efede7;
+  /* ── The Light Table ────────────────────────────────────────────────────────
+   * A print-production bench: cool graphite chrome, no accent hue. The paper
+   * (--page, white in both themes) is the only warm, bright object on screen.
+   * Selection and active state are graphite inversions, not tints. */
+  --canvas: #e9eaec; /* the bench: cool light gray, Paper Canvas backdrop */
+  --surface: #f4f5f6; /* chrome surfaces: top bar + side panes */
+  --surface-hover: #e4e6e8;
   --page: #ffffff; /* document paper — white in both themes */
   --field: #ffffff; /* compact field surface — one step off its panel, dark-safe */
-  --ink: #232220;
-  --ink-soft: #5f5b53;
+  --ink: #1c1e21;
+  --ink-soft: #565a60;
   /* Tertiary text still carries real information (page labels, timestamps,
      helper notes), so the faint step holds WCAG AA (≥4.5:1) on every surface
-     it can sit on — the warmest one included. */
-  --ink-faint: #6e6a60;
-  --hairline: #e7e3da;
-  --hairline-strong: #d5d0c4;
-  --accent: #7c6af7; /* the identity violet: text, rings, caret, tints — never under white text */
-  --accent-strong: #6a55f2; /* filled-control fill: 4.8:1 with white text, both themes */
-  --accent-deep: #5b46d9; /* filled-control hover/active */
-  --accent-soft: rgb(124 106 247 / 0.11);
+     it can sit on. */
+  --ink-faint: #6b7076;
+  --hairline: #dcdee1;
+  --hairline-strong: #c8cbcf;
+  --accent: #1c1e21; /* the "accent" is graphite: text, rings, caret, tints */
+  --accent-strong: #1c1e21; /* filled-control fill: far above 4.5:1 with white */
+  --accent-deep: #04060a; /* filled-control hover/active */
+  --accent-soft: rgb(28 30 33 / 0.08); /* selection wash */
   --accent-ink: #ffffff;
-  --danger: #dc2626; /* destructive actions (delete) */
+  --danger: #c4321f; /* destructive actions (delete) — the only hue in chrome */
 }
 
 [data-theme='dark'] {
-  --canvas: #232227;
-  --surface: #2b2a30;
-  --surface-hover: #36353c;
+  /* The bench darkens around the lit sheet; instruments go graphite-black. */
+  --canvas: #17181a;
+  --surface: #222427;
+  --surface-hover: #2e3134;
   --page: #ffffff;
   /* Fields must flip with the theme (unlike --page) or their text — which
      follows --ink — lands light-on-white and becomes unreadable. */
-  --field: #232227;
-  --ink: #ecebe8;
-  --ink-soft: #b4b1aa;
+  --field: #17181a;
+  --ink: #e8eaec;
+  --ink-soft: #a6abb1;
   /* AA like its light twin: the faint step clears 4.5:1 against every dark
-     surface it touches (the hover fill is the worst case). */
-  --ink-faint: #a5a197;
-  --hairline: #3c3b41;
-  --hairline-strong: #4b4a52;
-  --accent: #7c6af7;
-  /* White-on-violet contrast is theme-independent, so fills no longer lift
-     in dark mode — lifting to #8e7ef9 measured 3.2:1, a hard AA failure. */
-  --accent-strong: #6a55f2;
-  --accent-deep: #5b46d9;
-  --accent-soft: rgb(124 106 247 / 0.2);
-  --accent-ink: #ffffff;
-  --danger: #f87171;
+     surface it touches. */
+  --ink-faint: #8d9298;
+  --hairline: #34373a;
+  --hairline-strong: #474b4f;
+  --accent: #e8eaec;
+  /* Filled controls invert in dark mode: near-white fill, dark ink. */
+  --accent-strong: #e8eaec;
+  --accent-deep: #f8f9fa;
+  --accent-soft: rgb(232 234 236 / 0.12);
+  --accent-ink: #17181a;
+  --danger: #f07a6a;
 }
 
 /* Expose the tokens as Tailwind utilities (bg-canvas, text-ink, border-hairline, …). */
@@ -76,10 +80,16 @@
   --color-accent-ink: var(--accent-ink);
   --color-danger: var(--danger);
 
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:
+    'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
 
-  --radius-control: 8px;
-  --radius-pane: 10px;
+  /* The Light Table: sharp, instrument-grade corners. 2px on controls and
+     panels alike; 0px where a shape meets the bench edge. */
+  --radius-control: 2px;
+  --radius-pane: 2px;
 
   /* Motion: 150–200ms ease-out. Components pick duration-150/200; the curve is the default. */
   --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
@@ -112,6 +122,93 @@
 @layer base {
   :root {
     color-scheme: light;
+  }
+
+  /* ── The crop marks ───────────────────────────────────────────────────────
+   * The light table's signature: every sheet on the bench carries printer's
+   * corner registration marks. Four 12px L-marks, one per corner, held 6px
+   * off the page edge: two on the page frame (::before/::after), two on the
+   * page host (.pm-page-host). Pure CSS — no extra DOM, no images — and they
+   * scale with the page because they live on the zoomed frame. Ink follows
+   * --ink-faint so dark mode needs no extra rules. */
+  .pm-crop-marks {
+    position: relative;
+  }
+
+  .pm-crop-marks::before,
+  .pm-crop-marks::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    background: var(--ink-faint);
+  }
+
+  /* Top-left mark: the L opens right-and-down. */
+  .pm-crop-marks::before {
+    top: -6px;
+    left: -6px;
+    clip-path: polygon(0 0, 100% 0, 100% 1.5px, 1.5px 1.5px, 1.5px 100%, 0 100%);
+  }
+
+  /* Bottom-right mark: the L opens left-and-up. */
+  .pm-crop-marks::after {
+    right: -6px;
+    bottom: -6px;
+    clip-path: polygon(
+      100% 0,
+      100% 100%,
+      0 100%,
+      0 calc(100% - 1.5px),
+      calc(100% - 1.5px) calc(100% - 1.5px),
+      calc(100% - 1.5px) 0
+    );
+  }
+
+  /* The host (pm-page-host) carries the other two corners. */
+  .pm-page-host {
+    position: relative;
+  }
+
+  .pm-page-host::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    background: var(--ink-faint);
+    /* Top-right mark: the L opens left-and-down — horizontal arm along the
+       top, vertical arm down the right edge. */
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% 100%,
+      calc(100% - 1.5px) 100%,
+      calc(100% - 1.5px) 1.5px,
+      0 1.5px
+    );
+  }
+
+  .pm-page-host::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: -6px;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    background: var(--ink-faint);
+    clip-path: polygon(
+      0 0,
+      1.5px 0,
+      1.5px calc(100% - 1.5px),
+      100% calc(100% - 1.5px),
+      100% 100%,
+      0 100%
+    );
   }
 
   /* Reduced motion: the vocabulary is short color/opacity fades, but users

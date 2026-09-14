@@ -38,7 +38,7 @@ export function AuthPage({ mode }: AuthPageProps) {
           aria-label="PerfectMarkD home"
           className="select-none px-1 text-[15px] font-semibold tracking-tight"
         >
-          Perfect<span className="text-accent">Mark</span>D
+          Perfect<span className="font-mono">Mark</span>D
         </Link>
         <div className="ml-auto flex items-center gap-1.5">
           <ThemeToggle theme={theme} onToggle={toggle} />

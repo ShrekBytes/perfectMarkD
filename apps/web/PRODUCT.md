@@ -54,9 +54,9 @@ Success means a writer can go from Markdown to a PDF they are proud to send, in 
 
 ## Brand Commitments
 
-- **Name:** PerfectMarkD — always spelled as one word with that capitalization; the wordmark styles "Mark" in the accent color.
+- **Name:** PerfectMarkD — always spelled as one word with that capitalization; the wordmark styles "Mark" in IBM Plex Mono (the typographic brand mark; the Light Table redesign replaced the accent-violet treatment).
 - **Voice:** plain, confident, and concrete. It explains without overselling, and never invents proof it does not have.
-- **Identity constraint:** the accent violet `#7c6af7` is the identity inherited from the originating plugin and is binding. Inter is the committed UI typeface, self-hosted.
+- **Visual identity (Light Table):** cool graphite monochrome chrome, 2px radii, IBM Plex Sans/Mono, corner crop marks on preview pages. No accent hue in chrome — color belongs to the document. `apps/web/DESIGN.md` is the binding visual system.
 - **Design stance (from `PLAN.md` §2):** Excalidraw's low-chrome simplicity with modern polish — the chrome recedes and the editor and paper are the product. This is a strategic stance recorded here; the concrete visual system belongs in DESIGN.md.
 
 ## Evidence on Hand

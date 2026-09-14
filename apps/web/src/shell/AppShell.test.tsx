@@ -70,7 +70,7 @@ it('renders the top bar contract: wordmark, doc name, save state, Library, theme
 
   // The wordmark is styled across nested spans, so match its full text content.
   expect(screen.getByRole('banner')).toHaveTextContent('PerfectMarkD');
-  expect(screen.getByText('Mark')).toHaveClass('text-accent');
+  expect(screen.getByText('Mark')).toHaveClass('font-mono');
   // First run opens the seeded sample document. DocName's draft syncs via
   // effect after the store lands, so the value settles rather than being
   // read mid-seed (a rare-but-real flake under suite parallelism).

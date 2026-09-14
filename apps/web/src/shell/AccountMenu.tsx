@@ -74,7 +74,7 @@ export function AccountMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         title={user.email}
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-xs font-semibold text-accent transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-strong hover:text-accent-ink focus-visible:outline-2"
+        className="flex h-8 w-8 items-center justify-center rounded-control border border-hairline bg-canvas text-xs font-semibold text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
       >
         {initial}
       </button>

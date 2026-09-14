@@ -94,7 +94,7 @@ export function PlanComparison({
 function CellValue({ value }: { value: string | boolean }) {
   if (value === true) {
     return (
-      <span className="inline-flex items-center text-accent">
+      <span className="inline-flex items-center text-ink">
         <CheckIcon />
         <span className="sr-only">Included</span>
       </span>
@@ -129,7 +129,7 @@ function PlanCta({
       <button
         type="button"
         onClick={onOpenEditor}
-        className={`${base} border border-accent/40 bg-accent-soft text-accent hover:bg-accent-strong hover:text-accent-ink`}
+        className={`${base} border border-hairline bg-canvas text-ink hover:bg-surface-hover`}
       >
         Open the editor
       </button>

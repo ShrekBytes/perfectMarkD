@@ -94,7 +94,7 @@ export function GrantEntitlementDialog({
               onClick={() => setPlan(planId)}
               className={`h-8 rounded-control border px-3 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                 plan === planId
-                  ? 'border-accent bg-accent-strong text-accent-ink'
+                  ? 'border-ink bg-ink text-accent-ink'
                   : 'border-hairline bg-canvas text-ink-soft hover:bg-surface-hover hover:text-ink'
               }`}
             >
@@ -116,7 +116,7 @@ export function GrantEntitlementDialog({
               onClick={() => chooseDuration(months)}
               className={`h-8 rounded-control border px-3 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
                 duration === months && customDate === ''
-                  ? 'border-accent bg-accent-strong text-accent-ink'
+                  ? 'border-ink bg-ink text-accent-ink'
                   : 'border-hairline bg-canvas text-ink-soft hover:bg-surface-hover hover:text-ink'
               }`}
             >
@@ -142,7 +142,7 @@ export function GrantEntitlementDialog({
       {preview && (
         <p
           data-testid="grant-preview"
-          className="mt-3 rounded-control border border-accent/40 bg-accent-soft px-2.5 py-2 text-xs text-accent"
+          className="mt-3 rounded-control border border-hairline bg-canvas px-2.5 py-2 text-xs text-ink"
         >
           {PLAN_LABEL[plan]} until {preview} ({previewNote}).
         </p>
