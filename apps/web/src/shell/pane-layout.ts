@@ -56,9 +56,28 @@ export function effectiveEditorWidth(
 }
 
 /**
- * Clamp a pane's desired width so both panes keep their minimums and the Paper
- * Canvas keeps at least `canvasMin`. When the container is too small for every
- * minimum, the pane minimum wins (flexbox then degrades the canvas gracefully).
+ * A pane's own resize floor: its minimum width, or nothing at all once it is
+ * collapsed.
+ *
+ * The resize negotiation is coupled, and flexbox performs it in exactly this
+ * order: the Paper Canvas gives first (down to `canvasMin`), then the neighbor
+ * pane yields down to its own floor. Clamping against the neighbor's
+ * *requested* width instead would forbid grows the layout would happily have
+ * performed — that mismatch between the splitter's arithmetic and the DOM was
+ * the silent keyboard-resize dead zone just above `SHELL_WIDE_MIN`.
+ */
+function paneFloor(id: PaneId, layout: PaneLayoutState): number {
+  if (id === 'editor') {
+    return layout.editor.collapsed ? 0 : PANE_LIMITS.editorMin;
+  }
+  return layout.inspector.collapsed ? 0 : PANE_LIMITS.inspectorMin;
+}
+
+/**
+ * Clamp a pane's desired width so the Paper Canvas keeps at least `canvasMin`
+ * and the neighbor pane keeps its floor. When the container is too small for
+ * every minimum, the pane minimum wins (flexbox then degrades the canvas
+ * gracefully).
  */
 export function clampPaneWidth(
   id: PaneId,
@@ -66,15 +85,9 @@ export function clampPaneWidth(
   containerWidth: number,
   layout: PaneLayoutState,
 ): number {
-  const min =
-    id === 'editor' ? PANE_LIMITS.editorMin : PANE_LIMITS.inspectorMin;
-  const otherPane =
-    id === 'editor'
-      ? layout.inspector.collapsed
-        ? 0
-        : layout.inspector.width
-      : effectiveEditorWidth(layout.editor, containerWidth);
-  const max = containerWidth - PANE_LIMITS.canvasMin - otherPane;
+  const min = paneFloor(id, layout);
+  const other: PaneId = id === 'editor' ? 'inspector' : 'editor';
+  const max = containerWidth - PANE_LIMITS.canvasMin - paneFloor(other, layout);
   return Math.min(Math.max(desired, min), Math.max(max, min));
 }
 
@@ -122,15 +135,38 @@ export function usePaneLayout(containerRef: {
   }, []);
 
   const setPaneWidth = useCallback(
-    (id: PaneId, width: number) => {
+    (id: PaneId, desired: number) => {
       const containerWidth = containerRef.current?.clientWidth ?? 0;
-      setLayout((current) => ({
-        ...current,
-        [id]: {
-          ...current[id],
-          width: clampPaneWidth(id, width, containerWidth, current),
-        },
-      }));
+      setLayout((current) => {
+        const width = clampPaneWidth(id, desired, containerWidth, current);
+        const other: PaneId = id === 'editor' ? 'inspector' : 'editor';
+        const otherFloor = paneFloor(other, current);
+        const otherWidth =
+          other === 'inspector'
+            ? current.inspector.collapsed
+              ? 0
+              : current.inspector.width
+            : effectiveEditorWidth(current.editor, containerWidth);
+        // Write the neighbor's yielded width so the state describes what the
+        // DOM will actually render: when this pane's growth would push the
+        // canvas under its minimum, the neighbor gives up the difference down
+        // to its own floor. Without this the two could drift apart — the
+        // splitter's state refusing a grow the layout had already granted.
+        const over =
+          PANE_LIMITS.canvasMin + width + otherWidth - containerWidth;
+        if (over <= 0 || otherFloor === 0 || otherWidth <= otherFloor) {
+          return { ...current, [id]: { ...current[id], width } };
+        }
+        const yielded = Math.max(
+          otherFloor,
+          containerWidth - PANE_LIMITS.canvasMin - width,
+        );
+        return {
+          ...current,
+          [id]: { ...current[id], width },
+          [other]: { ...current[other], width: yielded },
+        };
+      });
     },
     [containerRef],
   );

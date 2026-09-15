@@ -78,7 +78,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
                 onClose();
                 navigate('/pricing');
               }}
-              className="mt-2 h-8 rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
+              className="touch-target mt-2 h-8 rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
             >
               View plans
             </button>
@@ -86,7 +86,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
             <button
               type="button"
               onClick={() => void refresh()}
-              className="mt-2 h-8 rounded-control border border-hairline px-3 text-xs text-ink-soft outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+              className="touch-target mt-2 h-8 rounded-control border border-hairline px-3 text-xs text-ink-soft outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
             >
               Retry
             </button>
@@ -133,7 +133,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
                 onClick={() => void download(entry)}
                 disabled={downloadingId !== null}
                 aria-label={`Download ${entry.name}`}
-                className="flex h-8 shrink-0 items-center gap-1.5 rounded-control border border-hairline px-2.5 text-xs text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-default disabled:opacity-70"
+                className="touch-target flex h-8 shrink-0 items-center gap-1.5 rounded-control border border-hairline px-2.5 text-xs text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-default disabled:opacity-70"
               >
                 {downloadingId === entry.id ? (
                   <SpinnerIcon className="animate-spin" />

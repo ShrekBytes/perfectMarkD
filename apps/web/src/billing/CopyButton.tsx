@@ -43,7 +43,7 @@ export function CopyButton({ value, label = 'Copy' }: CopyButtonProps) {
         onClick={onCopy}
         aria-label={label}
         title={copied ? 'Copied' : label}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control border border-hairline text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+        className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control border border-hairline text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
       >
         {copied ? <CheckIcon /> : <CopyIcon />}
       </button>

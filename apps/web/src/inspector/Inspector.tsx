@@ -28,7 +28,14 @@ const TAB_PANELS: Record<TabId, (props: TabProps) => React.ReactElement> = {
   'Header-Footer': HeaderFooterTab,
 };
 
-export function Inspector() {
+interface InspectorProps {
+  /** The compact bar's proof-gauge surrogate ("A4 · 12 pages"): wide layout
+   *  keeps the gauge in the top bar, so passing it here is compact-only and
+   *  the two never show the same readout twice. */
+  gauge?: string | null;
+}
+
+export function Inspector({ gauge = null }: InspectorProps) {
   const status = useDocumentStore((state) => state.status);
   const activeId = useDocumentStore((state) => state.activeId);
   const settings = useDocumentStore((state) => state.settings);
@@ -56,28 +63,41 @@ export function Inspector() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div
-        role="tablist"
-        aria-label="Inspector sections"
-        className="flex min-h-9 shrink-0 items-center gap-1 border-b border-hairline px-2"
-      >
-        {TABS.map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            data-testid={`inspector-tab-${id}`}
-            onClick={() => setTab(id)}
-            className={`touch-target h-7 rounded-control px-2.5 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
-              tab === id
-                ? 'bg-canvas text-ink font-semibold border border-hairline'
-                : 'text-ink-soft hover:bg-surface-hover hover:text-ink'
-            }`}
+      <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-hairline px-2">
+        <div
+          role="tablist"
+          aria-label="Inspector sections"
+          className="flex items-center gap-1"
+        >
+          {TABS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              data-testid={`inspector-tab-${id}`}
+              onClick={() => setTab(id)}
+              className={`touch-target h-7 rounded-control px-2.5 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
+                tab === id
+                  ? 'bg-canvas text-ink font-semibold border border-hairline'
+                  : 'text-ink-soft hover:bg-surface-hover hover:text-ink'
+              }`}
+            >
+              {id === 'Header-Footer' ? 'Header/Footer' : id}
+            </button>
+          ))}
+        </div>
+        {gauge && (
+          /* The compact proof gauge: which paper the document is on, in the
+             same voice as the wide top bar's readout. min-w-0 + truncate keep
+             a "Custom landscape · 999 pages" from pushing the tabs out. */
+          <span
+            data-testid="inspector-gauge"
+            className="ml-auto min-w-0 select-none truncate whitespace-nowrap text-xs text-ink-faint tabular-nums"
           >
-            {id === 'Header-Footer' ? 'Header/Footer' : id}
-          </button>
-        ))}
+            {gauge}
+          </span>
+        )}
       </div>
 
       <div

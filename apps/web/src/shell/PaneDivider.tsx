@@ -34,6 +34,15 @@ export function PaneDivider({
 }: PaneDividerProps) {
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
 
+  /** The splitter's range. When the container only fits the panes' minimums
+   *  (exactly at 860px, or after a neighbor gave all it had) there is nothing
+   *  to resize — a focusable splitter that silently refuses its arrow keys
+   *  reads as broken, so the range is announced instead. */
+  const min =
+    side === 'editor' ? PANE_LIMITS.editorMin : PANE_LIMITS.inspectorMin;
+  const max = Math.round(getMaxWidth());
+  const resizable = max > min;
+
   /** The editor's divider sits at the editor's right edge (drag right =
    *  wider); the inspector's sits at its left edge (drag left = wider). */
   const dragSign = side === 'editor' ? 1 : -1;
@@ -61,6 +70,7 @@ export function PaneDivider({
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!resizable && event.key !== 'Enter') return;
     const step = event.shiftKey ? RESIZE_STEP * 4 : RESIZE_STEP;
     switch (event.key) {
       case 'ArrowRight':
@@ -88,11 +98,18 @@ export function PaneDivider({
       aria-orientation="vertical"
       aria-label={`Resize ${side} pane`}
       aria-valuenow={Math.round(getStartWidth())}
-      aria-valuemin={side === 'editor' ? PANE_LIMITS.editorMin : PANE_LIMITS.inspectorMin}
-      aria-valuemax={Math.round(getMaxWidth())}
-      title="Drag to resize — double-click or press Enter to reset"
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-disabled={!resizable || undefined}
+      title={
+        resizable
+          ? 'Drag to resize — double-click or press Enter to reset'
+          : 'No room to resize — the panes and the paper are at their minimum widths'
+      }
       tabIndex={0}
-      className="touch-divider group relative z-10 -mx-2 w-4 shrink-0 cursor-col-resize touch-none select-none rounded-control outline-offset-2 outline-accent focus-visible:outline-2"
+      className={`touch-divider group relative z-10 -mx-2 w-4 shrink-0 touch-none select-none rounded-control outline-offset-2 outline-accent focus-visible:outline-2 ${
+        resizable ? 'cursor-col-resize' : 'cursor-default'
+      }`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

@@ -248,6 +248,26 @@
     color-scheme: dark;
   }
 
+  /* ── Browser surfaces the world must own ──────────────────────────────────
+   * Text selection in the chrome (a wallet address selected by hand, the
+   * rename field, dialog copy) was the platform's, and the platform's
+   * selection blue is the only hue on a graphite bench. `--accent-soft` is the
+   * documented selection wash — the same treatment the editor already gives
+   * its own text — and it is applied to the background only, so selected text
+   * keeps its own color (syntax tokens in the editor, ink on a filled
+   * control).
+   *
+   * The Paper Canvas is untouched: its pages live in shadow roots, where the
+   * document's own styling rules — that is the product's promise. */
+  ::selection {
+    background: var(--accent-soft);
+  }
+
+  input,
+  textarea {
+    caret-color: var(--accent);
+  }
+
   html,
   body,
   #root {
@@ -298,5 +318,14 @@
   .touch-divider {
     width: var(--touch-target);
     margin-inline: calc(var(--touch-target) / -2);
+  }
+
+  /* The zoom pill floats 12px above the bench's bottom edge, so the last
+     page's "Page N of M" label parks underneath it once the canvas is
+     scrolled home. The page stack's bottom padding (3.5rem from the markup)
+     reserves the pill's footprint; coarse pointers hold the taller pill, so
+     they need more clearance. */
+  .pm-pages {
+    padding-bottom: 4.5rem;
   }
 }

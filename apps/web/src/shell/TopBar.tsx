@@ -73,7 +73,14 @@ export function TopBar({
             <WordmarkRule />
           </span>
           <div className="flex min-w-0 flex-1 items-center">
-            <DocName name={docName} onRename={onRename} className="w-full" />
+            {/* Compact: a readout that opens the rename dialog — the bar's
+                111px is too little room to edit a real name in. */}
+            <DocName
+              name={docName}
+              onRename={onRename}
+              variant="dialog"
+              className="w-full"
+            />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <ShellMenu

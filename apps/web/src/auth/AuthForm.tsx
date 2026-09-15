@@ -82,7 +82,7 @@ export function AuthForm({
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+          className="touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
         />
       </label>
 
@@ -98,7 +98,7 @@ export function AuthForm({
           minLength={mode === 'register' ? 8 : undefined}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+          className="touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
         />
       </label>
 
@@ -111,7 +111,7 @@ export function AuthForm({
       <button
         type="submit"
         disabled={submitting}
-        className="mt-5 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
+        className="touch-target mt-5 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
       >
         {submitting ? 'Please wait…' : copy.submit}
       </button>

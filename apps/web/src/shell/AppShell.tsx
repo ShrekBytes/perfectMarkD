@@ -256,7 +256,7 @@ export function AppShell() {
                 !compact || pane.compactPane === 'inspector' ? 'flex' : 'hidden'
               } min-h-0 flex-col bg-surface ${compact ? 'w-full min-w-0' : ''}`}
             >
-              <Inspector />
+              <Inspector gauge={compact ? gauge : null} />
             </aside>
           </>
         )}

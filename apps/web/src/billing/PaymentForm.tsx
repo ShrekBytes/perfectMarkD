@@ -76,7 +76,7 @@ export function PaymentForm({
           name="network"
           value={network}
           onChange={(event) => setNetwork(event.target.value as Network)}
-          className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+          className="touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
         >
           {allowedNetworks.map((value) => (
             <option key={value} value={value}>
@@ -97,7 +97,7 @@ export function PaymentForm({
           placeholder="64-character hexadecimal string"
           value={txid}
           onChange={(event) => setTxid(event.target.value)}
-          className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+          className="touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
         />
       </label>
 
@@ -113,7 +113,7 @@ export function PaymentForm({
             inputMode="decimal"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+            className="touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
           />
         </label>
 
@@ -141,7 +141,7 @@ export function PaymentForm({
         <button
           type="submit"
           disabled={submitting}
-          className="h-9 flex-1 rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
+          className="touch-target h-9 flex-1 rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
         >
           {submitting ? 'Submitting…' : 'Submit payment details'}
         </button>
@@ -149,7 +149,7 @@ export function PaymentForm({
           <button
             type="button"
             onClick={onCancel}
-            className="h-9 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+            className="touch-target h-9 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
             Cancel
           </button>

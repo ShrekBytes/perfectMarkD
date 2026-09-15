@@ -265,7 +265,10 @@ export function Checkbox({
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="size-3.5 cursor-pointer rounded-[4px] accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+        /* The authored 14px box for fine pointers; coarse pointers lift it to
+           the 24px WCAG 2.5.8 floor — the Inspector's field pattern is exempt
+           from the 44px instrument rule, not from the accessibility floor. */
+        className="size-3.5 cursor-pointer rounded-[4px] accent-accent hover-none:min-h-6 hover-none:min-w-6 disabled:cursor-not-allowed disabled:opacity-50"
       />
       <label
         htmlFor={id}

@@ -154,20 +154,21 @@ it('exposes aria-valuemax on the pane separators, live with layout', async () =>
     name: 'Resize inspector pane',
   });
 
-  // jsdom stubs the container at 1200px: editor max = 1200 - 320 (canvas min)
-  // - 320 (inspector default); inspector max = 1200 - 320 - editor width.
-  // Editor width is its 38% default (456px rounded from 1200 * 0.38).
+  // jsdom stubs the container at 1200px. The ceiling is the coupled resize
+  // negotiation's: the canvas keeps its 320px minimum and the neighbor pane
+  // yields down to its own, so editor max = 1200 - 320 - 260 (inspector min)
+  // and inspector max = 1200 - 320 - 280 (editor min).
   expect(editorDivider).toHaveAttribute(
     'aria-valuemax',
-    String(1200 - 320 - 320),
+    String(1200 - 320 - 260),
   );
   expect(editorDivider).toHaveAttribute('aria-valuemin', '280');
   expect(
     Number(editorDivider.getAttribute('aria-valuemax')),
   ).toBeGreaterThanOrEqual(Number(editorDivider.getAttribute('aria-valuemin')));
-  expect(Number(inspectorDivider.getAttribute('aria-valuemax'))).toBeGreaterThan(
-    0,
-  );
+  expect(
+    Number(inspectorDivider.getAttribute('aria-valuemax')),
+  ).toBeGreaterThan(0);
   expect(inspectorDivider).toHaveAttribute('aria-valuemin', '260');
 
   // Collapsing the inspector frees its width: the editor's max ceiling grows.
@@ -523,13 +524,18 @@ it('clamps drags to the editor min and max widths', async () => {
     screen.getByRole('complementary', { name: 'Editor pane' }).style.width,
   ).toBe('280px');
 
-  // 456 + 4900 → max = 1200 - 320 canvas - 320 inspector = 560.
+  // 456 + 4900 → max = 1200 - 320 canvas - 260 inspector floor = 620, and the
+  // coupled write yields the inspector down to its 260px floor so the state
+  // matches what the layout renders.
   fireEvent.pointerDown(divider, { pointerId: 1, button: 0, clientX: 0 });
   fireEvent.pointerMove(divider, { pointerId: 1, clientX: 4900 });
   fireEvent.pointerUp(divider, { pointerId: 1 });
   expect(
     screen.getByRole('complementary', { name: 'Editor pane' }).style.width,
-  ).toBe('560px');
+  ).toBe('620px');
+  expect(
+    screen.getByRole('complementary', { name: 'Inspector pane' }).style.width,
+  ).toBe('260px');
 });
 
 it('resets the editor width to the default ratio on divider double-click', async () => {

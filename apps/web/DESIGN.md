@@ -113,9 +113,18 @@ the two attached footnotes).
   right cluster Library / theme / quota / Export / account.
 - **Panes:** editor 38% (min 280px), canvas flex (min 320px), Inspector 320px
   (min 260px). Dividers: 16px drag targets, ARIA splitters, keyboard resize,
-  Enter/double-click reset.
+  Enter/double-click reset. Resizing is a **coupled negotiation**: the canvas
+  gives first (to its 320px minimum), then the neighbor pane yields to its own
+  floor — so a pane's ceiling is `container − 320 − neighbor min`, and
+  `setPaneWidth` writes the neighbor's yielded width with it. State and DOM
+  then agree, and `aria-valuemax` is never a value the keyboard cannot reach.
+  Exactly at 860px nothing is left to give: the splitter says so
+  (`aria-disabled`, neutral cursor, an explanatory title) instead of silently
+  refusing its arrow keys.
 - **Canvas rhythm:** 24px page gap, 24/32px padding, "Page N of M" labels,
-  fit-to-width until the user takes over.
+  fit-to-width until the user takes over. The page stack's bottom padding
+  clears the floating zoom pill (3.5rem, 4.5rem under coarse pointers) so the
+  last page's label can always scroll out from under it.
 - **Spacing scale:** 2/4/6/8/10/12/16/20/24/32/40px.
 - **Chrome heights:** 28 / 32 / 36 / 40 / 48px. Nothing else.
 
@@ -127,8 +136,8 @@ own minimum width, which is exactly where the composition breaks.
 
 | Width | Layout |
 |---|---|
-| **≥ 860px** — *wide* | Three panes as columns. `860 = 280 + 320 + 260`. Dividers, collapse chevrons, fullscreen-canvas mode, autosave **and** gauge in the bar, the full Library / theme / quota / Export / account cluster. |
-| **< 860px** — *compact* | One pane at a time behind the **Pane Switcher** (Editor · Paper · Inspector), full width. Every pane stays mounted; the inactive ones are hidden. `SHELL_WIDE_MIN` in `shell/pane-layout.ts`. |
+| **≥ 860px** — *wide* | Three panes as columns. `860 = 280 + 320 + 260`. Dividers, collapse chevrons, fullscreen-canvas mode, autosave **and** gauge in the bar, the full Library / theme / quota / Export / account cluster, and the document name as an inline-edit field. |
+| **< 860px** — *compact* | One pane at a time behind the **Pane Switcher** (Editor · Paper · Inspector), full width. Every pane stays mounted; the inactive ones are hidden. The name becomes a readout that opens the **Rename dialog**, and the gauge moves to the Inspector header. `SHELL_WIDE_MIN` in `shell/pane-layout.ts`. |
 | **< 480px** (`roomy`) | The wordmark yields the bar to the document name and the Export action. The switcher row carries the autosave readout. |
 
 **Named rules:**
@@ -143,7 +152,13 @@ own minimum width, which is exactly where the composition breaks.
 - **Compact spends its bar on the document.** The proof gauge and the
   standalone quota chip are wide-layout chrome; the page count lives in the
   Paper view's labels and the Library rows, and the Server Export allowance in
-  the Export menu.
+  the Export menu. The gauge's compact surrogate is the Inspector header
+  readout — the one place a phone user goes to change the paper — and it is
+  rendered *only* in compact, so the same facts never appear twice on screen.
+- **Compact never edits in a sliver.** Where a wide-layout inline control cannot
+  hold its content at phone widths, it stops being an inline control: the
+  document name becomes a tap-to-rename readout over a full-width field in the
+  shared Dialog. Same commit semantics, honest room to type.
 
 ### Touch targets
 
@@ -159,9 +174,21 @@ min-heights, not fixed heights, so they grow with their contents; the editor
 toolbar also wraps (`flex-wrap`), which is what keeps Undo/Redo reachable at
 the 280px editor minimum instead of clipping. The pane dividers widen under
 the gate with compensating negative margins (`touch-divider`), preserving
-their net-zero footprint in the 860 arithmetic. The Inspector's 24px field
-micro-controls are exempt: they are the field pattern, not instruments, and
-their rows already sit inside full-size tap rows.
+their net-zero footprint in the 860 arithmetic.
+
+The rule crosses the overlay boundary: menus and menu items (the compact
+overflow, the account dropdown, the Export dropdown), the shared Dialog and its
+close button, the Library drawer, every dialog body (history, upgrade status,
+the upgrade flow, the rename dialog, the print hint), the payment and auth
+fields, the copy buttons, and the quota chip. An overlay is where a phone user
+goes to *act*, so it is not exempt. `e2e/shell-compact.spec.ts` sweeps the
+visible controls at 320px and fails on any box under the floor.
+
+The Inspector's 24px field micro-controls stay exempt — 12px text on a 24–27px
+input is the field pattern, not an instrument, and the panel is a column of
+rows rather than a bar of targets. The exemption is about size only, never
+about the accessibility floor: nothing sits under 24px (WCAG 2.5.8), so coarse
+pointers lift the 14px checkbox with `hover-none:min-h-6 hover-none:min-w-6`.
 
 ## Elevation & Depth
 
@@ -212,7 +239,8 @@ filled primary for paid, hairline ghost for free. Verified order badge:
 
 Inspector compact fields: 12px text on `--field`, 1px hairline, 2px radius;
 focus draws the 2px accent ring (the inline doc-name field swaps to
-`focus:border-accent` + `--field` instead). Full-width form fields: 36px,
+`focus:border-accent` + `--field` instead, and in the compact rename dialog the
+field is a full-width 36px form field). Full-width form fields: 36px,
 `--canvas` fill. Monospace for IDs, wallets, hex. Errors: 12px `--danger`
 below the field, `role="alert"`.
 
@@ -265,6 +293,25 @@ Below 860px the top bar's secondary cluster folds into a 32px `⋯` trigger:
 Library, the theme switch, and the account entries — the last shared with the
 desktop account dropdown so the two can never drift. Export stays out of it and
 remains the bar's only filled control.
+
+**Menus are 224px wide (`w-56`), never shrink-to-fit, and clamp to
+`calc(100vw − 1rem)`.** The compact overflow is anchored to the *viewport*
+(`fixed right-2`, below the bar plus the safe-area inset) rather than to its
+trigger, because the trigger sits ~44px from the bar's right edge and a
+224px trigger-anchored dropdown hangs half its labels off a 320px screen. The
+Export dropdown keeps trigger anchoring (it is a wide-layout control too) but
+takes the same fixed width: an auto-width menu inherits the split button's box
+and squeezes "Server Export" into a wrapped, cramped item.
+
+### Rename (compact)
+
+The document name in the compact bar is a tap-to-rename readout, not a 111px
+edit field: same borderless instrument styling and 44px floor, `aria-haspopup`,
+accessible name "Rename document: {name}", tail truncated with an ellipsis.
+Renaming itself happens in the shared Dialog — a full-width field, prefilled
+and selected, with Cancel and Done — because the width a phone bar can spare a
+name is not the width a name needs. Commit semantics are the inline field's:
+trim, ignore empty and unchanged drafts, Enter commits, Escape abandons.
 
 ## Do's and Don'ts
 

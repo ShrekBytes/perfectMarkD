@@ -136,13 +136,17 @@ export function ExportSplitButton() {
             ref={menuRef}
             role="menu"
             aria-label="Export options"
-            className="absolute right-0 top-full z-50 mt-1.5 overflow-hidden rounded-pane border border-hairline bg-surface py-1 shadow-lg"
+            /* Sized like the compact overflow menu, not shrink-to-fit: the
+               dropdown's containing block is the split button itself, so an
+               auto-width menu would squeeze "Server Export" into a wrapped,
+               cramped item at phone widths. */
+            className="absolute right-0 top-full z-50 mt-1.5 w-56 max-w-[calc(100vw-1rem)] overflow-hidden rounded-pane border border-hairline bg-surface py-1 shadow-lg"
           >
             <button
               role="menuitem"
               type="button"
               onClick={startExport}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
+              className="touch-target flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
             >
               <PrinterIcon className="text-ink-soft" />
               Print…
@@ -157,7 +161,7 @@ export function ExportSplitButton() {
                     ? 'Renders on the server with headless Chromium'
                     : 'Renders on the server — your admin-granted allowance'
                 }
-                className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
+                className="touch-target flex w-full items-start gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
               >
                 <ServerIcon className="mt-0.5 shrink-0 text-ink-soft" />
                 <span className="flex min-w-0 flex-col">
@@ -187,7 +191,7 @@ export function ExportSplitButton() {
                   setMenuOpen(false);
                   setPricingOpen(true);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
+                className="touch-target flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
               >
                 <ServerIcon className="text-ink-soft" />
                 Server Export

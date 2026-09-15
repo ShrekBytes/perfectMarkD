@@ -458,7 +458,10 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
           ref={pagesRef}
           data-testid="canvas-pages"
           aria-hidden="true"
-          className="pm-pages flex w-max min-w-full flex-col items-center gap-6 px-6 py-8"
+          /* Bottom padding clears the floating zoom pill (see the touch
+             targets block in global.css): the last page's label must be able
+             to scroll clear of it instead of parking underneath. */
+          className="pm-pages flex w-max min-w-full flex-col items-center gap-6 px-6 pb-14 pt-8"
         />
       </div>
 

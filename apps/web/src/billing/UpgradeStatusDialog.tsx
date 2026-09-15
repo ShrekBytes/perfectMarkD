@@ -53,7 +53,7 @@ export function UpgradeStatusDialog({ onClose }: UpgradeStatusDialogProps) {
           <button
             type="button"
             onClick={() => void refresh()}
-            className="mt-2 h-8 rounded-control border border-hairline px-3 text-xs text-ink-soft outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+            className="touch-target mt-2 h-8 rounded-control border border-hairline px-3 text-xs text-ink-soft outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
             Retry
           </button>
@@ -79,7 +79,7 @@ export function UpgradeStatusDialog({ onClose }: UpgradeStatusDialogProps) {
               onClose();
               navigate('/pricing');
             }}
-            className="mt-3 h-8 rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
+            className="touch-target mt-3 h-8 rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
           >
             View plans
           </button>
@@ -142,7 +142,7 @@ export function UpgradeStatusDialog({ onClose }: UpgradeStatusDialogProps) {
                   <button
                     type="button"
                     onClick={() => setExpandedId(order.id)}
-                    className="mt-2 h-7 rounded-control border border-hairline px-2.5 text-xs text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+                    className="touch-target mt-2 h-7 rounded-control border border-hairline px-2.5 text-xs text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
                   >
                     {order.status === 'rejected'
                       ? 'Resubmit payment'
