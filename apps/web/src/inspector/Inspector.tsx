@@ -59,7 +59,7 @@ export function Inspector() {
       <div
         role="tablist"
         aria-label="Inspector sections"
-        className="flex h-9 shrink-0 items-center gap-1 border-b border-hairline px-2"
+        className="flex min-h-9 shrink-0 items-center gap-1 border-b border-hairline px-2"
       >
         {TABS.map((id) => (
           <button
@@ -69,7 +69,7 @@ export function Inspector() {
             aria-selected={tab === id}
             data-testid={`inspector-tab-${id}`}
             onClick={() => setTab(id)}
-            className={`h-7 rounded-control px-2.5 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
+            className={`touch-target h-7 rounded-control px-2.5 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
               tab === id
                 ? 'bg-canvas text-ink font-semibold border border-hairline'
                 : 'text-ink-soft hover:bg-surface-hover hover:text-ink'

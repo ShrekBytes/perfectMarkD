@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   clampPaneWidth,
   effectiveEditorWidth,
+  SHELL_WIDE_MIN,
+  shellModeFor,
   usePaneLayout,
   type PaneLayoutState,
 } from './pane-layout';
@@ -83,6 +85,49 @@ describe('clampPaneWidth', () => {
     };
     // editor effective 380 → inspector max = 1000 - 380 - 320 = 300
     expect(clampPaneWidth('inspector', 400, 1000, narrow)).toBe(300);
+  });
+});
+
+describe('shellModeFor', () => {
+  it('keeps the three-pane row at and above the panes’ own minimum', () => {
+    expect(SHELL_WIDE_MIN).toBe(860); // 280 editor + 320 canvas + 260 inspector
+    expect(shellModeFor(SHELL_WIDE_MIN)).toBe('wide');
+    expect(shellModeFor(1440)).toBe('wide');
+  });
+
+  it('goes compact one pixel below it', () => {
+    expect(shellModeFor(SHELL_WIDE_MIN - 1)).toBe('compact');
+    expect(shellModeFor(375)).toBe('compact');
+  });
+
+  it('never collapses the workspace on an unknown width', () => {
+    // First paint before layout, and jsdom: the desktop layout stands.
+    expect(shellModeFor(0)).toBe('wide');
+  });
+});
+
+describe('usePaneLayout compact mode', () => {
+  it('starts on the editor and reports the pane the user picked', () => {
+    const compactRef = { current: { clientWidth: 420 } };
+    const { result } = renderHook(() => usePaneLayout(compactRef));
+
+    expect(result.current.mode).toBe('compact');
+    expect(result.current.compactPane).toBe('editor');
+
+    act(() => result.current.setCompactPane('inspector'));
+    expect(result.current.compactPane).toBe('inspector');
+  });
+
+  it('keeps the desktop collapse state apart from the compact pane', () => {
+    const wideRef = { current: { clientWidth: 1200 } };
+    const { result } = renderHook(() => usePaneLayout(wideRef));
+
+    expect(result.current.mode).toBe('wide');
+    act(() => result.current.togglePane('editor'));
+    expect(result.current.editor.collapsed).toBe(true);
+    // Collapsing is a wide-layout power; the compact view is unaffected.
+    expect(result.current.compactPane).toBe('editor');
+    expect(result.current.mode).toBe('wide');
   });
 });
 

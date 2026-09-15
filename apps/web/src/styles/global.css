@@ -7,6 +7,13 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
+ * Coarse-pointer gate: devices with no hover capability (phones, tablets) get
+ * persistent affordances where hover-revealed ones would be unreachable. The
+ * hover-revealed controls themselves stay for every device that can hover.
+ */
+@custom-variant hover-none (@media (hover: none));
+
+/*
  * Semantic design tokens. Light values are the default; dark overrides live under
  * [data-theme='dark']. Chrome darkens; --page (the paper) stays white in both.
  */
@@ -35,6 +42,11 @@
   --accent-soft: rgb(28 30 33 / 0.08); /* selection wash */
   --accent-ink: #ffffff;
   --danger: #c4321f; /* destructive actions (delete) — the only hue in chrome */
+
+  /* Touch-target floor (DESIGN.md → Layout → Touch targets): the minimum hit
+     area a chrome control must offer under coarse pointers. The authored
+     28/32px instrument sizes are fine-pointer values and never change there. */
+  --touch-target: 44px;
 }
 
 [data-theme='dark'] {
@@ -91,6 +103,14 @@
      panels alike; 0px where a shape meets the bench edge. */
   --radius-control: 2px;
   --radius-pane: 2px;
+
+  /* The shell's responsive ladder — one authored breakpoint, in the same
+     system as the tokens (DESIGN.md → Layout). 480px is where the compact top
+     bar can afford the wordmark beside the document name and the Export
+     action; below it the name and the action own that space. The wide/compact
+     workspace switch at 860px lives in pane-layout.ts (it must be read in JS
+     to change what renders) and is documented in DESIGN.md. */
+  --breakpoint-roomy: 480px;
 
   /* Motion: 150–200ms ease-out. Components pick duration-150/200; the curve is the default. */
   --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
@@ -234,7 +254,49 @@
     height: 100%;
   }
 
+  /* The app shell is the viewport: on phones the dynamic viewport unit keeps
+     the bottom-anchored chrome (the zoom pill, toasts) inside the area the
+     browser's own chrome leaves visible. `100%` is the fallback. */
+  #root {
+    height: 100dvh;
+  }
+
+  /* Notches and home indicators: the shell keeps its instruments inside the
+     safe area. Zero on every device without insets. */
+  .pm-shell {
+    padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0)
+      env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  }
+
+  /* ── Touch targets (DESIGN.md → Layout) ─────────────────────────────────
+   * The rules live at the end of this file, unlayered: the .touch-divider
+   * width must beat Tailwind's .w-4 utility, and unlayered author styles
+   * outrank every cascade layer. */
+
   body {
     @apply bg-canvas font-sans text-ink antialiased;
+    overscroll-behavior: none;
+  }
+}
+
+/* Coarse pointers get a 44×44px hit floor on every control carrying the
+ * `touch-target` class, via min-height/min-width: the hit area is the
+ * visible control, so no invisible zones and no overlap ambiguity. The
+ * same gate as the hover-none variant — fine-pointer desktop keeps the
+ * authored 28/32px instruments pixel-identical. Bars that hold these
+ * controls carry min-heights instead of fixed heights, so they grow with
+ * their contents. */
+@media (hover: none) {
+  .touch-target {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+
+  /* The pane divider is its own hit zone: widening it to the floor keeps
+     its net-zero footprint in the 860 arithmetic (44px wide, 22px pulled
+     back into each neighbor pane — the authored 16px/-8px pair, grown). */
+  .touch-divider {
+    width: var(--touch-target);
+    margin-inline: calc(var(--touch-target) / -2);
   }
 }

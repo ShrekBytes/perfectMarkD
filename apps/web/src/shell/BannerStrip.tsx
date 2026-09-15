@@ -15,13 +15,15 @@ import { CloseIcon } from './icons';
 const stripClasses =
   'flex min-h-10 shrink-0 items-center gap-3 border-b border-hairline bg-surface px-3 py-1.5 text-sm text-ink';
 
-/** The 28px action ladder shared by every strip control. */
+/** The 28px action ladder shared by every strip control. `touch-target` lifts
+ *  the hit area to the 44px floor under coarse pointers; the strip's own
+ *  min-height grows to hold the taller controls. */
 const primaryClasses =
-  'flex h-7 shrink-0 items-center rounded-control bg-accent-strong px-2.5 text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2';
+  'touch-target flex h-7 shrink-0 items-center rounded-control bg-accent-strong px-2.5 text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2';
 const ghostClasses =
-  'flex h-7 shrink-0 items-center rounded-control border border-hairline px-2.5 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2';
+  'touch-target flex h-7 shrink-0 items-center rounded-control border border-hairline px-2.5 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2';
 const dangerClasses =
-  'flex h-7 shrink-0 items-center rounded-control border border-danger/40 px-2.5 text-sm text-danger transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2';
+  'touch-target flex h-7 shrink-0 items-center rounded-control border border-danger/40 px-2.5 text-sm text-danger transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2';
 
 interface BannerButtonProps {
   variant: 'primary' | 'ghost' | 'danger';
@@ -102,7 +104,7 @@ export function BannerStrip({
             aria-label={dismissLabel}
             title="Dismiss"
             onClick={onDismiss}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+            className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
             <CloseIcon />
           </button>

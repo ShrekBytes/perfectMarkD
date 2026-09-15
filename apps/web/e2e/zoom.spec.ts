@@ -73,9 +73,10 @@ test('after takeover the zoom is frozen across viewport resizes', async ({
     .click();
   await expect(page.getByTestId('zoom-level')).toHaveText('100%');
 
-  // Shrink hard: a pre-takeover canvas would re-fit; the taken-over zoom
-  // must not move, and the page may overflow horizontally.
-  await page.setViewportSize({ width: 800, height: 700 });
+  // Shrink hard, staying in the wide layout (860px+): a pre-takeover canvas
+  // would re-fit; the taken-over zoom must not move, and the page may overflow
+  // its canvas horizontally.
+  await page.setViewportSize({ width: 900, height: 700 });
   await page.waitForTimeout(250);
   await expect(page.getByTestId('zoom-level')).toHaveText('100%');
   expect(await firstFrameWidth(page)).toBeCloseTo(794, 0);

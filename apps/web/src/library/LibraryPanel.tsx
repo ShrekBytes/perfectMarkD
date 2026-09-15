@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatPageCount, formatRelativeTime } from '../documents/text';
 import { useDocumentStore } from '../documents/store';
 import { PresetThumb } from '../inspector/PresetThumb';
@@ -6,6 +6,7 @@ import {
   CloseIcon,
   CopyIcon,
   DownloadIcon,
+  MoreIcon,
   PagesIcon,
   PencilIcon,
   PlusIcon,
@@ -13,7 +14,7 @@ import {
   UploadIcon,
 } from '../shell/icons';
 import { EmptyState } from '../shell/EmptyState';
-import { useEscapeLayer, useModalFocus } from '../shell/focus';
+import { useEscapeLayer, useMenuKeyboard, useModalFocus } from '../shell/focus';
 import { downloadMarkdown } from './download';
 import { thumbFootprint } from './thumb';
 
@@ -22,7 +23,7 @@ interface LibraryPanelProps {
 }
 
 const iconButton =
-  'flex h-7 w-7 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2';
+  'touch-target flex h-7 w-7 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2';
 
 /**
  * The Library: a slide-in drawer listing the local documents, with create /
@@ -62,6 +63,12 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
     if (name && name !== currentName) void renameDocument(id, name);
   };
 
+  const exportRow = (id: string) => {
+    void exportDocument(id).then((payload) => {
+      if (payload) downloadMarkdown(payload.fileName, payload.markdown);
+    });
+  };
+
   const handleImportChosen = (files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
@@ -85,7 +92,7 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
         aria-label="Library"
         data-testid="library-panel"
         tabIndex={-1}
-        className="animate-slide-in-left fixed inset-y-0 left-0 z-50 flex w-84 flex-col border-r border-hairline bg-surface shadow-xl outline-none"
+        className="animate-slide-in-left fixed inset-y-0 left-0 z-50 flex w-84 max-w-[calc(100vw-1rem)] flex-col border-r border-hairline bg-surface shadow-xl outline-none"
       >
         <header className="flex h-12 shrink-0 items-center justify-between border-b border-hairline pl-4 pr-2">
           <h2 className="text-sm font-semibold">Library</h2>
@@ -107,7 +114,7 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
           <button
             type="button"
             onClick={() => void createDocument().then(onClose)}
-            className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+            className="touch-target flex h-8 flex-1 items-center justify-center gap-1.5 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
             <PlusIcon />
             New document
@@ -115,7 +122,7 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+            className="touch-target flex h-8 items-center justify-center gap-1.5 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
             <UploadIcon />
             Import .md
@@ -204,55 +211,63 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
                 )}
 
                 {!renaming && (
-                  <div className="flex shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-                    <button
-                      type="button"
-                      aria-label={`Rename ${row.name}`}
-                      title="Rename"
-                      onClick={() => {
+                  <>
+                    {/* Fine-pointer actions: hover-revealed, as before.
+                        Coarse pointers have no hover, so this row hides
+                        entirely there and the kebab menu below is the twin —
+                        the actions stay reachable one-handed on touch. */}
+                    <div className="hover-none:hidden flex shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                      <button
+                        type="button"
+                        aria-label={`Rename ${row.name}`}
+                        title="Rename"
+                        onClick={() => {
+                          setDraft(row.name);
+                          setRenamingId(row.id);
+                        }}
+                        className={iconButton}
+                      >
+                        <PencilIcon />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Duplicate ${row.name}`}
+                        title="Duplicate"
+                        onClick={() => void duplicateDocument(row.id)}
+                        className={iconButton}
+                      >
+                        <CopyIcon />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Export ${row.name}`}
+                        title="Export .md"
+                        onClick={() => exportRow(row.id)}
+                        className={iconButton}
+                      >
+                        <DownloadIcon />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${row.name}`}
+                        title="Delete"
+                        onClick={() => void deleteDocument(row.id)}
+                        className={`${iconButton} hover:text-danger`}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                    <RowActionsMenu
+                      name={row.name}
+                      onRename={() => {
                         setDraft(row.name);
                         setRenamingId(row.id);
                       }}
-                      className={iconButton}
-                    >
-                      <PencilIcon />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Duplicate ${row.name}`}
-                      title="Duplicate"
-                      onClick={() => void duplicateDocument(row.id)}
-                      className={iconButton}
-                    >
-                      <CopyIcon />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Export ${row.name}`}
-                      title="Export .md"
-                      onClick={() => {
-                        void exportDocument(row.id).then((payload) => {
-                          if (payload)
-                            downloadMarkdown(
-                              payload.fileName,
-                              payload.markdown,
-                            );
-                        });
-                      }}
-                      className={iconButton}
-                    >
-                      <DownloadIcon />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Delete ${row.name}`}
-                      title="Delete"
-                      onClick={() => void deleteDocument(row.id)}
-                      className={`${iconButton} hover:text-danger`}
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
+                      onDuplicate={() => void duplicateDocument(row.id)}
+                      onExport={() => exportRow(row.id)}
+                      onDelete={() => void deleteDocument(row.id)}
+                    />
+                  </>
                 )}
               </li>
             );
@@ -271,5 +286,133 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
         </ul>
       </aside>
     </>
+  );
+}
+
+const rowMenuItem =
+  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:bg-surface-hover focus-visible:outline-2';
+
+/**
+ * The coarse-pointer twin of the hover-revealed icon row. Touch has no
+ * hover, so four invisible buttons are unreachable there; this renders one
+ * persistent kebab trigger whose menu names every action in text. Both
+ * branches stay mounted and a `(hover: none)` gate decides which a device
+ * sees — `display: none` keeps the hidden branch out of tab order and the
+ * accessibility tree, so keyboard and screen-reader users are never offered
+ * duplicates.
+ */
+function RowActionsMenu({
+  name,
+  onRename,
+  onDuplicate,
+  onExport,
+  onDelete,
+}: {
+  name: string;
+  onRename: () => void;
+  onDuplicate: () => void;
+  onExport: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Dropdown dismissal on outside pointer press.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
+  const close = () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  // Escape resolves the topmost layer only (the menu sits above the drawer)
+  // and returns focus to the trigger; the menu itself roves with the arrow
+  // keys (focus.ts).
+  useEscapeLayer(open, close);
+  useMenuKeyboard(menuRef, open, () => setOpen(false));
+
+  const run = (action: () => void) => () => {
+    action();
+    close();
+  };
+
+  return (
+    <div ref={containerRef} className="relative hidden hover-none:block">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label={`Actions for ${name}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={`Actions for ${name}`}
+        className={iconButton}
+      >
+        <MoreIcon />
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label={`Actions for ${name}`}
+          className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-pane border border-hairline bg-surface py-1 shadow-lg"
+        >
+          <button
+            role="menuitem"
+            type="button"
+            onClick={run(onRename)}
+            className={rowMenuItem}
+          >
+            <PencilIcon className="text-ink-soft" />
+            Rename
+          </button>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={run(onDuplicate)}
+            className={rowMenuItem}
+          >
+            <CopyIcon className="text-ink-soft" />
+            Duplicate
+          </button>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={run(onExport)}
+            className={rowMenuItem}
+          >
+            <DownloadIcon className="text-ink-soft" />
+            Export .md
+          </button>
+          <div
+            role="separator"
+            aria-hidden="true"
+            className="my-1 h-px bg-hairline"
+          />
+          {/* --danger is the chrome's one color and delete is its one job. */}
+          <button
+            role="menuitem"
+            type="button"
+            onClick={run(onDelete)}
+            className={`${rowMenuItem} text-danger`}
+          >
+            <TrashIcon />
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

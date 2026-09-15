@@ -180,6 +180,19 @@ export function CloseIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** The overflow trigger: the shell's secondary controls folded into a menu
+ *  when the top bar cannot hold them (compact layout). Three drawn dots, the
+ *  same construction as the list glyph — no Unicode. */
+export function MoreIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M5 12h.01" />
+      <path d="M12 12h.01" />
+      <path d="M19 12h.01" />
+    </Icon>
+  );
+}
+
 export function BoldIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

@@ -3,13 +3,16 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 interface DocNameProps {
   name: string;
   onRename: (name: string) => void;
+  /** Extra classes for the input — the compact top bar gives it `w-full` so it
+   *  tracks the bar instead of its `size`-derived intrinsic width. */
+  className?: string;
 }
 
 /**
  * The document's name as a borderless inline-edit field in the top bar.
  * Enter or blur commits; Escape reverts. Empty drafts are ignored.
  */
-export function DocName({ name, onRename }: DocNameProps) {
+export function DocName({ name, onRename, className = '' }: DocNameProps) {
   const [draft, setDraft] = useState(name);
   const cancelled = useRef(false);
 
@@ -52,7 +55,11 @@ export function DocName({ name, onRename }: DocNameProps) {
       /* Sized to the committed name, not the draft: per-keystroke resizing
          would shift the whole top bar's right cluster while typing. */
       size={Math.max(name.length, 8)}
-      className="min-w-0 rounded-control border border-transparent px-2 py-1 text-sm text-ink transition-colors duration-150 outline-none placeholder:text-ink-faint hover:border-hairline focus:border-accent focus:bg-field"
+      /* The floor keeps the field usable when the compact bar squeezes it:
+         without it flexbox shrinks the input to a sliver (min-w-0 let it
+         collapse to ~18px beside Export at phone widths). touch-target
+         lifts it to the 44px hit floor under coarse pointers. */
+      className={`touch-target min-w-24 rounded-control border border-transparent px-2 py-1 text-sm text-ink transition-colors duration-150 outline-none placeholder:text-ink-faint hover:border-hairline focus:border-accent focus:bg-field ${className}`}
     />
   );
 }

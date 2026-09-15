@@ -112,7 +112,7 @@ export function ExportSplitButton() {
           onClick={startExport}
           disabled={locked || !flow.canExport}
           title="Export — opens the print dialog (choose 'Save as PDF')"
-          className={`flex h-8 items-center gap-1.5 rounded-l-control py-1 pl-3 pr-2 text-sm font-medium ${busyButton}`}
+          className={`touch-target flex h-8 items-center gap-1.5 rounded-l-control py-1 pl-3 pr-2 text-sm font-medium ${busyButton}`}
         >
           {busy ? <SpinnerIcon className="animate-spin" /> : <DownloadIcon />}
           {busy ? 'Exporting…' : 'Export'}
@@ -126,7 +126,7 @@ export function ExportSplitButton() {
           aria-label="More export options"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          className={`flex h-8 w-6 items-center justify-center rounded-r-control ${busyButton}`}
+          className={`touch-target flex h-8 w-6 items-center justify-center rounded-r-control ${busyButton}`}
         >
           <ChevronDownIcon />
         </button>
@@ -242,7 +242,7 @@ function ExportToastView({
           type="button"
           aria-label="Dismiss"
           onClick={dismissToast}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+          className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
         >
           <CloseIcon />
         </button>

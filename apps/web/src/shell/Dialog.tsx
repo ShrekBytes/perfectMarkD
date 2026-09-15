@@ -51,10 +51,14 @@ export function Dialog({
         aria-label={label}
         data-testid={testId}
         tabIndex={-1}
-        className="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center p-6 outline-none"
+        /* The panel is centred while it fits and scrolls from the top when it
+           does not: `items-start` + `my-auto` on the panel keeps the heading
+           (and its close button) on screen at every height instead of clipping
+           them above the viewport — the trap a centered box hits on a phone. */
+        className="animate-fade-in fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto overscroll-contain p-4 outline-none sm:p-6"
       >
         <div
-          className={`rounded-pane border border-hairline bg-surface p-5 shadow-xl ${panelClassName}`}
+          className={`my-auto rounded-pane border border-hairline bg-surface p-5 shadow-xl ${panelClassName}`}
         >
           <div className="flex items-start justify-between gap-3">
             <h2 className="text-sm font-semibold">{label}</h2>
@@ -63,7 +67,7 @@ export function Dialog({
               autoFocus
               aria-label="Close"
               onClick={onClose}
-              className="-m-1 rounded-control p-1 text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+              className="touch-target -m-1 rounded-control p-1 text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
             >
               <CloseIcon />
             </button>

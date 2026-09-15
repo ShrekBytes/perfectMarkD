@@ -109,8 +109,6 @@ the two attached footnotes).
 
 ## Layout
 
-Unchanged from the previous system and still true:
-
 - **Top bar:** 48px, hairline bottom, wordmark · doc name · autosave · gauge;
   right cluster Library / theme / quota / Export / account.
 - **Panes:** editor 38% (min 280px), canvas flex (min 320px), Inspector 320px
@@ -120,6 +118,50 @@ Unchanged from the previous system and still true:
   fit-to-width until the user takes over.
 - **Spacing scale:** 2/4/6/8/10/12/16/20/24/32/40px.
 - **Chrome heights:** 28 / 32 / 36 / 40 / 48px. Nothing else.
+
+### The responsive ladder
+
+Two authored breakpoints, both tokens of the system rather than incidental
+properties of flexbox. The first is **content-driven**: it is the three panes'
+own minimum width, which is exactly where the composition breaks.
+
+| Width | Layout |
+|---|---|
+| **≥ 860px** — *wide* | Three panes as columns. `860 = 280 + 320 + 260`. Dividers, collapse chevrons, fullscreen-canvas mode, autosave **and** gauge in the bar, the full Library / theme / quota / Export / account cluster. |
+| **< 860px** — *compact* | One pane at a time behind the **Pane Switcher** (Editor · Paper · Inspector), full width. Every pane stays mounted; the inactive ones are hidden. `SHELL_WIDE_MIN` in `shell/pane-layout.ts`. |
+| **< 480px** (`roomy`) | The wordmark yields the bar to the document name and the Export action. The switcher row carries the autosave readout. |
+
+**Named rules:**
+
+- **The 860 Rule.** The three-pane row never renders below the sum of its own
+  minimums. Losing a pane is a layout decision, never a clipping accident.
+- **The One-Pane Rule.** In compact, panes are views, not columns. The switcher
+  names all three in text, and the primary action — Export — never moves into
+  the overflow menu.
+- **The Mounted Rule.** A hidden pane is hidden, never unmounted: the preview
+  keeps rendering while the user writes in another view.
+- **Compact spends its bar on the document.** The proof gauge and the
+  standalone quota chip are wide-layout chrome; the page count lives in the
+  Paper view's labels and the Library rows, and the Server Export allowance in
+  the Export menu.
+
+### Touch targets
+
+**The 44 Rule.** Under coarse pointers (`hover: none` — the same gate as the
+persistent-affordance variant) every chrome control offers a **44×44px** hit
+floor, the `--touch-target` token beside the breakpoints in `global.css`.
+Controls opt in with the `touch-target` class; the hit area is the visible
+control (min-height/min-width growth, never invisible overlays), so the
+authored 28/32px instrument sizes stay desktop/fine-pointer values and are
+pixel-identical there. Bars that hold 28px instruments — the editor toolbar,
+the Inspector tablist, the banner strips, the compact bar — carry
+min-heights, not fixed heights, so they grow with their contents; the editor
+toolbar also wraps (`flex-wrap`), which is what keeps Undo/Redo reachable at
+the 280px editor minimum instead of clipping. The pane dividers widen under
+the gate with compensating negative margins (`touch-divider`), preserving
+their net-zero footprint in the 860 arithmetic. The Inspector's 24px field
+micro-controls are exempt: they are the field pattern, not instruments, and
+their rows already sit inside full-size tap rows.
 
 ## Elevation & Depth
 
@@ -149,7 +191,8 @@ drop-overlay outline. No chamfers, no asymmetry.
   compact / 36px form), 2px radius, `shadow-sm`. Hover: `--accent-deep`.
 - **Ghost:** 1px hairline, Ink Soft text; hover fills `--surface-hover`.
 - **Quiet:** transparent, Ink Soft; top-bar default.
-- **Icon button:** 28/32px square, 2px radius.
+- **Icon button:** 28/32px square, 2px radius (44px hit floor under coarse
+  pointers — see Touch targets).
 - **Disabled:** `opacity-50`–`60`, no color change.
 - **Focus:** solid 2px `--accent` outline at 2px offset, on every interactive
   element, uniformly, non-negotiably.
@@ -208,6 +251,21 @@ it never sits at full weight on the sheet it overlaps: transparent-border,
 state (`surface/95`, hairline, `shadow-lg`). The recede is background weight,
 not container opacity — the readout text holds AA in every state.
 
+### Pane Switcher (compact)
+
+The compact workspace's view control: three text segments at 32px in a 40px
+row, the active one on `--canvas` with a hairline (the Inspector tablist's own
+treatment, one step up in size; the inactive segments carry a transparent
+border so selecting one shifts nothing). Every view is named in text — the
+desktop collapse chevrons are hover-revealed and therefore invisible on touch.
+
+### Overflow Menu (compact)
+
+Below 860px the top bar's secondary cluster folds into a 32px `⋯` trigger:
+Library, the theme switch, and the account entries — the last shared with the
+desktop account dropdown so the two can never drift. Export stays out of it and
+remains the bar's only filled control.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -220,6 +278,9 @@ not container opacity — the readout text holds AA in every state.
 - **Do** keep the crop marks on every preview page, in both themes.
 - **Do** pick heights from 28/32/36/40/48 and spacing from the scale.
 - **Do** write error copy that names the problem and the recovery.
+- **Do** keep the three-pane row at or above 860px — the panes' own minimums —
+  and one named pane per view below it.
+- **Do** keep a hidden pane mounted, so the preview never restarts.
 
 ### Don't:
 
@@ -234,3 +295,5 @@ not container opacity — the readout text holds AA in every state.
 - **Don't** add a second motion curve or duration.
 - **Don't** use Unicode glyphs or emoji as icons — authored SVGs only
   (24px viewBox, 1.75 stroke, currentColor).
+- **Don't** hide the primary action or a pane behind hover or clipping below
+  860px; the switcher names every view and Export never leaves the bar.

@@ -122,7 +122,7 @@ function PlanCta({
   compact?: boolean;
 }) {
   const size = compact ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-sm';
-  const base = `inline-flex items-center justify-center whitespace-nowrap rounded-control font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${size}`;
+  const base = `touch-target inline-flex items-center justify-center whitespace-nowrap rounded-control font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${size}`;
 
   if (plan.id === 'free') {
     return (

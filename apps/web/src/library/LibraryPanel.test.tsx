@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -145,6 +145,100 @@ describe('LibraryPanel', () => {
       ]);
     });
     expect(useDocumentStore.getState().deleteToast?.doc.name).toBe('First');
+  });
+
+  it('offers every row action through the coarse-pointer kebab menu', async () => {
+    await seedDocs();
+    render(<LibraryPanel onClose={onClose} />);
+
+    // Touch has no hover, so the icon row is unreachable there; the kebab
+    // menu is the twin and must reach the same actions.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for First' }),
+    );
+    const menu = screen.getByRole('menu', { name: 'Actions for First' });
+
+    await userEvent.click(
+      within(menu).getByRole('menuitem', { name: 'Delete' }),
+    );
+    await waitFor(() => {
+      expect(useDocumentStore.getState().docs.map((row) => row.name)).toEqual([
+        'Second',
+      ]);
+    });
+    expect(useDocumentStore.getState().deleteToast?.doc.name).toBe('First');
+    // The menu resolved with the action.
+    expect(
+      screen.queryByRole('menu', { name: 'Actions for First' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renames through the coarse-pointer kebab menu', async () => {
+    await seedDocs();
+    render(<LibraryPanel onClose={onClose} />);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Second' }),
+    );
+    await userEvent.click(
+      within(
+        screen.getByRole('menu', { name: 'Actions for Second' }),
+      ).getByRole('menuitem', { name: 'Rename' }),
+    );
+    await userEvent.clear(screen.getByLabelText('Rename document'));
+    await userEvent.type(
+      screen.getByLabelText('Rename document'),
+      'Via menu{Enter}',
+    );
+
+    expect(
+      useDocumentStore
+        .getState()
+        .docs.find((row) => row.name === 'Via menu'),
+    ).toBeDefined();
+  });
+
+  it('closes the kebab menu on Escape and returns focus to its trigger', async () => {
+    await seedDocs();
+    render(<LibraryPanel onClose={onClose} />);
+
+    const trigger = screen.getByRole('button', { name: 'Actions for First' });
+    await userEvent.click(trigger);
+    expect(
+      screen.getByRole('menu', { name: 'Actions for First' }),
+    ).toBeInTheDocument();
+
+    // The menu layer sits above the drawer, so Escape closes the menu only.
+    await userEvent.keyboard('{Escape}');
+    expect(
+      screen.queryByRole('menu', { name: 'Actions for First' }),
+    ).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(screen.getByTestId('library-panel')).toBeInTheDocument();
+  });
+
+  it('dismisses an open kebab menu on an outside press', async () => {
+    await seedDocs();
+    render(<LibraryPanel onClose={onClose} />);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for First' }),
+    );
+    expect(
+      screen.getByRole('menu', { name: 'Actions for First' }),
+    ).toBeInTheDocument();
+
+    // Pressing another row's kebab closes the first menu before its own
+    // click opens the second.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Second' }),
+    );
+    expect(
+      screen.queryByRole('menu', { name: 'Actions for First' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('menu', { name: 'Actions for Second' }),
+    ).toBeInTheDocument();
   });
 
   it('imports a chosen .md file as a new document', async () => {

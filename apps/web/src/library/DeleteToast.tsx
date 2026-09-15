@@ -38,7 +38,7 @@ export function DeleteToast() {
         <button
           type="button"
           onClick={() => void undoDelete()}
-          className="rounded-control px-2 py-1 text-sm font-medium text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
+          className="touch-target rounded-control px-2 py-1 text-sm font-medium text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
         >
           Undo
         </button>
@@ -46,7 +46,7 @@ export function DeleteToast() {
           type="button"
           aria-label="Dismiss"
           onClick={dismissDeleteToast}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+          className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
         >
           <CloseIcon />
         </button>

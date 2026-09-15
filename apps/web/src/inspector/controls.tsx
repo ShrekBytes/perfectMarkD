@@ -35,7 +35,11 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
+    // Wraps rather than overflows: at the Inspector's 260px minimum a wide
+    // control (a pair of numeric inputs, a select with a unit suffix) can
+    // exceed the row, and a horizontal scrollbar inside a settings pane is
+    // never the right answer. At every normal width the row never wraps.
+    <div className="flex flex-wrap items-center justify-between gap-3 py-1.5">
       <span className="shrink-0 text-xs font-medium text-ink-soft">
         {label}
       </span>
@@ -326,7 +330,7 @@ export function LockedRow({
   onOpenPricing: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
+    <div className="flex flex-wrap items-center justify-between gap-3 py-1.5">
       <span className="shrink-0 text-xs font-medium text-ink-soft">
         {label}
       </span>

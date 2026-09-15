@@ -61,7 +61,7 @@ function ToolButton(props: {
       title={props.hint ?? props.label}
       onClick={props.onClick}
       disabled={props.disabled}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+      className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
     >
       <Icon />
     </button>
@@ -191,7 +191,11 @@ export function EditorPane({
       <div
         role="toolbar"
         aria-label="Editor formatting"
-        className="flex h-9 shrink-0 items-center gap-0.5 border-b border-hairline px-2"
+        /* min-height + flex-wrap, not a fixed height: at the editor's 280px
+           minimum the nine instruments exceed one row, so Undo/Redo would
+           clip. Wrapping grows the bar to a second row instead; at desktop
+           widths nothing wraps and the bar stays its authored 36px. */
+        className="flex min-h-9 shrink-0 flex-wrap items-center gap-x-0.5 gap-y-1 border-b border-hairline px-2"
       >
         <ToolButton
           label="Bold"

@@ -419,7 +419,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
               type="button"
               data-testid="empty-canvas-new-doc"
               onClick={() => void createDocument()}
-              className="flex h-8 items-center justify-center gap-1.5 rounded-control bg-accent-strong px-3 text-sm text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
+              className="touch-target flex h-8 items-center justify-center gap-1.5 rounded-control bg-accent-strong px-3 text-sm text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
             >
               <PlusIcon />
               New document
@@ -431,7 +431,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   }
 
   const pillButton =
-    'flex h-7 w-7 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 hover:bg-surface-hover hover:text-ink';
+    'touch-target flex h-7 w-7 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 hover:bg-surface-hover hover:text-ink';
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -491,7 +491,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
             <button
               type="button"
               onClick={() => void runRenderRef.current()}
-              className="shrink-0 rounded-control border border-danger/30 px-2.5 py-1 text-xs font-medium text-danger transition-colors duration-150 outline-offset-2 outline-accent hover:bg-danger/20 focus-visible:outline-2"
+              className="touch-target shrink-0 rounded-control border border-danger/30 px-2.5 py-1 text-xs font-medium text-danger transition-colors duration-150 outline-offset-2 outline-accent hover:bg-danger/20 focus-visible:outline-2"
             >
               Retry
             </button>
@@ -514,7 +514,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
               type="button"
               data-testid="render-anyway"
               onClick={ackLargeDoc}
-              className="shrink-0 rounded-control bg-accent-strong px-2.5 py-1 text-xs font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-deep"
+              className="touch-target shrink-0 rounded-control bg-accent-strong px-2.5 py-1 text-xs font-medium text-accent-ink transition-colors duration-150 hover:bg-accent-deep"
             >
               Render anyway
             </button>
@@ -522,7 +522,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
               type="button"
               aria-label="Dismiss"
               onClick={() => setLargeDocCount(null)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+              className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
             >
               <CloseIcon />
             </button>
@@ -561,7 +561,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
             aria-label={`Zoom to actual size, currently ${Math.round(zoom * 100)}%`}
             title="Zoom to actual size"
             onClick={zoomToActual}
-            className="w-11 rounded-control text-center text-xs text-ink-soft tabular-nums select-none transition-colors duration-150 hover:bg-surface-hover hover:text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+            className="touch-target w-11 rounded-control text-center text-xs text-ink-soft tabular-nums select-none transition-colors duration-150 hover:bg-surface-hover hover:text-ink outline-offset-2 outline-accent focus-visible:outline-2"
           >
             {Math.round(zoom * 100)}%
           </button>

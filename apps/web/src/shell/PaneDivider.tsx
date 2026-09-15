@@ -92,7 +92,7 @@ export function PaneDivider({
       aria-valuemax={Math.round(getMaxWidth())}
       title="Drag to resize — double-click or press Enter to reset"
       tabIndex={0}
-      className="group relative z-10 -mx-2 w-4 shrink-0 cursor-col-resize touch-none select-none rounded-control outline-offset-2 outline-accent focus-visible:outline-2"
+      className="touch-divider group relative z-10 -mx-2 w-4 shrink-0 cursor-col-resize touch-none select-none rounded-control outline-offset-2 outline-accent focus-visible:outline-2"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -130,7 +130,7 @@ export function CollapsedPaneToggle({
       aria-label={`Show ${side} pane`}
       title={`Show ${side} pane`}
       onClick={onToggle}
-      className={`absolute top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-control border border-hairline bg-surface text-ink-faint shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2 ${
+      className={`touch-target absolute top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-control border border-hairline bg-surface text-ink-faint shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2 ${
         side === 'editor' ? 'left-2' : 'right-2'
       }`}
     >

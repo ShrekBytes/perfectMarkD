@@ -14,6 +14,31 @@ export const PANE_LIMITS = {
 
 export type PaneId = 'editor' | 'inspector';
 
+/**
+ * The workspace's content-width breakpoint. The three-pane row needs
+ * 280 + 320 + 260 = 860px of container width (the dividers are `w-4 -mx-2`,
+ * so they contribute no net width). Below it the row is wider than its bench
+ * and would be clipped — not scrolled. This is a content-driven breakpoint,
+ * not a device one: it is exactly where the three-column composition breaks.
+ */
+export const SHELL_WIDE_MIN = 860;
+
+/** Wide = the three-pane desktop row; compact = one pane plus its switcher. */
+export type ShellMode = 'wide' | 'compact';
+
+/** Which pane the compact layout presents. */
+export type CompactPane = 'editor' | 'canvas' | 'inspector';
+
+/**
+ * Container width → shell mode. An unknown width (0: first paint before layout
+ * has run, or jsdom) keeps the wide layout: the workspace must never collapse
+ * to a single pane on a guess.
+ */
+export function shellModeFor(containerWidth: number): ShellMode {
+  if (containerWidth <= 0) return 'wide';
+  return containerWidth >= SHELL_WIDE_MIN ? 'wide' : 'compact';
+}
+
 export interface PaneLayoutState {
   editor: { collapsed: boolean; width: number | null };
   inspector: { collapsed: boolean; width: number };
@@ -55,11 +80,13 @@ export function clampPaneWidth(
 
 /**
  * Three-pane shell layout state: collapse toggles, drag-resize with min widths,
- * and fullscreen canvas mode (both side panes collapsed).
+ * fullscreen canvas mode (both side panes collapsed), and — below
+ * `SHELL_WIDE_MIN` — the compact single-pane mode with its switcher.
  *
  * `containerRef` only needs `clientWidth` — React refs satisfy it structurally.
  * Container-width changes (window resize) bump a `containerWidth` state so
- * width-dependent readouts like the splitter's aria-valuemax re-render.
+ * width-dependent readouts like the splitter's aria-valuemax re-render, and so
+ * the shell can move between wide and compact.
  */
 export function usePaneLayout(containerRef: {
   current: { clientWidth: number } | null;
@@ -69,6 +96,9 @@ export function usePaneLayout(containerRef: {
     inspector: { collapsed: false, width: PANE_LIMITS.inspectorDefault },
   });
   const [containerWidth, setContainerWidth] = useState(0);
+  /** The compact layout's visible pane; the desktop collapse state is separate
+   *  so resizing between modes never loses a pane width or a collapse. */
+  const [compactPane, setCompactPaneState] = useState<CompactPane>('editor');
 
   // Track the container's width so aria-valuemax stays live on window
   // resizes (pane drags change layout state anyway; window resizes don't).
@@ -117,6 +147,17 @@ export function usePaneLayout(containerRef: {
 
   const fullscreen = layout.editor.collapsed && layout.inspector.collapsed;
 
+  const setCompactPane = useCallback((pane: CompactPane) => {
+    setCompactPaneState(pane);
+  }, []);
+
+  /** The container's live width: the observed value re-renders on window
+   *  resizes, while the DOM's own width is the first-paint answer before the
+   *  observer has fired. */
+  const liveContainerWidth =
+    containerRef.current?.clientWidth || containerWidth;
+  const mode = shellModeFor(liveContainerWidth);
+
   /** The largest width the pane can take right now (aria-valuemax for the
    *  splitter): the clamp's ceiling, floored at the pane minimum. Reads the
    *  observed `containerWidth` so it re-renders on window resizes; the live
@@ -136,11 +177,24 @@ export function usePaneLayout(containerRef: {
     () => ({
       ...layout,
       fullscreen,
+      mode,
+      compactPane,
+      setCompactPane,
       togglePane,
       setPaneWidth,
       maxPaneWidth,
       resetPaneWidth,
     }),
-    [layout, fullscreen, togglePane, setPaneWidth, maxPaneWidth, resetPaneWidth],
+    [
+      layout,
+      fullscreen,
+      mode,
+      compactPane,
+      setCompactPane,
+      togglePane,
+      setPaneWidth,
+      maxPaneWidth,
+      resetPaneWidth,
+    ],
   );
 }
