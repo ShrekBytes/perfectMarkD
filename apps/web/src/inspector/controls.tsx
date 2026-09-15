@@ -95,10 +95,20 @@ export function TextInput({
   );
 }
 
+/** Settled display value: engine presets carry float noise that lives well
+ *  below 1e-6, so capping the display there removes it (0.6499999… → 0.65)
+ *  while keeping every value a user can meaningfully type intact — 16.5
+ *  stays 16.5 even in an integer-step field. The exact value stays in the
+ *  store; only the display is rounded. */
+function formatSettled(value: number): string {
+  return String(parseFloat(value.toFixed(6)));
+}
+
 /** Number input. While focused it holds the user's draft verbatim (so
  *  clearing 25 to type 15 doesn't snap back to 25); every finite draft
  *  reports immediately, clamped to `min` so bad values never reach the
- *  store. Blur drops the draft and shows the settled value. */
+ *  store. Blur drops the draft and shows the settled value at the step's
+ *  precision. */
 export function NumberInput({
   value,
   onChange,
@@ -118,7 +128,7 @@ export function NumberInput({
 }) {
   // Null = not focused; the input renders the store value.
   const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? (Number.isFinite(value) ? String(value) : '');
+  const shown = draft ?? (Number.isFinite(value) ? formatSettled(value) : '');
 
   return (
     <input
@@ -137,7 +147,11 @@ export function NumberInput({
         }
       }}
       onBlur={() => setDraft(null)}
-      className={className ? `${inputClass} ${className}` : inputClass}
+      // In-place-updating numbers read in mono-grade digits (DESIGN.md,
+      // Tabular Numerals Rule).
+      className={
+        className ? `${inputClass} tabular-nums ${className}` : `${inputClass} tabular-nums`
+      }
     />
   );
 }

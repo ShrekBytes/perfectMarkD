@@ -24,8 +24,9 @@
   --ink-soft: #565a60;
   /* Tertiary text still carries real information (page labels, timestamps,
      helper notes), so the faint step holds WCAG AA (≥4.5:1) on every surface
-     it can sit on. */
-  --ink-faint: #6b7076;
+     it can sit on — including the canvas bench (#e9eaec), the darkest light
+     surface, at 4.54:1. */
+  --ink-faint: #646a71;
   --hairline: #dcdee1;
   --hairline-strong: #c8cbcf;
   --accent: #1c1e21; /* the "accent" is graphite: text, rings, caret, tints */

@@ -185,7 +185,11 @@ describe('Page tab', () => {
   it('locks Custom page size, custom size inputs, and the background image', async () => {
     render(<Inspector />);
 
-    expect(screen.getByRole('option', { name: 'Custom…' })).toBeDisabled();
+    // The gate is the locked "Custom size" row — no dead option in the list.
+    expect(
+      screen.queryByRole('option', { name: 'Custom…' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Custom size')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Background image (paid feature)' }),
     ).toBeInTheDocument();
@@ -200,6 +204,18 @@ describe('Page tab', () => {
       screen.getByRole('spinbutton', { name: 'Background image opacity' }),
     ).toBeDisabled();
     expect(screen.getByTestId('faux-upload')).toBeInTheDocument();
+  });
+
+  it('keeps a rendered Custom option for a persisted Custom document behind a closed gate', () => {
+    // A persisted Custom page size must never render a blank select, even
+    // with the gate closed — but the entry stays inert (the lock below is
+    // the only way to act on custom sizing again).
+    act(() => {
+      useDocumentStore.getState().updateActive({ settings: { pageSize: 'Custom' } });
+    });
+    render(<Inspector />);
+
+    expect(screen.getByRole('option', { name: 'Custom…' })).toBeDisabled();
   });
 });
 
@@ -742,7 +758,10 @@ describe('unlocked gates (billing/04)', () => {
       screen.getAllByRole('button', { name: 'Banner image (paid feature)' }),
     ).toHaveLength(2);
     fireEvent.click(screen.getByRole('tab', { name: 'Page' }));
-    expect(screen.getByRole('option', { name: 'Custom…' })).toBeDisabled();
+    // …no dead Custom option once the gate closes again…
+    expect(
+      screen.queryByRole('option', { name: 'Custom…' }),
+    ).not.toBeInTheDocument();
     // …no data was lost — the setting persists, just gated again…
     expect(useDocumentStore.getState().settings.headerImageRef).toBe(
       'asset://banner',

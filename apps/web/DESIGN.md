@@ -50,7 +50,7 @@ A cool graphite workspace with no accent hue. The paper is the color.
 | `--field` | `#ffffff` | `#17181a` | typed-into surfaces (flips with theme) |
 | `--ink` | `#1c1e21` | `#e8eaec` | body text, headings |
 | `--ink-soft` | `#565a60` | `#a6abb1` | secondary text, labels |
-| `--ink-faint` | `#6b7076` | `#8d9298` | tertiary text, crop marks (AA on all surfaces) |
+| `--ink-faint` | `#646a71` | `#8d9298` | tertiary text, crop marks (AA on all surfaces incl. the canvas bench) |
 | `--hairline` | `#dcdee1` | `#34373a` | every structural divider |
 | `--hairline-strong` | `#c8cbcf` | `#474b4f` | rules that must hold their own |
 | `--accent` | `#1c1e21` | `#e8eaec` | "accent" = graphite: focus rings, caret, links |
@@ -157,8 +157,10 @@ drop-overlay outline. No chamfers, no asymmetry.
 ### Selection & Active States
 
 Selected Library row: `--canvas` fill (the bench color inside a `--surface`
-panel — reads as "pressed through to the bench"). Active Inspector tab:
-`--canvas` fill, hairline border, Ink Full text at 600. Selected preset tile /
+panel — reads as "pressed through to the bench") plus an inset 1px
+`--hairline-strong` ring — in dark mode the fill alone is a ~4% luminance
+step, and the hairline is what keeps "this one is open" legible. Active
+Inspector tab: `--canvas` fill, hairline border, Ink Full text at 600. Selected preset tile /
 duration / payment method: `--ink` border on `--canvas` fill. Plan CTAs:
 filled primary for paid, hairline ghost for free. Verified order badge:
 `--ink` border, semibold.
@@ -197,6 +199,14 @@ the chrome palette. 84×112 base, scaled per footprint.
 
 Unchanged: 24px, 11px Ink Faint, lock glyph + "Pro"; gated controls render
 disabled-but-visible; clicking opens the pricing modal, never a signup wall.
+
+### Zoom Pill
+
+Bottom-center canvas control (− / % readout / + / fit). At rest it recedes so
+it never sits at full weight on the sheet it overlaps: transparent-border,
+`surface/60` fill, no shadow. Hover or keyboard focus restores the raised
+state (`surface/95`, hairline, `shadow-lg`). The recede is background weight,
+not container opacity — the readout text holds AA in every state.
 
 ## Do's and Don'ts
 

@@ -45,14 +45,24 @@ export function PageTab({
   flags,
   addImage,
 }: TabProps) {
-  // The Custom option is present either way (a persisted Custom document
-  // must never render a blank select); it selects only when the gate is open.
+  // The Custom entry only appears where it can act: when the gate is open,
+  // or when a persisted Custom document must not render a blank select.
+  // When the gate is closed it is absent — the locked "Custom size" row
+  // below is the single gate, not a dead option in the list.
   const pageSizeOptions: SelectOption<PageSize>[] = [
     ...Object.keys(PAGE_SIZES).map((size) => ({
       value: size as PageSize,
       label: size,
     })),
-    { value: 'Custom', label: 'Custom…', disabled: !flags.customPageSize },
+    ...(flags.customPageSize || settings.pageSize === 'Custom'
+      ? [
+          {
+            value: 'Custom' as PageSize,
+            label: 'Custom…',
+            disabled: !flags.customPageSize,
+          },
+        ]
+      : []),
   ];
 
   return (

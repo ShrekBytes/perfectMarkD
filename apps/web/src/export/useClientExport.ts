@@ -53,6 +53,8 @@ export interface ClientExportState {
   busy: boolean;
   /** The build is running — the button shows its busy label. */
   building: boolean;
+  /** Chromium is printing — the button keeps its busy label. */
+  printing: boolean;
   hintVisible: boolean;
   /** The hint dialog carries the browser notice when it applies. */
   showBrowserNoticeInHint: boolean;
@@ -179,6 +181,7 @@ export function useClientExport(): ClientExportState {
     canExport,
     busy: phase !== 'idle',
     building: phase === 'building',
+    printing: phase === 'printing',
     hintVisible: phase === 'awaiting-hint',
     showBrowserNoticeInHint,
     toast,

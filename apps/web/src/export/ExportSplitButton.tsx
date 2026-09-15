@@ -67,7 +67,13 @@ export function ExportSplitButton() {
   });
   useMenuKeyboard(menuRef, menuOpen, () => setMenuOpen(false));
 
-  const busy = flow.busy || server.busy;
+  // The button's busy signal covers real work only. While the hint dialog
+  // awaits the user's decision nothing is being exported — a spinner and
+  // "Exporting…" there would mislabel the one moment the user is in
+  // control — but the button stays disabled so the deliberation can't be
+  // double-clicked into a silent no-op.
+  const busy = flow.building || flow.printing || server.busy;
+  const locked = busy || flow.hintVisible;
 
   const startExport = () => {
     setMenuOpen(false);
@@ -104,7 +110,7 @@ export function ExportSplitButton() {
         <button
           type="button"
           onClick={startExport}
-          disabled={busy || !flow.canExport}
+          disabled={locked || !flow.canExport}
           title="Export — opens the print dialog (choose 'Save as PDF')"
           className={`flex h-8 items-center gap-1.5 rounded-l-control py-1 pl-3 pr-2 text-sm font-medium ${busyButton}`}
         >
@@ -116,7 +122,7 @@ export function ExportSplitButton() {
           ref={triggerRef}
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
-          disabled={busy || !flow.canExport}
+          disabled={locked || !flow.canExport}
           aria-label="More export options"
           aria-haspopup="menu"
           aria-expanded={menuOpen}

@@ -129,6 +129,27 @@ it('disables the split button with a busy label while building', async () => {
   expect(screen.getByText('Export')).toBeInTheDocument();
 });
 
+it('keeps a plain disabled Export label while the hint awaits confirmation', async () => {
+  render(<ExportSplitButton />);
+  typeMarkdown('# Hint');
+
+  await userEvent.click(exportButton());
+  await screen.findByRole('dialog', {
+    name: /export via the print dialog/i,
+  });
+
+  // Nothing is being exported yet — the dialog awaits the user's decision,
+  // so no spinner and no "Exporting…" — but the button is locked so the
+  // deliberation can't be double-clicked into a silent no-op.
+  expect(screen.queryByText('Exporting…')).not.toBeInTheDocument();
+  expect(exportButton()).toBeDisabled();
+  expect(exportButton()).toHaveTextContent('Export');
+  expect(screen.getByTestId('export-split')).toHaveAttribute(
+    'aria-busy',
+    'false',
+  );
+});
+
 it('shows the one-time hint before the first print, then prints on confirm', async () => {
   render(<ExportSplitButton />);
   typeMarkdown('# First export');

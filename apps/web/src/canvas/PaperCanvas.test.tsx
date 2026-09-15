@@ -113,6 +113,38 @@ describe('PaperCanvas rendering', () => {
     );
   });
 
+  it('hides the mounted pages from the a11y tree and summarizes the preview instead', async () => {
+    mountCanvas();
+    setMarkdown('# Hello\n\nWorld.');
+    await flushRender();
+
+    const scroll = screen.getByTestId('canvas-scroll');
+    expect(scroll).toHaveAttribute('role', 'region');
+    expect(scroll).toHaveAttribute('aria-label', 'Paper Canvas preview');
+    // The editor holds the editable truth — the pages are a picture, not a
+    // second copy of the document in the accessibility tree.
+    expect(screen.getByTestId('canvas-pages')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Previewing 1 page');
+  });
+
+  it('recedes at rest and restores on hover or focus, with AA text in both states', () => {
+    mountCanvas();
+
+    const pill = screen.getByTestId('zoom-pill');
+    // Rest: background weight only — no opacity fade, which would push the
+    // readout text under 4.5:1 (DESIGN.md: the paper is never covered, but
+    // text never drops below AA either).
+    expect(pill.className).toContain('bg-surface/60');
+    expect(pill.className).toContain('border-transparent');
+    expect(pill.className).not.toContain('opacity-');
+    // Reaching for it (pointer or keyboard) restores the raised state.
+    expect(pill.className).toContain('hover:bg-surface/95');
+    expect(pill.className).toContain('focus-within:bg-surface/95');
+  });
+
   it('debounces edits and coalesces bursts into one engine run', async () => {
     const spy = vi.spyOn(pipelineModule, 'runDocumentPipeline');
     mountCanvas();

@@ -119,6 +119,13 @@ function mountPageSlots(
     contentRoot.querySelectorAll('[id]').forEach((el) => {
       headingIndex.set(el.id, index);
     });
+    // The pages container is aria-hidden: any focusable element inside —
+    // heading anchors — must leave the tab order too, or keyboard users
+    // land in content their screen reader cannot see (ARIA 4.1.2). The
+    // canvas click handler still resolves them (scroll-to-heading).
+    contentRoot
+      .querySelectorAll('a[href]')
+      .forEach((el) => el.setAttribute('tabindex', '-1'));
 
     const label = document.createElement('p');
     label.className =
@@ -431,13 +438,26 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       <div
         ref={scrollRef}
         data-testid="canvas-scroll"
+        role="region"
+        aria-label="Paper Canvas preview"
         aria-busy={rendering}
         onClick={handleCanvasClick}
         className="absolute inset-0 overflow-auto bg-canvas"
       >
+        {/* The editor holds the editable truth; the pages are a picture of
+            the result. Hiding them keeps screen-reader heading navigation
+            from walking the document twice (with the Inspector's section
+            headings interleaved), while the summary below announces what
+            the preview shows. */}
+        <p role="status" className="sr-only">
+          {pageCount === 0
+            ? 'Rendering preview…'
+            : `Previewing ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}`}
+        </p>
         <div
           ref={pagesRef}
           data-testid="canvas-pages"
+          aria-hidden="true"
           className="pm-pages flex w-max min-w-full flex-col items-center gap-6 px-6 py-8"
         />
       </div>
@@ -515,7 +535,13 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
           role="group"
           aria-label="Zoom"
           data-testid="zoom-pill"
-          className="pointer-events-auto flex items-center gap-0.5 rounded-control border border-hairline bg-surface/95 py-1 pr-1.5 pl-1.5 shadow-lg backdrop-blur"
+          // At rest the pill recedes — transparent fill, no shadow, no
+          // border — so it never sits at full weight on the sheet it
+          // overlaps. Hover or keyboard focus restores the raised state.
+          // The recede is background weight, not container opacity: the
+          // readout text must hold AA in every state (a uniform opacity
+          // fade would push it under 4.5:1).
+          className="pointer-events-auto flex items-center gap-0.5 rounded-control border border-transparent bg-surface/60 py-1 pr-1.5 pl-1.5 transition-colors duration-150 hover:border-hairline hover:bg-surface/95 hover:shadow-lg focus-within:border-hairline focus-within:bg-surface/95 focus-within:shadow-lg"
         >
           <button
             type="button"

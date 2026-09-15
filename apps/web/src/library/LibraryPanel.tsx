@@ -142,7 +142,12 @@ export function LibraryPanel({ onClose }: LibraryPanelProps) {
                 key={row.id}
                 aria-current={isActive ? 'true' : undefined}
                 className={`group flex items-center gap-1 rounded-control p-1 ${
-                  isActive ? 'bg-canvas' : 'hover:bg-surface-hover'
+                  isActive
+                    ? // The bench fill plus an inset hairline: in dark mode the
+                      // canvas-on-surface fill alone is a ~4% luminance step —
+                      // the hairline is what makes "this one is open" legible.
+                      'bg-canvas shadow-[inset_0_0_0_1px_var(--hairline-strong)]'
+                    : 'hover:bg-surface-hover'
                 }`}
               >
                 {/* The leading miniature sheet: a sketch from the document's
