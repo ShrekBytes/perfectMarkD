@@ -1,6 +1,8 @@
+import { useId } from 'react';
 import { FEATURE_ROWS, PLANS, formatPrice } from './plans';
 import type { Plan } from './plans';
 import { CheckIcon } from '../shell/icons';
+import './pricing.css';
 
 interface PlanComparisonProps {
   /** Tighter type and spacing for the pricing modal; rows stay identical. */
@@ -23,34 +25,45 @@ export function PlanComparison({
   onOpenEditor,
   onUpgrade,
 }: PlanComparisonProps) {
+  const comparisonId = useId();
   const bodyText = compact ? 'text-xs' : 'text-sm';
   const cellPad = compact ? 'px-2 py-1.5' : 'px-3 py-2';
 
   return (
-    <div className="overflow-x-auto">
+    <div className="plan-comparison-container">
       <table
+        role="table"
+        aria-label="Compare plans"
         data-testid="plan-comparison"
-        className={`w-full border-collapse ${bodyText}`}
+        className={`plan-comparison w-full table-fixed border-collapse ${bodyText}`}
       >
-        <thead>
-          <tr>
-            <th scope="col" className="w-2/5 border-b border-hairline-strong" />
+        <thead role="rowgroup">
+          <tr role="row">
+            <th
+              role="columnheader"
+              scope="col"
+              className="plan-feature-heading w-[34%] border-b border-hairline-strong"
+            >
+              <span className="sr-only">Features</span>
+            </th>
             {PLANS.map((plan) => (
               <th
                 key={plan.id}
+                id={`${comparisonId}-${plan.id}`}
+                role="columnheader"
                 scope="col"
-                className="border-b border-hairline-strong px-2 pb-3 pt-1 text-center align-bottom font-normal"
+                className="plan-heading border-b border-hairline-strong px-3 pb-4 pt-1 text-center align-top font-normal"
               >
                 <span
                   className={`font-semibold text-ink ${compact ? 'text-sm' : 'text-base'}`}
                 >
                   {plan.name}
                 </span>
-                <span className="mt-0.5 block text-xs text-ink-soft">
+                <span className="mt-1 block font-mono text-xs tabular-nums text-ink-soft">
                   {formatPrice(plan)}
                 </span>
                 {!compact && (
-                  <span className="mt-1 block text-xs font-normal text-ink-faint">
+                  <span className="plan-blurb mt-2 block text-xs font-normal text-ink-soft">
                     {plan.blurb}
                   </span>
                 )}
@@ -66,10 +79,16 @@ export function PlanComparison({
             ))}
           </tr>
         </thead>
-        <tbody>
-          {FEATURE_ROWS.map((row) => (
-            <tr key={row.label}>
+        <tbody role="rowgroup">
+          {FEATURE_ROWS.map((row, rowIndex) => (
+            <tr
+              role="row"
+              key={row.label}
+              className={row.groupStart ? 'plan-group-start' : undefined}
+            >
               <th
+                role="rowheader"
+                id={`${comparisonId}-feature-${rowIndex}`}
                 scope="row"
                 className={`border-b border-hairline text-left font-normal text-ink-soft ${cellPad} ${bodyText}`}
               >
@@ -78,7 +97,9 @@ export function PlanComparison({
               {PLANS.map((plan) => (
                 <td
                   key={plan.id}
-                  className={`border-b border-hairline text-center ${cellPad}`}
+                  role="cell"
+                  headers={`${comparisonId}-feature-${rowIndex} ${comparisonId}-${plan.id}`}
+                  className={`border-b border-hairline text-center tabular-nums ${cellPad}`}
                 >
                   <CellValue value={row.values[plan.id]} />
                 </td>

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLIENT_EXPORT_NOTE,
   DURATION_NOTE,
   DURATIONS,
   FEATURE_ROWS,
+  PAID_PLANS_PITCH,
   PLANS,
   priceForDuration,
   type PlanId,
@@ -65,6 +67,31 @@ describe('plan catalog (PLAN.md §1 tiers table)', () => {
       expect(row, label).toBeDefined();
       expect(row!.values).toEqual({ free: false, pro: false, premium: true });
     }
+  });
+
+  it('marks the gated-styling and Premium-only blocks as group starts', () => {
+    const groupStarts = FEATURE_ROWS.filter((r) => r.groupStart);
+    expect(groupStarts.map((r) => r.label)).toEqual([
+      'Custom page size',
+      'Priority render queue',
+    ]);
+  });
+});
+
+describe('plan-facts copy (kept beside the matrix)', () => {
+  it('names the gated features and all four Pro/Premium differences', () => {
+    // CONTEXT.md: Pro and Premium differ in quota, page caps, queue
+    // priority, and Export History — the pitch must not flatten that.
+    expect(PAID_PLANS_PITCH).toMatch(/unlock every paid feature/);
+    expect(PAID_PLANS_PITCH).toMatch(/page sizes, stylesheets, fonts/);
+    expect(PAID_PLANS_PITCH).toMatch(/quota/);
+    expect(PAID_PLANS_PITCH).toMatch(/page cap/);
+    expect(PAID_PLANS_PITCH).toMatch(/priority render queue/i);
+    expect(PAID_PLANS_PITCH).toMatch(/Export History/);
+  });
+
+  it('keeps the Client Export reassurance', () => {
+    expect(CLIENT_EXPORT_NOTE).toMatch(/Client Export keeps working/);
   });
 });
 

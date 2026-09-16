@@ -42,6 +42,8 @@ export const PLANS: Plan[] = [
 export interface FeatureRow {
   label: string;
   values: Record<PlanId, string | boolean>;
+  /** Starts a visually separated group of rows in the comparison table. */
+  groupStart?: boolean;
 }
 
 /** Display price for a plan column header. */
@@ -70,6 +72,7 @@ export const FEATURE_ROWS: FeatureRow[] = [
   },
   {
     label: 'Custom page size',
+    groupStart: true,
     values: { free: false, pro: true, premium: true },
   },
   {
@@ -90,6 +93,7 @@ export const FEATURE_ROWS: FeatureRow[] = [
   },
   {
     label: 'Priority render queue',
+    groupStart: true,
     values: { free: false, pro: false, premium: true },
   },
   {
@@ -97,6 +101,22 @@ export const FEATURE_ROWS: FeatureRow[] = [
     values: { free: false, pro: false, premium: true },
   },
 ];
+
+/**
+ * Plan-facts prose for the pricing modal, kept beside the matrix it must
+ * match: the gated styling rows and the four ways Pro and Premium differ
+ * (CONTEXT.md — quota, page caps, queue priority, Export History). Update
+ * this with the table, not independently.
+ */
+export const PAID_PLANS_PITCH =
+  'Pro and Premium both unlock every paid feature — custom page sizes, ' +
+  'stylesheets, fonts, and images included. Premium raises the Server ' +
+  'Export quota and page cap, and adds the priority render queue and ' +
+  '30-day Export History.';
+
+/** The free tier's untouched Client Export, promised under the modal's table. */
+export const CLIENT_EXPORT_NOTE =
+  'Client Export keeps working exactly as it does now.';
 
 /**
  * Manual crypto billing (ADR-0005): no card processor, no auto-renewal —

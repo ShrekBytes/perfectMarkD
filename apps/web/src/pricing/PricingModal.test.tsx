@@ -17,6 +17,9 @@ it('renders the compact plan comparison', () => {
   expect(screen.getByText('Premium')).toBeInTheDocument();
   expect(screen.getByText('3 USDT/mo')).toBeInTheDocument();
   expect(screen.getByText('Priority render queue')).toBeInTheDocument();
+  // Pitch and Client Export note render from the plans module.
+  expect(screen.getByText(/unlock every paid feature/)).toBeInTheDocument();
+  expect(screen.getByText(/Client Export keeps working/)).toBeInTheDocument();
 });
 
 it('swaps to the upgrade flow when a paid plan is chosen', async () => {

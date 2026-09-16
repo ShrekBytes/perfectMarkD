@@ -1,0 +1,75 @@
+.plan-comparison-container {
+  container-type: inline-size;
+}
+
+/* Reserve the tallest blurb's height on every column so the three CTAs
+   stay aligned on /pricing (compact mode drops blurbs entirely). */
+.plan-comparison .plan-blurb {
+  min-height: 4rem;
+}
+
+/* Breathing room above a group's first row: the gated-styling block
+   ("Custom page size") and the Premium-only block ("Priority render
+   queue") are marked groupStart in plans.ts. */
+.plan-comparison .plan-group-start > * {
+  padding-top: 1.25rem;
+}
+
+/* Keep all three plans in view when the comparison's own container narrows:
+   below ≈39rem of inline size the 34% feature column leaves each of the
+   three plan columns less than its CTA and price need, so the table stacks
+   — each feature row becomes a mini three-column grid with the feature
+   name as a full-width caption. Explicit table roles above preserve the
+   header/cell relationships under the changed display. */
+@container (max-width: 39rem) {
+  .plan-comparison,
+  .plan-comparison thead,
+  .plan-comparison tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .plan-comparison tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .plan-comparison .plan-feature-heading {
+    display: none;
+  }
+
+  .plan-comparison .plan-heading {
+    min-width: 0;
+    padding-inline: 0.25rem;
+  }
+
+  .plan-comparison .plan-blurb {
+    display: none;
+  }
+
+  .plan-comparison .plan-heading button {
+    width: 100%;
+    min-height: 2.75rem;
+    height: auto;
+    padding: 0.25rem;
+    white-space: normal;
+    font-size: 0.75rem;
+  }
+
+  .plan-comparison tbody th {
+    grid-column: 1 / -1;
+    border-bottom: 0;
+    padding: 0.75rem 0.25rem 0.25rem;
+    color: var(--ink-soft);
+  }
+
+  .plan-comparison tbody td {
+    min-width: 0;
+    padding: 0.25rem 0.25rem 0.75rem;
+    overflow-wrap: anywhere;
+  }
+
+  .plan-comparison .plan-group-start th {
+    padding-top: 1.5rem;
+  }
+}

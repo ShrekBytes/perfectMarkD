@@ -30,7 +30,7 @@ export function PricingPage() {
         <Link
           to="/"
           aria-label="PerfectMarkD home"
-          className="select-none px-1 text-[15px] font-semibold tracking-tight"
+          className="touch-target inline-flex shrink-0 select-none items-center px-1 text-sm font-semibold tracking-tight outline-offset-2 outline-accent focus-visible:outline-2"
         >
           Perfect<span className="font-mono">Mark</span>D
         </Link>
@@ -38,7 +38,7 @@ export function PricingPage() {
         <div className="ml-auto flex items-center gap-1.5">
           <Link
             to="/"
-            className="flex h-8 items-center rounded-control px-2.5 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+            className="touch-target flex h-8 items-center rounded-control px-2 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
             Open the editor
           </Link>
@@ -46,16 +46,17 @@ export function PricingPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         <h1 className="text-2xl font-semibold tracking-tight">
           Simple pricing
         </h1>
         <p className="mt-2 max-w-prose text-sm text-ink-soft">
-          Everything you need to make perfectly laid-out PDFs is free. Paid
-          plans only add one-click Server Export and convenience features.
+          The editor and Client Export are free — no account needed. Paid plans
+          add one-click Server Export and custom page sizes, stylesheets, fonts,
+          and images. Premium adds the priority render queue and Export History.
         </p>
 
-        <div className="mt-8 rounded-pane border border-hairline bg-surface p-4 shadow-sm">
+        <div className="mt-8 rounded-pane bg-surface px-3 py-5 sm:p-6">
           <PlanComparison
             onOpenEditor={() => navigate('/')}
             onUpgrade={setUpgradePlan}
@@ -71,9 +72,9 @@ export function PricingPage() {
             </li>
             <li>{DURATION_NOTE}</li>
             <li>
-              PerfectMarkD is free software under AGPL-3.0 — the whole app
-              (editor, engine, and server) can be self-hosted under the same
-              license.
+              PerfectMarkD is free software under AGPL-3.0. The whole app —
+              editor, engine, and server — can be self-hosted, and a self-hosted
+              instance uses its own wallets and verification.
             </li>
           </ul>
         </section>

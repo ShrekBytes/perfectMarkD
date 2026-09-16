@@ -27,11 +27,13 @@ it('renders the three-column comparison from the shared plans module', () => {
   expect(screen.getByText('Priority render queue')).toBeInTheDocument();
 });
 
-it('carries the AGPL note and duration terms', () => {
+it('carries the AGPL note, duration terms, and watermark promise', () => {
   render(<PricingPage />);
 
-  expect(screen.getByText(/AGPL-3\.0 — the whole app/)).toBeInTheDocument();
+  expect(screen.getByText(/AGPL-3\.0\. The whole app/)).toBeInTheDocument();
   expect(screen.getByText(/12 months costs 10×/)).toBeInTheDocument();
+  // PLAN.md §1's exact wording.
+  expect(screen.getByText(/No watermarks anywhere/)).toBeInTheDocument();
 });
 
 it('links the license badge and GitHub in the footer', () => {

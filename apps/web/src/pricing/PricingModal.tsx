@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog } from '../shell/Dialog';
 import { PlanComparison } from './PlanComparison';
-import { planName } from './plans';
+import { CLIENT_EXPORT_NOTE, PAID_PLANS_PITCH, planName } from './plans';
 import { UpgradeFlow } from '../billing/UpgradeFlow';
 
 interface PricingModalProps {
@@ -30,20 +30,21 @@ export function PricingModal({ onClose }: PricingModalProps) {
       testId="pricing-modal"
       backdropTestId="pricing-modal-backdrop"
       onClose={onClose}
+      panelClassName={upgradePlan ? undefined : 'w-full max-w-4xl'}
     >
       {upgradePlan ? (
         <UpgradeFlow plan={upgradePlan} onClose={onClose} />
       ) : (
         <>
+          <p className="mb-6 max-w-prose text-sm text-ink-soft">
+            {PAID_PLANS_PITCH}
+          </p>
           <PlanComparison
             compact
             onOpenEditor={onClose}
             onUpgrade={setUpgradePlan}
           />
-          <p className="mt-3 text-xs text-ink-soft">
-            Paid plans only add one-click Server Export and convenience
-            features. Client Export keeps working exactly as it does now.
-          </p>
+          <p className="mt-3 text-xs text-ink-soft">{CLIENT_EXPORT_NOTE}</p>
         </>
       )}
     </Dialog>
