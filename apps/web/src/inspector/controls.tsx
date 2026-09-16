@@ -25,8 +25,17 @@ export interface TabProps {
   addImage: (file: File) => Promise<AddAssetResult>;
 }
 
-/** A field row: label on the left, control on the right. The control names
- *  itself via aria-label; this label is visual. */
+/** The label column: 112px of right-aligned label. */
+const LABEL_COLUMN = 'w-28 shrink-0 text-right text-xs font-medium text-ink-soft';
+
+/** Where every control's left edge lands: the label column plus its 8px
+ *  gutter. Fields and checkboxes share this one axis, which is what makes a
+ *  260px-wide column of instruments scannable — the eye reads a single column
+ *  of values instead of hopping between two edges of a narrow pane. */
+const CONTROL_AXIS = 'ml-[120px]';
+
+/** A field row: a right-aligned label, then the control on the shared axis.
+ *  The control names itself via aria-label; this label is visual. */
 export function Field({
   label,
   children,
@@ -35,16 +44,59 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    // Wraps rather than overflows: at the Inspector's 260px minimum a wide
-    // control (a pair of numeric inputs, a select with a unit suffix) can
-    // exceed the row, and a horizontal scrollbar inside a settings pane is
-    // never the right answer. At every normal width the row never wraps.
-    <div className="flex flex-wrap items-center justify-between gap-3 py-1.5">
-      <span className="shrink-0 text-xs font-medium text-ink-soft">
+    <div className="flex items-center gap-2 py-1">
+      <span className={LABEL_COLUMN}>{label}</span>
+      {/* Wraps rather than overflows: at the Inspector's 260px minimum a wide
+          control (a pair of numeric inputs, an upload button plus Remove) can
+          exceed the column, and a horizontal scrollbar inside a settings pane
+          is never the right answer. Wrapped items stay on the axis. */}
+      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        {children}
+      </span>
+    </div>
+  );
+}
+
+/** A boolean row: the box sits on the control axis and the whole row is the
+ *  label, so the hit target is the full row and there is exactly one name for
+ *  the checkbox. A field row's label lives left of the axis; a toggle's lives
+ *  right of it, because a checkbox reads as "box, then what it turns on". */
+export function ToggleRow({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  return (
+    <label
+      htmlFor={id}
+      className={`flex items-center gap-2 py-1 ${
+        disabled ? '' : 'cursor-pointer'
+      }`}
+    >
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        /* The authored 14px box for fine pointers; coarse pointers lift it to
+           the 24px WCAG 2.5.8 floor — the Inspector's field pattern is exempt
+           from the 44px instrument rule, not from the accessibility floor. */
+        className={`${CONTROL_AXIS} size-3.5 shrink-0 cursor-pointer rounded-[4px] accent-accent hover-none:min-h-6 hover-none:min-w-6 disabled:cursor-not-allowed disabled:opacity-50`}
+      />
+      <span
+        className={`min-w-0 text-xs ${disabled ? 'text-ink-faint' : 'text-ink'}`}
+      >
         {label}
       </span>
-      {children}
-    </div>
+    </label>
   );
 }
 
@@ -67,10 +119,35 @@ export function Section({
   );
 }
 
-const inputClass =
-  'rounded-control border border-hairline bg-field px-2 py-1 text-xs text-ink transition-colors duration-150 outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-50';
+/** A named run of fields inside a Section — one step below the section head
+ *  in both weight and case, so a long section can be read in groups without
+ *  each group becoming a bordered box. */
+export function Subgroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mt-2 first:mt-0">
+      <h3 className="mb-0.5 text-[11px] font-medium text-ink-faint">
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
 
-/** Small text input. */
+/* One field surface for the panel. Spinner chrome is stripped from the number
+ * inputs: 15px of arrows inside a 64px field is what clips a "210" at the
+ * pane's floor, and stepping a page size by 1mm is not a real interaction —
+ * keyboard arrows still step (type=number keeps that), the arrows were noise. */
+const inputClass =
+  '[appearance:textfield] min-w-0 rounded-control border border-hairline bg-field px-2 py-1 text-xs text-ink transition-colors duration-150 outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
+/** Small text input. Fills the control column: a typed value needs the room
+ *  more than the row needs a ragged right edge. */
 export function TextInput({
   value,
   onChange,
@@ -94,7 +171,7 @@ export function TextInput({
       placeholder={placeholder}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      className={className ? `${inputClass} ${className}` : inputClass}
+      className={`${inputClass} w-full ${className ?? ''}`}
     />
   );
 }
@@ -152,10 +229,10 @@ export function NumberInput({
       }}
       onBlur={() => setDraft(null)}
       // In-place-updating numbers read in mono-grade digits (DESIGN.md,
-      // Tabular Numerals Rule).
-      className={
-        className ? `${inputClass} tabular-nums ${className}` : `${inputClass} tabular-nums`
-      }
+      // Tabular Numerals Rule). 64px is the width of a measurement, not of the
+      // row: a numeric field stays narrow on the axis and the white space
+      // belongs to the pane.
+      className={`${inputClass} w-16 tabular-nums ${className ?? ''}`}
     />
   );
 }
@@ -167,7 +244,9 @@ export interface SelectOption<T extends string> {
   disabled?: boolean;
 }
 
-/** Compact select. */
+/** A select: fills the control column, because the option that is currently
+ *  chosen is the longest text in the row and must be readable, not clipped to
+ *  the width of the shortest one. */
 export function Select<T extends string>({
   value,
   options,
@@ -189,7 +268,7 @@ export function Select<T extends string>({
       value={value}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value as T)}
-      className={className ? `${inputClass} ${className}` : inputClass}
+      className={`${inputClass} w-full ${className ?? ''}`}
     >
       {options.map((option) => (
         <option
@@ -240,42 +319,6 @@ export function ColorInput({
       <span className="font-mono text-[11px] text-ink-faint tabular-nums select-none">
         {value}
       </span>
-    </span>
-  );
-}
-
-/** Checkbox with a bound clickable label. */
-export function Checkbox({
-  checked,
-  onChange,
-  label,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-  disabled?: boolean;
-}) {
-  const id = useId();
-  return (
-    <span className="flex items-center gap-1.5 py-0.5">
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        /* The authored 14px box for fine pointers; coarse pointers lift it to
-           the 24px WCAG 2.5.8 floor — the Inspector's field pattern is exempt
-           from the 44px instrument rule, not from the accessibility floor. */
-        className="size-3.5 cursor-pointer rounded-[4px] accent-accent hover-none:min-h-6 hover-none:min-w-6 disabled:cursor-not-allowed disabled:opacity-50"
-      />
-      <label
-        htmlFor={id}
-        className={`cursor-pointer text-xs ${disabled ? 'text-ink-faint' : 'text-ink'}`}
-      >
-        {label}
-      </label>
     </span>
   );
 }
@@ -333,11 +376,9 @@ export function LockedRow({
   onOpenPricing: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 py-1.5">
-      <span className="shrink-0 text-xs font-medium text-ink-soft">
-        {label}
-      </span>
-      <span className="flex items-center gap-2">
+    <div className="flex items-center gap-2 py-1">
+      <span className={LABEL_COLUMN}>{label}</span>
+      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         {control}
         <GateLock onClick={onOpenPricing} label={label} />
       </span>
@@ -400,7 +441,7 @@ export function GateImagePicker({
   };
 
   return (
-    <span className="flex flex-col items-end gap-0.5">
+    <span className="flex w-full flex-col items-start gap-0.5">
       <span className="flex items-center gap-1">
         <button
           type="button"
@@ -427,7 +468,7 @@ export function GateImagePicker({
       {error && (
         <span
           role="alert"
-          className="max-w-44 text-right text-[10px] text-danger"
+          className="max-w-44 text-left text-[10px] text-danger"
         >
           {error}
         </span>

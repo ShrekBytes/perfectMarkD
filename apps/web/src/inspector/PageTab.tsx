@@ -7,7 +7,6 @@
 import { PAGE_SIZES, type DocumentSettings } from '@perfectmarkd/core';
 import { applyOrientation } from './settings-edit';
 import {
-  Checkbox,
   ColorInput,
   Field,
   FauxUploadButton,
@@ -18,6 +17,7 @@ import {
   Select,
   type SelectOption,
   type TabProps,
+  ToggleRow,
 } from './controls';
 
 type PageSize = DocumentSettings['pageSize'];
@@ -78,19 +78,22 @@ export function PageTab({
         </Field>
         {flags.customPageSize ? (
           <Field label="Custom size (mm)">
-            <span className="flex items-center gap-1">
+            {/* The pair fills the control column and shrinks with it: two
+                56px inputs plus the separator do not fit the column at the
+                pane's 260px minimum, and the value they hold is short. */}
+            <span className="flex min-w-0 flex-1 items-center gap-2">
               <NumberInput
                 ariaLabel="Custom width"
                 value={settings.customPageWidth}
                 onChange={(customPageWidth) => set({ customPageWidth })}
-                className="w-14"
+                className="w-auto min-w-0 flex-1"
               />
-              <span className="text-[11px] text-ink-faint">×</span>
+              <span className="shrink-0 text-[11px] text-ink-faint">×</span>
               <NumberInput
                 ariaLabel="Custom height"
                 value={settings.customPageHeight}
                 onChange={(customPageHeight) => set({ customPageHeight })}
-                className="w-14"
+                className="w-auto min-w-0 flex-1"
               />
             </span>
           </Field>
@@ -101,21 +104,21 @@ export function PageTab({
             control={
               <span
                 aria-hidden="true"
-                className="flex items-center gap-1 opacity-50"
+                className="flex min-w-0 flex-1 items-center gap-2 opacity-50"
               >
                 <NumberInput
                   ariaLabel="Custom width"
                   value={settings.customPageWidth}
                   onChange={() => {}}
-                  className="w-14"
+                  className="w-auto min-w-0 flex-1"
                   disabled
                 />
-                <span className="text-[11px] text-ink-faint">×</span>
+                <span className="shrink-0 text-[11px] text-ink-faint">×</span>
                 <NumberInput
                   ariaLabel="Custom height"
                   value={settings.customPageHeight}
                   onChange={() => {}}
-                  className="w-14"
+                  className="w-auto min-w-0 flex-1"
                   disabled
                 />
               </span>
@@ -140,7 +143,6 @@ export function PageTab({
             ariaLabel="Top margin"
             value={settings.marginTop}
             onChange={(marginTop) => set({ marginTop })}
-            className="w-16"
           />
         </Field>
         <Field label="Bottom">
@@ -148,7 +150,6 @@ export function PageTab({
             ariaLabel="Bottom margin"
             value={settings.marginBottom}
             onChange={(marginBottom) => set({ marginBottom })}
-            className="w-16"
           />
         </Field>
         <Field label="Left">
@@ -156,7 +157,6 @@ export function PageTab({
             ariaLabel="Left margin"
             value={settings.marginLeft}
             onChange={(marginLeft) => set({ marginLeft })}
-            className="w-16"
           />
         </Field>
         <Field label="Right">
@@ -164,19 +164,16 @@ export function PageTab({
             ariaLabel="Right margin"
             value={settings.marginRight}
             onChange={(marginRight) => set({ marginRight })}
-            className="w-16"
           />
         </Field>
       </Section>
 
       <Section title="Frame">
-        <Field label="Enable">
-          <Checkbox
-            checked={settings.frameEnabled}
-            onChange={(frameEnabled) => set({ frameEnabled })}
-            label="Page frame"
-          />
-        </Field>
+        <ToggleRow
+          checked={settings.frameEnabled}
+          onChange={(frameEnabled) => set({ frameEnabled })}
+          label="Page frame"
+        />
         <Field label="Style">
           <Select<FrameStyle>
             ariaLabel="Frame style"
@@ -200,7 +197,6 @@ export function PageTab({
             value={settings.frameThickness}
             min={1}
             onChange={(frameThickness) => set({ frameThickness })}
-            className="w-16"
             disabled={!settings.frameEnabled}
           />
         </Field>
@@ -209,7 +205,6 @@ export function PageTab({
             ariaLabel="Frame margin"
             value={settings.frameMargin}
             onChange={(frameMargin) => set({ frameMargin })}
-            className="w-16"
             disabled={!settings.frameEnabled}
           />
         </Field>
@@ -217,7 +212,7 @@ export function PageTab({
 
       <Section title="Background image">
         {flags.backgroundImage ? (
-          <Field label="Image">
+          <Field label="Background image">
             <GateImagePicker
               ariaLabel="Background image"
               addImage={addImage}
@@ -273,7 +268,6 @@ export function PageTab({
             onChange={(percent) =>
               set({ backgroundImageOpacity: Math.min(100, percent) / 100 })
             }
-            className="w-16"
             disabled={!flags.backgroundImage}
           />
         </Field>

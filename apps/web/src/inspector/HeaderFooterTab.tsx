@@ -7,7 +7,6 @@
 
 import type { DocumentSettings } from '@perfectmarkd/core';
 import {
-  Checkbox,
   ColorInput,
   Field,
   FauxUploadButton,
@@ -18,6 +17,7 @@ import {
   Select,
   type TabProps,
   TextInput,
+  ToggleRow,
 } from './controls';
 
 type Alignment = 'left' | 'center' | 'right';
@@ -92,28 +92,23 @@ export function HeaderFooterTab({
   return (
     <>
       <Section title="Header">
-        <Field label="Show">
-          <Checkbox
-            checked={settings.showHeader}
-            onChange={(showHeader) => set({ showHeader })}
-            label="Show header"
-          />
-        </Field>
-        <Field label="First page">
-          <Checkbox
-            checked={settings.showHeaderOnFirstPage}
-            onChange={(showHeaderOnFirstPage) => set({ showHeaderOnFirstPage })}
-            label="Show header on first page"
-            disabled={!settings.showHeader}
-          />
-        </Field>
+        <ToggleRow
+          checked={settings.showHeader}
+          onChange={(showHeader) => set({ showHeader })}
+          label="Show header"
+        />
+        <ToggleRow
+          checked={settings.showHeaderOnFirstPage}
+          onChange={(showHeaderOnFirstPage) => set({ showHeaderOnFirstPage })}
+          label="Show header on first page"
+          disabled={!settings.showHeader}
+        />
         <Field label="Text">
           <TextInput
             ariaLabel="Header text"
             value={settings.headerText}
             onChange={(headerText) => set({ headerText })}
             placeholder="Header text"
-            className="w-40"
             disabled={!settings.showHeader}
           />
         </Field>
@@ -126,13 +121,12 @@ export function HeaderFooterTab({
             disabled={!settings.showHeader}
           />
         </Field>
-        <Field label="Font size (px)">
+        <Field label="Size (px)">
           <NumberInput
             ariaLabel="Header font size"
             value={settings.headerFontSize}
             min={1}
             onChange={(headerFontSize) => set({ headerFontSize })}
-            className="w-16"
             disabled={!settings.showHeader}
           />
         </Field>
@@ -144,14 +138,12 @@ export function HeaderFooterTab({
             disabled={!settings.showHeader}
           />
         </Field>
-        <Field label="Border">
-          <Checkbox
-            checked={settings.showHeaderBorder}
-            onChange={(showHeaderBorder) => set({ showHeaderBorder })}
-            label="Bottom border"
-            disabled={!settings.showHeader}
-          />
-        </Field>
+        <ToggleRow
+          checked={settings.showHeaderBorder}
+          onChange={(showHeaderBorder) => set({ showHeaderBorder })}
+          label="Bottom border"
+          disabled={!settings.showHeader}
+        />
         <BannerImageField
           band="header"
           bandLabel="Header"
@@ -165,28 +157,23 @@ export function HeaderFooterTab({
       </Section>
 
       <Section title="Footer">
-        <Field label="Show">
-          <Checkbox
-            checked={settings.showFooter}
-            onChange={(showFooter) => set({ showFooter })}
-            label="Show footer"
-          />
-        </Field>
-        <Field label="First page">
-          <Checkbox
-            checked={settings.showFooterOnFirstPage}
-            onChange={(showFooterOnFirstPage) => set({ showFooterOnFirstPage })}
-            label="Show footer on first page"
-            disabled={!settings.showFooter}
-          />
-        </Field>
+        <ToggleRow
+          checked={settings.showFooter}
+          onChange={(showFooter) => set({ showFooter })}
+          label="Show footer"
+        />
+        <ToggleRow
+          checked={settings.showFooterOnFirstPage}
+          onChange={(showFooterOnFirstPage) => set({ showFooterOnFirstPage })}
+          label="Show footer on first page"
+          disabled={!settings.showFooter}
+        />
         <Field label="Text">
           <TextInput
             ariaLabel="Footer text"
             value={settings.footerText}
             onChange={(footerText) => set({ footerText })}
             placeholder="Footer text"
-            className="w-40"
             disabled={!settings.showFooter}
           />
         </Field>
@@ -199,13 +186,12 @@ export function HeaderFooterTab({
             disabled={!settings.showFooter}
           />
         </Field>
-        <Field label="Font size (px)">
+        <Field label="Size (px)">
           <NumberInput
             ariaLabel="Footer font size"
             value={settings.footerFontSize}
             min={1}
             onChange={(footerFontSize) => set({ footerFontSize })}
-            className="w-16"
             disabled={!settings.showFooter}
           />
         </Field>
@@ -217,14 +203,12 @@ export function HeaderFooterTab({
             disabled={!settings.showFooter}
           />
         </Field>
-        <Field label="Border">
-          <Checkbox
-            checked={settings.showFooterBorder}
-            onChange={(showFooterBorder) => set({ showFooterBorder })}
-            label="Top border"
-            disabled={!settings.showFooter}
-          />
-        </Field>
+        <ToggleRow
+          checked={settings.showFooterBorder}
+          onChange={(showFooterBorder) => set({ showFooterBorder })}
+          label="Top border"
+          disabled={!settings.showFooter}
+        />
         <BannerImageField
           band="footer"
           bandLabel="Footer"
@@ -238,13 +222,11 @@ export function HeaderFooterTab({
       </Section>
 
       <Section title="Page numbers">
-        <Field label="Show">
-          <Checkbox
-            checked={settings.showPageNumbers}
-            onChange={(showPageNumbers) => set({ showPageNumbers })}
-            label="Page numbers"
-          />
-        </Field>
+        <ToggleRow
+          checked={settings.showPageNumbers}
+          onChange={(showPageNumbers) => set({ showPageNumbers })}
+          label="Page numbers"
+        />
         <Field label="Position">
           <Select<DocumentSettings['pageNumberPosition']>
             ariaLabel="Page number position"
@@ -255,12 +237,11 @@ export function HeaderFooterTab({
           />
         </Field>
         <Field label="Format">
-          <span className="flex flex-col items-end gap-0.5">
+          <span className="flex w-full flex-col items-start gap-0.5">
             <TextInput
               ariaLabel="Page number format"
               value={settings.pageNumberFormat}
               onChange={(pageNumberFormat) => set({ pageNumberFormat })}
-              className="w-40"
             />
             <span className="text-[10px] text-ink-faint">{FORMAT_HINT}</span>
           </span>
@@ -271,7 +252,6 @@ export function HeaderFooterTab({
             value={settings.pageNumberStart}
             min={1}
             onChange={(pageNumberStart) => set({ pageNumberStart })}
-            className="w-16"
             disabled={!settings.showPageNumbers}
           />
         </Field>

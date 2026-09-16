@@ -32,10 +32,12 @@ interface TopBarProps {
   mode: ShellMode;
 }
 
-/** The wordmark: the workspace's top-level heading. */
+/** The wordmark: the workspace's top-level heading. It anchors the bar but
+ *  never out-shouts the document beside it — the name is the context the user
+ *  is actually in, and the brand is furniture. */
 function Wordmark() {
   return (
-    <h1 className="select-none px-1 text-[15px] font-semibold tracking-tight">
+    <h1 className="shrink-0 select-none px-1 text-sm font-semibold tracking-tight">
       Perfect<span className="font-mono">Mark</span>D
     </h1>
   );
@@ -62,7 +64,10 @@ export function TopBar({
   const compact = mode === 'compact';
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-surface px-3">
+    // The bar's rhythm is 8px inside a group, 12px between groups. Five
+    // items at one uniform gap read as one undifferentiated run; the groups
+    // make the identity, the state, and the actions findable at a squint.
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-hairline bg-surface px-3">
       {compact ? (
         <>
           {/* The wordmark needs ~104px of the bar. Below 480px the document
@@ -97,30 +102,47 @@ export function TopBar({
         </>
       ) : (
         <>
-          <Wordmark />
-          <WordmarkRule />
-          <DocName name={docName} onRename={onRename} />
-          {saveState && (
-            <span
-              aria-live="polite"
-              data-testid="save-state"
-              /* Fixed minimum width: Saving… and Saved are different lengths, and
-                 a shifting readout would nudge the whole right cluster. */
-              className="inline-block min-w-14 text-left select-none text-xs text-ink-faint"
-            >
-              {saveState === 'saving' ? 'Saving…' : 'Saved'}
-            </span>
-          )}
-          {gauge && (
-            <span
-              data-testid="proof-gauge"
-              className="select-none whitespace-nowrap text-xs text-ink-faint tabular-nums"
-            >
-              {gauge}
-            </span>
+          {/* Identity: the brand and the document it names. min-w-0 lets a
+              long name give its width back to the bar instead of pushing the
+              actions off it. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <Wordmark />
+            <WordmarkRule />
+            <DocName name={docName} onRename={onRename} />
+          </div>
+
+          {/* State: two readouts about the same document, one tight cluster
+              and one step away from the identity group they belong to. */}
+          {(saveState || gauge) && (
+            <div className="flex shrink-0 items-center gap-2 text-xs text-ink-faint">
+              {saveState && (
+                <span
+                  aria-live="polite"
+                  data-testid="save-state"
+                  /* Fixed minimum width: Saving… and Saved are different
+                     lengths, and a shifting readout would nudge the whole
+                     right cluster. */
+                  className="inline-block min-w-14 select-none"
+                >
+                  {saveState === 'saving' ? 'Saving…' : 'Saved'}
+                </span>
+              )}
+              {gauge && (
+                <span
+                  data-testid="proof-gauge"
+                  className="select-none whitespace-nowrap tabular-nums"
+                >
+                  {gauge}
+                </span>
+              )}
+            </div>
           )}
 
-          <div className="ml-auto flex items-center gap-1.5">
+          {/* Actions, split by weight: the quiet view controls, then — one
+              step away — the quota, the one filled control in the bar, and
+              the account. Export gets air so the bar's primary action reads
+              as primary. */}
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={onOpenLibrary}
@@ -133,7 +155,8 @@ export function TopBar({
             </button>
 
             <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
             {/* Quota chip (server/04): usage against the active plan's monthly
                 Server Export allowance; absent on Free. Compact drops the
                 standalone chip — the Export menu's Server Export item carries

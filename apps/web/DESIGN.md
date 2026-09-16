@@ -94,10 +94,13 @@ the one branded typographic moment, "Perfect**Mark**D".
 - **Headline** (600, 24px): the pricing page's `h1` only.
 - **Subhead** (600, 18px): auth page `h1`, empty-state glyphs.
 - **Section head** (600, 16px): upgrade step panels, plan column names.
-- **Wordmark** (600, 15px): "PerfectMarkD", "Mark" in Plex Mono.
+- **Wordmark** (600, 14px): "PerfectMarkD", "Mark" in Plex Mono.
 - **Title** (600, 14px): dialog and panel headings, list row names.
 - **Body** (400–500, 14px): buttons, menu items, inputs, banner copy.
 - **Label** (500, 12px): field labels, tabs, chips, metadata. The workhorse.
+- **Group head** (500, 11px, sentence case): Inspector subgroups — a named run
+  of fields inside a section, one step below the section head in both weight
+  and case.
 - **Micro** (600, 11px, uppercase, `0.025em`): Inspector section headings.
 - **Footnote** (400, 10px): two instances only, attached to their controls.
 - **Editor code** (400, 13.5px, 1.7): Plex Mono, caret and selection graphite.
@@ -109,8 +112,12 @@ the two attached footnotes).
 
 ## Layout
 
-- **Top bar:** 48px, hairline bottom, wordmark · doc name · autosave · gauge;
-  right cluster Library / theme / quota / Export / account.
+- **Top bar:** 48px, hairline bottom, and a three-group rhythm — 8px inside a
+  group, 12px between groups. Identity (wordmark · rule · document name, the
+  name free to shrink), state (autosave · proof gauge, one tight cluster), and
+  actions (Library / theme · quota / Export / account, the quiet view controls
+  one step away from the primary action). The wordmark anchors the bar at 14px
+  and never out-shouts the document beside it.
 - **Panes:** editor 38% (min 280px), canvas flex (min 320px), Inspector 320px
   (min 260px). Dividers: 16px drag targets, ARIA splitters, keyboard resize,
   Enter/double-click reset. Resizing is a **coupled negotiation**: the canvas
@@ -237,12 +244,28 @@ filled primary for paid, hairline ghost for free. Verified order badge:
 
 ### Inputs / Fields
 
-Inspector compact fields: 12px text on `--field`, 1px hairline, 2px radius;
-focus draws the 2px accent ring (the inline doc-name field swaps to
-`focus:border-accent` + `--field` instead, and in the compact rename dialog the
-field is a full-width 36px form field). Full-width form fields: 36px,
-`--canvas` fill. Monospace for IDs, wallets, hex. Errors: 12px `--danger`
-below the field, `role="alert"`.
+**The Inspector is a column of instruments, not a form stretched across a
+narrow pane.** Every row shares one control axis: a 112px right-aligned label
+column, an 8px gutter, then the control — so a label sits 8px from its value
+at every pane width from the 260px floor up, and the values read as a single
+column instead of hopping between two edges. The axis belongs to
+`controls.tsx` (`LABEL_COLUMN` / `CONTROL_AXIS`); keep them paired.
+
+- Fields: 12px text on `--field`, 1px hairline, 2px radius; focus draws the
+  2px accent ring. Number fields are 64px — a measurement's width, not the
+  row's — and carry no spinner chrome (stepping a page size by 1mm is not a
+  real interaction; keyboard arrows still step). Selects and text inputs fill
+  the column, because the chosen option is the longest text in the row.
+- Toggle rows: the box sits on the control axis and the *whole row* is the
+  label, so the hit target is the full row and there is exactly one name for
+  the checkbox. A field's label lives left of the axis; a toggle's lives right
+  of it.
+- Rows wrap within their control column, never the pane: at the 260px floor a
+  wrapped lock or button stays on the axis.
+- The inline doc-name field swaps to `focus:border-accent` + `--field`, and in
+  the compact rename dialog the field is a full-width 36px form field.
+  Full-width form fields: 36px, `--canvas` fill. Monospace for IDs, wallets,
+  hex. Errors: 12px `--danger` below the field, `role="alert"`.
 
 ### Banner Strip
 
@@ -264,7 +287,10 @@ frame. Do not remove them; they are the world's one authored moment.
 ### Preset Thumbnail
 
 Unchanged: a CSS sketch from the document's own `DocStyle` — its colors, never
-the chrome palette. 84×112 base, scaled per footprint.
+the chrome palette. The drawing is authored once at 84×112 and scaled to its
+footprint: 60×80 in the Inspector's preset gallery, whose `auto-fill` grid
+decides its own column count from the pane's width (4 across at the default,
+3 at the 260px floor) so no preset is ever stranded alone on a row.
 
 ### Gate Lock
 

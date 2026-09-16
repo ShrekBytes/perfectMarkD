@@ -63,7 +63,10 @@ export function Inspector({ gauge = null }: InspectorProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-hairline px-2">
+      {/* px-3, not px-2: the tabs and the sections below share one left edge
+          — a 4px jog between the tab row and the first heading reads as a
+          rendering bug, not a style. */}
+      <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-hairline px-3">
         <div
           role="tablist"
           aria-label="Inspector sections"
