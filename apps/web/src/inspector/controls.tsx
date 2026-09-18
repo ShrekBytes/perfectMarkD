@@ -57,10 +57,15 @@ export function Field({
   );
 }
 
-/** A boolean row: the box sits on the control axis and the whole row is the
- *  label, so the hit target is the full row and there is exactly one name for
- *  the checkbox. A field row's label lives left of the axis; a toggle's lives
- *  right of it, because a checkbox reads as "box, then what it turns on". */
+/** A boolean row: the switch sits on the control axis and the whole row is
+ *  the label, so the hit target is the full row and there is exactly one
+ *  name for the checkbox. A field row's label lives left of the axis; a
+ *  toggle's lives right of it, because a switch reads as "control, then
+ *  what it turns on". The visual is a rectangular graphite switch — on is a
+ *  graphite fill with a light knob (the system's inversion language), off
+ *  is a hairline track — never a pill: the world holds 2px radii and no
+ *  circles. Semantics stay a native checkbox (role, keyboard, screen-reader
+ *  name all unchanged); only the paint is a switch. */
 export function ToggleRow({
   checked,
   onChange,
@@ -76,7 +81,7 @@ export function ToggleRow({
   return (
     <label
       htmlFor={id}
-      className={`flex items-center gap-2 py-1 ${
+      className={`relative flex items-center gap-2 py-1 ${
         disabled ? '' : 'cursor-pointer'
       }`}
     >
@@ -86,13 +91,38 @@ export function ToggleRow({
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        /* The authored 14px box for fine pointers; coarse pointers lift it to
-           the 24px WCAG 2.5.8 floor — the Inspector's field pattern is exempt
-           from the 44px instrument rule, not from the accessibility floor. */
-        className={`${CONTROL_AXIS} size-3.5 shrink-0 cursor-pointer rounded-[4px] accent-accent hover-none:min-h-6 hover-none:min-w-6 disabled:cursor-not-allowed disabled:opacity-50`}
+        /* The control covers the whole row: transparent, but directly
+           hittable, so pointer, keyboard, and assistive-tech clicks all
+           land on the real checkbox. Focus and paint ride below — the
+           track carries the peer ring, both spans are pointer-transparent
+           so this input is always the hit target. */
+        className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
       />
+      {/* The track: 32×16 from the spacing scale, on the shared control
+          axis. The row itself is the hit target (py-1 + text clears the
+          24px floor), so coarse pointers need no visual lift. */}
       <span
-        className={`min-w-0 text-xs ${disabled ? 'text-ink-faint' : 'text-ink'}`}
+        aria-hidden="true"
+        className={`${CONTROL_AXIS} pointer-events-none flex h-4 w-8 shrink-0 items-center rounded-control border px-[2px] transition-colors duration-150 outline-offset-2 outline-accent peer-focus-visible:outline-2 ${
+          checked
+            ? 'border-accent-strong bg-accent-strong'
+            : 'border-hairline-strong bg-field'
+        } ${disabled ? 'opacity-50' : ''}`}
+      >
+        {/* The knob: a 12px square, graphite-faint at rest, light ink when
+            on. Travel is the inner width minus knob and insets (14px). The
+            slide is a composited transform on the single 150ms curve —
+            never layout. */}
+        <span
+          className={`block size-3 rounded-control transition-transform duration-150 ${
+            checked
+              ? 'translate-x-3.5 bg-accent-ink'
+              : 'translate-x-0 bg-ink-faint'
+          }`}
+        />
+      </span>
+      <span
+        className={`pointer-events-none min-w-0 text-xs ${disabled ? 'text-ink-faint' : 'text-ink'}`}
       >
         {label}
       </span>
@@ -324,9 +354,13 @@ export function ColorInput({
 }
 
 /**
- * The lock glyph on a paid control: inert-but-explaining. Clicking opens the
- *  pricing modal (never a signup wall); the control beside it is disabled so
- *  the gate reads as locked, not broken.
+ * The lock tag on a paid control: a small graphite chip — canvas fill,
+ * strong hairline, semibold ink — so the paid feature reads as a real,
+ * clickable thing rather than faint helper text. Hover inverts to the
+ * graphite fill (the system's selection language) to invite the click that
+ * opens the pricing modal (never a signup wall); the control beside it is
+ * disabled so the gate reads as locked, not broken. No hue: premium here
+ * is weight and border, not color.
  */
 export function GateLock({
   onClick,
@@ -341,7 +375,7 @@ export function GateLock({
       onClick={onClick}
       aria-label={`${label} (paid feature)`}
       title={`${label} needs a paid plan — open plans to compare`}
-      className="flex h-6 shrink-0 items-center gap-1 rounded-control px-1.5 text-[11px] font-medium text-ink-faint transition-colors duration-150 hover:bg-surface-hover hover:text-ink"
+      className="flex h-6 shrink-0 items-center gap-1 rounded-control border border-hairline-strong bg-canvas px-1.5 text-[11px] font-semibold text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:border-accent-strong hover:bg-accent-strong hover:text-accent-ink focus-visible:outline-2"
     >
       <LockIcon />
       Pro

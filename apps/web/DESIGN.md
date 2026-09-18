@@ -258,10 +258,12 @@ column instead of hopping between two edges. The axis belongs to
   row's — and carry no spinner chrome (stepping a page size by 1mm is not a
   real interaction; keyboard arrows still step). Selects and text inputs fill
   the column, because the chosen option is the longest text in the row.
-- Toggle rows: the box sits on the control axis and the *whole row* is the
+- Toggle rows: the switch sits on the control axis and the *whole row* is the
   label, so the hit target is the full row and there is exactly one name for
-  the checkbox. A field's label lives left of the axis; a toggle's lives right
-  of it.
+  the checkbox. A field's label lives left of the axis; a toggle's lives
+  right of it. The visual is a rectangular 32×16 graphite switch (2px radii,
+  no circles): on is the graphite fill with a light knob, off is a hairline
+  track. Semantics stay a native checkbox — only the paint is a switch.
 - Rows wrap within their control column, never the pane: at the 260px floor a
   wrapped lock or button stays on the axis.
 - The inline doc-name field swaps to `focus:border-accent` + `--field`, and in
@@ -303,8 +305,10 @@ decides its own column count from the pane's width (4 across at the default,
 
 ### Gate Lock
 
-Unchanged: 24px, 11px Ink Faint, lock glyph + "Pro"; gated controls render
-disabled-but-visible; clicking opens the pricing modal, never a signup wall.
+A graphite chip, not faint text: 24px, 11px semibold Ink on a `--canvas` fill
+with a `--hairline-strong` border, lock glyph + "Pro". Hover inverts to the
+graphite fill with light ink; gated controls render disabled-but-visible;
+clicking opens the pricing modal, never a signup wall.
 
 ### Zoom Pill
 
