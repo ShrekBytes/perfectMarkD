@@ -39,7 +39,7 @@ const TABS: Array<{ id: AdminTab; label: string }> = [
         <Link
           to="/"
           aria-label="PerfectMarkD home"
-          className="select-none px-1 text-[15px] font-semibold tracking-tight"
+          className="touch-target inline-flex select-none items-center rounded-control px-1 text-sm font-semibold tracking-tight outline-offset-2 outline-accent focus-visible:outline-2"
         >
           Perfect<span className="font-mono">Mark</span>D
         </Link>

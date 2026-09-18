@@ -19,8 +19,10 @@ export class ApiError extends Error {
   }
 }
 
-/** Marks an error whose body carried no readable `{ error }` — the message is
- *  ours, so callers branch on this code, never on the display string. */
+/** The message shown when a body carries no readable `{ error }`, and the
+ *  `code` that marks it — callers branch on this code, never the display
+ *  string. */
+const FALLBACK_MESSAGE = 'Something went wrong.';
 export const FALLBACK_CODE = 'fallback';
 
 export function postJson(path: string, payload: unknown): Promise<Response> {
@@ -47,20 +49,20 @@ export function deleteJson(path: string): Promise<Response> {
 
 export async function errorFrom(res: Response): Promise<ApiError> {
   const body: unknown = await res.json().catch(() => null);
-  const hasError =
-    typeof body === 'object' &&
-    body !== null &&
-    typeof (body as { error?: unknown }).error === 'string';
+  const fields =
+    typeof body === 'object' && body !== null
+      ? (body as { error?: unknown; code?: unknown })
+      : null;
+  const hasError = typeof fields?.error === 'string';
   const message = hasError
-    ? (body as { error: string }).error
-    : 'Something went wrong.';
-  const code =
-    typeof body === 'object' &&
-    body !== null &&
-    typeof (body as { code?: unknown }).code === 'string'
-      ? (body as { code: string }).code
-      : hasError
-        ? undefined
-        : FALLBACK_CODE;
+    ? (fields as { error: string }).error
+    : FALLBACK_MESSAGE;
+  const code = hasError
+    ? typeof fields?.code === 'string'
+      ? (fields as { code: string }).code
+      : undefined
+    : // A body we couldn't read is not a shape we understand — the fallback
+      // marker is ours, and it wins over a body-supplied code.
+      FALLBACK_CODE;
   return new ApiError(message, res.status, code);
 }

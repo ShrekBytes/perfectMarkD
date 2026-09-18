@@ -37,6 +37,11 @@ const COPY = {
 const SWITCH_CLASS =
   'touch-target mt-2 flex h-9 w-full items-center justify-center rounded-control border border-hairline text-sm font-medium text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2';
 
+/** The two fields share one control: same geometry, same ring, same touch
+ *  floor. */
+const INPUT_CLASS =
+  'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
+
 /** Statuses where the recovery is to fix what was typed, so the inputs are
  *  marked invalid. A 5xx, an unreadable body, or a fetch that never landed is
  *  not the user's input; flagging a field there would misdirect them. */
@@ -126,10 +131,11 @@ export function AuthForm({
     }
   };
 
-  const short = password.length > 0 && password.length < PASSWORD_MIN;
+  const passwordTooShort =
+    password.length > 0 && password.length < PASSWORD_MIN;
   const hint =
     mode === 'register'
-      ? short
+      ? passwordTooShort
         ? `At least ${PASSWORD_MIN} characters — ${PASSWORD_MIN - password.length} more needed.`
         : `At least ${PASSWORD_MIN} characters.`
       : null;
@@ -161,7 +167,7 @@ export function AuthForm({
           aria-describedby={failure ? ERROR_ID : undefined}
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+          className={INPUT_CLASS}
         />
       </label>
 
@@ -179,7 +185,7 @@ export function AuthForm({
           minLength={mode === 'register' ? PASSWORD_MIN : undefined}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          className="touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+          className={INPUT_CLASS}
         />
       </label>
 

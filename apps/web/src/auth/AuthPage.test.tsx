@@ -251,6 +251,28 @@ describe('error recovery', () => {
       'aria-invalid',
     );
   });
+
+  it('treats a body with a code but no error as the fallback too', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: 'nope' }), { status: 400 }),
+      ),
+    );
+    render(<AuthPage mode="login" />);
+
+    await user.type(screen.getByLabelText(/email/i), 'a@b.co');
+    await user.type(screen.getByLabelText(/password/i), 'nope');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /the server couldn't complete that/i,
+    );
+    // The fallback marker travels with the fallback message — no field flag.
+    expect(screen.getByLabelText(/email/i)).not.toHaveAttribute('aria-invalid');
+  });
 });
 
 describe('forgot password', () => {

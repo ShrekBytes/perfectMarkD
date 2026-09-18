@@ -18,7 +18,7 @@ const COPY = {
   },
   register: {
     heading: 'Create account',
-    blurb: 'An account lets you take a paid plan — with Export History.',
+    blurb: 'An account lets you take a Premium plan — with Export History.',
     // The honest warning with the honest recovery, no blame: the Admin can
     // set a temporary password (billing/03), and the login form's "Forgot
     // password?" affordance carries the full answer.
