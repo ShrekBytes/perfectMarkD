@@ -121,7 +121,7 @@ export function EditorPane({
         const mb = Math.round(MAX_ASSET_BYTES / MB);
         setNotice(
           failed.error === 'too-large'
-            ? `"${failed.name}" is over the ${mb} MB image limit and was not added.`
+            ? `"${failed.name}" is over the ${mb} MB image limit and was not added. Use a smaller file.`
             : failed.error === 'unsupported'
               ? `"${failed.name}" is not an image — paste, drop, or pick PNG, JPEG, WebP, SVG, or similar files.`
               : 'Open a document before adding images.',
@@ -218,12 +218,14 @@ export function EditorPane({
         />
         <ToolButton
           label="Bulleted list"
+          hint="Toggle bulleted list"
           onClick={run(toggleBulletList)}
           icon={ListIcon}
         />
         <Divider />
         <ToolButton
           label="Insert table"
+          hint="Insert a 3-column starter table"
           onClick={run(insertTable)}
           icon={TableIcon}
         />

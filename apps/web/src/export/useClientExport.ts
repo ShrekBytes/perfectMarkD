@@ -34,7 +34,7 @@ export interface ExportToast {
 
 const TOAST_MS = 6000;
 const BROWSER_NOTICE = 'Tip: for best print results, use Chrome or Edge.';
-const EXPORT_ERROR = 'Export failed. Please try again.';
+const EXPORT_ERROR = 'Client Export failed. Please try again.';
 
 /** How long the browser notice stays readable before the print dialog opens
  *  over it. Tests shrink this via setBrowserNoticeDelayForTests. */

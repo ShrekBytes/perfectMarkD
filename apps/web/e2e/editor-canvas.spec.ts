@@ -42,7 +42,7 @@ test('changing the style preset re-styles the mounted pages', async ({
 
   const before = await pageBoxStyle(page, 'background-color');
   await openInspectorTab(page, 'Style');
-  const gallery = page.getByRole('radiogroup', { name: 'Style preset' });
+  const gallery = page.getByRole('radiogroup', { name: 'Preset' });
   await gallery.getByRole('radio', { name: 'Dark' }).click();
   await expect(gallery.getByRole('radio', { name: 'Dark' })).toBeChecked();
 

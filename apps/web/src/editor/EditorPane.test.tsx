@@ -94,7 +94,7 @@ it('shows the word and character counts in the footer', async () => {
 it('shows the placeholder while the document is empty', () => {
   render(<EditorPane />);
   expect(
-    screen.getByText('Start writing — your markdown goes here.'),
+    screen.getByText('Start writing in Markdown — the paper updates as you type.'),
   ).toBeInTheDocument();
 });
 

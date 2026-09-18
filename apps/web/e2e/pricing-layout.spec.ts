@@ -56,7 +56,7 @@ for (const width of [320, 375, 768, 1280]) {
         .click();
     }
     await page
-      .getByRole('button', { name: 'Custom size (paid feature)' })
+      .getByRole('button', { name: 'Custom size (mm) (paid feature)' })
       .click();
     await expectComparisonFits(page);
     await page

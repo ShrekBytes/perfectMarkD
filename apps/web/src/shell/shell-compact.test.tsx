@@ -117,7 +117,7 @@ it('keeps the primary Export action in the bar and folds the rest into the menu'
   await renderCompactShell();
 
   expect(screen.getByTestId('export-split')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'More options' })).toBeInTheDocument();
 
   // The desktop-only cluster is gone; Library, theme, and account live in the
   // overflow menu (the Export menu still carries the Server Export quota).
@@ -135,7 +135,7 @@ it('keeps the primary Export action in the bar and folds the rest into the menu'
 it('reaches the Library through the overflow menu', async () => {
   await renderCompactShell();
 
-  await userEvent.click(screen.getByRole('button', { name: 'More' }));
+  await userEvent.click(screen.getByRole('button', { name: 'More options' }));
   await userEvent.click(screen.getByRole('menuitem', { name: /Library/ }));
 
   expect(screen.getByRole('dialog', { name: 'Library' })).toBeInTheDocument();

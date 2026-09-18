@@ -91,7 +91,7 @@ describe('Inspector tabs', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Header/Footer' }));
     expect(
-      screen.getByRole('tabpanel', { name: 'Header-Footer settings' }),
+      screen.getByRole('tabpanel', { name: 'Header/Footer settings' }),
     ).toBeInTheDocument();
   });
 
@@ -101,7 +101,7 @@ describe('Inspector tabs', () => {
     });
     render(<Inspector />);
     expect(
-      screen.getByText('Page, style, and header/footer settings live here.'),
+      screen.getByText('Open a document to tune its page, style, and header/footer.'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
@@ -157,15 +157,15 @@ describe('Page tab', () => {
     render(<Inspector />);
 
     expect(
-      screen.getByRole('combobox', { name: 'Frame style' }),
+      screen.getByRole('combobox', { name: 'Frame border style' }),
     ).toBeDisabled();
 
     await user.click(screen.getByRole('checkbox', { name: 'Page frame' }));
     expect(activeSettings().frameEnabled).toBe(true);
-    expect(screen.getByRole('combobox', { name: 'Frame style' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'Frame border style' })).toBeEnabled();
 
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Frame style' }),
+      screen.getByRole('combobox', { name: 'Frame border style' }),
       'dashed',
     );
     expect(activeSettings().frameStyle).toBe('dashed');
@@ -185,11 +185,11 @@ describe('Page tab', () => {
   it('locks Custom page size, custom size inputs, and the background image', async () => {
     render(<Inspector />);
 
-    // The gate is the locked "Custom size" row — no dead option in the list.
+    // The gate is the locked "Custom size (mm)" row — no dead option in the list.
     expect(
       screen.queryByRole('option', { name: 'Custom…' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Custom size')).toBeInTheDocument();
+    expect(screen.getByText('Custom size (mm)')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Background image (paid feature)' }),
     ).toBeInTheDocument();
@@ -224,7 +224,7 @@ describe('Style tab', () => {
     render(<Inspector />);
     fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
 
-    const gallery = screen.getByRole('radiogroup', { name: 'Style preset' });
+    const gallery = screen.getByRole('radiogroup', { name: 'Preset' });
     expect(gallery.querySelectorAll('[role="radio"]')).toHaveLength(7);
     // The seeded sample runs the default preset.
     expect(screen.getByRole('radio', { name: /default/i })).toHaveAttribute(

@@ -30,8 +30,8 @@ export function PrintHintDialog({
       onClose={onCancel}
     >
       <p className="text-sm text-ink-soft">
-        Your export opens your browser's print dialog. Choose 'Save as PDF' in
-        the dialog — quality is identical to a downloaded PDF.
+        This opens your browser's print dialog. Choose 'Save as PDF' —
+        quality is identical to a downloaded PDF.
       </p>
       {/* Phones: the mobile print experience is a different dance, and this
           dialog is the only moment to teach it — the browser's own UI takes
@@ -55,7 +55,7 @@ export function PrintHintDialog({
           onClick={onCancel}
           className="touch-target flex h-8 items-center rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
         >
-          Cancel
+          Cancel export
         </button>
         <button
           type="button"

@@ -19,7 +19,7 @@ test('gated controls show locks that open the pricing modal', async ({
   // Page tab: custom size + background image
   await openInspectorTab(page, 'Page');
   await expect(
-    page.getByRole('button', { name: 'Custom size (paid feature)' }),
+    page.getByRole('button', { name: 'Custom size (mm) (paid feature)' }),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Background image (paid feature)' }),
@@ -43,7 +43,7 @@ test('gated controls show locks that open the pricing modal', async ({
   // A lock opens the pricing modal; Escape closes it again.
   await openInspectorTab(page, 'Page');
   await page
-    .getByRole('button', { name: 'Custom size (paid feature)' })
+    .getByRole('button', { name: 'Custom size (mm) (paid feature)' })
     .click();
   await expect(modal).toBeVisible();
   await page.keyboard.press('Escape');

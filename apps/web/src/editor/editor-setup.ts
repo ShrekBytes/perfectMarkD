@@ -113,7 +113,7 @@ export function createEditorExtensions(handlers: EditorHandlers): Extension[] {
     markdown({ base: markdownLanguage, codeLanguages: languages }),
     syntaxHighlighting(markdownHighlighting),
     pageBreakFlags,
-    placeholder('Start writing — your markdown goes here.'),
+    placeholder('Start writing in Markdown — the paper updates as you type.'),
     // Listed before the default keymaps, so these bindings win.
     keymap.of([
       { key: 'Mod-b', run: toggleBold },

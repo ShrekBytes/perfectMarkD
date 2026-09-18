@@ -160,7 +160,7 @@ it('shows the one-time hint before the first print, then prints on confirm', asy
     name: /export via the print dialog/i,
   });
   expect(dialog).toHaveTextContent(
-    /Choose 'Save as PDF' in the dialog — quality is identical to a downloaded PDF/,
+    /Choose 'Save as PDF' — quality is identical to a downloaded PDF/,
   );
   // Nothing printed while the hint is up.
   expect(printStub.windows).toHaveLength(0);
@@ -224,7 +224,7 @@ it('includes the browser notice in the first-export hint dialog', async () => {
   );
 });
 
-it('runs the same flow from the dropdown Print… item', async () => {
+it('runs the same flow from the dropdown Client Export… item', async () => {
   markPrintHintShown();
   render(<ExportSplitButton />);
   typeMarkdown('# Via menu');
@@ -233,7 +233,7 @@ it('runs the same flow from the dropdown Print… item', async () => {
   expect(
     screen.getByRole('menu', { name: /export options/i }),
   ).toBeInTheDocument();
-  await userEvent.click(screen.getByRole('menuitem', { name: 'Print…' }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Client Export…' }));
 
   // The menu closed and the flow ran without the hint (already shown).
   expect(screen.queryByRole('menu')).not.toBeInTheDocument();
@@ -247,7 +247,7 @@ it('closes the dropdown with Escape without exporting', async () => {
   render(<ExportSplitButton />);
 
   await userEvent.click(chevron());
-  expect(screen.getByRole('menuitem', { name: 'Print…' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Client Export…' })).toBeInTheDocument();
   await userEvent.keyboard('{Escape}');
 
   expect(screen.queryByRole('menu')).not.toBeInTheDocument();
@@ -453,7 +453,7 @@ describe('Server Export (billing/04)', () => {
     await userEvent.click(chevron());
     const item = screen.getByRole('menuitem', { name: /server export/i });
     expect(item).toHaveTextContent('1/5');
-    expect(item).toHaveTextContent('Admin-granted exports');
+    expect(item).toHaveTextContent('Comp exports — no plan needed');
 
     await userEvent.click(item);
     await screen.findByText(/Server Export complete/i);

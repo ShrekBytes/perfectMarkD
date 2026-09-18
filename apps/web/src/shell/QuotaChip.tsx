@@ -40,8 +40,8 @@ export function QuotaChip() {
           type="button"
           data-testid="quota-chip"
           data-exhausted="true"
-          title={`Server Export: all ${limit} of this period's exports are used — it resets next period`}
-          aria-label={`Server Export quota used up (${used} of ${limit}) — open plans`}
+          title={`Server Export quota used up (${used} of ${limit}) — resets next period; open plans for more`}
+          aria-label={`Server Export quota used up (${used} of ${limit}) — open plans for more`}
           onClick={() => setPricingOpen(true)}
           className={`${chipClasses} touch-target shrink-0 outline-offset-2 outline-accent transition-colors duration-150 hover:bg-accent-deep focus-visible:outline-2`}
         >
@@ -50,7 +50,7 @@ export function QuotaChip() {
       ) : (
         <span
           data-testid="quota-chip"
-          title={`Server Export: ${used} of ${limit} exports used this period`}
+          title={`Server Export quota: ${used} of ${limit} used this period`}
           className={chipClasses}
         >
           {used}/{limit}

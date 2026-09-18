@@ -118,6 +118,16 @@ export function TopBar({
               {saveState && (
                 <span
                   aria-live="polite"
+                  aria-label={
+                    saveState === 'saving'
+                      ? 'Saving document…'
+                      : 'Document saved in this browser'
+                  }
+                  title={
+                    saveState === 'saving'
+                      ? 'Saving to this browser…'
+                      : 'Saved in this browser'
+                  }
                   data-testid="save-state"
                   /* Fixed minimum width: Saving… and Saved are different
                      lengths, and a shifting readout would nudge the whole
@@ -130,6 +140,8 @@ export function TopBar({
               {gauge && (
                 <span
                   data-testid="proof-gauge"
+                  title="Paper size and page count"
+                  aria-label={`Paper: ${gauge}`}
                   className="select-none whitespace-nowrap tabular-nums"
                 >
                   {gauge}
@@ -147,7 +159,7 @@ export function TopBar({
               type="button"
               onClick={onOpenLibrary}
               aria-expanded={libraryOpen}
-              title="Library"
+              title="Library — your documents"
               className="touch-target flex h-8 items-center gap-1.5 rounded-control px-2.5 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
             >
               <BookIcon />

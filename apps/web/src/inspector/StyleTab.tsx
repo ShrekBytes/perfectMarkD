@@ -48,7 +48,7 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
             on the last row. */}
         <div
           role="radiogroup"
-          aria-label="Style preset"
+          aria-label="Preset"
           data-testid="preset-gallery"
           className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5"
         >
@@ -159,7 +159,7 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
           </Field>
         </Subgroup>
         <Subgroup title="Blocks & tables">
-          <Field label="Quote fill">
+          <Field label="Quote background">
             <ColorInput
               ariaLabel="Blockquote background"
               value={
@@ -170,7 +170,7 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
               onChange={(blockquoteBg) => set({ blockquoteBg })}
             />
           </Field>
-          <Field label="Quote bar">
+          <Field label="Quote border">
             <ColorInput
               ariaLabel="Blockquote border color"
               value={settings.blockquoteBorderColor}
@@ -179,7 +179,7 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
               }
             />
           </Field>
-          <Field label="Code fill">
+          <Field label="Code background">
             <ColorInput
               ariaLabel="Code background"
               value={settings.codeBackground}

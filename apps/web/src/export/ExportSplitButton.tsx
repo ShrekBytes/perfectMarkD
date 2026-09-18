@@ -16,7 +16,7 @@ import { useServerExport } from './useServerExport';
 
 /**
  * The top bar's `⬇ Export ▾` split button: the main action is Client Export
- * (ADR-0002's print flow); the dropdown's "Print…" item is the same flow, the
+ * (ADR-0002's print flow); the dropdown's "Client Export…" item is the same flow, the
  * dialog being inherent. "Server Export" (billing/04) shows the account's
  * quota chip and the Premium queue-priority note for entitled users — or the
  * admin-granted comp allowance — and runs the real enqueue/poll/download
@@ -32,8 +32,8 @@ function priorityNote(plan: string | null): string {
   return plan === 'premium'
     ? 'Priority render queue'
     : plan === 'pro'
-      ? 'Premium renders first'
-      : 'Admin-granted exports';
+      ? 'Standard queue — Premium renders first'
+      : 'Comp exports — no plan needed';
 }
 
 export function ExportSplitButton() {
@@ -111,7 +111,7 @@ export function ExportSplitButton() {
           type="button"
           onClick={startExport}
           disabled={locked || !flow.canExport}
-          title="Export — opens the print dialog (choose 'Save as PDF')"
+          title="Client Export — opens the print dialog (choose 'Save as PDF')"
           className={`touch-target flex h-8 items-center gap-1.5 rounded-l-control py-1 pl-3 pr-2 text-sm font-medium ${busyButton}`}
         >
           {busy ? <SpinnerIcon className="animate-spin" /> : <DownloadIcon />}
@@ -146,10 +146,11 @@ export function ExportSplitButton() {
               role="menuitem"
               type="button"
               onClick={startExport}
+              title="Free — opens the print dialog (choose 'Save as PDF')"
               className="touch-target flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
             >
               <PrinterIcon className="text-ink-soft" />
-              Print…
+              Client Export…
             </button>
             {canServerExport && quota ? (
               <button
@@ -158,8 +159,8 @@ export function ExportSplitButton() {
                 onClick={startServerExport}
                 title={
                   entitlement
-                    ? 'Renders on the server with headless Chromium'
-                    : 'Renders on the server — your admin-granted allowance'
+                    ? 'Renders on the server — the PDF downloads when ready'
+                    : "Renders on the server — uses your extra exports"
                 }
                 className="touch-target flex w-full items-start gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
               >
@@ -191,11 +192,12 @@ export function ExportSplitButton() {
                   setMenuOpen(false);
                   setPricingOpen(true);
                 }}
+                title="Needs a paid plan — see plans"
                 className="touch-target flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
               >
                 <ServerIcon className="text-ink-soft" />
                 Server Export
-                <span className="ml-auto text-xs text-ink-faint">Paid</span>
+                <span className="ml-auto text-xs text-ink-faint">Paid plan</span>
               </button>
             )}
           </div>

@@ -67,7 +67,12 @@ export function AccountMenuItems({
         className={itemClasses}
       >
         Export history
-        <span className="ml-auto text-xs text-ink-faint">30 days</span>
+        <span
+          title="Server Export PDFs are kept for 30 days"
+          className="ml-auto text-xs text-ink-faint"
+        >
+          kept 30 days
+        </span>
       </button>
       <button
         role="menuitem"

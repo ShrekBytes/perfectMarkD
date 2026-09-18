@@ -65,10 +65,10 @@ export function ShellMenu({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        aria-label="More"
+        aria-label="More options"
         aria-haspopup="menu"
         aria-expanded={open}
-        title="More"
+        title="More options"
         className="touch-target flex h-8 w-8 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
       >
         <MoreIcon />
@@ -78,7 +78,7 @@ export function ShellMenu({
         <div
           ref={menuRef}
           role="menu"
-          aria-label="More"
+          aria-label="More options"
           /* Viewport-anchored, not trigger-anchored: the trigger sits ~44px
              from the bar's right edge, so a 224px right-0 dropdown overhangs
              the viewport's left edge at 320px (menu at x=-48, half its labels

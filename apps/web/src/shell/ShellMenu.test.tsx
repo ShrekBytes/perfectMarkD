@@ -37,8 +37,8 @@ it('folds Library, theme, and the account entries into one menu', async () => {
   });
   renderMenu();
 
-  await userEvent.click(screen.getByRole('button', { name: 'More' }));
-  const menu = screen.getByRole('menu', { name: 'More' });
+  await userEvent.click(screen.getByRole('button', { name: 'More options' }));
+  const menu = screen.getByRole('menu', { name: 'More options' });
 
   expect(within(menu).getByRole('menuitem', { name: /Library/ })).toBeInTheDocument();
   expect(
@@ -52,7 +52,7 @@ it('offers sign-in when signed out', async () => {
   useAccountStore.setState({ user: null, status: 'ready' });
   renderMenu();
 
-  await userEvent.click(screen.getByRole('button', { name: 'More' }));
+  await userEvent.click(screen.getByRole('button', { name: 'More options' }));
   expect(
     screen.getByRole('menuitem', { name: 'Sign in' }),
   ).toHaveAttribute('href', '/login');
@@ -62,7 +62,7 @@ it('runs the shell action the item names, closing first', async () => {
   useAccountStore.setState({ user: null, status: 'ready' });
   renderMenu();
 
-  await userEvent.click(screen.getByRole('button', { name: 'More' }));
+  await userEvent.click(screen.getByRole('button', { name: 'More options' }));
   await userEvent.click(screen.getByRole('menuitem', { name: /Library/ }));
 
   expect(handlers.onOpenLibrary).toHaveBeenCalledTimes(1);
@@ -73,7 +73,7 @@ it('names the theme item by where the switch lands', async () => {
   useAccountStore.setState({ user: null, status: 'ready' });
   renderMenu('dark');
 
-  await userEvent.click(screen.getByRole('button', { name: 'More' }));
+  await userEvent.click(screen.getByRole('button', { name: 'More options' }));
   await userEvent.click(
     screen.getByRole('menuitem', { name: 'Switch to light theme' }),
   );
@@ -84,7 +84,7 @@ it('closes on Escape and returns focus to its trigger', async () => {
   useAccountStore.setState({ user: null, status: 'ready' });
   renderMenu();
 
-  const trigger = screen.getByRole('button', { name: 'More' });
+  const trigger = screen.getByRole('button', { name: 'More options' });
   await userEvent.click(trigger);
   expect(screen.getByRole('menu')).toBeInTheDocument();
 

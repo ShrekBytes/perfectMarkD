@@ -51,7 +51,7 @@ export function Inspector({ gauge = null }: InspectorProps) {
       <EmptyState
         icon={<SlidersIcon />}
         title="Inspector"
-        hint="Page, style, and header/footer settings live here."
+        hint="Open a document to tune its page, style, and header/footer."
       />
     );
   }
@@ -96,6 +96,8 @@ export function Inspector({ gauge = null }: InspectorProps) {
              a "Custom landscape · 999 pages" from pushing the tabs out. */
           <span
             data-testid="inspector-gauge"
+            title="Paper size and page count"
+            aria-label={`Paper: ${gauge}`}
             className="ml-auto min-w-0 select-none truncate whitespace-nowrap text-xs text-ink-faint tabular-nums"
           >
             {gauge}
@@ -105,7 +107,7 @@ export function Inspector({ gauge = null }: InspectorProps) {
 
       <div
         role="tabpanel"
-        aria-label={`${tab} settings`}
+        aria-label={`${tab === 'Header-Footer' ? 'Header/Footer' : tab} settings`}
         className="min-h-0 flex-1 overflow-y-auto"
       >
         <TabPanel

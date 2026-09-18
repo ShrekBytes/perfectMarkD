@@ -47,7 +47,7 @@ export function PageTab({
 }: TabProps) {
   // The Custom entry only appears where it can act: when the gate is open,
   // or when a persisted Custom document must not render a blank select.
-  // When the gate is closed it is absent — the locked "Custom size" row
+  // When the gate is closed it is absent — the locked "Custom size (mm)" row
   // below is the single gate, not a dead option in the list.
   const pageSizeOptions: SelectOption<PageSize>[] = [
     ...Object.keys(PAGE_SIZES).map((size) => ({
@@ -99,7 +99,7 @@ export function PageTab({
           </Field>
         ) : (
           <LockedRow
-            label="Custom size"
+            label="Custom size (mm)"
             onOpenPricing={onOpenPricing}
             control={
               <span
@@ -174,9 +174,9 @@ export function PageTab({
           onChange={(frameEnabled) => set({ frameEnabled })}
           label="Page frame"
         />
-        <Field label="Style">
+        <Field label="Border style">
           <Select<FrameStyle>
-            ariaLabel="Frame style"
+            ariaLabel="Frame border style"
             value={settings.frameStyle}
             options={FRAME_STYLES}
             onChange={(frameStyle) => set({ frameStyle })}

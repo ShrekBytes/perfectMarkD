@@ -129,7 +129,7 @@ export function DocName({
                   type="submit"
                   className="touch-target flex h-9 items-center rounded-control bg-accent-strong px-3 text-sm font-medium text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
                 >
-                  Done
+                  Rename
                 </button>
               </div>
             </form>
@@ -144,6 +144,7 @@ export function DocName({
       ref={fieldRef}
       type="text"
       aria-label="Document name"
+      title="Rename document"
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}

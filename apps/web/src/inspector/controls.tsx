@@ -340,7 +340,7 @@ export function GateLock({
       type="button"
       onClick={onClick}
       aria-label={`${label} (paid feature)`}
-      title={`${label} is a paid feature — see plans`}
+      title={`${label} needs a paid plan — open plans to compare`}
       className="flex h-6 shrink-0 items-center gap-1 rounded-control px-1.5 text-[11px] font-medium text-ink-faint transition-colors duration-150 hover:bg-surface-hover hover:text-ink"
     >
       <LockIcon />

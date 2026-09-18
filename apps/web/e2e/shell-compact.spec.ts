@@ -129,13 +129,13 @@ test.describe('compact shell', () => {
     await page.setViewportSize({ width: 320, height: 812 });
     await openApp(page);
 
-    await page.getByRole('button', { name: 'More', exact: true }).click();
-    await expect(page.getByRole('menu', { name: 'More' })).toBeVisible();
+    await page.getByRole('button', { name: 'More options', exact: true }).click();
+    await expect(page.getByRole('menu', { name: 'More options' })).toBeVisible();
 
     // The trap this guards: the menu is 224px wide but the trigger sits ~44px
     // from the bar's right edge, so a trigger-anchored dropdown hung half its
     // labels off the viewport's left edge at the smallest supported width.
-    const menu = page.getByRole('menu', { name: 'More' });
+    const menu = page.getByRole('menu', { name: 'More options' });
     const box = await menu.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.x).toBeGreaterThanOrEqual(0);
@@ -226,20 +226,20 @@ test.describe('touch floor', () => {
     await expectFloor(page);
 
     // The compact overflow menu.
-    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: 'More options', exact: true }).click();
     await expectFloor(page);
     await page.keyboard.press('Escape');
 
     // The Export dropdown — the one menu that stays in the bar.
     await page.getByRole('button', { name: 'More export options' }).click();
     await expectFloor(page);
-    await page.getByRole('menuitem', { name: 'Server Export Paid' }).click();
+    await page.getByRole('menuitem', { name: 'Server Export Paid plan' }).click();
     await expect(page.getByTestId('pricing-modal')).toBeVisible();
     await expectFloor(page);
     await page.keyboard.press('Escape');
 
     // The Library drawer.
-    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: 'More options', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Library' }).click();
     await expect(page.getByRole('dialog', { name: 'Library' })).toBeVisible();
     await expectFloor(page);
@@ -262,7 +262,7 @@ test.describe('touch floor', () => {
     expect(box!.width).toBeGreaterThan(200); // the bar's 111px was the trap
 
     await input.fill('Field report');
-    await dialog.getByRole('button', { name: 'Done' }).click();
+    await dialog.getByRole('button', { name: 'Rename' }).click();
     await expect(
       page.getByRole('button', { name: 'Rename document: Field report' }),
     ).toBeVisible();

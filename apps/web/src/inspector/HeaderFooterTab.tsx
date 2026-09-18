@@ -37,7 +37,7 @@ const pageNumberPositionOptions: {
   { value: 'right', label: 'Right' },
 ];
 
-const FORMAT_HINT = 'Use {{current}}, {{total}}, {{title}}';
+const FORMAT_HINT = 'Example: Page {{current}} of {{total}} — {{title}} is the document name';
 
 /** The per-band banner gate: a live picker when the flag is open, the lock
  *  otherwise. One shape for both bands so they can't drift apart. */
@@ -108,7 +108,7 @@ export function HeaderFooterTab({
             ariaLabel="Header text"
             value={settings.headerText}
             onChange={(headerText) => set({ headerText })}
-            placeholder="Header text"
+            placeholder="e.g. Quarterly report"
             disabled={!settings.showHeader}
           />
         </Field>
@@ -173,7 +173,7 @@ export function HeaderFooterTab({
             ariaLabel="Footer text"
             value={settings.footerText}
             onChange={(footerText) => set({ footerText })}
-            placeholder="Footer text"
+            placeholder="e.g. Acme Inc"
             disabled={!settings.showFooter}
           />
         </Field>

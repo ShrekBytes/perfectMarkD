@@ -148,6 +148,16 @@ export function AppShell() {
           {saveState && (
             <span
               aria-live="polite"
+              aria-label={
+                saveState === 'saving'
+                  ? 'Saving document…'
+                  : 'Document saved in this browser'
+              }
+              title={
+                saveState === 'saving'
+                  ? 'Saving to this browser…'
+                  : 'Saved in this browser'
+              }
               data-testid="save-state"
               className="ml-auto min-w-14 text-right select-none text-xs text-ink-faint"
             >
