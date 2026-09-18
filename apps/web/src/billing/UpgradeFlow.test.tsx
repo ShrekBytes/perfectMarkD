@@ -220,12 +220,12 @@ describe('account step', () => {
 
     await user.click(screen.getByRole('button', { name: /Sign in/i }));
 
-    // Now the submit button is "Sign in" and switching back offers "Create one".
+    // Now the submit button is "Sign in" and switching back offers "Create an account".
     expect(
       screen.getByRole('button', { name: /^Sign in$/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Create one' }),
+      screen.getByRole('button', { name: 'Create an account' }),
     ).toBeInTheDocument();
   });
 });

@@ -12,10 +12,18 @@ const COPY = {
   login: {
     heading: 'Sign in',
     blurb: 'Sign in to manage a paid plan and Server Export.',
+    // No colophon: the login form's "Forgot password?" affordance carries the
+    // recovery answer.
+    colophon: undefined,
   },
   register: {
     heading: 'Create account',
-    blurb: 'Free to use. No email verification — keep your password safe.',
+    blurb: 'An account lets you take a paid plan — with Export History.',
+    // The honest warning with the honest recovery, no blame: the Admin can
+    // set a temporary password (billing/03), and the login form's "Forgot
+    // password?" affordance carries the full answer.
+    colophon:
+      'No email verification and no password reset — if you are locked out, ask the Admin.',
   },
 } as const;
 
@@ -24,6 +32,11 @@ const COPY = {
  * the upgrade flow's in-dialog account step (billing/01); this page exists so
  * accounts can be reached directly and sessions managed. On success it
  * returns to the editor, where the session cookie now applies.
+ *
+ * The job jacket: this is the one chrome surface users meet outside the
+ * editor, so it borrows the preview page's registration marks and sits on the
+ * bench like a proof sheet pulled for inspection (DESIGN.md → Crop Marks).
+ * Depth is declared once — the hairline — never a border+shadow stack.
  */
 export function AuthPage({ mode }: AuthPageProps) {
   const { theme, toggle } = useTheme();
@@ -36,7 +49,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         <Link
           to="/"
           aria-label="PerfectMarkD home"
-          className="select-none px-1 text-[15px] font-semibold tracking-tight"
+          className="touch-target inline-flex select-none items-center rounded-control px-1 text-sm font-semibold tracking-tight outline-offset-2 outline-accent focus-visible:outline-2"
         >
           Perfect<span className="font-mono">Mark</span>D
         </Link>
@@ -46,20 +59,29 @@ export function AuthPage({ mode }: AuthPageProps) {
       </header>
 
       <main className="flex flex-1 items-center justify-center p-6">
-        <div className="w-full max-w-sm rounded-pane border border-hairline bg-surface p-6 shadow-sm">
-          <h1 className="text-lg font-semibold tracking-tight">
-            {copy.heading}
-          </h1>
-          <p className="mt-1 text-xs text-ink-soft">{copy.blurb}</p>
+        <div className="pm-reg-marks relative w-full max-w-sm rounded-pane border border-hairline bg-surface">
+          <span className="pm-reg-host absolute inset-0" aria-hidden="true" />
+          <div className="p-6">
+            <h1 className="text-lg font-semibold tracking-tight">
+              {copy.heading}
+            </h1>
+            <p className="mt-1 text-xs text-ink-soft">{copy.blurb}</p>
 
-          <div className="mt-5">
-            <AuthForm
-              mode={mode}
-              onAuthenticated={(user) => {
-                signedIn(user);
-                navigate('/');
-              }}
-            />
+            <div className="mt-5">
+              <AuthForm
+                mode={mode}
+                onAuthenticated={(user) => {
+                  signedIn(user);
+                  navigate('/');
+                }}
+              />
+            </div>
+
+            {copy.colophon && (
+              <p className="mt-5 border-t border-hairline pt-3 text-[11px] leading-relaxed text-ink-faint">
+                {copy.colophon}
+              </p>
+            )}
           </div>
         </div>
       </main>

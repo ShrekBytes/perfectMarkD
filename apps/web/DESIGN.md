@@ -102,6 +102,8 @@ the one branded typographic moment, "Perfect**Mark**D".
   of fields inside a section, one step below the section head in both weight
   and case.
 - **Micro** (600, 11px, uppercase, `0.025em`): Inspector section headings.
+- **Hint** (400, 11px): field helper text and colophons — quiet guidance, one
+  step below Label in weight.
 - **Footnote** (400, 10px): two instances only, attached to their controls.
 - **Editor code** (400, 13.5px, 1.7): Plex Mono, caret and selection graphite.
 
@@ -283,6 +285,12 @@ L-marks in `--ink-faint`, held 6px off the page edge. Two live on
 `.pm-page-host` (top-right, bottom-left). Pure CSS via `clip-path` polygons —
 no DOM, no images — and they scale with zoom because they ride the zoomed
 frame. Do not remove them; they are the world's one authored moment.
+
+The auth surface (`/login`, `/register`) is the one chrome surface users meet
+outside the editor, so it borrows the same marks as a **proof sheet**: the
+`.pm-reg-marks` / `.pm-reg-host` pair draws the four corners on a panel, and
+the sheet sits centered on the bench the way a canvas page does. Elevation
+stays declared once — the hairline — never a border+shadow stack.
 
 ### Preset Thumbnail
 

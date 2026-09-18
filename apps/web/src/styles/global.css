@@ -151,13 +151,25 @@
    * off the page edge: two on the page frame (::before/::after), two on the
    * page host (.pm-page-host). Pure CSS — no extra DOM, no images — and they
    * scale with the page because they live on the zoomed frame. Ink follows
-   * --ink-faint so dark mode needs no extra rules. */
-  .pm-crop-marks {
+   * --ink-faint so dark mode needs no extra rules.
+   *
+   * The chrome proof sheet (.pm-reg-marks / .pm-reg-host — the auth job
+   * jacket) borrows the same geometry on a panel instead of a page. The
+   * proof-sheet element positions itself, so .pm-reg-host adds only the two
+   * corners the outer pair cannot carry. */
+  .pm-crop-marks,
+  .pm-reg-marks {
     position: relative;
   }
 
   .pm-crop-marks::before,
-  .pm-crop-marks::after {
+  .pm-crop-marks::after,
+  .pm-reg-marks::before,
+  .pm-reg-marks::after,
+  .pm-page-host::before,
+  .pm-page-host::after,
+  .pm-reg-host::before,
+  .pm-reg-host::after {
     content: '';
     position: absolute;
     width: 12px;
@@ -167,14 +179,16 @@
   }
 
   /* Top-left mark: the L opens right-and-down. */
-  .pm-crop-marks::before {
+  .pm-crop-marks::before,
+  .pm-reg-marks::before {
     top: -6px;
     left: -6px;
     clip-path: polygon(0 0, 100% 0, 100% 1.5px, 1.5px 1.5px, 1.5px 100%, 0 100%);
   }
 
   /* Bottom-right mark: the L opens left-and-up. */
-  .pm-crop-marks::after {
+  .pm-crop-marks::after,
+  .pm-reg-marks::after {
     right: -6px;
     bottom: -6px;
     clip-path: polygon(
@@ -187,22 +201,24 @@
     );
   }
 
-  /* The host (pm-page-host) carries the other two corners. */
+  /* The host carries the other two corners: the page host, or the proof
+     sheet's positioned overlay. */
   .pm-page-host {
     position: relative;
   }
 
-  .pm-page-host::before {
-    content: '';
-    position: absolute;
+  /* The proof-sheet host element itself must not intercept clicks: it spans
+     the whole sheet, and the marks it carries are decoration. */
+  .pm-reg-host {
+    pointer-events: none;
+  }
+
+  /* Top-right mark: the L opens left-and-down — horizontal arm along the
+     top, vertical arm down the right edge. */
+  .pm-page-host::before,
+  .pm-reg-host::before {
     top: -6px;
     right: -6px;
-    width: 12px;
-    height: 12px;
-    pointer-events: none;
-    background: var(--ink-faint);
-    /* Top-right mark: the L opens left-and-down — horizontal arm along the
-       top, vertical arm down the right edge. */
     clip-path: polygon(
       0 0,
       100% 0,
@@ -213,15 +229,11 @@
     );
   }
 
-  .pm-page-host::after {
-    content: '';
-    position: absolute;
+  /* Bottom-left mark: the L opens right-and-up. */
+  .pm-page-host::after,
+  .pm-reg-host::after {
     bottom: -6px;
     left: -6px;
-    width: 12px;
-    height: 12px;
-    pointer-events: none;
-    background: var(--ink-faint);
     clip-path: polygon(
       0 0,
       1.5px 0,
