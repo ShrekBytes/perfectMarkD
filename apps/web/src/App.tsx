@@ -1,4 +1,5 @@
 import { AdminPage } from './admin/AdminPage';
+import { AccountPage } from './account/AccountPage';
 import { AuthPage } from './auth/AuthPage';
 import { ExportPage } from './export/ExportPage';
 import { AboutPage } from './pages/AboutPage';
@@ -10,17 +11,19 @@ import { AppShell } from './shell/AppShell';
 
 /**
  * Route switch for the SPA's surfaces (PLAN.md §3): the `/` editor, the
- * static `/pricing`, About, and Privacy pages, the two auth forms
- * (`/login`, `/register`) the upgrade flow uses, the Admin's panel (`/admin`,
- * billing/02), and the hidden `/export` render surface the server's worker
- * loads (server/03, ADR-0003). Unknown paths get the 404 (launch-chrome
- * spec) instead of falling through to the editor.
+ * static `/pricing`, About, and Privacy pages, the Account page (`/account`),
+ * the two auth forms (`/login`, `/register`) the upgrade flow uses, the
+ * Admin's panel (`/admin`, billing/02), and the hidden `/export` render
+ * surface the server's worker loads (server/03, ADR-0003). Unknown paths get
+ * the 404 (launch-chrome spec) instead of falling through to the editor.
  */
 export function App() {
   const route = useRoute();
   switch (route) {
     case 'pricing':
       return <PricingPage />;
+    case 'account':
+      return <AccountPage />;
     case 'about':
       return <AboutPage />;
     case 'privacy':

@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Display vocabulary for the billing surfaces — the upgrade flow, the user's
-// Upgrade status view, and the admin panel (billing/01, billing/02). Mirrors
-// the server's canonical sets — apps/server/src/db/schema.ts owns the truth;
-// this module only labels and validates it for display.
+// Orders (on the Account page), and the admin panel (billing/01, billing/02).
+// Mirrors the server's canonical sets — apps/server/src/db/schema.ts owns the
+// truth; this module only labels and validates it for display.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Coin, Network, OrderStatus, PaymentMethod } from './api';
@@ -49,8 +49,9 @@ export function isValidTxid(value: string): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Order-status display vocabulary, shared by the user's Upgrade status view
-// and the admin queue (billing/02) so both surfaces label states alike.
+// Order-status display vocabulary, shared by the user's Orders list (the
+// Account page) and the admin queue (billing/02) so both surfaces label
+// states alike.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {

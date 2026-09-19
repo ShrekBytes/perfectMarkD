@@ -187,11 +187,11 @@ their net-zero footprint in the 860 arithmetic.
 
 The rule crosses the overlay boundary: menus and menu items (the compact
 overflow, the account dropdown, the Export dropdown), the shared Dialog and its
-close button, the Library drawer, every dialog body (history, upgrade status,
-the upgrade flow, the rename dialog, the print hint), the payment and auth
-fields, the copy buttons, and the quota chip. An overlay is where a phone user
-goes to *act*, so it is not exempt. `e2e/shell-compact.spec.ts` sweeps the
-visible controls at 320px and fails on any box under the floor.
+close button, the Library drawer, every dialog body (the upgrade flow, the
+rename dialog, the print hint), the Account page's fields and rows, the
+payment and auth fields, the copy buttons, and the quota chip. An overlay is
+where a phone user goes to *act*, so it is not exempt. `e2e/shell-compact.spec.ts`
+sweeps the visible controls at 320px and fails on any box under the floor.
 
 The Inspector's 24px field micro-controls stay exempt — 12px text on a 24–27px
 input is the field pattern, not an instrument, and the panel is a column of

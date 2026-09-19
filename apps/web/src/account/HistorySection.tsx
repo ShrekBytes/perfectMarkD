@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { navigate } from '../router';
+import { Link } from '../router';
 import { ApiError } from '../api/client';
-import { Dialog } from '../shell/Dialog';
 import { DownloadIcon, SpinnerIcon } from '../shell/icons';
-import { downloadHistoryPdf, listHistory, type HistoryEntry } from './api';
-import { formatBytes, formatDate } from './format';
-
-interface HistoryDialogProps {
-  onClose: () => void;
-}
+import {
+  downloadHistoryPdf,
+  listHistory,
+  type HistoryEntry,
+} from '../history/api';
+import { formatBytes, formatDate } from '../history/format';
 
 /** Any failure crossing the boundary becomes an ApiError the UI can render. */
 function toApiError(cause: unknown): ApiError {
@@ -21,12 +20,13 @@ function toApiError(cause: unknown): ApiError {
 }
 
 /**
- * Export History (server/05): the user's Server Export PDFs from the last 30
- * days, re-downloadable. Reached from the account menu. A Premium gate
- * rejection (403) gets its own state — the modal is the one place a Pro user
- * meets the tier difference — while other failures stay retryable.
+ * The Account page's Export History section (server/05, moved out of its
+ * dialog): the user's Server Export PDFs from the last 30 days,
+ * re-downloadable. A Premium gate rejection (403) gets its own upsell state —
+ * /pricing is where the upgrade flow starts — while other failures stay
+ * retryable.
  */
-export function HistoryDialog({ onClose }: HistoryDialogProps) {
+export function HistorySection() {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -58,30 +58,29 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
   };
 
   return (
-    <Dialog
-      label="Export history"
-      testId="history-dialog"
-      backdropTestId="history-backdrop"
-      panelClassName="flex max-h-[85vh] w-full max-w-lg flex-col"
-      contentClassName="min-h-0 flex-1 overflow-y-auto"
-      onClose={onClose}
+    <section
+      aria-labelledby="account-history-heading"
+      className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
     >
+      <h2
+        id="account-history-heading"
+        className="text-base font-semibold tracking-tight text-ink"
+      >
+        Export history
+      </h2>
+
       {error && (
-        <div className="text-sm">
+        <div className="mt-3">
           <p role="alert" className="text-xs text-danger">
             {error.message}
           </p>
           {premiumGated ? (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                navigate('/pricing');
-              }}
-              className="touch-target mt-2 h-8 rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
+            <Link
+              to="/pricing"
+              className="touch-target mt-2 inline-flex h-8 items-center rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-2"
             >
               View plans
-            </button>
+            </Link>
           ) : (
             <button
               type="button"
@@ -95,13 +94,13 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
       )}
 
       {!error && entries === null && (
-        <p className="py-6 text-center text-xs text-ink-faint">
+        <p className="mt-3 py-4 text-center text-xs text-ink-faint">
           Loading your exports…
         </p>
       )}
 
       {entries !== null && entries.length === 0 && !error && (
-        <div className="py-6 text-center">
+        <div className="mt-3 py-4 text-center">
           <p className="text-sm text-ink">No exports yet.</p>
           <p className="mx-auto mt-1 max-w-prose text-xs text-ink-soft">
             Server Exports you make on Premium are kept here for 30 days —
@@ -112,7 +111,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
       )}
 
       {entries !== null && entries.length > 0 && !error && (
-        <ul className="space-y-2" data-testid="history-list">
+        <ul className="mt-3 space-y-2" data-testid="history-list">
           {entries.map((entry) => (
             <li
               key={entry.id}
@@ -123,7 +122,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
                 <p className="truncate text-sm font-medium text-ink">
                   {entry.name}
                 </p>
-                <p className="mt-0.5 text-xs text-ink-soft">
+                <p className="mt-0.5 text-xs text-ink-soft tabular-nums">
                   {formatDate(entry.createdAt)} · {entry.pages} pages ·{' '}
                   {formatBytes(entry.sizeBytes)}
                 </p>
@@ -133,7 +132,7 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
                 onClick={() => void download(entry)}
                 disabled={downloadingId !== null}
                 aria-label={`Download ${entry.name}`}
-                className="touch-target flex h-8 shrink-0 items-center gap-1.5 rounded-control border border-hairline px-2.5 text-xs text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-default disabled:opacity-70"
+                className="touch-target flex h-8 shrink-0 items-center gap-1.5 rounded-control border border-hairline px-2.5 text-xs text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-default disabled:opacity-60"
               >
                 {downloadingId === entry.id ? (
                   <SpinnerIcon className="animate-spin" />
@@ -149,6 +148,6 @@ export function HistoryDialog({ onClose }: HistoryDialogProps) {
           </li>
         </ul>
       )}
-    </Dialog>
+    </section>
   );
 }

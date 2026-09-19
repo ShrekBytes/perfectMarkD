@@ -3,9 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { HistoryDialog } from './HistoryDialog';
-
-const onClose = vi.fn();
+import { HistorySection } from './HistorySection';
+import { jsonResponse } from '../testing/json-response';
 
 function entry(overrides: Record<string, unknown> = {}) {
   return {
@@ -17,13 +16,6 @@ function entry(overrides: Record<string, unknown> = {}) {
     expiresAt: '2026-10-10T08:30:00.000Z',
     ...overrides,
   };
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
 }
 
 beforeEach(() => {
@@ -39,7 +31,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('lists the user’s exports newest-first with their metadata', async () => {
+it('lists the user’s exports with their metadata', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string | URL | Request) => {
@@ -61,7 +53,7 @@ it('lists the user’s exports newest-first with their metadata', async () => {
     }),
   );
 
-  render(<HistoryDialog onClose={onClose} />);
+  render(<HistorySection />);
 
   const rows = await screen.findAllByTestId('history-row');
   expect(rows).toHaveLength(2);
@@ -103,7 +95,7 @@ it('downloads an entry through the object-URL anchor flow', async () => {
     revokeObjectURL: vi.fn(),
   });
 
-  render(<HistoryDialog onClose={onClose} />);
+  render(<HistorySection />);
   await user.click(await screen.findByRole('button', { name: /Download/ }));
 
   await waitFor(() => {
@@ -130,14 +122,15 @@ it('offers the plans when the server rejects a non-Premium user', async () => {
     ),
   );
 
-  render(<HistoryDialog onClose={onClose} />);
+  render(<HistorySection />);
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
     /part of Premium/i,
   );
-  expect(
-    screen.getByRole('button', { name: 'View plans' }),
-  ).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'View plans' })).toHaveAttribute(
+    'href',
+    '/pricing',
+  );
 });
 
 it('shows an empty state until the first Premium export exists', async () => {
@@ -146,9 +139,11 @@ it('shows an empty state until the first Premium export exists', async () => {
     vi.fn(() => Promise.resolve(jsonResponse(200, { entries: [] }))),
   );
 
-  render(<HistoryDialog onClose={onClose} />);
+  render(<HistorySection />);
 
   expect(await screen.findByText('No exports yet.')).toBeInTheDocument();
+  // The empty state explains what History keeps, instead of a blank list.
+  expect(screen.getByText(/kept here for 30 days/)).toBeInTheDocument();
 });
 
 it('recovers from a failed load via Retry', async () => {
@@ -162,7 +157,7 @@ it('recovers from a failed load via Retry', async () => {
     }),
   );
 
-  render(<HistoryDialog onClose={onClose} />);
+  render(<HistorySection />);
   expect(await screen.findByRole('alert')).toHaveTextContent(/network down/i);
 
   failing = false;

@@ -13,6 +13,7 @@ import { useEffect, useState, type AnchorHTMLAttributes } from 'react';
 export type Route =
   | 'editor'
   | 'pricing'
+  | 'account'
   | 'login'
   | 'register'
   | 'admin'
@@ -28,6 +29,7 @@ export function routeForPath(pathname: string): Route {
   // other unknown path now gets the 404.
   if (pathname === '/') return 'editor';
   if (pathname === '/pricing') return 'pricing';
+  if (pathname === '/account') return 'account';
   if (pathname === '/login') return 'login';
   if (pathname === '/register') return 'register';
   if (pathname === '/admin') return 'admin';

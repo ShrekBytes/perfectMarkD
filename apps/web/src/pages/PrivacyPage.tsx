@@ -1,4 +1,3 @@
-import { Link } from '../router';
 import { PageHeader } from './PageHeader';
 import { Footer } from './Footer';
 import { GITHUB_URL } from './site-links';

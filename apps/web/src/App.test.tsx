@@ -5,10 +5,15 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { resetDocumentStoreForTests } from './documents/store';
+import {
+  resetAccountStoreForTests,
+  useAccountStore,
+} from './auth/account-store';
 import { stubBroadcastChannel } from './testing/stub-broadcast-channel';
 import { stubClientRects } from './testing/stub-client-rects';
 import { stubIndexedDB } from './testing/stub-idb';
 import { stubSystemTheme } from './testing/match-media';
+import { jsonResponse } from './testing/json-response';
 
 // The editor surface pulls the real sample document (mermaid fence) — keep the
 // heavy DOM-timing bundle out of component tests, as in AppShell.test.tsx.
@@ -25,6 +30,7 @@ beforeEach(() => {
   stubBroadcastChannel().reset();
   stubClientRects();
   resetDocumentStoreForTests();
+  resetAccountStoreForTests();
   window.history.pushState({}, '', '/');
 });
 
@@ -69,5 +75,35 @@ it.each([
 
   expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
   // The editor must not mount behind the form.
+  expect(screen.queryByTestId('export-split')).not.toBeInTheDocument();
+});
+
+it('renders the account page at /account', async () => {
+  window.history.pushState({}, '', '/account');
+  useAccountStore.setState({
+    user: { email: 'reader@example.com', isAdmin: false },
+    status: 'ready',
+    entitlement: { plan: 'pro', expiresAt: '2026-10-15T00:00:00.000Z' },
+    quota: { used: 1, limit: 10 },
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string | URL | Request) => {
+      if (String(url) === '/api/orders') {
+        return Promise.resolve(jsonResponse(200, { orders: [] }));
+      }
+      if (String(url) === '/api/history') {
+        return Promise.resolve(jsonResponse(200, { entries: [] }));
+      }
+      return Promise.reject(new Error('unexpected fetch'));
+    }),
+  );
+  render(<App />);
+
+  expect(
+    await screen.findByRole('heading', { name: 'Account' }),
+  ).toBeInTheDocument();
+  expect(await screen.findByText('Pro')).toBeInTheDocument();
+  // The editor must not mount behind the page.
   expect(screen.queryByTestId('export-split')).not.toBeInTheDocument();
 });

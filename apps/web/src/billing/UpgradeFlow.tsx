@@ -27,7 +27,7 @@ interface UpgradeFlowProps {
  * account or sign in if needed → the server creates the Order → payment
  * instructions (Reference Code, wallet, network warning) → "I've sent the
  * payment" details → submitted. Everything after the Order exists is also
- * reachable later from the Upgrade status view.
+ * reachable later from the Account page's Orders section.
  */
 export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
   const user = useAccountStore((state) => state.user);
@@ -246,7 +246,7 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
             onClick={onClose}
             className="touch-target mt-2 h-9 w-full rounded-control border border-hairline text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
-            Pay later — the order is saved in Upgrade status
+            Pay later — the order is saved on the Account page
           </button>
         </div>
       )}
@@ -282,9 +282,8 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
           </h3>
           <p className="mx-auto mt-2 max-w-prose text-xs text-ink-soft">
             Verification is manual, so this can take a little while. Follow it
-            under <span className="text-ink">Upgrade status</span> in the
-            account menu — if anything doesn't match, you'll see the reason and
-            can resubmit.
+            on the <span className="text-ink">Account page</span> — if anything
+            doesn't match, you'll see the reason and can resubmit.
           </p>
 
           <button

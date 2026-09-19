@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from '../router';
+import { Link, navigate } from '../router';
 import { useAccountStore } from '../auth/account-store';
 import { useEscapeLayer, useMenuKeyboard } from './focus';
 
-interface AccountMenuProps {
-  /** Opens the Upgrade status dialog (owned by the shell). */
-  onOpenUpgradeStatus: () => void;
-  /** Opens the Export History dialog (server/05, owned by the shell). */
-  onOpenHistory: () => void;
+interface AccountMenuItemsProps {
+  onClose: () => void;
 }
 
 /** Shared item styling for both menu renderings (account dropdown, overflow). */
@@ -18,13 +15,9 @@ const itemClasses =
  * The account entries, rendered as menu items so both the desktop account
  * dropdown and the compact overflow menu can host them without duplicating
  * the signed-in / signed-out logic. `onClose` fires before the item's own
- * action so the hosting menu is never left open behind a dialog.
+ * action so the hosting menu is never left open behind a page swap.
  */
-export function AccountMenuItems({
-  onOpenUpgradeStatus,
-  onOpenHistory,
-  onClose,
-}: AccountMenuProps & { onClose: () => void }) {
+export function AccountMenuItems({ onClose }: AccountMenuItemsProps) {
   const user = useAccountStore((state) => state.user);
   const status = useAccountStore((state) => state.status);
   const signOut = useAccountStore((state) => state.signOut);
@@ -46,40 +39,24 @@ export function AccountMenuItems({
       <p className="truncate px-3 pb-1 pt-2 text-xs text-ink-faint">
         {user.email}
       </p>
-      <button
+      <Link
+        to="/account"
         role="menuitem"
-        type="button"
-        onClick={() => {
-          onClose();
-          onOpenUpgradeStatus();
-        }}
+        onClick={onClose}
         className={itemClasses}
       >
-        Upgrade status
-      </button>
+        Account
+      </Link>
       <button
         role="menuitem"
         type="button"
         onClick={() => {
           onClose();
-          onOpenHistory();
-        }}
-        className={itemClasses}
-      >
-        Export history
-        <span
-          title="Server Export PDFs are kept for 30 days"
-          className="ml-auto text-xs text-ink-faint"
-        >
-          kept 30 days
-        </span>
-      </button>
-      <button
-        role="menuitem"
-        type="button"
-        onClick={() => {
-          onClose();
-          void signOut();
+          void signOut().then(() => {
+            // After sign-out the user returns to the editor (the account
+            // spec) — already there when the menu lives on the editor shell.
+            if (window.location.pathname !== '/') navigate('/');
+          });
         }}
         className={itemClasses}
       >
@@ -91,13 +68,11 @@ export function AccountMenuItems({
 
 /**
  * The top bar's account control (billing/01): a sign-in link when signed out,
- * and when signed in a menu with the account email, the Upgrade status entry
- * point, Export History (Premium's re-downloadable exports), and sign-out.
+ * and when signed in a menu with the account email, the Account page (where
+ * the plan's Orders, Export History, and the password form live), and
+ * sign-out.
  */
-export function AccountMenu({
-  onOpenUpgradeStatus,
-  onOpenHistory,
-}: AccountMenuProps) {
+export function AccountMenu() {
   const user = useAccountStore((state) => state.user);
   const status = useAccountStore((state) => state.status);
   const [open, setOpen] = useState(false);
@@ -162,11 +137,7 @@ export function AccountMenu({
           aria-label="Account"
           className="absolute right-0 top-full z-50 mt-1.5 w-48 overflow-hidden rounded-pane border border-hairline bg-surface py-1 shadow-lg"
         >
-          <AccountMenuItems
-            onOpenUpgradeStatus={onOpenUpgradeStatus}
-            onOpenHistory={onOpenHistory}
-            onClose={() => setOpen(false)}
-          />
+          <AccountMenuItems onClose={() => setOpen(false)} />
         </div>
       )}
     </div>

@@ -21,6 +21,7 @@ afterEach(() => {
 describe('routeForPath', () => {
   it('maps known paths, with the editor at /', () => {
     expect(routeForPath('/pricing')).toBe('pricing');
+    expect(routeForPath('/account')).toBe('account');
     expect(routeForPath('/login')).toBe('login');
     expect(routeForPath('/register')).toBe('register');
     expect(routeForPath('/admin')).toBe('admin');

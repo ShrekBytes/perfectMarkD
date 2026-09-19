@@ -10,11 +10,9 @@ import {
   useAccountStore,
 } from '../auth/account-store';
 
-const onOpenUpgradeStatus = vi.fn();
-const onOpenHistory = vi.fn();
-
 beforeEach(() => {
   resetAccountStoreForTests();
+  window.history.pushState({}, '', '/');
 });
 
 afterEach(() => {
@@ -23,12 +21,7 @@ afterEach(() => {
 });
 
 it('renders nothing until the session check resolves', () => {
-  const { container } = render(
-    <AccountMenu
-      onOpenUpgradeStatus={onOpenUpgradeStatus}
-      onOpenHistory={onOpenHistory}
-    />,
-  );
+  const { container } = render(<AccountMenu />);
 
   expect(container).toBeEmptyDOMElement();
 });
@@ -36,71 +29,83 @@ it('renders nothing until the session check resolves', () => {
 it('offers sign-in when signed out', async () => {
   useAccountStore.setState({ user: null, status: 'ready' });
 
-  render(
-    <AccountMenu
-      onOpenUpgradeStatus={onOpenUpgradeStatus}
-      onOpenHistory={onOpenHistory}
-    />,
-  );
+  render(<AccountMenu />);
 
   const link = screen.getByRole('link', { name: 'Sign in' });
   expect(link).toHaveAttribute('href', '/login');
 });
 
-it('signed in: opens a menu with upgrade status, history, and sign-out', async () => {
+it('signed in: opens a menu with the Account page and sign-out', async () => {
   const user = userEvent.setup();
   useAccountStore.setState({
     user: { email: 'reader@example.com', isAdmin: false },
     status: 'ready',
   });
 
-  render(
-    <AccountMenu
-      onOpenUpgradeStatus={onOpenUpgradeStatus}
-      onOpenHistory={onOpenHistory}
-    />,
-  );
+  render(<AccountMenu />);
 
   await user.click(screen.getByRole('button', { name: 'Account menu' }));
 
   const menu = screen.getByRole('menu', { name: 'Account' });
   expect(menu).toHaveTextContent('reader@example.com');
+  const account = screen.getByRole('menuitem', { name: 'Account' });
+  expect(account).toHaveAttribute('href', '/account');
+  // The dialogs are gone — everything account-owned lives on the Account page.
   expect(
-    screen.getByRole('menuitem', { name: /Upgrade status/ }),
-  ).toBeInTheDocument();
+    screen.queryByRole('menuitem', { name: /Upgrade status/ }),
+  ).not.toBeInTheDocument();
   expect(
-    screen.getByRole('menuitem', { name: /Export history/ }),
-  ).toBeInTheDocument();
+    screen.queryByRole('menuitem', { name: /Export history/ }),
+  ).not.toBeInTheDocument();
   expect(
     screen.getByRole('menuitem', { name: 'Sign out' }),
   ).toBeInTheDocument();
-
-  await user.click(screen.getByRole('menuitem', { name: /Upgrade status/ }));
-  expect(onOpenUpgradeStatus).toHaveBeenCalledTimes(1);
-
-  // Opening the status dialog closed the menu; open it again for History.
-  await user.click(screen.getByRole('button', { name: 'Account menu' }));
-  await user.click(screen.getByRole('menuitem', { name: /Export history/ }));
-  expect(onOpenHistory).toHaveBeenCalledTimes(1);
 });
 
-it('signs out from the menu — clearing the account', async () => {
+it('the Account item reaches the Account page in one click', async () => {
   const user = userEvent.setup();
+  useAccountStore.setState({
+    user: { email: 'reader@example.com', isAdmin: false },
+    status: 'ready',
+  });
+
+  render(<AccountMenu />);
+  await user.click(screen.getByRole('button', { name: 'Account menu' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Account' }));
+
+  expect(window.location.pathname).toBe('/account');
+});
+
+it('signs out from the menu — clearing the account and returning to the editor', async () => {
+  const user = userEvent.setup();
+  window.history.pushState({}, '', '/account');
   useAccountStore.setState({
     user: { email: 'reader@example.com', isAdmin: false },
     status: 'ready',
   });
   const logout = vi.spyOn(authApi, 'logout').mockResolvedValue(undefined);
 
-  render(
-    <AccountMenu
-      onOpenUpgradeStatus={onOpenUpgradeStatus}
-      onOpenHistory={onOpenHistory}
-    />,
-  );
+  render(<AccountMenu />);
   await user.click(screen.getByRole('button', { name: 'Account menu' }));
   await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
 
   await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
   expect(useAccountStore.getState().user).toBeNull();
+  await waitFor(() => expect(window.location.pathname).toBe('/'));
+});
+
+it('signs out on the editor without adding a history entry', async () => {
+  const user = userEvent.setup();
+  useAccountStore.setState({
+    user: { email: 'reader@example.com', isAdmin: false },
+    status: 'ready',
+  });
+  vi.spyOn(authApi, 'logout').mockResolvedValue(undefined);
+
+  render(<AccountMenu />);
+  await user.click(screen.getByRole('button', { name: 'Account menu' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+
+  await waitFor(() => expect(useAccountStore.getState().user).toBeNull());
+  expect(window.location.pathname).toBe('/');
 });

@@ -10,8 +10,6 @@ import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
 import { useDocumentStore } from '../documents/store';
 import { useAccountStore } from '../auth/account-store';
-import { UpgradeStatusDialog } from '../billing/UpgradeStatusDialog';
-import { HistoryDialog } from '../history/HistoryDialog';
 import { EditorPane } from '../editor/EditorPane';
 import { DeleteToast } from '../library/DeleteToast';
 import { LibraryPanel } from '../library/LibraryPanel';
@@ -64,8 +62,6 @@ export function AppShell() {
   const importDocument = useDocumentStore((state) => state.importDocument);
 
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [upgradeStatusOpen, setUpgradeStatusOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   /** Names of files from the last drop that were not Markdown. */
   const [rejectedDrop, setRejectedDrop] = useState<string[] | null>(null);
 
@@ -128,8 +124,6 @@ export function AppShell() {
         onOpenLibrary={() => setLibraryOpen(true)}
         theme={theme}
         onToggleTheme={toggle}
-        onOpenUpgradeStatus={() => setUpgradeStatusOpen(true)}
-        onOpenHistory={() => setHistoryOpen(true)}
         mode={pane.mode}
       />
 
@@ -287,10 +281,6 @@ export function AppShell() {
       )}
 
       {libraryOpen && <LibraryPanel onClose={() => setLibraryOpen(false)} />}
-      {upgradeStatusOpen && (
-        <UpgradeStatusDialog onClose={() => setUpgradeStatusOpen(false)} />
-      )}
-      {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
       {rejectedDrop && (
         <div
           role="status"

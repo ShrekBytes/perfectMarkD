@@ -12,8 +12,6 @@ import {
 const handlers = {
   onOpenLibrary: vi.fn(),
   onToggleTheme: vi.fn(),
-  onOpenUpgradeStatus: vi.fn(),
-  onOpenHistory: vi.fn(),
 };
 
 function renderMenu(theme: 'light' | 'dark' = 'light') {

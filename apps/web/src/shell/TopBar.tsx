@@ -21,10 +21,6 @@ interface TopBarProps {
   onOpenLibrary: () => void;
   theme: Theme;
   onToggleTheme: () => void;
-  /** Opens the Upgrade status dialog (billing/01). */
-  onOpenUpgradeStatus: () => void;
-  /** Opens the Export History dialog (server/05). */
-  onOpenHistory: () => void;
   /** The shell's layout mode. Compact folds the secondary cluster — Library,
    *  theme, quota, account — into the overflow menu and hands the autosave
    *  readout to the switcher row, so the bar can hold the document name and
@@ -57,8 +53,6 @@ export function TopBar({
   onOpenLibrary,
   theme,
   onToggleTheme,
-  onOpenUpgradeStatus,
-  onOpenHistory,
   mode,
 }: TopBarProps) {
   const compact = mode === 'compact';
@@ -92,8 +86,6 @@ export function TopBar({
               onOpenLibrary={onOpenLibrary}
               theme={theme}
               onToggleTheme={onToggleTheme}
-              onOpenUpgradeStatus={onOpenUpgradeStatus}
-              onOpenHistory={onOpenHistory}
             />
             {/* The primary action stays in the bar at every width — it never
                 hides behind the overflow. */}
@@ -179,10 +171,7 @@ export function TopBar({
                 print flow, one-time hint, and toasts all live inside it. */}
             <ExportSplitButton />
 
-            <AccountMenu
-              onOpenUpgradeStatus={onOpenUpgradeStatus}
-              onOpenHistory={onOpenHistory}
-            />
+            <AccountMenu />
           </div>
         </>
       )}

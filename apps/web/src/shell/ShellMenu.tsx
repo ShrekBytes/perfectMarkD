@@ -9,8 +9,6 @@ interface ShellMenuProps {
   onOpenLibrary: () => void;
   theme: Theme;
   onToggleTheme: () => void;
-  onOpenUpgradeStatus: () => void;
-  onOpenHistory: () => void;
 }
 
 const itemClasses =
@@ -25,13 +23,7 @@ const itemClasses =
  * The primary action, Export, deliberately stays out: it is the product's
  * job and never hides behind a menu.
  */
-export function ShellMenu({
-  onOpenLibrary,
-  theme,
-  onToggleTheme,
-  onOpenUpgradeStatus,
-  onOpenHistory,
-}: ShellMenuProps) {
+export function ShellMenu({ onOpenLibrary, theme, onToggleTheme }: ShellMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -119,11 +111,7 @@ export function ShellMenu({
             aria-hidden="true"
             className="my-1 h-px bg-hairline"
           />
-          <AccountMenuItems
-            onOpenUpgradeStatus={onOpenUpgradeStatus}
-            onOpenHistory={onOpenHistory}
-            onClose={() => setOpen(false)}
-          />
+          <AccountMenuItems onClose={() => setOpen(false)} />
         </div>
       )}
     </div>

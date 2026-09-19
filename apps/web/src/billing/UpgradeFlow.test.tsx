@@ -298,7 +298,7 @@ describe('instructions step', () => {
     expect(screen.getByTestId('upgrade-step-details')).toBeInTheDocument();
   });
 
-  it('offers to pay later — the order survives in Upgrade status', async () => {
+  it('offers to pay later — the order survives on the Account page', async () => {
     const user = userEvent.setup();
     signIn();
     render(<UpgradeFlow plan="pro" onClose={onClose} />);

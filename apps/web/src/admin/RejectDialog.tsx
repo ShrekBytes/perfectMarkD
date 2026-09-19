@@ -11,7 +11,7 @@ interface RejectDialogProps {
 
 /**
  * The Reject decision (billing/02). The reason is the point of rejecting —
- * it is what the user reads in their Upgrade status view and what they
+ * it is what the user reads on their Account page and what they
  * correct on resubmission, so the dialog refuses to send without one.
  */
 export function RejectDialog({
