@@ -97,3 +97,11 @@ _Avoid_: settings, sidebar
 **Library**:
 The panel listing the user's local Documents (rename, duplicate, delete, import, export).
 _Avoid_: file manager, recents
+
+**Account**:
+The signed-in user's space for plan and Quota status, Orders, Export History, and password management. Distinct from the account-less Free Tier and from the local Library.
+_Avoid_: profile, dashboard, workspace
+
+**Docs**:
+The single page explaining every feature and how to use the editor. Distinct from the onboarding sample Document, which demos the engine inside the editor itself.
+_Avoid_: tutorial, guide, help
