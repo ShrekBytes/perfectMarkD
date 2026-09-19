@@ -1,6 +1,6 @@
 # Launch chrome: shared footer, About, Privacy, 404
 
-Status: ready-for-agent
+Status: ready-for-human
 
 ## Problem Statement
 
@@ -68,3 +68,7 @@ hatch); and a minimal 404 page with a link back to the editor.
 
 - ADR-0007 records the no-landing-page decision and when to revisit it.
 - This spec has no dependencies; `docs-page` depends on its Footer. Together with `account-page` (independent), the three specs cover the launch work.
+
+## Comments
+
+- Implemented in commit 3ba10b1 (feat(web): shared footer, About and Privacy pages, 404 for unknown paths). All 15 stories covered; e2e smoke tests in `apps/web/e2e/launch-chrome.spec.ts` (7 passing); typecheck, lint, full unit suite (1035 tests), and full e2e suite (42 tests) green. Verified in a real browser (About, Privacy, 404, pricing screenshots). Contact email `shrebytes@duck.com` confirmed by the Admin during implementation. Two-axis code review run; its actionable findings (Headline tier in DESIGN.md, footer touch targets, CTA button spec alignment, shared PageHeader/site-links modules, the premature "only analytics are self-hosted" claim) were addressed; remaining notes: trailing-slash deep links (`/about/`) land on the 404 (consistent with the case-sensitivity treatment), and the shared header is not yet used by the auth/pricing pages (out of scope here).
