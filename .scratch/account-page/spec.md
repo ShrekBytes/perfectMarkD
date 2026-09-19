@@ -1,6 +1,6 @@
 # Account page
 
-Status: ready-for-agent
+Status: ready-for-human
 
 ## Problem Statement
 
@@ -77,3 +77,8 @@ signed out) and the two dialogs it used to open are deleted.
 - The **Docs** menu item is added to the AccountMenu by the `docs-page` spec, not this one.
 - The **Account** term is now defined in the project glossary (`CONTEXT.md`), distinct from the account-less Free Tier and from the local Library.
 - This spec is independent of `launch-chrome` and `docs-page`; it can be implemented in any order.
+
+## Comments
+
+- Implemented in commit f38674d (feat(web): Account page — plan, quota, orders, history, password in one place). All 21 stories covered; component tests colocated with the page (PlanSummary, OrdersSection, HistorySection, ChangePasswordForm, AccountPage, plus the updated AccountMenu tests) and the /account route test — typecheck, lint, the full unit suite (1059 tests), and the full e2e suite (42 tests) green. Verified in a real browser: the signed-out prompt, the Free plan with the upgrade CTA, the Pro plan with Plan Expiry + Quota readout, the expired state with its Ended date, the Orders badges + pending strip + the rejected reason when expanded, the change-password form against the live API (wrong-current and too-short feedback, then a real change), and phone-width single-column use.
+- Two-axis code review run; its actionable findings were addressed in the same commit: the History download button's disabled opacity (70 → the system's 60), the ended-plan date now folds the verified Orders the way the server stacks grants (apps/server/src/admin/entitlement.ts) with day-of-month clamping, tabular-nums on the Orders/History data lines, a shared `jsonResponse` test helper, and the stale "Upgrade status" copy in the upgrade flow updated to the Account page. Remaining judgement calls, kept deliberately: the two test files' Order fixtures keep per-context defaults (colocated per the Testing Decisions), the Orders section flattens load errors to their message while History keeps the `ApiError` (its 403 gate needs the status), and the post-sign-out navigation lives in the menu item rather than the account store.
