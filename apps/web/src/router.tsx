@@ -2,26 +2,43 @@ import { useEffect, useState, type AnchorHTMLAttributes } from 'react';
 
 /**
  * Minimal History-API routing for the SPA's few surfaces (PLAN.md §3: `/`
- * editor, `/pricing`, and the admin panel). No router dependency — the
- * surfaces are few and static. Same-tab pushes fire a custom event because
- * popstate only covers browser navigation; deep links work wherever the host
- * serves index.html as the SPA fallback (Vite dev does by default; the
- * server's static serving config handles it in server/06).
+ * editor, `/pricing`, the static About and Privacy pages, and the admin
+ * panel). No router dependency — the surfaces are few and static. Same-tab
+ * pushes fire a custom event because popstate only covers browser navigation;
+ * deep links work wherever the host serves index.html as the SPA fallback
+ * (Vite dev does by default; the server's static serving config handles it in
+ * server/06). Unknown paths get the 404 page (launch-chrome spec).
  */
 
 export type Route =
-  'editor' | 'pricing' | 'login' | 'register' | 'admin' | 'export';
+  | 'editor'
+  | 'pricing'
+  | 'login'
+  | 'register'
+  | 'admin'
+  | 'export'
+  | 'about'
+  | 'privacy'
+  | 'not-found';
 
 const NAVIGATE_EVENT = 'perfectmarkd:navigate';
 
 export function routeForPath(pathname: string): Route {
+  // The editor is the homepage (ADR-0007) — matched explicitly, since every
+  // other unknown path now gets the 404.
+  if (pathname === '/') return 'editor';
   if (pathname === '/pricing') return 'pricing';
   if (pathname === '/login') return 'login';
   if (pathname === '/register') return 'register';
   if (pathname === '/admin') return 'admin';
+  if (pathname === '/about') return 'about';
+  if (pathname === '/privacy') return 'privacy';
   // Hidden render surface the server's worker loads (server/03, ADR-0003).
   if (pathname === '/export') return 'export';
-  return 'editor';
+  // Unknown paths get the 404 instead of falling through to a fresh editor
+  // (launch-chrome spec): a fresh editor reads as broken rather than
+  // intentional.
+  return 'not-found';
 }
 
 /** Pushes a new history entry and notifies useRoute() subscribers in this tab. */

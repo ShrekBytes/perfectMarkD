@@ -2,21 +2,16 @@ import { Link, navigate } from '../router';
 import { useTheme } from '../theme/theme';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { UpgradeDialog } from '../billing/UpgradeDialog';
+import { Footer } from '../pages/Footer';
 import { PlanComparison } from './PlanComparison';
 import { DURATION_NOTE } from './plans';
 import { useState } from 'react';
 
-// Repo links for the footer. The project's own GitHub org/repo is one of
-// PLAN.md §7's open action items — flip these constants when it's decided.
-export const GITHUB_URL = 'https://github.com/ShrekBytes/perfectMarkD';
-export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
-export const PLUGIN_URL = 'https://github.com/ShrekBytes/advanced-pdf-export';
-
 /**
  * The /pricing page: three-column plan comparison whose paid CTAs open the
- * upgrade flow (billing/01), the AGPL note, and the footer's GitHub + license
- * badge links. Static content in the SPA; renders entirely from the shared
- * plans module.
+ * upgrade flow (billing/01), the AGPL note, and the shared Footer's GitHub +
+ * license badge links. Static content in the SPA; renders entirely from the
+ * shared plans module.
  */
 export function PricingPage() {
   const { theme, toggle } = useTheme();
@@ -80,26 +75,7 @@ export function PricingPage() {
         </section>
       </main>
 
-      <footer className="flex flex-wrap items-center gap-3 border-t border-hairline bg-surface px-4 py-4 text-xs text-ink-soft">
-        <a
-          href={LICENSE_URL}
-          className="rounded-control border border-hairline bg-canvas px-2 py-0.5 font-medium text-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover focus-visible:outline-2"
-        >
-          AGPL-3.0
-        </a>
-        <a
-          href={GITHUB_URL}
-          className="transition-colors duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2"
-        >
-          GitHub
-        </a>
-        <a
-          href={PLUGIN_URL}
-          className="ml-auto transition-colors duration-150 outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2"
-        >
-          Successor to the Advanced PDF Export plugin
-        </a>
-      </footer>
+      <Footer />
 
       {upgradePlan && (
         <UpgradeDialog

@@ -19,15 +19,24 @@ afterEach(() => {
 });
 
 describe('routeForPath', () => {
-  it('maps known paths and falls back to the editor', () => {
+  it('maps known paths, with the editor at /', () => {
     expect(routeForPath('/pricing')).toBe('pricing');
     expect(routeForPath('/login')).toBe('login');
     expect(routeForPath('/register')).toBe('register');
     expect(routeForPath('/admin')).toBe('admin');
+    expect(routeForPath('/about')).toBe('about');
+    expect(routeForPath('/privacy')).toBe('privacy');
     expect(routeForPath('/')).toBe('editor');
     // /export is the hidden route the server's worker loads (server/03,
     // ADR-0003) — a real route, not the editor fallback.
     expect(routeForPath('/export')).toBe('export');
+  });
+
+  it('gives unknown paths the 404 instead of the editor', () => {
+    // launch-chrome spec: a fresh editor on a mistyped address reads as
+    // broken rather than intentional.
+    expect(routeForPath('/this/path/does/not/exist')).toBe('not-found');
+    expect(routeForPath('/Pricing')).toBe('not-found');
   });
 });
 

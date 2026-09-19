@@ -91,8 +91,8 @@ the one branded typographic moment, "Perfect**Mark**D".
 
 ### Hierarchy
 
-- **Headline** (600, 24px): the pricing page's `h1` only.
-- **Subhead** (600, 18px): auth page `h1`, empty-state glyphs.
+- **Headline** (600, 24px): the static pages' `h1` — pricing, About, Privacy.
+- **Subhead** (600, 18px): auth page and 404 `h1`, empty-state glyphs.
 - **Section head** (600, 16px): upgrade step panels, plan column names.
 - **Wordmark** (600, 14px): "PerfectMarkD", "Mark" in Plex Mono.
 - **Title** (600, 14px): dialog and panel headings, list row names.

@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { stubSystemTheme } from '../testing/match-media';
-import { GITHUB_URL, LICENSE_URL, PLUGIN_URL } from './PricingPage';
+import { GITHUB_URL, LICENSE_URL, PLUGIN_URL } from '../pages/site-links';
 import { PricingPage } from './PricingPage';
 
 beforeEach(() => {
