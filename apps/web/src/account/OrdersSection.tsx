@@ -110,7 +110,7 @@ export function OrdersSection({
                       <p className="font-mono text-sm font-semibold text-ink">
                         {order.referenceCode}
                       </p>
-                      <p className="mt-0.5 text-xs text-ink-soft tabular-nums">
+                      <p className="mt-0.5 font-mono text-xs text-ink-soft tabular-nums">
                         {order.plan} · {order.durationMonths}{' '}
                         {order.durationMonths === 1 ? 'month' : 'months'}
                         {' · '}

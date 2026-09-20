@@ -61,6 +61,8 @@ interface PlanSummaryProps {
   quota: { used: number; limit: number } | null;
   /** The user's Orders — the ended plan's source once the Entitlement is gone. */
   orders: Order[] | null;
+  /** The Orders request's failure, so Free-ness doesn't wait on the list. */
+  ordersError: string | null;
 }
 
 /**
@@ -69,10 +71,17 @@ interface PlanSummaryProps {
  * Entitlement is gone, the Server Export quota used vs limit (comps are
  * already folded into the limit the server reports), and the upgrade CTA
  * whenever no Entitlement is active — /pricing is where the upgrade flow
- * starts. The plan row renders only once its data exists: no wrong state
- * flashes while the Orders load.
+ * starts. Free-ness never waits on the Orders request: without an active
+ * Entitlement the row shows a loading line while the list is in flight and
+ * Free as soon as it lands — or fails — because /api/me already settled the
+ * plan; only the ended plan's name and date need the Order history.
  */
-export function PlanSummary({ entitlement, quota, orders }: PlanSummaryProps) {
+export function PlanSummary({
+  entitlement,
+  quota,
+  orders,
+  ordersError,
+}: PlanSummaryProps) {
   const last = entitlement ? null : orders ? lastPlanPeriod(orders) : null;
   const ended = last !== null && last.endedAt.getTime() <= Date.now();
 
@@ -122,14 +131,20 @@ export function PlanSummary({ entitlement, quota, orders }: PlanSummaryProps) {
         </div>
       )}
 
-      {!entitlement && !last && orders !== null && (
-        <div className="mt-3">
-          <p className="text-sm font-semibold text-ink">Free</p>
-          <p className="mt-0.5 text-xs text-ink-soft">
-            No paid plan — upgrades start from the plans.
-          </p>
-        </div>
+      {!entitlement && !last && orders === null && ordersError === null && (
+        <p className="mt-3 text-xs text-ink-faint">Loading your plan…</p>
       )}
+
+      {!entitlement &&
+        !last &&
+        (orders !== null || ordersError !== null) && (
+          <div className="mt-3">
+            <p className="text-sm font-semibold text-ink">Free</p>
+            <p className="mt-0.5 text-xs text-ink-soft">
+              No paid plan — upgrades start from the plans.
+            </p>
+          </div>
+        )}
 
       {quota && (entitlement || quota.limit > 0) && (
         <div className="mt-4">
@@ -138,7 +153,7 @@ export function PlanSummary({ entitlement, quota, orders }: PlanSummaryProps) {
           </p>
           <p
             data-testid="account-quota"
-            className="mt-0.5 text-xs text-ink tabular-nums"
+            className="mt-0.5 font-mono text-xs text-ink tabular-nums"
           >
             {quota.used} of {quota.limit} used this period
           </p>
@@ -151,7 +166,7 @@ export function PlanSummary({ entitlement, quota, orders }: PlanSummaryProps) {
             to="/pricing"
             className="touch-target inline-flex h-8 items-center rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-2"
           >
-            See plans
+            View plans
           </Link>
         </div>
       )}

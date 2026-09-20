@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { ApiError, FALLBACK_CODE } from '../api/client';
+import { ApiError, errorToMessage, FALLBACK_CODE } from '../api/client';
 import { changePassword } from '../auth/api';
 
 /** The policy the server enforces on new passwords (server/02). */
@@ -15,7 +15,8 @@ const INPUT_CLASS =
 /** Name the problem and the recovery (DESIGN.md → Do's). The server's own
  *  message wins when it carries one; the generic strings are ours. A 5xx or
  *  the fallback marker (a body the client couldn't read) is never about the
- *  input, so no field is flagged. */
+ *  input, so no field is flagged; everything else falls to the shared mapper
+ *  (the offline case included). */
 function messageFor(cause: unknown): { message: string; fieldError: boolean } {
   if (cause instanceof ApiError) {
     if (cause.status >= 500 || cause.code === FALLBACK_CODE) {
@@ -29,12 +30,7 @@ function messageFor(cause: unknown): { message: string; fieldError: boolean } {
       fieldError: cause.status === 400 || cause.status === 401,
     };
   }
-  // fetch rejects with a TypeError when the request never reaches the API —
-  // the API process is down, or the device is offline.
-  return {
-    message: "Couldn't reach the server. Check your connection and try again.",
-    fieldError: false,
-  };
+  return { message: errorToMessage(cause), fieldError: false };
 }
 
 /**

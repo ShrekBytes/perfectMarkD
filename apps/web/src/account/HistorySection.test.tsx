@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { HistorySection } from './HistorySection';
@@ -108,7 +108,7 @@ it('downloads an entry through the object-URL anchor flow', async () => {
   ).toBe(true);
 });
 
-it('offers the plans when the server rejects a non-Premium user', async () => {
+it('offers the plans as a neutral state when the server gates a non-Premium user', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(() =>
@@ -124,13 +124,30 @@ it('offers the plans when the server rejects a non-Premium user', async () => {
 
   render(<HistorySection />);
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    /part of Premium/i,
-  );
+  // The gate is an upsell, not a failure: same shape as the empty state, no
+  // red alert semantics.
+  expect(
+    await screen.findByText('Export History is part of Premium.'),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'View plans' })).toHaveAttribute(
     'href',
     '/pricing',
   );
+});
+
+it('treats a 200 with a wrong envelope as a retryable failure', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { nope: true }))),
+  );
+
+  render(<HistorySection />);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    /shape this page can’t read/i,
+  );
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 });
 
 it('shows an empty state until the first Premium export exists', async () => {
@@ -164,4 +181,59 @@ it('recovers from a failed load via Retry', async () => {
   await user.click(screen.getByRole('button', { name: 'Retry' }));
 
   expect(await screen.findByTestId('history-row')).toBeInTheDocument();
+});
+
+it('disables only the preparing row and keeps its siblings clickable', async () => {
+  const user = userEvent.setup();
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string | URL | Request) => {
+      if (String(url) === '/api/history/7') {
+        return gate.then(
+          () =>
+            new Response(new Uint8Array([0x25, 0x50, 0x44]).buffer, {
+              status: 200,
+              headers: { 'content-type': 'application/pdf' },
+            }),
+        );
+      }
+      return Promise.resolve(
+        jsonResponse(200, {
+          entries: [entry(), entry({ id: 3, name: 'Thesis draft' })],
+        }),
+      );
+    }),
+  );
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+    function (this: HTMLAnchorElement) {
+      void this.download;
+    },
+  );
+  vi.stubGlobal('URL', {
+    ...URL,
+    createObjectURL: vi.fn(() => 'blob:fake'),
+    revokeObjectURL: vi.fn(),
+  });
+
+  render(<HistorySection />);
+  const rows = await screen.findAllByTestId('history-row');
+  await user.click(within(rows[0]!).getByRole('button', { name: /Download/ }));
+
+  // The active row shows progress and waits; the sibling stays clickable —
+  // disabling every row for one download held the list hostage. (The
+  // aria-label names every state "Download …", so assert on the text.)
+  const active = within(rows[0]!).getByRole('button');
+  expect(await within(active).findByText('Preparing…')).toBeInTheDocument();
+  expect(active).toBeDisabled();
+  expect(within(rows[1]!).getByRole('button')).toBeEnabled();
+
+  release?.();
+  await waitFor(() => {
+    expect(within(rows[0]!).getByRole('button')).toBeEnabled();
+  });
+  expect(within(rows[0]!).getByText('Download')).toBeInTheDocument();
 });

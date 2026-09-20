@@ -22,7 +22,7 @@ export class ApiError extends Error {
 /** The message shown when a body carries no readable `{ error }`, and the
  *  `code` that marks it — callers branch on this code, never the display
  *  string. */
-const FALLBACK_MESSAGE = 'Something went wrong.';
+export const FALLBACK_MESSAGE = 'Something went wrong.';
 export const FALLBACK_CODE = 'fallback';
 
 export function postJson(path: string, payload: unknown): Promise<Response> {
@@ -65,4 +65,17 @@ export async function errorFrom(res: Response): Promise<ApiError> {
       // marker is ours, and it wins over a body-supplied code.
       FALLBACK_CODE;
   return new ApiError(message, res.status, code);
+}
+
+/** One message per failure, the sections all share: the server's own message
+ *  when it sent one, the offline case named plainly (fetch rejects with a
+ *  TypeError when the request never reaches the API — the API process is
+ *  down, or the device is offline) instead of the browser's raw "Failed to
+ *  fetch", and the fallback for anything else. */
+export function errorToMessage(cause: unknown): string {
+  if (cause instanceof ApiError) return cause.message;
+  if (cause instanceof TypeError) {
+    return "Couldn't reach the server. Check your connection and try again.";
+  }
+  return FALLBACK_MESSAGE;
 }

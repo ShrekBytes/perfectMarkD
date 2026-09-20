@@ -92,6 +92,32 @@ describe('listOrders', () => {
 
     expect(await listOrders()).toEqual([ORDER]);
   });
+
+  it('rejects a 200 with the wrong envelope as an ApiError', async () => {
+    // A portal or proxy answering 200 with a non-API body must reach the
+    // page as a renderable failure, never `undefined` into a .length.
+    stubFetch(() => jsonResponse(200, { nope: true }));
+
+    const error = await listOrders().catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).message).toMatch(/shape this page can’t read/i);
+    expect((error as ApiError).code).toBe('fallback');
+  });
+
+  it('rejects an empty 200 body as an ApiError', async () => {
+    stubFetch(
+      () =>
+        new Response('null', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+
+    const error = await listOrders().catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApiError);
+  });
 });
 
 describe('submitOrderPayment', () => {

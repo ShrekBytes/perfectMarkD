@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from '../router';
+import { errorToMessage } from '../api/client';
 import { useTheme } from '../theme/theme';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { useAccountStore } from '../auth/account-store';
 import { listOrders, type Order } from '../billing/api';
+import { ErrorBoundary } from '../shell/ErrorBoundary';
 import { PlanSummary } from './PlanSummary';
 import { OrdersSection } from './OrdersSection';
 import { HistorySection } from './HistorySection';
@@ -41,9 +43,7 @@ export function AccountPage() {
     try {
       setOrders(await listOrders());
     } catch (cause) {
-      setOrdersError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
+      setOrdersError(errorToMessage(cause));
     }
   }, []);
 
@@ -92,18 +92,29 @@ export function AccountPage() {
           <p className="mt-1 text-xs text-ink-soft">{user.email}</p>
 
           <div className="mt-6 space-y-4">
-            <PlanSummary
-              entitlement={entitlement}
-              quota={quota}
-              orders={orders}
-            />
-            <OrdersSection
-              orders={orders}
-              error={ordersError}
-              onRefresh={() => void refreshOrders()}
-            />
-            <HistorySection />
-            <ChangePasswordForm />
+            {/* Each section is contained: a render error inside one is that
+                section's inline failure, not a blank page. */}
+            <ErrorBoundary label="The Plan section">
+              <PlanSummary
+                entitlement={entitlement}
+                quota={quota}
+                orders={orders}
+                ordersError={ordersError}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary label="The Orders section">
+              <OrdersSection
+                orders={orders}
+                error={ordersError}
+                onRefresh={() => void refreshOrders()}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary label="The Export history section">
+              <HistorySection />
+            </ErrorBoundary>
+            <ErrorBoundary label="The password form">
+              <ChangePasswordForm />
+            </ErrorBoundary>
           </div>
         </main>
       )}

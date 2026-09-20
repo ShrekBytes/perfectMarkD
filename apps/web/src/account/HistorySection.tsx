@@ -53,7 +53,9 @@ export function HistorySection() {
     } catch (cause) {
       setError(toApiError(cause));
     } finally {
-      setDownloadingId(null);
+      // Only clear if this entry still owns the state — a download started
+      // meanwhile must not be erased by this one finishing.
+      setDownloadingId((current) => (current === entry.id ? null : current));
     }
   };
 
@@ -69,27 +71,36 @@ export function HistorySection() {
         Export history
       </h2>
 
-      {error && (
+      {premiumGated && (
+        <div className="mt-3 py-4 text-center">
+          <p className="text-sm text-ink">
+            Export History is part of Premium.
+          </p>
+          <p className="mx-auto mt-1 max-w-prose text-xs text-ink-soft">
+            Server Exports made on Premium are kept here for 30 days — upgrade
+            to keep yours.
+          </p>
+          <Link
+            to="/pricing"
+            className="touch-target mt-3 inline-flex h-8 items-center rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-2"
+          >
+            View plans
+          </Link>
+        </div>
+      )}
+
+      {error && !premiumGated && (
         <div className="mt-3">
           <p role="alert" className="text-xs text-danger">
             {error.message}
           </p>
-          {premiumGated ? (
-            <Link
-              to="/pricing"
-              className="touch-target mt-2 inline-flex h-8 items-center rounded-control border border-hairline bg-canvas px-3 text-xs font-medium text-ink outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-2"
-            >
-              View plans
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="touch-target mt-2 h-8 rounded-control border border-hairline px-3 text-xs text-ink-soft outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
-            >
-              Retry
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="touch-target mt-2 h-8 rounded-control border border-hairline px-3 text-xs text-ink-soft outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -130,9 +141,9 @@ export function HistorySection() {
               <button
                 type="button"
                 onClick={() => void download(entry)}
-                disabled={downloadingId !== null}
+                disabled={downloadingId === entry.id}
                 aria-label={`Download ${entry.name}`}
-                className="touch-target flex h-8 shrink-0 items-center gap-1.5 rounded-control border border-hairline px-2.5 text-xs text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-default disabled:opacity-60"
+                className="touch-target flex h-8 shrink-0 items-center gap-1.5 rounded-control border border-hairline px-2.5 font-mono text-xs text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-default disabled:opacity-60"
               >
                 {downloadingId === entry.id ? (
                   <SpinnerIcon className="animate-spin" />
@@ -143,10 +154,13 @@ export function HistorySection() {
               </button>
             </li>
           ))}
-          <li className="pt-1 text-center text-xs text-ink-faint">
-            Exports are removed 30 days after they were made.
-          </li>
         </ul>
+      )}
+
+      {entries !== null && entries.length > 0 && !error && (
+        <p className="mt-2 text-center text-xs text-ink-faint">
+          Exports are removed 30 days after they were made.
+        </p>
       )}
     </section>
   );

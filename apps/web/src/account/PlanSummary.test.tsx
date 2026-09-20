@@ -37,6 +37,7 @@ it('shows the active plan with its expiry and quota', () => {
       entitlement={{ plan: 'premium', expiresAt: '2026-10-15T00:00:00.000Z' }}
       quota={{ used: 2, limit: 40 }}
       orders={[]}
+      ordersError={null}
     />,
   );
 
@@ -47,20 +48,25 @@ it('shows the active plan with its expiry and quota', () => {
   );
   // An active plan needs no upgrade CTA.
   expect(
-    screen.queryByRole('link', { name: 'See plans' }),
+    screen.queryByRole('link', { name: 'View plans' }),
   ).not.toBeInTheDocument();
 });
 
 it('shows the Free plan with the upgrade CTA and no quota readout', () => {
   render(
-    <PlanSummary entitlement={null} quota={{ used: 0, limit: 0 }} orders={[]} />,
+    <PlanSummary
+      entitlement={null}
+      quota={{ used: 0, limit: 0 }}
+      orders={[]}
+      ordersError={null}
+    />,
   );
 
   expect(screen.getByText('Free')).toBeInTheDocument();
   expect(
     screen.getByText('No paid plan — upgrades start from the plans.'),
   ).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'See plans' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'View plans' })).toHaveAttribute(
     'href',
     '/pricing',
   );
@@ -76,6 +82,7 @@ it('shows a comped user’s real allowance', () => {
       entitlement={null}
       quota={{ used: 1, limit: 3 }}
       orders={[]}
+      ordersError={null}
     />,
   );
 
@@ -96,6 +103,7 @@ it('shows the expired state derived from the Order history', () => {
           durationMonths: 3,
         }),
       ]}
+      ordersError={null}
     />,
   );
 
@@ -104,7 +112,7 @@ it('shows the expired state derived from the Order history', () => {
   expect(screen.getByText('Pro')).toBeInTheDocument();
   expect(screen.getByText(/Ended 2020-09-11/)).toBeInTheDocument();
   expect(screen.getByText(/nothing auto-renews/)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'See plans' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'View plans' })).toHaveAttribute(
     'href',
     '/pricing',
   );
@@ -124,6 +132,7 @@ it('names an ended plan without a date claim while the window has not lapsed', (
           durationMonths: 3,
         }),
       ]}
+      ordersError={null}
     />,
   );
 
@@ -132,20 +141,38 @@ it('names an ended plan without a date claim while the window has not lapsed', (
   expect(screen.getByText('No longer active — nothing auto-renews.')).toBeInTheDocument();
 });
 
-it('renders no plan name while the Orders are still loading', () => {
+it('renders a loading line while the Orders are still loading', () => {
   render(
     <PlanSummary
       entitlement={null}
       quota={{ used: 0, limit: 0 }}
       orders={null}
+      ordersError={null}
     />,
   );
 
-  // No wrong state flash: the plan row waits for its data. The CTA is
-  // correct in every no-entitlement state.
+  // No wrong state flash: the plan row waits for its data, but the section
+  // is never empty. The CTA is correct in every no-entitlement state.
+  expect(screen.getByText('Loading your plan…')).toBeInTheDocument();
   expect(screen.queryByText('Free')).not.toBeInTheDocument();
   expect(screen.queryByTestId('plan-expired')).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'See plans' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'View plans' })).toBeInTheDocument();
+});
+
+it('shows Free without waiting for the Orders list when the request failed', () => {
+  // /api/me already settled the plan; the ended plan's derivation is the
+  // only thing that needs the Order history.
+  render(
+    <PlanSummary
+      entitlement={null}
+      quota={{ used: 0, limit: 0 }}
+      orders={null}
+      ordersError="Couldn't reach the server. Check your connection and try again."
+    />,
+  );
+
+  expect(screen.getByText('Free')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'View plans' })).toBeInTheDocument();
 });
 
 describe('lastPlanPeriod', () => {
