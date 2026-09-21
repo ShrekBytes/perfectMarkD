@@ -51,7 +51,7 @@ function payload(
     markdown: '# Heading One\n\nSome text.',
     settings: { ...DEFAULT_SETTINGS },
     assets: {},
-    fonts: {},
+    fonts: [],
     ...overrides,
   };
 }
@@ -120,7 +120,13 @@ describe('renderServerExportDocument', () => {
           fontFamily: '__custom__',
           customFontName: 'Inter',
         },
-        fonts: { Inter: 'data:font/woff2;base64,AAA' },
+        fonts: [
+          {
+            family: 'Inter',
+            url: 'data:font/woff2;base64,AAA',
+            format: 'woff2',
+          },
+        ],
       }),
       { mathCSS: '' },
     );
@@ -128,15 +134,17 @@ describe('renderServerExportDocument', () => {
     // Registered before pagination (metrics), then embedded in the painted
     // document (print).
     expect(registeredFaces).toEqual(['Inter']);
-    expect(document.querySelector('style')?.textContent).toContain(
-      '@font-face { font-family: "Inter"',
-    );
+    const css = document.querySelector('style')?.textContent ?? '';
+    expect(css).toContain('@font-face { font-family: "Inter"');
+    // The payload's format hint survives to the embedded rule — the same
+    // @font-face shape the Client Export embeds.
+    expect(css).toContain('format("woff2")');
   });
 
   it('survives a corrupt payload font and embeds nothing', async () => {
     failNextLoad = true;
     const result = await renderServerExportDocument(
-      payload({ fonts: { Bad: 'data:font/ttf;base64,AAA' } }),
+      payload({ fonts: [{ family: 'Bad', url: 'data:font/ttf;base64,AAA' }] }),
       { mathCSS: '' },
     );
     expect(result.ok).toBe(true);

@@ -35,7 +35,11 @@ function stubFontFace(): void {
   stubFaces = [];
   registry = new Set();
   failNextLoad = false;
-  const Face = vi.fn(function (this: unknown, family: string, source: string | ArrayBuffer) {
+  const Face = vi.fn(function (
+    this: unknown,
+    family: string,
+    source: string | ArrayBuffer,
+  ) {
     const face: StubFace = {
       family,
       source,
@@ -207,15 +211,21 @@ describe('fontFacesForExport / fontFaceCSSForExport', () => {
 
 describe('registerPayloadFonts', () => {
   it('registers each payload font for rendering', async () => {
-    await registerPayloadFonts({ Inter: 'data:font/woff2;base64,AQID' });
+    await registerPayloadFonts([
+      { family: 'Inter', url: 'data:font/woff2;base64,AQID', format: 'woff2' },
+    ]);
     expect(isFontFamilyLoaded('Inter')).toBe(true);
     // The data URI arrives wrapped in the CSS src form FontFace requires.
     expect(stubFaces[0]!.source).toBe('url("data:font/woff2;base64,AQID")');
   });
 
   it('replaces the previous payload faces so same-named families cannot go stale', async () => {
-    await registerPayloadFonts({ Stale: 'data:font/woff2;base64,AQID' });
-    await registerPayloadFonts({ Fira: 'data:font/ttf;base64,BAU=' });
+    await registerPayloadFonts([
+      { family: 'Stale', url: 'data:font/woff2;base64,AQID' },
+    ]);
+    await registerPayloadFonts([
+      { family: 'Fira', url: 'data:font/ttf;base64,BAU=' },
+    ]);
     expect(isFontFamilyLoaded('Stale')).toBe(false);
     expect(isFontFamilyLoaded('Fira')).toBe(true);
     expect(registry.size).toBe(1);
@@ -224,7 +234,9 @@ describe('registerPayloadFonts', () => {
   it('keeps rendering when a payload font is corrupt', async () => {
     failNextLoad = true;
     expect(
-      await registerPayloadFonts({ Bad: 'data:font/ttf;base64,AQID' }),
+      await registerPayloadFonts([
+        { family: 'Bad', url: 'data:font/ttf;base64,AQID' },
+      ]),
     ).toEqual([]);
     expect(isFontFamilyLoaded('Bad')).toBe(false);
   });
@@ -233,7 +245,9 @@ describe('registerPayloadFonts', () => {
     vi.unstubAllGlobals();
     stubIndexedDB();
     expect(
-      await registerPayloadFonts({ Inter: 'data:font/ttf;base64,AQID' }),
+      await registerPayloadFonts([
+        { family: 'Inter', url: 'data:font/ttf;base64,AQID' },
+      ]),
     ).toEqual([]);
   });
 });

@@ -37,3 +37,33 @@ export function applyOrientation(
     customPageHeight: s.customPageWidth,
   };
 }
+
+// ─── Custom-font picker mapping (billing/05) ─────────────────────────────────
+// The pickers list uploaded fonts alongside the bundled catalog, but every
+// uploaded font resolves to the same settings pair the engine speaks
+// (`fontFamily: '__custom__'` + customFontName — resolveFont/resolveCodeFont).
+// A `__custom__:<name>` option value makes each font a distinct <option>
+// while decoding back to the sentinel pair.
+
+const CUSTOM_FONT_PREFIX = '__custom__:';
+
+/** The <option> value for one uploaded family. */
+export function customFontValue(family: string): string {
+  return `${CUSTOM_FONT_PREFIX}${family}`;
+}
+
+/** Decodes a picker selection into the settings patch: bundled families set
+ *  the family string directly, `__custom__:<name>` entries select an
+ *  uploaded font through the sentinel pair. The code picker passes its own
+ *  field names (codeFontFamily/customCodeFontName). */
+export function fontChange(
+  value: string,
+  familyField: 'fontFamily' | 'codeFontFamily',
+  nameField: 'customFontName' | 'customCodeFontName',
+): Partial<DocumentSettings> {
+  if (!value.startsWith(CUSTOM_FONT_PREFIX)) {
+    return { [familyField]: value };
+  }
+  const family = value.slice(CUSTOM_FONT_PREFIX.length).trim();
+  return { [familyField]: '__custom__', [nameField]: family };
+}

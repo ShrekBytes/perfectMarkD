@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyOrientation, applyPreset } from './settings-edit';
+import {
+  applyOrientation,
+  applyPreset,
+  customFontValue,
+  fontChange,
+} from './settings-edit';
 import {
   DEFAULT_SETTINGS,
   PRESETS,
@@ -68,5 +73,50 @@ describe('applyOrientation', () => {
   it('is a no-op when the orientation already matches', () => {
     const same = applyOrientation(DEFAULT_SETTINGS, 'portrait');
     expect(same).toBe(DEFAULT_SETTINGS);
+  });
+});
+
+describe('customFontValue / fontChange (billing/05)', () => {
+  it('makes each uploaded family a distinct value that decodes to the sentinel pair', () => {
+    const value = customFontValue('Inter');
+    expect(value).toBe('__custom__:Inter');
+    expect(fontChange(value, 'fontFamily', 'customFontName')).toEqual({
+      fontFamily: '__custom__',
+      customFontName: 'Inter',
+    });
+  });
+
+  it('passes bundled families straight through to the family field', () => {
+    expect(
+      fontChange('Georgia, serif', 'fontFamily', 'customFontName'),
+    ).toEqual({
+      fontFamily: 'Georgia, serif',
+    });
+    expect(
+      fontChange(
+        "'Courier New', monospace",
+        'codeFontFamily',
+        'customCodeFontName',
+      ),
+    ).toEqual({ codeFontFamily: "'Courier New', monospace" });
+  });
+
+  it('writes the code picker through its own field names', () => {
+    expect(
+      fontChange(
+        customFontValue('Fira Code'),
+        'codeFontFamily',
+        'customCodeFontName',
+      ),
+    ).toEqual({
+      codeFontFamily: '__custom__',
+      customCodeFontName: 'Fira Code',
+    });
+  });
+
+  it('trims the decoded family so stray whitespace cannot orphan the option', () => {
+    expect(
+      fontChange(customFontValue('  Inter  '), 'fontFamily', 'customFontName'),
+    ).toEqual({ fontFamily: '__custom__', customFontName: 'Inter' });
   });
 });

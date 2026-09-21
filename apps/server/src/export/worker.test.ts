@@ -36,7 +36,7 @@ const PAYLOAD: ExportPayload = {
   settings: { preset: 'default' } as ExportPayload['settings'],
   pageCount: 1,
   assets: {},
-  fonts: {},
+  fonts: [],
 };
 
 function fakePdf(pages: number): Uint8Array {

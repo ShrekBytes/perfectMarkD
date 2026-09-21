@@ -130,16 +130,20 @@ const payload = {
   } as DocumentSettings,
   pageCount: 2,
   assets: {},
-  fonts: {
-    E2ECustomFont: `data:font/woff2;base64,${(
-      await readFile(
-        join(
-          REPO_ROOT,
-          'apps/web/node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2',
-        ),
-      )
-    ).toString('base64')}`,
-  },
+  fonts: [
+    {
+      family: 'E2ECustomFont',
+      url: `data:font/woff2;base64,${(
+        await readFile(
+          join(
+            REPO_ROOT,
+            'apps/web/node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2',
+          ),
+        )
+      ).toString('base64')}`,
+      format: 'woff2',
+    },
+  ],
 };
 
 const FONT_TYPES: Record<string, string> = {

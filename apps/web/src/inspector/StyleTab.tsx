@@ -4,12 +4,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect } from 'react';
-import {
-  CODE_THEMES,
-  PRESETS,
-  type DocumentSettings,
-} from '@perfectmarkd/core';
-import { applyPreset } from './settings-edit';
+import { CODE_THEMES, PRESETS } from '@perfectmarkd/core';
+import { applyPreset, customFontValue, fontChange } from './settings-edit';
 import { PresetThumb } from './PresetThumb';
 import { BODY_FONTS, CODE_FONTS } from './fonts';
 import { useCustomFontStore } from '../fonts/store';
@@ -28,30 +24,6 @@ import {
   type TabProps,
   ToggleRow,
 } from './controls';
-
-/** Prefix that makes each uploaded font a distinct <option> value while all
- *  of them resolve to the same settings sentinel (fontFamily '__custom__'
- *  plus customFontName, which resolveFont/resolveCodeFont already speak). */
-const CUSTOM_FONT_PREFIX = '__custom__:';
-
-const customFontValue = (family: string): string =>
-  `${CUSTOM_FONT_PREFIX}${family}`;
-
-/** Decodes a picker selection into the settings patch: bundled families set
- *  the family string directly, `__custom__:<name>` entries select an
- *  uploaded font through the sentinel pair. The code picker passes its own
- *  field names (codeFontFamily/customCodeFontName). */
-const fontChange = (
-  value: string,
-  familyField: 'fontFamily' | 'codeFontFamily',
-  nameField: 'customFontName' | 'customCodeFontName',
-): Partial<DocumentSettings> =>
-  value.startsWith(CUSTOM_FONT_PREFIX)
-    ? {
-        [familyField]: '__custom__',
-        [nameField]: value.slice(CUSTOM_FONT_PREFIX.length),
-      }
-    : { [familyField]: value };
 
 /** The options for one font picker: the bundled catalog plus the uploaded
  *  library (locked behind the gate the way the Custom page size is — a
@@ -115,13 +87,16 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
     void loadFonts();
   }, [loadFonts]);
 
+  // Trimmed to match the fallback option's synthesis (and the ingest-time
+  // sanitization): the select value must never differ from the option values
+  // by invisible whitespace.
   const bodyFontValue =
     settings.fontFamily === '__custom__'
-      ? customFontValue(settings.customFontName)
+      ? customFontValue(settings.customFontName.trim())
       : settings.fontFamily;
   const codeFontValue =
     settings.codeFontFamily === '__custom__'
-      ? customFontValue(settings.customCodeFontName)
+      ? customFontValue(settings.customCodeFontName.trim())
       : settings.codeFontFamily;
 
   return (

@@ -23,6 +23,7 @@ import {
   buildFontFaceCSS,
   extractOutlineEntries,
   type DocumentSettings,
+  type FontFaceSource,
   type OutlineEntry,
   type RenderMermaidHook,
 } from '@perfectmarkd/core';
@@ -42,8 +43,10 @@ export interface ExportRenderPayload {
   settings: DocumentSettings;
   /** asset:// refs resolved to data: URIs by the client. */
   assets: Record<string, string>;
-  /** The document's custom fonts (billing/05): family → data: URI. */
-  fonts: Record<string, string>;
+  /** The document's custom fonts (billing/05), data-URI FontFaceSources —
+   *  the exact shape buildFontFaceCSS consumes, so the embedded rules are
+   *  the ones the Client Export embeds. */
+  fonts: FontFaceSource[];
 }
 
 export interface ExportRenderSuccess {
@@ -106,7 +109,6 @@ export async function renderServerExportDocument(
     // and only the faces that registered get embedded in the print
     // document, which would never load the corrupt ones either.
     const registeredFonts = await registerPayloadFonts(payload.fonts);
-
     const result = await runDocumentPipeline(
       payload.markdown,
       payload.settings,
@@ -137,12 +139,11 @@ export async function renderServerExportDocument(
         title,
         mathCSS: options.mathCSS,
         isRTL: result.isRTL,
-        // The same URIs the faces registered from, embedded so the print
-        // document carries its own fonts.
+        // The same faces registered above, embedded so the print document
+        // carries its own fonts — the identical rules the Client Export
+        // embeds (one pipeline, one document shape).
         fontFaceCSS: buildFontFaceCSS(
-          Object.entries(payload.fonts)
-            .filter(([family]) => registeredFonts.includes(family))
-            .map(([family, url]) => ({ family, url })),
+          payload.fonts.filter((face) => registeredFonts.includes(face.family)),
         ),
       },
     );

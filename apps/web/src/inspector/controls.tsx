@@ -506,10 +506,7 @@ export function GateImagePicker({
         )}
       </span>
       {error && (
-        <span
-          role="alert"
-          className="max-w-44 text-left text-[10px] text-danger"
-        >
+        <span role="alert" className="max-w-44 text-left text-xs text-danger">
           {error}
         </span>
       )}
@@ -596,10 +593,7 @@ export function GateFontPicker({
         Upload font…
       </button>
       {error && (
-        <span
-          role="alert"
-          className="max-w-44 text-left text-[10px] text-danger"
-        >
+        <span role="alert" className="max-w-44 text-left text-xs text-danger">
           {error}
         </span>
       )}

@@ -11,19 +11,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import {
-  deleteFont,
-  listFonts,
-  openDatabase,
-  putFont,
-} from '../documents/db';
+import { deleteFont, listFonts, openDatabase, putFont } from '../documents/db';
 import type { FontRecord } from '../documents/types';
 import { prepareFont, type FontIngestError } from './ingest';
 import { registerCustomFont, unregisterCustomFont } from './loader';
 
 export type AddFontResult =
-  | { ok: true; family: string }
-  | { ok: false; error: FontIngestError };
+  { ok: true; family: string } | { ok: false; error: FontIngestError };
 
 interface CustomFontState {
   fonts: FontRecord[];
@@ -79,10 +73,9 @@ export const useCustomFontStore = create<CustomFontState>()((set, get) => ({
     for (const { id } of replaced) await deleteFont(db, id);
     await putFont(db, font);
     set({
-      fonts: [
-        ...get().fonts.filter((f) => f.family !== family),
-        font,
-      ].sort((a, b) => a.family.localeCompare(b.family)),
+      fonts: [...get().fonts.filter((f) => f.family !== family), font].sort(
+        (a, b) => a.family.localeCompare(b.family),
+      ),
       loaded: true,
     });
     return { ok: true, family };
@@ -96,8 +89,3 @@ export const useCustomFontStore = create<CustomFontState>()((set, get) => ({
     set({ fonts: get().fonts.filter((f) => f.id !== id) });
   },
 }));
-
-/** The font library store's selector for the Inspector's Style tab. */
-export function useCustomFonts(): CustomFontState {
-  return useCustomFontStore((state) => state);
-}

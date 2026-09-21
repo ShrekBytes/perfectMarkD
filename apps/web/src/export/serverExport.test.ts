@@ -128,8 +128,13 @@ describe('buildServerExportPayload', () => {
       },
     });
 
-    expect(Object.keys(payload.fonts)).toEqual(['Inter']);
-    expect(payload.fonts['Inter']).toMatch(/^data:font\/woff2;base64,/);
+    expect(payload.fonts).toEqual([
+      {
+        family: 'Inter',
+        url: expect.stringMatching(/^data:font\/woff2;base64,/),
+        format: 'woff2',
+      },
+    ]);
   });
 
   it('carries no fonts when no custom family is in use', async () => {
@@ -138,7 +143,7 @@ describe('buildServerExportPayload', () => {
       markdown: '# Hello',
       settings: useDocumentStore.getState().settings,
     });
-    expect(payload.fonts).toEqual({});
+    expect(payload.fonts).toEqual([]);
   });
 });
 
@@ -163,7 +168,7 @@ describe('Server Export payload fonts contract', () => {
       'assets',
       'fonts',
     ]);
-    expect(typeof payload.fonts).toBe('object');
+    expect(Array.isArray(payload.fonts)).toBe(true);
   });
 });
 
@@ -178,7 +183,7 @@ describe('queueServerExport', () => {
       settings: useDocumentStore.getState().settings,
       pageCount: 1,
       assets: {},
-      fonts: {},
+      fonts: [],
     });
 
     expect(job.id).toBe('job-1');
@@ -209,7 +214,7 @@ describe('queueServerExport', () => {
       settings: useDocumentStore.getState().settings,
       pageCount: 1,
       assets: {},
-      fonts: {},
+      fonts: [],
     }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiError);
@@ -238,7 +243,7 @@ describe('queueServerExport', () => {
       settings: useDocumentStore.getState().settings,
       pageCount: 1,
       assets: {},
-      fonts: {},
+      fonts: [],
     }).catch((e: unknown) => e);
 
     expect((error as ApiError).code).toBe('entitlement_required');
@@ -255,7 +260,7 @@ describe('queueServerExport', () => {
       settings: useDocumentStore.getState().settings,
       pageCount: 1,
       assets: {},
-      fonts: {},
+      fonts: [],
     }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ServerExportError);

@@ -154,22 +154,22 @@ export async function fontFaceCSSForExport(
 }
 
 /**
- * The /export page's half: registers the payload's fonts (data: URIs) so
- * pagination measures the real metrics. Returns the families that actually
- * registered — the caller embeds only those (a corrupt font falls back to
- * the CSS stack, not a failed export). Each call replaces the previous
- * payload's faces — the page is fresh per job, but a stale same-named face
- * must never outlive its payload.
+ * The /export page's half: registers the payload's font faces (data: URIs)
+ * so pagination measures the real metrics. Returns the families that
+ * actually registered — the caller embeds only those (a corrupt font falls
+ * back to the CSS stack, not a failed export). Each call replaces the
+ * previous payload's faces — the page is fresh per job, but a stale
+ * same-named face must never outlive its payload.
  */
 export async function registerPayloadFonts(
-  fonts: Record<string, string>,
+  fonts: readonly FontFaceSource[],
 ): Promise<string[]> {
   for (const face of payloadFaces.values()) document.fonts?.delete(face);
   payloadFaces.clear();
 
   if (!fontApiAvailable()) return [];
   const registered: string[] = [];
-  for (const [family, url] of Object.entries(fonts)) {
+  for (const { family, url } of fonts) {
     // The FontFace string source is a CSS src form — url(...) — not a bare
     // URL; a raw data: URI string fails to parse and the face never loads.
     const face = new FontFace(family, `url("${url}")`);

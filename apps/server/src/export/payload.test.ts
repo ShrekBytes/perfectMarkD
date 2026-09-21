@@ -94,40 +94,85 @@ describe('parseExportPayload', () => {
     ).toBe(true);
   });
 
-  it('accepts custom fonts as data: URIs and rejects anything else (billing/05)', () => {
+  it('accepts custom fonts as data: font faces and rejects anything else (billing/05)', () => {
     const parsed = parseExportPayload(
-      basePayload({ fonts: { Inter: 'data:font/woff2;base64,x' } }),
+      basePayload({
+        fonts: [
+          { family: 'Inter', url: 'data:font/woff2;base64,x', format: 'woff2' },
+        ],
+      }),
       PAGE_CAP,
     );
     expect(parsed.ok).toBe(true);
     if (parsed.ok) {
-      expect(parsed.payload.fonts).toEqual({
-        Inter: 'data:font/woff2;base64,x',
-      });
+      expect(parsed.payload.fonts).toEqual([
+        { family: 'Inter', url: 'data:font/woff2;base64,x', format: 'woff2' },
+      ]);
     }
 
+    // Only data: font URIs — https and non-font data URIs are refused.
     expect(
       parseExportPayload(
-        basePayload({ fonts: { Inter: 'https://evil.example/inter.woff2' } }),
+        basePayload({
+          fonts: [{ family: 'Inter', url: 'https://evil.example/inter.woff2' }],
+        }),
         PAGE_CAP,
       ).ok,
     ).toBe(false);
     expect(
+      parseExportPayload(
+        basePayload({
+          fonts: [{ family: 'X', url: 'data:text/html;base64,x' }],
+        }),
+        PAGE_CAP,
+      ).ok,
+    ).toBe(false);
+    // Shape: non-arrays, faceless entries, blank or duplicate families.
+    expect(
       parseExportPayload(basePayload({ fonts: 'nope' }), PAGE_CAP).ok,
     ).toBe(false);
-    const tooMany = Object.fromEntries(
-      Array.from({ length: 51 }, (_, i) => [
-        `Font${i}`,
-        'data:font/ttf;base64,x',
-      ]),
-    );
+    expect(
+      parseExportPayload(basePayload({ fonts: ['nope'] }), PAGE_CAP).ok,
+    ).toBe(false);
+    expect(
+      parseExportPayload(
+        basePayload({
+          fonts: [{ family: '  ', url: 'data:font/ttf;base64,x' }],
+        }),
+        PAGE_CAP,
+      ).ok,
+    ).toBe(false);
+    expect(
+      parseExportPayload(
+        basePayload({
+          fonts: [
+            { family: 'A', url: 'data:font/ttf;base64,x' },
+            { family: 'A', url: 'data:font/ttf;base64,y' },
+          ],
+        }),
+        PAGE_CAP,
+      ).ok,
+    ).toBe(false);
+    const tooMany = Array.from({ length: 51 }, (_, i) => ({
+      family: `Font${i}`,
+      url: 'data:font/ttf;base64,x',
+    }));
     expect(
       parseExportPayload(basePayload({ fonts: tooMany }), PAGE_CAP).ok,
     ).toBe(false);
+    // The format hint is optional.
+    expect(
+      parseExportPayload(
+        basePayload({
+          fonts: [{ family: 'Inter', url: 'data:font/ttf;base64,x' }],
+        }),
+        PAGE_CAP,
+      ).ok,
+    ).toBe(true);
   });
 
-  it('defaults missing fonts to an empty map', () => {
+  it('defaults missing fonts to an empty list', () => {
     const parsed = parseExportPayload(basePayload(), PAGE_CAP);
-    expect(parsed.ok && parsed.payload.fonts).toEqual({});
+    expect(parsed.ok && parsed.payload.fonts).toEqual([]);
   });
 });
