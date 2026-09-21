@@ -1,0 +1,18 @@
+# 05: `/ai` — ask, review, apply
+
+**What to build:** A paying user pauses mid-sentence in the editor, types `/ai`, and a popup opens at their cursor showing what will be rewritten and how big it is. They describe the change, press Enter, and after a working state a dialog shows the proposal as a diff they can read, uncheck, accept or reject. Accept changes the Document as one undo step, focus returns to their place, and one AI Action is counted. Nothing reaches the Document without that acceptance. A Free Tier visitor typing the same thing gets the upsell instead, a user who has turned AI off gets no command at all, and an instance with no provider configured shows nothing anywhere. The first AI Action per account states where the text is going, and the Privacy page already says it.
+
+**Spec:** `.scratch/ai-transforms/spec.md` (trigger rules, the review surface, the AI route contract, gate precedence, AI Access, and the promises that must change).
+
+**Blocked by:** 03 (provider config, the provider seam, the instance's AI state), 04 (the estimator, scope resolution, and anchored edits).
+
+**Status:** ready-for-agent
+
+- [ ] A hint appears for `/a` and `/s` only, accepting with Tab, Enter, or a click; a bare `/` shows nothing; `/aix` and other continuations trigger nothing; matching is case-insensitive and only at a line start or after whitespace, never inside inline or fenced code; pasted text and programmatic edits trigger nothing.
+- [ ] `/ai` plus a space opens the popup at the caret with the trigger text removed; Esc restores exactly what was removed, leaving the Document byte-identical; Enter submits, Shift+Enter adds a line, and Cancel aborts a running request.
+- [ ] The popup states the resolved scope and its size against the cap, and its own state when unavailable: not configured (no command at all), not entitled (upsell copy plus one line that AI Actions send the submitted text to an external AI provider, opening the pricing modal), AI off (no command in the editor), allowance spent (the count, the period, and the reset date), provider unavailable (a plain message with Retry, naming nothing about the provider).
+- [ ] The review dialog shows a graphite diff with `+`/`−` marks, three lines of context, a change count, and a "show all" control; each change is independently checkable and checked by default; Accept applies the checked changes as one undoable edit through the normal document-update path; Reject leaves the Document untouched; Retry and Edit prompt are both available and each submission is a fresh AI Action.
+- [ ] A truncated, empty, or unusable reply is refused with a plain message and a smaller-scope suggestion, is never offered as a proposal, and consumes no allowance; a proposal whose target text changed underneath it cannot be accepted and says why.
+- [ ] The allowance and the switch behave as specified: AI Actions counted only when a proposal is offered, in a calendar-month period of their own, separate from Server Export Quota in both directions and in every surface; the Account page carries the remaining count and the AI Access switch beside plan and Quota, and the first-use disclosure is recorded on the account, once.
+- [ ] The Privacy page and the product principles document are updated so that what leaves the browser, when, and what is never stored are stated plainly, and no claim contradicts them.
+- [ ] Tests: the trigger rules and popup states as component tests; the route's gate order, metering, and error codes against a fake provider; the review dialog's accept, reject, and partial accept as component tests; and an end-to-end browser pass typing `/ai`, reviewing, accepting, and asserting the Document's new text with one undo step back.

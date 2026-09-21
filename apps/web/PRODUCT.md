@@ -72,7 +72,7 @@ Success means a writer can go from Markdown to a PDF they are proud to send, in 
 1. **The preview is the contract.** Never let the rendered preview and the exported PDF diverge. Any feature that cannot hold this is not shippable.
 2. **Free means genuinely useful.** The full editing and styling experience is free and unmetered; monetization is server capacity, never withheld quality or watermarks.
 3. **No account to start.** A first-time visitor reaches a working, good-looking document in seconds. Accounts are only asked for when a paid capability requires them.
-4. **Privacy by default.** Free users' content never leaves the browser; server-processed content is ephemeral. No third-party requests, no tracking beyond anonymous aggregates.
+4. **Privacy by default.** Free users' content never leaves the browser; server-processed content is ephemeral. No third-party requests from the editor, the preview, exports, or fonts — AI Actions are the deliberate exception: paid, disclosed at the point of use, and switchable off (ADR-0009). No tracking beyond anonymous aggregates.
 5. **Terminology is precision.** The domain glossary exists because vague words ("theme", "template", "invoice") cause real product mistakes. Use the canonical terms.
 
 ## Accessibility & Inclusion

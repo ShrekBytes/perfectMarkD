@@ -51,7 +51,7 @@ Manual crypto: **USDT-TRC20, USDT-BEP20, Litecoin**, static wallet addresses. Fl
 
 ### Privacy posture
 
-Server Export payloads are processed in memory and deleted immediately after rendering — never written to disk, never logged. The single exception is Premium Export History: PDFs kept 30 days, encrypted at rest, auto-purged. Client Exports never touch the server. No cookies beyond the login session. Analytics: self-hosted Umami, anonymous event counts only, no personal data, no third-party requests (fonts are self-hosted).
+Server Export payloads are processed in memory and deleted immediately after rendering — never written to disk, never logged. The single exception is Premium Export History: PDFs kept 30 days, encrypted at rest, auto-purged. Client Exports never touch the server. No cookies beyond the login session. Analytics: self-hosted Umami, anonymous event counts only, no personal data. No third-party requests from the editor, the preview, exports, or fonts (self-hosted); AI Actions are the deliberate exception — paid, disclosed at the point of use, switchable off (ADR-0009).
 
 ## 2. Design language
 
@@ -91,7 +91,7 @@ Server Export payloads are processed in memory and deleted immediately after ren
 | **2 — Paid tier** (~2–3 wks) | Server + auth, Server Export pipeline, quotas, upgrade flow + Order submission, admin panel (payments/users/settings/audit), gated-feature unlocks (custom page size, CSS, fonts, banner/background images), Export History | Payments go live |
 | **3 — Polish & launch ops** (~1–2 wks) | Umami analytics, docs page, backups + restore runbook, perf guards (large-doc warning, lazy Shiki, mermaid caching), deploy hardening, launch checklist | Full launch |
 
-Workstreams & tickets live in `.scratch/`: [`engine-port`](.scratch/engine-port/spec.md) · [`editor-app`](.scratch/editor-app/spec.md) · [`server`](.scratch/server/spec.md) · [`billing`](.scratch/billing/spec.md) · [`launch`](.scratch/launch/spec.md). **Execution sequence: [build order](.scratch/build-order.md)** — each ticket's `Blocked by:` line is the source of truth.
+Workstreams & tickets live in `.scratch/`: [`engine-port`](.scratch/engine-port/spec.md) · [`editor-app`](.scratch/editor-app/spec.md) · [`server`](.scratch/server/spec.md) · [`billing`](.scratch/billing/spec.md) · [`launch`](.scratch/launch/spec.md) · [`ai-transforms`](.scratch/ai-transforms/spec.md). **Execution order comes from each ticket's `Blocked by:` line** — work the frontier: any ticket whose blockers are resolved, lowest number first.
 
 ## 5. Risks & mitigations
 

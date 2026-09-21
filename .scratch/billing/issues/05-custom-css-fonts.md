@@ -1,8 +1,12 @@
-# 05 — Gated feature UIs: custom stylesheet + custom fonts
+# 05 — Gated feature UI: custom fonts
 
 Status: ready-for-agent
 Blocked by: billing/04, editor-app/05
 
-Build the two paid features that have no Phase-1 UI (page size/banner/background UIs exist from Phase 1, only unlock here). **Custom stylesheet**: Style tab section — textarea with the user CSS appended to `docCSS` (sanitized for `</style>`, per engine's `escapeCSSForStyle`), live re-render, per-document, a "Custom CSS" preset-slot so it survives preset switches. **Custom fonts**: upload `.ttf/.otf/.woff/.woff2` (≤ 10 MB each) → FontFace API load (client print works instantly, no server); asset stored like images; selectable in font pickers; Server Export embeds fonts as data: URIs in the payload (counted against the 50 MB cap). Gated UI both.
+Build the paid feature that has no Phase-1 UI (page size/banner/background UIs exist from Phase 1, only unlock here). **Custom fonts**: upload `.ttf/.otf/.woff/.woff2` (≤ 10 MB each) → FontFace API load (client print works instantly, no server); asset stored like images; selectable in font pickers; Server Export embeds fonts as data: URIs in the payload (counted against the 50 MB cap). Gated UI.
 
-**Accepts**: custom CSS visibly restyles output and survives preset switch; uploaded font renders in preview, Client Export, and Server Export.
+**Accepts**: uploaded font renders in preview, Client Export, and Server Export.
+
+## Comments
+
+- The custom-stylesheet half this ticket used to carry is **superseded** by `.scratch/ai-transforms/issues/01-custom-stylesheet.md` (see `.scratch/ai-transforms/spec.md`): the engine field, the Stylesheet Inspector tab, the preset-gallery tile, and the `@page` guardrail are specified and ticketed there, with the styling reference in that workstream's ticket 02. Implementing it here would duplicate that work and produce two different boxes, so it was removed from this ticket's scope; the custom-fonts work above is untouched and is this ticket's own work.

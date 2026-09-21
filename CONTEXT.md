@@ -16,6 +16,10 @@ _Avoid_: break, separator (a `---` horizontal rule is not a Page Break)
 A named bundle of Document style values (typography, colors, layout) the user can switch between.
 _Avoid_: theme, template, style
 
+**Custom Stylesheet**:
+The user's own CSS for a Document, layered on top of the CSS the engine generates from that Document's style values. A paid capability. It is a layer, not a Preset: it changes no style value, so it can be on alongside any Preset (the preset gallery shows it as a tile, and the Preset's tile stays selected).
+_Avoid_: custom preset, theme, template, skin
+
 **Outline**:
 A bookmark tree embedded in the exported PDF, built from the Document's headings; shown in PDF readers' side panel.
 _Avoid_: TOC (a TOC is visible content inside the Document; the Outline is PDF metadata)
@@ -83,6 +87,36 @@ _Avoid_: staff, moderator
 **Self-Hosted Instance**:
 A deployment of the AGPL-3.0 codebase run by someone other than the Admin. It is its own operator's service, with its own wallets and Verification.
 _Avoid_: fork, mirror
+
+## AI
+
+**AI Action**:
+One thing a user asks the AI to do: rewrite markdown from the editor (`/ai`), or edit the Custom Stylesheet (`/ss`, from the editor or from the Stylesheet tab's chat). Each AI Action counts against the plan's AI Allowance.
+_Avoid_: transform, generation, prompt, job
+
+**AI Allowance**:
+The monthly number of AI Actions a paid plan allows. Distinct from Quota, which counts Server Exports.
+_Avoid_: AI quota, AI credits, AI tokens
+
+**AI Access**:
+The user's own on/off switch for AI Actions. On by default; while the user has it off, the AI commands do not exist for them.
+_Avoid_: AI opt-in, AI consent, AI permission
+
+**AI Proposal**:
+What an AI Action produced, shown for review before anything is applied. Neither the Document nor the Custom Stylesheet changes until the user accepts the proposal.
+_Avoid_: suggestion, draft, diff, preview
+
+**AI Scope**:
+Which part of a Document an AI Action may change: the selection, one section, or the whole Document. Distinct from what the AI may read as context.
+_Avoid_: target, range, window
+
+**AI Plan**:
+For a Document too large for one AI Action, the approved list of steps the work is broken into; each step is its own AI Action with its own AI Proposal.
+_Avoid_: batch, job, queue, run
+
+**AI Provider Config**:
+The Admin's configuration of the AI service: which compatible endpoint, which model, and how much reasoning. The API key belongs to the deployment, not to a setting.
+_Avoid_: AI settings, model config
 
 ## Product UI
 
