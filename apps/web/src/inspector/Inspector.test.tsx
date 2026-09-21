@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act } from 'react';
@@ -19,6 +20,7 @@ import {
 import * as api from '../auth/api';
 import type { MePayload } from '../auth/api';
 import { LOCKED_FLAGS, OPEN_FLAGS } from '../auth/flags';
+import { useCustomFontStore } from '../fonts/store';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
@@ -101,7 +103,9 @@ describe('Inspector tabs', () => {
     });
     render(<Inspector />);
     expect(
-      screen.getByText('Open a document to tune its page, style, and header/footer.'),
+      screen.getByText(
+        'Open a document to tune its page, style, and header/footer.',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
@@ -162,7 +166,9 @@ describe('Page tab', () => {
 
     await user.click(screen.getByRole('checkbox', { name: 'Page frame' }));
     expect(activeSettings().frameEnabled).toBe(true);
-    expect(screen.getByRole('combobox', { name: 'Frame border style' })).toBeEnabled();
+    expect(
+      screen.getByRole('combobox', { name: 'Frame border style' }),
+    ).toBeEnabled();
 
     await user.selectOptions(
       screen.getByRole('combobox', { name: 'Frame border style' }),
@@ -211,11 +217,37 @@ describe('Page tab', () => {
     // with the gate closed — but the entry stays inert (the lock below is
     // the only way to act on custom sizing again).
     act(() => {
-      useDocumentStore.getState().updateActive({ settings: { pageSize: 'Custom' } });
+      useDocumentStore
+        .getState()
+        .updateActive({ settings: { pageSize: 'Custom' } });
     });
     render(<Inspector />);
 
     expect(screen.getByRole('option', { name: 'Custom…' })).toBeDisabled();
+  });
+
+  it('keeps a rendered Custom entry for a persisted custom font behind a closed gate (billing/05)', () => {
+    // Same contract as the Custom page size: the pickers render the persisted
+    // choice disabled — a select that lost its selection is never the answer.
+    act(() => {
+      useDocumentStore.getState().updateActive({
+        settings: {
+          fontFamily: '__custom__',
+          customFontName: 'Inter',
+          codeFontFamily: '__custom__',
+          customCodeFontName: 'Fira Code',
+        },
+      });
+    });
+    render(<Inspector />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
+
+    expect(
+      screen.getByRole('option', { name: 'Custom — Inter' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('option', { name: 'Custom — Fira Code' }),
+    ).toBeDisabled();
   });
 });
 
@@ -557,10 +589,14 @@ describe('unlocked gates (billing/04)', () => {
       screen.queryByRole('button', { name: /paid feature/i }),
     ).not.toBeInTheDocument();
 
-    // Style tab: fonts and stylesheet are included, not locked.
+    // Style tab: fonts have their live upload control (billing/05), the
+    // stylesheet is still the ai-transforms placeholder, nothing locked.
     fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
-    expect(screen.getAllByTestId('gate-included')).toHaveLength(2);
+    expect(screen.getByTestId('gate-included')).toBeInTheDocument();
     expect(screen.queryByTestId('faux-upload')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upload custom font' }),
+    ).toBeInTheDocument();
 
     // Page tab: Custom… is selectable.
     fireEvent.click(screen.getByRole('tab', { name: 'Page' }));
@@ -655,6 +691,103 @@ describe('unlocked gates (billing/04)', () => {
     await user.clear(opacity);
     await user.type(opacity, '40');
     expect(activeSettings().backgroundImageOpacity).toBe(0.4);
+  });
+
+  it('uploads a custom font and selects it in the body picker (billing/05)', async () => {
+    unlockAsPro();
+    const user = userEvent.setup();
+    render(<Inspector />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
+
+    // Real font-library flow against the fake IDB: prepare → persist → list.
+    const picker = screen.getByRole('button', { name: 'Upload custom font' });
+    const input = fileInputBehind(picker);
+    await act(async () => {
+      fireEvent.change(input, {
+        target: { files: [new File(['font-bytes'], 'Inter.ttf')] },
+      });
+    });
+
+    // The library lists it and the body picker offers it as a family.
+    await screen.findByText('Inter');
+    const bodyFont = screen.getByRole('combobox', { name: 'Body font' });
+    await user.selectOptions(bodyFont, 'Custom — Inter');
+    expect(activeSettings().fontFamily).toBe('__custom__');
+    expect(activeSettings().customFontName).toBe('Inter');
+
+    // The code picker offers the same library under its own sentinel.
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Code font' }),
+      'Custom — Inter',
+    );
+    expect(activeSettings().codeFontFamily).toBe('__custom__');
+    expect(activeSettings().customCodeFontName).toBe('Inter');
+  });
+
+  it('removes an uploaded font from the library and the pickers', async () => {
+    unlockAsPro();
+    const user = userEvent.setup();
+    render(<Inspector />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
+
+    const picker = screen.getByRole('button', { name: 'Upload custom font' });
+    await act(async () => {
+      fireEvent.change(fileInputBehind(picker), {
+        target: { files: [new File(['font-bytes'], 'Fira.ttf')] },
+      });
+    });
+    await screen.findByText('Fira');
+    // Select it first, so removal has a settings consequence to absorb.
+    const bodyFont = screen.getByRole('combobox', { name: 'Body font' });
+    await user.selectOptions(bodyFont, 'Custom — Fira');
+    expect(activeSettings().fontFamily).toBe('__custom__');
+    expect(activeSettings().customFontName).toBe('Fira');
+
+    await user.click(screen.getByRole('button', { name: 'Remove font Fira' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Fira')).not.toBeInTheDocument(),
+    );
+    // The settings keep the name; an unknown family renders disabled, never
+    // a select that lost its selection.
+    expect(activeSettings().fontFamily).toBe('__custom__');
+    const options = Array.from(
+      within(screen.getByRole('combobox', { name: 'Body font' })).getAllByRole(
+        'option',
+        { name: 'Custom — Fira' },
+      ),
+    );
+    expect(options).toHaveLength(1);
+    expect(options[0]).toBeDisabled();
+  });
+
+  it('surfaces a font ingest failure inline instead of listing the font', async () => {
+    unlockAsPro();
+    render(<Inspector />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
+
+    const add = vi
+      .fn()
+      .mockResolvedValue({ ok: false as const, error: 'invalid' as const });
+    act(() => {
+      useCustomFontStore.setState({ add });
+    });
+    await act(async () => {
+      fireEvent.change(
+        fileInputBehind(
+          screen.getByRole('button', { name: 'Upload custom font' }),
+        ),
+        {
+          target: {
+            files: [new File(['junk'], 'corrupt.woff2')],
+          },
+        },
+      );
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /could not be read as a font/i,
+    );
+    expect(add).toHaveBeenCalled();
   });
 
   it('surfaces an ingest failure inline instead of writing a broken ref', async () => {

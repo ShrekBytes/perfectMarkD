@@ -21,6 +21,7 @@
 import { buildExportHTML, type DocumentSettings } from '@perfectmarkd/core';
 import { createAssetResolver } from '../assets/resolver';
 import { KATEX_EXPORT_CSS } from '../canvas/katex-css';
+import { ensureCustomFontsLoaded, fontFaceCSSForExport } from '../fonts/loader';
 import { collectAssetRefs, runDocumentPipeline } from '../canvas/pipeline';
 import { renderMermaid } from '../canvas/mermaid';
 import { openDatabase } from '../documents/db';
@@ -34,6 +35,12 @@ export async function buildExportDocument(
   settings: DocumentSettings,
   title: string,
 ): Promise<string> {
+  // Custom fonts (billing/05) must be live before the pipeline paginates —
+  // pagination measures text — and embedded as @font-face data URIs after
+  // it, since the print document is its own document with no access to the
+  // app's registered faces.
+  await ensureCustomFontsLoaded(settings);
+  const fontFaceCSS = await fontFaceCSSForExport(settings);
   const assets = createAssetResolver(await openDatabase(), 'data-uri');
   try {
     await assets.warmup(collectAssetRefs(markdown, settings));
@@ -61,6 +68,7 @@ export async function buildExportDocument(
       title,
       mathCSS: KATEX_EXPORT_CSS,
       isRTL: result.isRTL,
+      fontFaceCSS,
     });
   } finally {
     assets.dispose();

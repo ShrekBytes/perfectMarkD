@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '@perfectmarkd/core';
 import {
   EXPORT_RENDER_MESSAGE,
@@ -8,7 +8,34 @@ import {
   type ExportRenderPayload,
 } from './protocol';
 
+/** jsdom has no FontFace and no document.fonts; these record what the render
+ *  registers. jsdom's Document accepts the fonts expando fine. */
+const registeredFaces: string[] = [];
+let failNextLoad: boolean;
+
+beforeEach(() => {
+  registeredFaces.length = 0;
+  failNextLoad = false;
+  const Face = vi.fn(function (this: unknown, family: string, source: string) {
+    return {
+      family,
+      source,
+      load: vi.fn(async () => {
+        if (failNextLoad) throw new Error('bad font');
+        registeredFaces.push(family);
+      }),
+    };
+  });
+  vi.stubGlobal('FontFace', Face);
+  (document as unknown as { fonts: unknown }).fonts = {
+    add: vi.fn(),
+    delete: vi.fn(),
+  };
+});
+
 afterEach(() => {
+  vi.unstubAllGlobals();
+  delete (document as unknown as { fonts?: unknown }).fonts;
   // Each render paints over the document; restore a blank one.
   document.documentElement.replaceChildren(
     document.createElement('head'),
@@ -24,6 +51,7 @@ function payload(
     markdown: '# Heading One\n\nSome text.',
     settings: { ...DEFAULT_SETTINGS },
     assets: {},
+    fonts: {},
     ...overrides,
   };
 }
@@ -82,5 +110,39 @@ describe('renderServerExportDocument', () => {
       { mathCSS: '' },
     );
     expect(result).toMatchObject({ ok: false, errorCode: 'render_failed' });
+  });
+
+  it('registers payload fonts before paginating and embeds them as @font-face (billing/05)', async () => {
+    const result = await renderServerExportDocument(
+      payload({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          fontFamily: '__custom__',
+          customFontName: 'Inter',
+        },
+        fonts: { Inter: 'data:font/woff2;base64,AAA' },
+      }),
+      { mathCSS: '' },
+    );
+    expect(result.ok).toBe(true);
+    // Registered before pagination (metrics), then embedded in the painted
+    // document (print).
+    expect(registeredFaces).toEqual(['Inter']);
+    expect(document.querySelector('style')?.textContent).toContain(
+      '@font-face { font-family: "Inter"',
+    );
+  });
+
+  it('survives a corrupt payload font and embeds nothing', async () => {
+    failNextLoad = true;
+    const result = await renderServerExportDocument(
+      payload({ fonts: { Bad: 'data:font/ttf;base64,AAA' } }),
+      { mathCSS: '' },
+    );
+    expect(result.ok).toBe(true);
+    expect(registeredFaces).toEqual([]);
+    expect(document.querySelector('style')?.textContent).not.toContain(
+      '@font-face',
+    );
   });
 });

@@ -21,6 +21,7 @@
 import type { DocumentSettings } from '@perfectmarkd/core';
 import { errorFrom, postJson, ApiError } from '../api/client';
 import { createAssetResolver } from '../assets/resolver';
+import { ensureCustomFontsLoaded, fontFacesForExport } from '../fonts/loader';
 import { collectAssetRefs, runDocumentPipeline } from '../canvas/pipeline';
 import { renderMermaid } from '../canvas/mermaid';
 import { openDatabase } from '../documents/db';
@@ -50,6 +51,11 @@ export interface ServerExportPayload {
   pageCount: number;
   /** Every asset:// ref resolved to a data: URI. */
   assets: Record<string, string>;
+  /** The document's custom fonts (billing/05), family name → data: URI —
+   *  the /export page registers them before paginating and embeds them as
+   *  @font-face rules. Rides the same request body, so the 50 MB body cap
+   *  bounds fonts and assets together. */
+  fonts: Record<string, string>;
 }
 
 export type ServerExportErrorCode =
@@ -96,6 +102,14 @@ export async function buildServerExportPayload(input: {
   markdown: string;
   settings: DocumentSettings;
 }): Promise<ServerExportPayload> {
+  // Fonts load before the pipeline so the declared pageCount is measured
+  // with the real metrics — the server re-checks it against the render.
+  await ensureCustomFontsLoaded(input.settings);
+  const faces = await fontFacesForExport(input.settings);
+  const fonts = Object.fromEntries(
+    faces.map(({ family, url }) => [family, url]),
+  );
+
   const assets = createAssetResolver(await openDatabase(), 'data-uri');
   try {
     const refs = collectAssetRefs(input.markdown, input.settings);
@@ -120,6 +134,7 @@ export async function buildServerExportPayload(input: {
       settings: input.settings,
       pageCount: result.layouts.length,
       assets: resolved,
+      fonts,
     };
   } finally {
     assets.dispose();

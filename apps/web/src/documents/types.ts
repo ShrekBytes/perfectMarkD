@@ -39,3 +39,19 @@ export type DocumentSummary = Pick<
   DocumentRecord,
   'id' | 'name' | 'updatedAt' | 'pageCount' | 'settings'
 >;
+
+/** An uploaded custom font in the user's library (billing/05). Bytes + media
+ *  type follow the image AssetRecord pattern, but fonts live in their own
+ *  `fonts` store and are user-level, not per-document: every uploaded font
+ *  is offered in every document's font pickers, so no assetIds coupling and
+ *  no orphan collection — a font stays until the user removes it. */
+export interface FontRecord {
+  id: string;
+  /** The CSS font-family name the face is registered under (derived from
+   *  the file name at upload; settings reference it via customFontName). */
+  family: string;
+  /** ArrayBuffer-backed so the bytes double as a Blob part at load time. */
+  bytes: Uint8Array<ArrayBuffer>;
+  mediaType: string;
+  createdAt: number;
+}

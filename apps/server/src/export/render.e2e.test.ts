@@ -16,7 +16,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PDFDocument, PDFName } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';
 import { build as esbuildBuild } from 'esbuild';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type DocumentSettings } from '@perfectmarkd/core';
@@ -118,9 +118,28 @@ const payload = {
   title: 'E2E Doc',
   markdown:
     '# First\n\nSome text with $x^2$ math.\n\n///\n\n# Second\n\nMore text.\n',
-  settings: DEFAULT_SETTINGS as DocumentSettings,
+  settings: {
+    ...DEFAULT_SETTINGS,
+    // A custom font end to end (billing/05): the fixture page must register
+    // it as a FontFace before paginating and embed it for Page.pdf. IBM
+    // Plex Mono's internal name is distinctive in the PDF's font table
+    // (Chromium names embedded fonts by the file's PostScript name, not
+    // the CSS family alias).
+    fontFamily: '__custom__',
+    customFontName: 'E2ECustomFont',
+  } as DocumentSettings,
   pageCount: 2,
   assets: {},
+  fonts: {
+    E2ECustomFont: `data:font/woff2;base64,${(
+      await readFile(
+        join(
+          REPO_ROOT,
+          'apps/web/node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2',
+        ),
+      )
+    ).toString('base64')}`,
+  },
 };
 
 const FONT_TYPES: Record<string, string> = {
@@ -247,6 +266,19 @@ describe('Server Export end-to-end (real Chromium)', () => {
     expect(doc.getTitle()).toBe('E2E Doc');
     // injectPDFOutline ran: the catalog carries an Outlines dict.
     expect(doc.catalog.get(PDFName.of('Outlines'))).toBeDefined();
+    // The payload's custom font made it into the print (billing/05): the
+    // page resources reference the font file's PostScript name.
+    const baseFonts: string[] = [];
+    for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+      if (
+        obj instanceof PDFDict &&
+        obj.get(PDFName.of('Type')) === PDFName.of('Font') &&
+        obj.get(PDFName.of('BaseFont'))
+      ) {
+        baseFonts.push(String(obj.get(PDFName.of('BaseFont'))));
+      }
+    }
+    expect(baseFonts.some((name) => name.includes('IBMPlexMono'))).toBe(true);
     worker.stop();
   });
 

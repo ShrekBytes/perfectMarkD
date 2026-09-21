@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bgImageCssProps,
   buildCodeBlockCSS,
+  buildFontFaceCSS,
   buildDocCSS,
   buildFrameOverlayHTML,
   escapeCSSForStyle,
@@ -11,6 +12,7 @@ import {
   mmToPx,
   resolveCodeFont,
   resolveFont,
+  customFontFamilies,
   resolvePageDims,
   resolvePageGeometry,
 } from './css-builder';
@@ -426,5 +428,97 @@ describe('resolvePageGeometry', () => {
     );
     expect(g.pw).toBe(794); // round(210 / 25.4 * 96)
     expect(g.ph).toBe(1123); // round(297 / 25.4 * 96)
+  });
+});
+
+// ─── Custom font families (billing/05) ───────────────────────────────────────
+
+describe('customFontFamilies', () => {
+  it('reports the body family when the body font is custom', () => {
+    expect(
+      customFontFamilies(
+        settings({ fontFamily: '__custom__', customFontName: 'Inter' }),
+      ),
+    ).toEqual(['Inter']);
+  });
+
+  it('reports the code family when the code font is custom', () => {
+    expect(
+      customFontFamilies(
+        settings({
+          codeFontFamily: '__custom__',
+          customCodeFontName: 'Fira Code',
+        }),
+      ),
+    ).toEqual(['Fira Code']);
+  });
+
+  it('reports both families, deduplicated, in body-then-code order', () => {
+    expect(
+      customFontFamilies(
+        settings({
+          fontFamily: '__custom__',
+          customFontName: 'Inter',
+          codeFontFamily: '__custom__',
+          customCodeFontName: 'Inter',
+        }),
+      ),
+    ).toEqual(['Inter']);
+    expect(
+      customFontFamilies(
+        settings({
+          fontFamily: '__custom__',
+          customFontName: 'Inter',
+          codeFontFamily: '__custom__',
+          customCodeFontName: 'Fira Code',
+        }),
+      ),
+    ).toEqual(['Inter', 'Fira Code']);
+  });
+
+  it('is empty when no sentinel is set, and ignores blank names', () => {
+    expect(customFontFamilies(settings({}))).toEqual([]);
+    expect(
+      customFontFamilies(
+        settings({ fontFamily: '__custom__', customFontName: '   ' }),
+      ),
+    ).toEqual([]);
+  });
+});
+
+// ─── Font-face CSS assembly (billing/05) ─────────────────────────────────────
+
+describe('buildFontFaceCSS', () => {
+  it('emits one @font-face rule per face with a format hint', () => {
+    const css = buildFontFaceCSS([
+      {
+        family: 'Inter',
+        url: 'data:font/woff2;base64,AAA',
+        format: 'woff2',
+      },
+    ]);
+    expect(css).toBe(
+      '@font-face { font-family: "Inter"; src: url("data:font/woff2;base64,AAA") format("woff2"); }',
+    );
+  });
+
+  it('omits the format clause when no hint is given', () => {
+    const css = buildFontFaceCSS([
+      { family: 'Inter', url: 'data:font/ttf;base64,AAA' },
+    ]);
+    expect(css).toBe(
+      '@font-face { font-family: "Inter"; src: url("data:font/ttf;base64,AAA"); }',
+    );
+  });
+
+  it('escapes quote characters in family names so a file name cannot break the rule', () => {
+    const css = buildFontFaceCSS([
+      { family: 'My "Fancy" Font', url: 'data:font/ttf;base64,AAA' },
+    ]);
+    expect(css).toContain('font-family: "My \\"Fancy\\" Font"');
+  });
+
+  it('returns an empty string for an empty face list', () => {
+    expect(buildFontFaceCSS([])).toBe('');
   });
 });

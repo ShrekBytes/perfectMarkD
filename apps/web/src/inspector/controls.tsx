@@ -10,6 +10,13 @@ import { useId, useRef, useState, type ReactNode } from 'react';
 import type { DocumentSettings } from '@perfectmarkd/core';
 import { LockIcon, UploadIcon } from '../shell/icons';
 import { MAX_ASSET_BYTES } from '../assets/ingest';
+import {
+  FONT_ACCEPT,
+  MAX_FONT_BYTES,
+  type FontIngestError,
+} from '../fonts/ingest';
+import type { AddFontResult } from '../fonts/store';
+import type { FontRecord } from '../documents/types';
 import type { AddAssetResult } from '../documents/store';
 import type { FeatureFlags } from '../auth/flags';
 
@@ -26,7 +33,8 @@ export interface TabProps {
 }
 
 /** The label column: 112px of right-aligned label. */
-const LABEL_COLUMN = 'w-28 shrink-0 text-right text-xs font-medium text-ink-soft';
+const LABEL_COLUMN =
+  'w-28 shrink-0 text-right text-xs font-medium text-ink-soft';
 
 /** Where every control's left edge lands: the label column plus its 8px
  *  gutter. Fields and checkboxes share this one axis, which is what makes a
@@ -161,9 +169,7 @@ export function Subgroup({
 }) {
   return (
     <div className="mt-2 first:mt-0">
-      <h3 className="mb-0.5 text-[11px] font-medium text-ink-faint">
-        {title}
-      </h3>
+      <h3 className="mb-0.5 text-[11px] font-medium text-ink-faint">{title}</h3>
       {children}
     </div>
   );
@@ -527,13 +533,115 @@ export function GateImagePicker({
 
 /**
  * The unlocked state for gates whose real control billing/05 still builds
- * (custom fonts, custom stylesheet): the lock is gone — the plan includes
- * the feature — and there is nothing to edit here yet.
+ * (custom stylesheet): the lock is gone — the plan includes the feature —
+ * and there is nothing to edit here yet.
  */
 export function IncludedNote() {
   return (
     <span data-testid="gate-included" className="text-[11px] text-ink-faint">
       Included with your plan
+    </span>
+  );
+}
+
+const FONT_ERRORS: Record<FontIngestError, string> = {
+  'too-large': `That font is over the ${Math.round(MAX_FONT_BYTES / MB)} MB limit and was not added.`,
+  unsupported: 'That file is not a font — pick TTF, OTF, WOFF, or WOFF2.',
+  invalid: 'That file could not be read as a font and was not added.',
+};
+
+/**
+ * The unlocked font gate (billing/05): pick a font file, store it in the
+ * user's font library, and it joins every font picker as a selectable
+ * family — the FontFace API registers it on the spot, so the preview
+ * renders with no server round-trip. The library lists under the upload
+ * button with a remove per entry; ingest failures surface inline (the same
+ * pattern the image pickers use).
+ */
+export function GateFontPicker({
+  ariaLabel,
+  addFont,
+  fonts,
+  onRemove,
+}: {
+  ariaLabel: string;
+  addFont: (file: File) => Promise<AddFontResult>;
+  fonts: FontRecord[];
+  onRemove: (id: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = (file: File) => {
+    setError(null);
+    setBusy(true);
+    void addFont(file)
+      .then((result) => {
+        if (!result.ok) setError(FONT_ERRORS[result.error]);
+      })
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <span className="flex w-full flex-col items-start gap-0.5">
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+        className={pickerButtonClass}
+      >
+        <UploadIcon />
+        Upload font…
+      </button>
+      {error && (
+        <span
+          role="alert"
+          className="max-w-44 text-left text-[10px] text-danger"
+        >
+          {error}
+        </span>
+      )}
+      {fonts.length > 0 && (
+        <ul
+          aria-label="Uploaded fonts"
+          className="flex w-full flex-col items-stretch gap-0.5"
+        >
+          {fonts.map((font) => (
+            <li
+              key={font.id}
+              className="flex min-w-0 items-center gap-1 text-[11px] text-ink"
+            >
+              <span className="min-w-0 truncate" title={font.family}>
+                {font.family}
+              </span>
+              <button
+                type="button"
+                aria-label={`Remove font ${font.family}`}
+                onClick={() => onRemove(font.id)}
+                className="shrink-0 rounded-control px-1.5 py-0.5 text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-danger focus-visible:outline-2"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={FONT_ACCEPT}
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          // Clear so picking the same file again fires change.
+          event.target.value = '';
+          if (file) handleFile(file);
+        }}
+      />
     </span>
   );
 }

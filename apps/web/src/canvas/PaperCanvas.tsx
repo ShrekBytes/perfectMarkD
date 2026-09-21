@@ -10,6 +10,7 @@ import {
   createAssetResolver,
   type AssetResolverCache,
 } from '../assets/resolver';
+import { ensureCustomFontsLoaded } from '../fonts/loader';
 import { openDatabase } from '../documents/db';
 import { useDocumentStore } from '../documents/store';
 import { EmptyState } from '../shell/EmptyState';
@@ -206,6 +207,11 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       }
       const resolver = resolverRef.current.resolver;
       await resolver.warmup(collectAssetRefs(md, docSettings));
+      if (token !== tokenRef.current) return;
+
+      // Custom fonts (billing/05) must be live before the pipeline runs:
+      // pagination measures text, so a late font means wrong page breaks.
+      await ensureCustomFontsLoaded(docSettings);
       if (token !== tokenRef.current) return;
 
       const result = await runDocumentPipeline(md, docSettings, {

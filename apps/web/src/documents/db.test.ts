@@ -4,16 +4,20 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   deleteAssets,
   deleteDocument,
+  deleteFont,
   getAsset,
   getAssets,
   getDocument,
   getMeta,
   listDocuments,
+  listFonts,
   openDatabase,
   putAssets,
   putDocument,
+  putFont,
   putMeta,
 } from './db';
+import { closeAfterSettle } from '../testing/test-assets';
 import type { AssetRecord, DocumentRecord } from './types';
 import { stubIndexedDB } from '../testing/stub-idb';
 
@@ -136,4 +140,57 @@ it('keeps meta keys independent', async () => {
 
   expect(await getMeta(db, 'a')).toBe(1);
   expect(await getMeta(db, 'b')).toBe(2);
+});
+
+it('upgrades a pre-fonts (version 2) database in place, keeping its data', async () => {
+  db.close();
+  // A fresh factory, then a library as version 2 wrote it: three stores, no
+  // fonts, and one document row the upgrade must keep.
+  stubIndexedDB();
+  const legacy = indexedDB.open('perfectmarkd', 2);
+  legacy.onupgradeneeded = () => {
+    legacy.result.createObjectStore('documents', { keyPath: 'id' });
+    legacy.result.createObjectStore('assets', { keyPath: 'id' });
+    legacy.result.createObjectStore('meta');
+  };
+  await new Promise((resolve, reject) => {
+    legacy.onsuccess = () => resolve(null);
+    legacy.onerror = () => reject(legacy.error);
+  });
+  const legacyTx = legacy.result
+    .transaction('documents', 'readwrite')
+    .objectStore('documents')
+    .put(makeDoc({ name: 'Legacy' }));
+  await new Promise((resolve, reject) => {
+    legacyTx.onsuccess = () => resolve(null);
+    legacyTx.onerror = () => reject(legacyTx.error);
+  });
+  legacy.result.close();
+
+  const upgraded = await openDatabase();
+  expect(upgraded.version).toBe(3);
+  expect(upgraded.objectStoreNames.contains('fonts')).toBe(true);
+  await putFont(upgraded, {
+    id: 'f1',
+    family: 'Inter',
+    bytes: new Uint8Array(1),
+    mediaType: 'font/woff2',
+    createdAt: 1,
+  });
+  expect(await listFonts(upgraded)).toHaveLength(1);
+  expect((await getDocument(upgraded, 'doc-1'))?.name).toBe('Legacy');
+  await closeAfterSettle(upgraded);
+});
+
+it('round-trips a font record (billing/05)', async () => {
+  await putFont(db, {
+    id: 'f1',
+    family: 'Inter',
+    bytes: new Uint8Array([1, 2]),
+    mediaType: 'font/woff2',
+    createdAt: 5,
+  });
+  expect((await listFonts(db))[0]).toMatchObject({ id: 'f1', family: 'Inter' });
+  await deleteFont(db, 'f1');
+  expect(await listFonts(db)).toEqual([]);
 });

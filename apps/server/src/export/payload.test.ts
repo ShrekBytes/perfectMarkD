@@ -93,4 +93,41 @@ describe('parseExportPayload', () => {
       ).ok,
     ).toBe(true);
   });
+
+  it('accepts custom fonts as data: URIs and rejects anything else (billing/05)', () => {
+    const parsed = parseExportPayload(
+      basePayload({ fonts: { Inter: 'data:font/woff2;base64,x' } }),
+      PAGE_CAP,
+    );
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.payload.fonts).toEqual({
+        Inter: 'data:font/woff2;base64,x',
+      });
+    }
+
+    expect(
+      parseExportPayload(
+        basePayload({ fonts: { Inter: 'https://evil.example/inter.woff2' } }),
+        PAGE_CAP,
+      ).ok,
+    ).toBe(false);
+    expect(
+      parseExportPayload(basePayload({ fonts: 'nope' }), PAGE_CAP).ok,
+    ).toBe(false);
+    const tooMany = Object.fromEntries(
+      Array.from({ length: 51 }, (_, i) => [
+        `Font${i}`,
+        'data:font/ttf;base64,x',
+      ]),
+    );
+    expect(
+      parseExportPayload(basePayload({ fonts: tooMany }), PAGE_CAP).ok,
+    ).toBe(false);
+  });
+
+  it('defaults missing fonts to an empty map', () => {
+    const parsed = parseExportPayload(basePayload(), PAGE_CAP);
+    expect(parsed.ok && parsed.payload.fonts).toEqual({});
+  });
 });

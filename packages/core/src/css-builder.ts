@@ -163,6 +163,53 @@ export function resolveCodeFont(s: DocumentSettings): string {
     : s.codeFontFamily;
 }
 
+/** The custom font families a settings object puts to use (billing/05):
+ *  body family first, code family second, deduplicated. Empty when neither
+ *  picker sits on `__custom__` — hosts load exactly these families through
+ *  the FontFace API before rendering or exporting, and embed exactly these
+ *  in export payloads. */
+export function customFontFamilies(s: DocumentSettings): string[] {
+  const families: string[] = [];
+  const body = s.customFontName.trim();
+  const code = s.customCodeFontName.trim();
+  if (s.fontFamily === '__custom__' && body) families.push(body);
+  if (s.codeFontFamily === '__custom__' && code && code !== body) {
+    families.push(code);
+  }
+  return families;
+}
+
+/** One custom font face a host hands over for export embedding. */
+export interface FontFaceSource {
+  /** The CSS font-family name the face is registered under — the name the
+   *  settings' customFontName carries. */
+  family: string;
+  /** A font URL renderable in the export context (a data: URI — the export
+   *  document must be self-contained). */
+  url: string;
+  /** CSS format hint ("woff2", "truetype", …); omitted when unknown. */
+  format?: string;
+}
+
+/** Escapes a value for a double-quoted CSS string (family names come from
+ *  user file names, which may carry quotes or backslashes). */
+function cssString(value: string): string {
+  return `"${value.replace(/["'\\]/g, '\\$&')}"`;
+}
+
+/** Builds the @font-face rules that embed custom fonts into an export
+ *  document (billing/05): one rule per face, data: URIs included, so the
+ *  standalone print document renders with the uploaded faces. Returns ''
+ *  for an empty list — callers insert the text only when non-empty. */
+export function buildFontFaceCSS(faces: readonly FontFaceSource[]): string {
+  return faces
+    .map(({ family, url, format }) => {
+      const src = `url(${cssString(url)})${format ? ` format(${cssString(format)})` : ''}`;
+      return `@font-face { font-family: ${cssString(family)}; src: ${src}; }`;
+    })
+    .join('\n');
+}
+
 // ─── Code block base styling ──────────────────────────────────────────────────
 // Shiki colors highlighted code inline at markdown-render time, so this only
 // carries the settings-driven base: background, font, ligatures. Plain code

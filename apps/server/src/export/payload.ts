@@ -37,6 +37,13 @@ export interface ExportPayload {
    * export document is self-contained and no user file ever touches disk.
    */
   assets: Record<string, string>;
+  /**
+   * The document's custom fonts (billing/05): CSS family name → data: URI.
+   * The /export page registers them as FontFaces before paginating and
+   * embeds them as @font-face rules in the print document. Part of the same
+   * request body, so the 50 MB body cap bounds fonts and assets together.
+   */
+  fonts: Record<string, string>;
 }
 
 /** Hard cap on the request body (spec §Security posture). */
@@ -44,6 +51,9 @@ export const MAX_EXPORT_BODY_BYTES = 50 * 1024 * 1024;
 
 /** Upper bound on distinct asset refs in one payload. */
 const MAX_ASSETS = 200;
+
+/** Upper bound on distinct custom font families in one payload (billing/05). */
+const MAX_FONTS = 50;
 
 const MAX_TITLE_LENGTH = 200;
 
@@ -102,6 +112,14 @@ export function parseExportPayload(
     };
   }
 
+  const fonts = parseFonts(record.fonts);
+  if (!fonts) {
+    return {
+      ok: false,
+      error: `Fonts must map family names to data: URIs (at most ${MAX_FONTS}).`,
+    };
+  }
+
   return {
     ok: true,
     payload: {
@@ -110,6 +128,7 @@ export function parseExportPayload(
       settings,
       pageCount: record.pageCount,
       assets,
+      fonts,
     },
   };
 }
@@ -139,6 +158,22 @@ function parseAssets(value: unknown): Record<string, string> | null {
   for (const [ref, uri] of entries) {
     if (typeof uri !== 'string' || !uri.startsWith('data:')) return null;
     out[ref] = uri;
+  }
+  return out;
+}
+
+/** Same shape as assets, keyed by family name instead of ref (billing/05). */
+function parseFonts(value: unknown): Record<string, string> | null {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const entries = Object.entries(record);
+  if (entries.length > MAX_FONTS) return null;
+  const out: Record<string, string> = {};
+  for (const [family, uri] of entries) {
+    if (typeof family !== 'string' || family.trim() === '') return null;
+    if (typeof uri !== 'string' || !uri.startsWith('data:')) return null;
+    out[family] = uri;
   }
   return out;
 }

@@ -52,6 +52,11 @@ export interface ExportHTMLOptions {
    *  uses, keeping preview and print identical). Font URLs inside it are the
    *  host's to make resolvable from the export document. */
   mathCSS?: string;
+  /** @font-face rules (buildFontFaceCSS) for the document's custom fonts
+   *  (billing/05), inlined as their own <style> before the print CSS. The
+   *  standalone export document has no other way to know the faces — the
+   *  host resolves the settings' custom families to data: URIs. */
+  fontFaceCSS?: string;
   /** RTL switch for the doc CSS and the content div's dir attribute. When
    *  omitted it is derived from the layout content (same heuristic the render
    *  pipeline applies to raw markdown). Pass the value used for buildDocCSS
@@ -155,13 +160,16 @@ export function buildExportHTML(
   const mathCSS = options.mathCSS
     ? `<style>${escapeCSSForStyle(options.mathCSS)}</style>\n`
     : '';
+  const fontFaceCSS = options.fontFaceCSS
+    ? `<style>${escapeCSSForStyle(options.fontFaceCSS)}</style>\n`
+    : '';
 
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <title>${escapeHTML(title)}</title>
-${mathCSS}<style>${escapeCSSForStyle(printCSS)}</style>
+${mathCSS}${fontFaceCSS}<style>${escapeCSSForStyle(printCSS)}</style>
 </head>
 <body>
 ${pageHTMLParts.join('\n')}

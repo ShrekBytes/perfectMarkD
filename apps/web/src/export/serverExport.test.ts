@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
-import { putAssets } from '../documents/db';
+import { openDatabase, putAssets, putFont } from '../documents/db';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
@@ -104,6 +104,67 @@ describe('buildServerExportPayload', () => {
       /^data:image\/png;base64,/,
     );
   });
+
+  it('embeds the settings custom fonts as data: URIs (billing/05)', async () => {
+    const db = await openDatabase();
+    await putFont(db, {
+      id: 'f1',
+      family: 'Inter',
+      bytes: new TextEncoder().encode('woff2-bytes'),
+      mediaType: 'font/woff2',
+      createdAt: 1,
+    });
+    db.close();
+
+    const payload = await buildServerExportPayload({
+      title: 'Report',
+      markdown: '# Hello',
+      settings: {
+        ...useDocumentStore.getState().settings,
+        fontFamily: '__custom__',
+        customFontName: 'Inter',
+        codeFontFamily: '__custom__',
+        customCodeFontName: 'Inter', // same family: one entry, not two
+      },
+    });
+
+    expect(Object.keys(payload.fonts)).toEqual(['Inter']);
+    expect(payload.fonts['Inter']).toMatch(/^data:font\/woff2;base64,/);
+  });
+
+  it('carries no fonts when no custom family is in use', async () => {
+    const payload = await buildServerExportPayload({
+      title: 'Report',
+      markdown: '# Hello',
+      settings: useDocumentStore.getState().settings,
+    });
+    expect(payload.fonts).toEqual({});
+  });
+});
+
+describe('Server Export payload fonts contract', () => {
+  it('a custom-font document serializes to the route with its fonts (billing/05)', async () => {
+    // Client and server share field names, not code; this pins the wire
+    // shape the enqueue route validates (payload.ts parseExportPayload).
+    const payload = await buildServerExportPayload({
+      title: 'Report',
+      markdown: '# Hello',
+      settings: {
+        ...useDocumentStore.getState().settings,
+        fontFamily: '__custom__',
+        customFontName: 'Inter',
+      },
+    });
+    expect(Object.keys(payload)).toEqual([
+      'title',
+      'markdown',
+      'settings',
+      'pageCount',
+      'assets',
+      'fonts',
+    ]);
+    expect(typeof payload.fonts).toBe('object');
+  });
 });
 
 describe('queueServerExport', () => {
@@ -117,6 +178,7 @@ describe('queueServerExport', () => {
       settings: useDocumentStore.getState().settings,
       pageCount: 1,
       assets: {},
+      fonts: {},
     });
 
     expect(job.id).toBe('job-1');
@@ -147,6 +209,7 @@ describe('queueServerExport', () => {
       settings: useDocumentStore.getState().settings,
       pageCount: 1,
       assets: {},
+      fonts: {},
     }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiError);
@@ -175,6 +238,7 @@ describe('queueServerExport', () => {
       settings: useDocumentStore.getState().settings,
       pageCount: 1,
       assets: {},
+      fonts: {},
     }).catch((e: unknown) => e);
 
     expect((error as ApiError).code).toBe('entitlement_required');
@@ -191,6 +255,7 @@ describe('queueServerExport', () => {
       settings: useDocumentStore.getState().settings,
       pageCount: 1,
       assets: {},
+      fonts: {},
     }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ServerExportError);

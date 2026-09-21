@@ -174,6 +174,28 @@ describe('buildExportHTML', () => {
     );
   });
 
+  it('injects font-face CSS as its own style block, escaped, before the print CSS (billing/05)', () => {
+    const s = settings();
+    const fontCSS =
+      '@font-face { font-family: "Inter"; src: url("data:font/woff2;base64,AAA") format("woff2"); }';
+    const html = buildExportHTML(twoPageLayouts(s), s, resolveNothing, {
+      fontFaceCSS: fontCSS,
+    });
+    const fontAt = html.indexOf(`<style>${fontCSS}</style>`);
+    const printAt = html.indexOf('@page {');
+    expect(fontAt).toBeGreaterThan(-1);
+    expect(printAt).toBeGreaterThan(fontAt);
+    // Omitted by default; a family name can't close the style block early —
+    // the breakout sequence is escaped, so hostile text stays inert CSS.
+    expect(buildExportHTML(twoPageLayouts(s), s, resolveNothing)).not.toContain(
+      '@font-face',
+    );
+    const hostile = buildExportHTML(twoPageLayouts(s), s, resolveNothing, {
+      fontFaceCSS: '</style><script>alert(1)</script>',
+    });
+    expect(hostile).toContain('<style><\\/style>');
+  });
+
   it('escapes header and footer text', () => {
     const s = settings({ headerText: 'R&D <dept>', footerText: '"Q1" & more' });
     const html = buildExportHTML(twoPageLayouts(s), s, resolveNothing);

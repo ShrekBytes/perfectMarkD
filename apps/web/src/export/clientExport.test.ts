@@ -3,7 +3,7 @@
 import '@testing-library/jest-dom/vitest';
 import { DEFAULT_SETTINGS, type DocumentSettings } from '@perfectmarkd/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { openDatabase, putAssets } from '../documents/db';
+import { openDatabase, putAssets, putFont } from '../documents/db';
 import { closeAfterSettle } from '../testing/test-assets';
 import { stubIndexedDB } from '../testing/stub-idb';
 import { stubPrintIframes } from '../testing/stub-print-iframe';
@@ -89,6 +89,27 @@ describe('buildExportDocument', () => {
     );
 
     expect(html).not.toContain('<img');
+  });
+
+  it('embeds the custom fonts as @font-face data URIs (billing/05)', async () => {
+    await putFont(db!, {
+      id: 'f1',
+      family: 'Inter',
+      bytes: new TextEncoder().encode('woff2-bytes'),
+      mediaType: 'font/woff2',
+      createdAt: 1,
+    });
+    const html = await buildExportDocument(
+      '# Hello',
+      settings({ fontFamily: '__custom__', customFontName: 'Inter' }),
+      'Fonts',
+    );
+
+    expect(html).toContain('@font-face');
+    expect(html).toContain('font-family: "Inter"');
+    expect(html).toMatch(
+      /url\("data:font\/woff2;base64,[^"]+"\) format\("woff2"\)/,
+    );
   });
 
   it('carries the pipeline RTL decision into the print document', async () => {

@@ -5,14 +5,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { openDB, type IDBPDatabase } from 'idb';
-import type { AssetRecord, DocumentRecord } from './types';
+import type { AssetRecord, DocumentRecord, FontRecord } from './types';
 
 const DB_NAME = 'perfectmarkd';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const DOCS = 'documents';
 const ASSETS = 'assets';
 /** Out-of-line-keyed key/value store for app-level flags (e.g. onboarding). */
 const META = 'meta';
+/** The user's uploaded custom fonts (billing/05) — user-level, so its own
+ *  store rather than document-coupled asset rows. */
+const FONTS = 'fonts';
 
 /** Opens (and on first use creates) the library database. */
 export function openDatabase(): Promise<IDBPDatabase> {
@@ -26,6 +29,9 @@ export function openDatabase(): Promise<IDBPDatabase> {
       }
       if (!db.objectStoreNames.contains(META)) {
         db.createObjectStore(META);
+      }
+      if (!db.objectStoreNames.contains(FONTS)) {
+        db.createObjectStore(FONTS, { keyPath: 'id' });
       }
     },
   });
@@ -112,4 +118,19 @@ export function deleteAssets(
   const tx = db.transaction(ASSETS, 'readwrite');
   for (const id of ids) void tx.store.delete(id);
   return tx.done.then(() => undefined);
+}
+
+// ─── Custom fonts (billing/05) ────────────────────────────────────────────────
+
+export function putFont(db: IDBPDatabase, font: FontRecord): Promise<void> {
+  return db.put(FONTS, font).then(() => undefined);
+}
+
+export async function listFonts(db: IDBPDatabase): Promise<FontRecord[]> {
+  const fonts = await db.getAll(FONTS);
+  return fonts.sort((a, b) => a.family.localeCompare(b.family));
+}
+
+export function deleteFont(db: IDBPDatabase, id: string): Promise<void> {
+  return db.delete(FONTS, id).then(() => undefined);
 }

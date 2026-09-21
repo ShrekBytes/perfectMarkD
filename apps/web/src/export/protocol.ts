@@ -20,11 +20,13 @@
 
 import {
   buildExportHTML,
+  buildFontFaceCSS,
   extractOutlineEntries,
   type DocumentSettings,
   type OutlineEntry,
   type RenderMermaidHook,
 } from '@perfectmarkd/core';
+import { registerPayloadFonts } from '../fonts/loader';
 import { runDocumentPipeline } from '../canvas/pipeline';
 
 export const EXPORT_RENDER_MESSAGE = 'pmd:export-render';
@@ -40,6 +42,8 @@ export interface ExportRenderPayload {
   settings: DocumentSettings;
   /** asset:// refs resolved to data: URIs by the client. */
   assets: Record<string, string>;
+  /** The document's custom fonts (billing/05): family → data: URI. */
+  fonts: Record<string, string>;
 }
 
 export interface ExportRenderSuccess {
@@ -96,6 +100,13 @@ export async function renderServerExportDocument(
     const title = payload.title.trim() || 'Untitled';
     const resolveAsset = (ref: string) => payload.assets[ref];
 
+    // Custom fonts (billing/05) live before pagination: the layout must
+    // measure the real metrics, or the rendered page count could disagree
+    // with the client's declared pageCount. A corrupt font falls back —
+    // and only the faces that registered get embedded in the print
+    // document, which would never load the corrupt ones either.
+    const registeredFonts = await registerPayloadFonts(payload.fonts);
+
     const result = await runDocumentPipeline(
       payload.markdown,
       payload.settings,
@@ -126,6 +137,13 @@ export async function renderServerExportDocument(
         title,
         mathCSS: options.mathCSS,
         isRTL: result.isRTL,
+        // The same URIs the faces registered from, embedded so the print
+        // document carries its own fonts.
+        fontFaceCSS: buildFontFaceCSS(
+          Object.entries(payload.fonts)
+            .filter(([family]) => registeredFonts.includes(family))
+            .map(([family, url]) => ({ family, url })),
+        ),
       },
     );
     paintExportDocument(html);

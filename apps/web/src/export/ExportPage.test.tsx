@@ -67,6 +67,7 @@ it('renders on the agreed message and reports via the done callback', async () =
       markdown: '# H',
       settings: { ...DEFAULT_SETTINGS },
       assets: {},
+      fonts: {},
     },
   });
   await flush();

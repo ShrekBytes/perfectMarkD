@@ -3,23 +3,88 @@
 // colors, and the code-font group (Shiki theme catalog + ligatures).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { CODE_THEMES, PRESETS } from '@perfectmarkd/core';
+import { useEffect } from 'react';
+import {
+  CODE_THEMES,
+  PRESETS,
+  type DocumentSettings,
+} from '@perfectmarkd/core';
 import { applyPreset } from './settings-edit';
 import { PresetThumb } from './PresetThumb';
 import { BODY_FONTS, CODE_FONTS } from './fonts';
+import { useCustomFontStore } from '../fonts/store';
 import {
   ColorInput,
   Field,
   FauxUploadButton,
+  GateFontPicker,
   IncludedNote,
   LockedRow,
   NumberInput,
   Section,
   Select,
   Subgroup,
+  type SelectOption,
   type TabProps,
   ToggleRow,
 } from './controls';
+
+/** Prefix that makes each uploaded font a distinct <option> value while all
+ *  of them resolve to the same settings sentinel (fontFamily '__custom__'
+ *  plus customFontName, which resolveFont/resolveCodeFont already speak). */
+const CUSTOM_FONT_PREFIX = '__custom__:';
+
+const customFontValue = (family: string): string =>
+  `${CUSTOM_FONT_PREFIX}${family}`;
+
+/** Decodes a picker selection into the settings patch: bundled families set
+ *  the family string directly, `__custom__:<name>` entries select an
+ *  uploaded font through the sentinel pair. The code picker passes its own
+ *  field names (codeFontFamily/customCodeFontName). */
+const fontChange = (
+  value: string,
+  familyField: 'fontFamily' | 'codeFontFamily',
+  nameField: 'customFontName' | 'customCodeFontName',
+): Partial<DocumentSettings> =>
+  value.startsWith(CUSTOM_FONT_PREFIX)
+    ? {
+        [familyField]: '__custom__',
+        [nameField]: value.slice(CUSTOM_FONT_PREFIX.length),
+      }
+    : { [familyField]: value };
+
+/** The options for one font picker: the bundled catalog plus the uploaded
+ *  library (locked behind the gate the way the Custom page size is — a
+ *  persisted custom choice renders disabled, never blank). */
+function fontOptionsWithCustom(
+  bundled: { value: string; label: string }[],
+  uploaded: { family: string }[],
+  active: { isCustom: boolean; name: string },
+  gateOpen: boolean,
+): SelectOption<string>[] {
+  const options: SelectOption<string>[] = bundled.map((font) => ({
+    value: font.value,
+    label: font.label,
+  }));
+  for (const font of uploaded) {
+    options.push({
+      value: customFontValue(font.family),
+      label: `Custom — ${font.family}`,
+      disabled: !gateOpen,
+    });
+  }
+  // A settings object can name a family the library no longer has (the font
+  // was removed, or the gate closed before the library loaded): render it
+  // disabled rather than a select that lost its selection.
+  if (active.isCustom && !uploaded.some((f) => f.family === active.name)) {
+    options.push({
+      value: customFontValue(active.name),
+      label: `Custom — ${active.name || 'font'}`,
+      disabled: true,
+    });
+  }
+  return options;
+}
 
 const bodyFontOptions = BODY_FONTS.map((font) => ({
   value: font.css,
@@ -39,6 +104,26 @@ const codeThemeOptions = CODE_THEMES.map((theme) => ({
 const TILE_THUMB = { width: 60, height: 80 };
 
 export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
+  const fonts = useCustomFontStore((state) => state.fonts);
+  const loadFonts = useCustomFontStore((state) => state.load);
+  const addFont = useCustomFontStore((state) => state.add);
+  const removeFont = useCustomFontStore((state) => state.remove);
+
+  // The library lives in IndexedDB; one read on first mount fills the
+  // pickers. Repeated calls are safe (the store guards nothing else).
+  useEffect(() => {
+    void loadFonts();
+  }, [loadFonts]);
+
+  const bodyFontValue =
+    settings.fontFamily === '__custom__'
+      ? customFontValue(settings.customFontName)
+      : settings.fontFamily;
+  const codeFontValue =
+    settings.codeFontFamily === '__custom__'
+      ? customFontValue(settings.customCodeFontName)
+      : settings.codeFontFamily;
+
   return (
     <>
       <Section title="Preset">
@@ -84,9 +169,19 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
         <Field label="Font">
           <Select
             ariaLabel="Body font"
-            value={settings.fontFamily}
-            options={bodyFontOptions}
-            onChange={(fontFamily) => set({ fontFamily })}
+            value={bodyFontValue}
+            options={fontOptionsWithCustom(
+              bodyFontOptions,
+              fonts,
+              {
+                isCustom: settings.fontFamily === '__custom__',
+                name: settings.customFontName.trim(),
+              },
+              flags.customFonts,
+            )}
+            onChange={(value) =>
+              set(fontChange(value, 'fontFamily', 'customFontName'))
+            }
           />
         </Field>
         <Field label="Size (px)">
@@ -213,9 +308,19 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
         <Field label="Code font">
           <Select
             ariaLabel="Code font"
-            value={settings.codeFontFamily}
-            options={codeFontOptions}
-            onChange={(codeFontFamily) => set({ codeFontFamily })}
+            value={codeFontValue}
+            options={fontOptionsWithCustom(
+              codeFontOptions,
+              fonts,
+              {
+                isCustom: settings.codeFontFamily === '__custom__',
+                name: settings.customCodeFontName.trim(),
+              },
+              flags.customFonts,
+            )}
+            onChange={(value) =>
+              set(fontChange(value, 'codeFontFamily', 'customCodeFontName'))
+            }
           />
         </Field>
         <ToggleRow
@@ -226,12 +331,19 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
       </Section>
 
       <Section title="Custom (Pro)">
-        {/* The real gated UIs (font upload + stylesheet textarea) are
-            billing/05; until then the unlocked state says what the plan
-            includes instead of showing a lock a paying user can't act on. */}
+        {/* The custom-stylesheet UI is ai-transforms/01's ticket (the engine
+            field + Stylesheet Inspector tab live there); until then the
+            unlocked state says what the plan includes instead of showing a
+            lock a paying user can't act on. Custom fonts (billing/05) are
+            live: the library uploads here, the pickers above list it. */}
         {flags.customFonts ? (
           <Field label="Custom fonts">
-            <IncludedNote />
+            <GateFontPicker
+              ariaLabel="Upload custom font"
+              addFont={addFont}
+              fonts={fonts}
+              onRemove={(id) => void removeFont(id)}
+            />
           </Field>
         ) : (
           <LockedRow
