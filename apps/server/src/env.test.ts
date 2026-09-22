@@ -14,6 +14,7 @@ describe('loadEnv', () => {
       exportRenderTimeoutMs: 120_000,
       historyDir: './data/history',
       historyEncryptionKey: null,
+      aiApiKey: null,
     });
   });
 
@@ -30,6 +31,7 @@ describe('loadEnv', () => {
         EXPORT_RENDER_TIMEOUT_MS: '60000',
         HISTORY_DIR: '/var/lib/pmd/history',
         HISTORY_ENCRYPTION_KEY: 'a'.repeat(64),
+        AI_API_KEY: 'sk-provider-key',
       }),
     ).toEqual({
       port: 8080,
@@ -42,6 +44,7 @@ describe('loadEnv', () => {
       exportRenderTimeoutMs: 60_000,
       historyDir: '/var/lib/pmd/history',
       historyEncryptionKey: 'a'.repeat(64),
+      aiApiKey: 'sk-provider-key',
     });
   });
 
@@ -55,6 +58,7 @@ describe('loadEnv', () => {
     expect(loadEnv({ HISTORY_ENCRYPTION_KEY: '' }).historyEncryptionKey).toBe(
       null,
     );
+    expect(loadEnv({ AI_API_KEY: ' ' }).aiApiKey).toBeNull();
   });
 
   it('rejects a PORT that is not an integer in range', () => {

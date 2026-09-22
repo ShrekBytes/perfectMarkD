@@ -295,8 +295,8 @@ describe('quota enforcement (server/04)', () => {
   /** Tight plan limits so a quota can be exhausted with one export. */
   function setQuota(db: AppDatabase, proQuota: number): void {
     const limits: PlanLimits = {
-      pro: { pageCap: 300, quotaMonthly: proQuota },
-      premium: { pageCap: 1000, quotaMonthly: 1000 },
+      pro: { pageCap: 300, quotaMonthly: proQuota, aiActionsMonthly: 0 },
+      premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 0 },
     };
     setSetting(db, LIMITS_KEY, limits);
   }

@@ -83,6 +83,15 @@ export interface UsageView {
   allowance: number;
 }
 
+/** This period's AI Action usage, as the panel shows it (03). */
+export interface AiUsageView {
+  period: string;
+  used: number;
+  /** The plan's monthly AI Allowance while the Entitlement is active. */
+  allowance: number;
+  remaining: number;
+}
+
 /** A user row in the search list. */
 export interface AdminUser {
   id: number;
@@ -91,6 +100,7 @@ export interface AdminUser {
   createdAt: string;
   entitlement: EntitlementView | null;
   usage: UsageView;
+  aiUsage: AiUsageView;
 }
 
 /** The detail view: the row plus the user's Order history. */
@@ -160,8 +170,10 @@ export async function deleteAdminUser(userId: number): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Settings (billing/03): wallets, prices, limits, LTC rate — all in
-// settings_kv on the server, editable without a redeploy.
+// Settings (billing/03 + ai-transforms/03): wallets, prices, limits, LTC rate,
+// and the AI Provider Config — all in settings_kv on the server, editable
+// without a redeploy. The AI key is never part of any payload; the view only
+// says whether the environment has one.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type WalletAddresses = Record<PaymentMethod, string>;
@@ -175,8 +187,26 @@ export type PlanPrices = Record<'pro' | 'premium', PlanPrice>;
 export interface PlanLimit {
   pageCap: number;
   quotaMonthly: number;
+  /** Monthly AI Actions; zero disables AI Actions for the plan. */
+  aiActionsMonthly: number;
 }
 export type PlanLimits = Record<'pro' | 'premium', PlanLimit>;
+
+export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
+
+/** The Admin's AI Provider Config; the key lives in the environment only. */
+export interface AiProviderConfig {
+  enabled: boolean;
+  baseUrl: string;
+  model: string;
+  stylesheetModel: string | null;
+  reasoningEffort: ReasoningEffort;
+  contextWindow: number;
+  maxOutputTokens: number;
+  maxInputCharacters: number;
+  timeoutSeconds: number;
+  burstPerMinute: number;
+}
 
 export interface AdminSettings {
   wallets: WalletAddresses;
@@ -184,9 +214,13 @@ export interface AdminSettings {
   limits: PlanLimits;
   /** USDT per LTC captured into new Orders; null disables LTC payments. */
   ltcRateUsdt: number | null;
+  aiProvider: AiProviderConfig;
+  /** Whether the deployment's environment has an AI key — never the key. */
+  aiKeyPresent: boolean;
 }
 
-export type SettingsKey = 'wallets' | 'prices' | 'limits' | 'ltcRateUsdt';
+export type SettingsKey =
+  'wallets' | 'prices' | 'limits' | 'ltcRateUsdt' | 'aiProvider';
 
 export async function getAdminSettings(): Promise<AdminSettings> {
   const res = await fetch('/api/admin/settings', { credentials: 'include' });
@@ -201,4 +235,35 @@ export async function updateAdminSetting(
   const res = await putJson(`/api/admin/settings/${key}`, value);
   if (!res.ok) throw await errorFrom(res);
   return ((await res.json()) as { settings: AdminSettings }).settings;
+}
+
+/** Published model metadata from Test connection. */
+export interface AiConnectionModel {
+  id: string;
+  contextLength: number | null;
+  maxOutputTokens: number | null;
+  inputPricePerMillion: number | null;
+  outputPricePerMillion: number | null;
+}
+
+/** Test connection's report — Admin-only, never persisted. */
+export interface AiConnectionReport {
+  ok: boolean;
+  keyPresent: boolean;
+  model: AiConnectionModel | null;
+  warnings: string[];
+  error: string | null;
+  detail: string | null;
+}
+
+/**
+ * Tests the draft the panel is editing; the server re-validates it and uses
+ * the environment's key without ever returning it.
+ */
+export async function testAiConnection(
+  config: AiProviderConfig,
+): Promise<AiConnectionReport> {
+  const res = await postJson('/api/admin/settings/ai/test', config);
+  if (!res.ok) throw await errorFrom(res);
+  return ((await res.json()) as { report: AiConnectionReport }).report;
 }

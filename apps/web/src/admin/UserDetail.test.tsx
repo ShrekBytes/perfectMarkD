@@ -19,6 +19,7 @@ function adminUserDetail(
     createdAt: '2026-08-01T00:00:00.000Z',
     entitlement: { plan: 'pro', expiresAt: '2027-01-05T00:00:00.000Z' },
     usage: { period: '2026-09', used: 300, comps: 10, allowance: 310 },
+    aiUsage: { period: '2026-09', used: 12, allowance: 100, remaining: 88 },
     orders: [],
     ...overrides,
   };
@@ -87,12 +88,33 @@ it('shows entitlement, usage with comps, and the action buttons', async () => {
   expect(screen.getByTestId('user-usage')).toHaveTextContent(
     '300 of 310 used (2026-09) — includes 10 comped',
   );
+  expect(screen.getByTestId('user-ai-usage')).toHaveTextContent(
+    '12 of 100 used (2026-09) — 88 remaining',
+  );
   expect(screen.getByTestId('user-grant')).toHaveTextContent('Extend');
   expect(screen.getByTestId('user-revoke')).toBeInTheDocument();
   expect(screen.getByTestId('user-comp')).toBeInTheDocument();
   expect(screen.getByTestId('user-reset-password')).toBeInTheDocument();
   expect(screen.getByTestId('user-delete')).toBeInTheDocument();
   expect(onChanged).toHaveBeenCalled();
+});
+
+it('shows the AI count without an allowance when the plan has none', async () => {
+  vi.stubGlobal(
+    'fetch',
+    mockApi(() =>
+      adminUserDetail({
+        entitlement: null,
+        aiUsage: { period: '2026-09', used: 3, allowance: 0, remaining: 0 },
+      }),
+    ),
+  );
+
+  render(<UserDetail userId={42} onBack={onBack} onChanged={onChanged} />);
+
+  expect(await screen.findByTestId('user-ai-usage')).toHaveTextContent(
+    '3 used (2026-09) — no AI allowance on this plan',
+  );
 });
 
 it('grants an entitlement and refreshes to the new state', async () => {

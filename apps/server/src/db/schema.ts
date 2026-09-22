@@ -33,6 +33,36 @@ export type Coin = 'USDT' | 'LTC';
 export const NETWORKS = ['TRC20', 'BEP20', 'mainnet'] as const;
 export type Network = (typeof NETWORKS)[number];
 
+/** Reasoning effort an AI Action may ask for (settings_kv: `ai_provider`). */
+export const REASONING_EFFORTS = ['off', 'low', 'medium', 'high'] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+/**
+ * The Admin's AI Provider Config (settings_kv: `ai_provider`). The API key is
+ * deliberately absent: it lives in the deployment's environment, never in the
+ * database or a settings read, and rotating it needs a restart (ADR-0008).
+ */
+export interface AiProviderConfig {
+  /** Kill switch: off removes AI from the whole instance. */
+  enabled: boolean;
+  /** OpenAI-compatible API root, e.g. https://openrouter.ai/api/v1. */
+  baseUrl: string;
+  /** Model id used for AI Actions; empty until the Admin picks one. */
+  model: string;
+  /** Cheaper model for stylesheet edits; null uses `model`. */
+  stylesheetModel: string | null;
+  reasoningEffort: ReasoningEffort;
+  /** The model's context window, in tokens, the caps are budgeted against. */
+  contextWindow: number;
+  /** Explicit output cap sent with every request. */
+  maxOutputTokens: number;
+  /** Characters of target text the size ladder may send. */
+  maxInputCharacters: number;
+  timeoutSeconds: number;
+  /** Max AI Action requests per minute per user. */
+  burstPerMinute: number;
+}
+
 /** Admin actions recorded in the audit log (billing/02, billing/03). */
 export const AUDIT_ACTIONS = [
   'order.verify',
@@ -94,6 +124,8 @@ export interface PlanLimit {
   pageCap: number;
   /** Monthly Server Export quota. */
   quotaMonthly: number;
+  /** Monthly AI Actions; zero disables AI Actions for the plan. */
+  aiActionsMonthly: number;
 }
 export type PlanLimits = Record<Plan, PlanLimit>;
 
@@ -106,6 +138,18 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+  /**
+   * AI Access (CONTEXT.md): the user's own on/off switch, on by default —
+   * the submit is the choice, so the switch only exists to decline (ADR-0009).
+   */
+  aiAccess: integer('ai_access', { mode: 'boolean' }).notNull().default(true),
+  /**
+   * First-use disclosure: recorded server-side so the notice shows once per
+   * account, not once per browser.
+   */
+  aiDisclosureSeen: integer('ai_disclosure_seen', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -188,6 +232,23 @@ export const exportUsage = sqliteTable(
     count: integer('count').notNull().default(0),
     /** Admin-granted extra allowance for the period (billing/03 comp quota). */
     comps: integer('comps').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.period] })],
+);
+
+/**
+ * Monthly AI Action usage keyed by period (`YYYY-MM`). Deliberately separate
+ * from `export_usage`: separate features, separate allowances, and a shared
+ * row would make one feature's bookkeeping depend on the other's.
+ */
+export const aiUsage = sqliteTable(
+  'ai_usage',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    period: text('period').notNull(),
+    count: integer('count').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.userId, t.period] })],
 );

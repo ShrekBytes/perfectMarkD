@@ -17,6 +17,7 @@ function adminUserDetail(): AdminUserDetail {
     createdAt: '2026-08-01T00:00:00.000Z',
     entitlement: null,
     usage: { period: '2026-09', used: 0, comps: 0, allowance: 0 },
+    aiUsage: { period: '2026-09', used: 0, allowance: 0, remaining: 0 },
     orders: [],
   };
 }

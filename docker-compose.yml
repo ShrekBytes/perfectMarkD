@@ -54,6 +54,9 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required, see .env.example}
       HISTORY_ENCRYPTION_KEY: ${HISTORY_ENCRYPTION_KEY:?HISTORY_ENCRYPTION_KEY is required, see .env.example}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      # AI Actions (ADR-0008): deployment-level provider key; unset means the
+      # instance reports AI as unavailable (no key is ever stored in the db).
+      AI_API_KEY: ${AI_API_KEY:-}
       # The worker's Chromium loads the SPA's /export page from Caddy over
       # the internal network — the loopback origin (http://caddy) exists so
       # the worker has one regardless of how the public site is served.

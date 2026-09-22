@@ -1,20 +1,28 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import type { AppDatabase } from './database.js';
 import {
   DURATION_MONTHS,
   PAYMENT_METHODS,
   PLANS,
+  settingsKv,
   type PlanPrices,
   type WalletAddresses,
 } from './schema.js';
 import {
+  AI_PROVIDER_KEY,
+  DEFAULT_AI_PROVIDER_CONFIG,
+  getAiProviderConfig,
   getPlanLimits,
   getPlanPrices,
   getSetting,
   getWallets,
   LIMITS_KEY,
   pageCapFor,
+  parseAiProviderConfig,
+  parsePlanLimits,
   PRICES_KEY,
+  seedSettings,
   setSetting,
   WALLETS_KEY,
 } from './settings.js';
@@ -123,8 +131,8 @@ describe('typed accessor', () => {
 describe('pageCapFor', () => {
   it('reads the cap for a known plan', () => {
     setSetting(db, LIMITS_KEY, {
-      pro: { pageCap: 300, quotaMonthly: 300 },
-      premium: { pageCap: 1000, quotaMonthly: 1000 },
+      pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 100 },
+      premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
     });
     expect(pageCapFor(getPlanLimits(db), 'pro')).toBe(300);
     expect(pageCapFor(getPlanLimits(db), 'premium')).toBe(1000);
@@ -132,11 +140,159 @@ describe('pageCapFor', () => {
 
   it('gives planless (free) and unknown plans the smallest paid cap', () => {
     setSetting(db, LIMITS_KEY, {
-      pro: { pageCap: 300, quotaMonthly: 300 },
-      premium: { pageCap: 1000, quotaMonthly: 1000 },
+      pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 100 },
+      premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
     });
     const limits = getPlanLimits(db);
     expect(pageCapFor(limits, 'free')).toBe(300);
     expect(pageCapFor(limits, 'mystery')).toBe(300);
   });
 });
+
+describe('seeded AI provider config', () => {
+  it('seeds the default endpoint, effort, and caps (no model picked)', () => {
+    expect(getAiProviderConfig(db)).toEqual({
+      enabled: true,
+      baseUrl: 'https://openrouter.ai/api/v1',
+      model: '',
+      stylesheetModel: null,
+      reasoningEffort: 'medium',
+      contextWindow: 128_000,
+      maxOutputTokens: 16_000,
+      maxInputCharacters: 60_000,
+      timeoutSeconds: 60,
+      burstPerMinute: 10,
+    });
+  });
+
+  it('exposes the settings key for direct access', () => {
+    expect(AI_PROVIDER_KEY).toBe('ai_provider');
+  });
+});
+
+describe('AI provider config validation', () => {
+  const valid = () => ({
+    ...DEFAULT_AI_PROVIDER_CONFIG,
+    model: 'vendor/model',
+  });
+
+  it('accepts a well-formed config', () => {
+    expect(parseAiProviderConfig(valid())).toEqual(valid());
+  });
+
+  it('trims a trailing slash from the base URL so paths never double up', () => {
+    const parsed = parseAiProviderConfig({
+      ...valid(),
+      baseUrl: 'https://ai.example.com/v1///',
+    });
+    expect(parsed?.baseUrl).toBe('https://ai.example.com/v1');
+  });
+
+  it('accepts zero as an allowance elsewhere but keeps output inside the window', () => {
+    const parsed = parseAiProviderConfig({
+      ...valid(),
+      contextWindow: 8_000,
+      maxOutputTokens: 4_000,
+    });
+    expect(parsed).not.toBeNull();
+  });
+
+  it('rejects malformed values', () => {
+    const reject = (overrides: Record<string, unknown>) => {
+      expect(parseAiProviderConfig({ ...valid(), ...overrides })).toBeNull();
+    };
+    expect(parseAiProviderConfig(null)).toBeNull();
+    expect(parseAiProviderConfig('nope')).toBeNull();
+    expect(parseAiProviderConfig({})).toBeNull();
+    reject({ enabled: 'yes' });
+    reject({ baseUrl: 'ftp://ai.example.com' });
+    reject({ baseUrl: '' });
+    reject({ baseUrl: 42 });
+    reject({ model: 42 });
+    reject({ stylesheetModel: '' });
+    reject({ reasoningEffort: 'maximum' });
+    reject({ contextWindow: 0 });
+    reject({ contextWindow: 100.5 });
+    reject({ maxOutputTokens: -1 });
+    reject({ maxInputCharacters: 0 });
+    reject({ timeoutSeconds: 0 });
+    reject({ burstPerMinute: 0 });
+    // A cap equal to or above the window can never fit a request.
+    reject({ contextWindow: 16_000, maxOutputTokens: 16_000 });
+    reject({ contextWindow: 8_000, maxOutputTokens: 16_000 });
+    // Unknown fields are typos, not future-proofing.
+    reject({ maxOutptTokens: 5_000 });
+  });
+
+  it('reads the config back through the typed accessor and rejects corruption', () => {
+    const edited = { ...DEFAULT_AI_PROVIDER_CONFIG, model: 'vendor/model' };
+    setSetting(db, AI_PROVIDER_KEY, edited);
+    expect(getAiProviderConfig(db)).toEqual(edited);
+
+    setSetting(db, AI_PROVIDER_KEY, { enabled: true });
+    expect(() => getAiProviderConfig(db)).toThrow(/ai_provider/);
+
+    // Restore valid state for any later reader of the shared database.
+    setSetting(db, AI_PROVIDER_KEY, DEFAULT_AI_PROVIDER_CONFIG);
+  });
+});
+
+describe('plan limits: the monthly AI allowance', () => {
+  it('accepts zero (AI disabled for the plan) and rejects a negative or fractional allowance', () => {
+    const limits = (aiActionsMonthly: number) => ({
+      pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly },
+      premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
+    });
+    expect(parsePlanLimits(limits(0))).not.toBeNull();
+    expect(parsePlanLimits(limits(-1))).toBeNull();
+    expect(parsePlanLimits(limits(1.5))).toBeNull();
+    expect(
+      parsePlanLimits({
+        pro: { pageCap: 300, quotaMonthly: 300 },
+        premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
+      }),
+    ).toBeNull();
+  });
+
+  it('fills the allowance into limits seeded before the field existed, keeping admin edits', () => {
+    // The shape a pre-AI upgrade has in settings_kv: both older fields edited
+    // by the Admin, no allowance field.
+    setSetting(db, LIMITS_KEY, {
+      pro: { pageCap: 250, quotaMonthly: 150 },
+      premium: { pageCap: 1200, quotaMonthly: 2000 },
+    });
+    expect(() => getPlanLimits(db)).toThrow(/limits/);
+
+    seedSettings(db);
+
+    expect(getPlanLimits(db)).toEqual({
+      pro: { pageCap: 250, quotaMonthly: 150, aiActionsMonthly: 100 },
+      premium: { pageCap: 1200, quotaMonthly: 2000, aiActionsMonthly: 300 },
+    });
+  });
+
+  it('leaves a corrupt limits row alone rather than guessing', () => {
+    setSetting(db, LIMITS_KEY, {
+      pro: { pageCap: 0, quotaMonthly: 300 },
+      premium: { pageCap: 1000, quotaMonthly: 1000 },
+    });
+    seedSettings(db);
+    // The valid row gets the new field; the corrupt one is left for the
+    // validator to reject rather than silently rewritten.
+    expect(getSetting(db, LIMITS_KEY)).toEqual({
+      pro: { pageCap: 0, quotaMonthly: 300 },
+      premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
+    });
+    expect(() => getPlanLimits(db)).toThrow(/limits/);
+
+    // Restore valid state for any later reader of the shared database.
+    seedSettingsAfterReset();
+  });
+});
+
+/** Re-seed the shared database's limits to the valid defaults. */
+function seedSettingsAfterReset(): void {
+  // A fresh seed only fills absent keys, so remove the corrupt row first.
+  db.delete(settingsKv).where(eq(settingsKv.key, LIMITS_KEY)).run();
+  seedSettings(db);
+}

@@ -4,6 +4,8 @@ import type { AppEnv } from '../index.js';
 import { auditLogs, settingsKv } from '../db/schema.js';
 import type { AppDatabase } from '../db/database.js';
 import {
+  AI_PROVIDER_KEY,
+  getAiProviderConfig,
   getLtcRate,
   getPlanLimits,
   getPlanPrices,
@@ -11,6 +13,7 @@ import {
   getWallets,
   LIMITS_KEY,
   LTC_RATE_KEY,
+  parseAiProviderConfig,
   parseLtcRate,
   parsePlanLimits,
   parsePlanPrices,
@@ -18,15 +21,27 @@ import {
   PRICES_KEY,
   WALLETS_KEY,
 } from '../db/settings.js';
-import type { PlanLimits, PlanPrices, WalletAddresses } from '../db/schema.js';
+import type {
+  AiProviderConfig,
+  PlanLimits,
+  PlanPrices,
+  WalletAddresses,
+} from '../db/schema.js';
 import { parseJson } from '../request-body.js';
+import { resolveAiContext, type AiContext } from '../ai/context.js';
+import { testAiConnection } from '../ai/test-connection.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Admin settings (billing/03): wallets, plan prices, plan limits, and the LTC
-// rate — all in settings_kv, editable in-panel so a wallet change needs no
-// redeploy. Each key updates (and audit-logs) on its own, so the trail shows
-// exactly which setting changed. Validation runs through the same parsers the
-// readers use, so a value the panel writes is always a value the app accepts.
+// Admin settings (billing/03 + ai-transforms/03): wallets, plan prices, plan
+// limits, the LTC rate, and the AI Provider Config — all in settings_kv,
+// editable in-panel so a wallet change or a model swap needs no redeploy.
+// Each key updates (and audit-logs) on its own, so the trail shows exactly
+// which setting changed. Validation runs through the same parsers the readers
+// use, so a value the panel writes is always a value the app accepts.
+//
+// The AI key is deliberately NOT a setting (ADR-0008): the view reports only
+// whether the environment carries one, and Test connection uses the key from
+// the app's AI context without ever echoing it.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The settings the panel edits, as one view. */
@@ -36,19 +51,29 @@ export interface AdminSettingsView {
   limits: PlanLimits;
   /** USDT per LTC captured into new Orders; null disables LTC payments. */
   ltcRateUsdt: number | null;
+  /** The Admin's AI Provider Config (ADR-0008). */
+  aiProvider: AiProviderConfig;
+  /** Whether the deployment's environment has an AI key — never the key. */
+  aiKeyPresent: boolean;
 }
 
-export function settingsView(db: AppDatabase): AdminSettingsView {
+export function settingsView(
+  db: AppDatabase,
+  aiKeyPresent: boolean,
+): AdminSettingsView {
   return {
     wallets: getWallets(db),
     prices: getPlanPrices(db),
     limits: getPlanLimits(db),
     ltcRateUsdt: getLtcRate(db),
+    aiProvider: getAiProviderConfig(db),
+    aiKeyPresent,
   };
 }
 
 /** The panel-facing key (URL segment) for each settings_kv key. */
-type SettingKey = 'wallets' | 'prices' | 'limits' | 'ltcRateUsdt';
+type SettingKey =
+  'wallets' | 'prices' | 'limits' | 'ltcRateUsdt' | 'aiProvider';
 
 interface ParsedSetting {
   ok: true;
@@ -58,6 +83,9 @@ interface RejectedSetting {
   ok: false;
   error: string;
 }
+
+const AI_PROVIDER_ERROR =
+  'The AI provider config must carry an enabled flag, an http(s) base URL, a model id, a reasoning effort of off/low/medium/high, and whole-number caps with the output cap inside the context window.';
 
 const VALIDATORS: Record<
   SettingKey,
@@ -90,7 +118,7 @@ const VALIDATORS: Record<
       : {
           ok: false,
           error:
-            'Plan limits must be an object with a whole-number pageCap and quotaMonthly above zero for every plan.',
+            'Plan limits must be an object with a whole-number pageCap and quotaMonthly above zero, and a whole-number aiActionsMonthly of zero or more, for every plan.',
         };
   },
   ltcRateUsdt: (value) => {
@@ -104,6 +132,12 @@ const VALIDATORS: Record<
             'The LTC rate must be a positive USDT-per-LTC number, or null to disable LTC payments.',
         };
   },
+  aiProvider: (value) => {
+    const parsed = parseAiProviderConfig(value);
+    return parsed
+      ? { ok: true, value: parsed }
+      : { ok: false, error: AI_PROVIDER_ERROR };
+  },
 };
 
 const KV_KEYS: Record<SettingKey, string> = {
@@ -111,15 +145,48 @@ const KV_KEYS: Record<SettingKey, string> = {
   prices: PRICES_KEY,
   limits: LIMITS_KEY,
   ltcRateUsdt: LTC_RATE_KEY,
+  aiProvider: AI_PROVIDER_KEY,
 };
+
+export interface SettingsRoutesOptions {
+  now?: () => Date;
+  /** The AI context (key presence + provider seam) for Test connection. */
+  ai?: AiContext;
+}
 
 export function settingsRoutes({
   now = () => new Date(),
-}: { now?: () => Date } = {}) {
+  ai = resolveAiContext(),
+}: SettingsRoutesOptions = {}) {
   const app = new Hono<AppEnv>();
+  const aiKeyPresent = ai.apiKey !== null;
 
   app.get('/', (c) => {
-    return c.json({ settings: settingsView(c.var.db) });
+    return c.json({ settings: settingsView(c.var.db, aiKeyPresent) });
+  });
+
+  /**
+   * Test connection (ai-transforms/03): tests the draft the panel is editing
+   * when it sends one, otherwise the saved config. One minimal completion plus
+   * a best-effort metadata lookup; the report never leaves the Admin surface.
+   */
+  app.post('/ai/test', async (c) => {
+    const db = c.var.db;
+    const body = parseJson(await c.req.text());
+    let config: AiProviderConfig;
+    if (body === null) {
+      config = getAiProviderConfig(db);
+    } else {
+      const parsed = parseAiProviderConfig(body);
+      if (!parsed) return c.json({ error: AI_PROVIDER_ERROR }, 400);
+      config = parsed;
+    }
+    const report = await testAiConnection({
+      config,
+      apiKey: ai.apiKey,
+      provider: ai.provider,
+    });
+    return c.json({ report });
   });
 
   app.put('/:key', async (c) => {
@@ -168,7 +235,7 @@ export function settingsRoutes({
         .run();
     });
 
-    return c.json({ settings: settingsView(db) });
+    return c.json({ settings: settingsView(db, aiKeyPresent) });
   });
 
   return app;

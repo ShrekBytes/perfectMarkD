@@ -19,6 +19,7 @@ function adminUserDetail(
     createdAt: '2026-08-01T00:00:00.000Z',
     entitlement: { plan: 'pro', expiresAt: '2026-10-05T00:00:00.000Z' },
     usage: { period: '2026-09', used: 0, comps: 0, allowance: 300 },
+    aiUsage: { period: '2026-09', used: 0, allowance: 100, remaining: 100 },
     orders: [],
     ...overrides,
   };

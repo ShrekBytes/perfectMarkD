@@ -25,8 +25,8 @@ function makeDb(): AppDatabase {
 
 /** Tight limits so tests can exhaust a quota without looping exports. */
 const TEST_LIMITS: PlanLimits = {
-  pro: { pageCap: 300, quotaMonthly: 2 },
-  premium: { pageCap: 1000, quotaMonthly: 5 },
+  pro: { pageCap: 300, quotaMonthly: 2, aiActionsMonthly: 0 },
+  premium: { pageCap: 1000, quotaMonthly: 5, aiActionsMonthly: 0 },
 };
 
 function insertUser(db: AppDatabase): number {

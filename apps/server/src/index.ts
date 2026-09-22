@@ -19,6 +19,7 @@ import { ExportWorker, type RenderPdf } from './export/worker.js';
 import { historyRoutes } from './history/routes.js';
 import type { HistoryStore } from './history/store.js';
 import { meRoutes } from './me.js';
+import { resolveAiContext, type AiAppOptions } from './ai/context.js';
 
 export interface AppEnv {
   Variables: {
@@ -76,6 +77,13 @@ export interface CreateAppOptions {
   history?: HistoryStore;
   /** Mounts the Server Export API + in-process worker (server/03). */
   export?: ExportAppOptions;
+  /**
+   * The AI provider seam (ADR-0008): the deployment's key from the
+   * environment, and the client to call it with. Omitted entirely means the
+   * instance has no key, so AI reports as unconfigured; tests inject a fake
+   * provider so nothing here touches a live API.
+   */
+  ai?: AiAppOptions;
 }
 
 /**
@@ -92,8 +100,13 @@ export function createApp({
   removeStoredFile,
   history,
   export: exportOptions,
+  ai: aiOptions,
 }: CreateAppOptions) {
   const clock: Clock = now ?? (() => new Date());
+  // The AI context is resolved once: the environment key plus the provider
+  // seam. With no key the context is inert — AI reports as unconfigured and
+  // no surface can reach a provider.
+  const ai = resolveAiContext(aiOptions);
 
   // The Server Export pipeline (server/03): memory stores, the in-process
   // worker, and the /api/export routes. The worker's boot (stale-job
@@ -150,13 +163,13 @@ export function createApp({
       return next();
     })
     .get('/healthz', (c) => c.json({ ok: true }))
-    .route('/api/me', meRoutes({ now: clock }))
+    .route('/api/me', meRoutes({ now: clock, ai }))
     .route(
       '/api/auth',
       authRoutes({ sessionSecret, adminEmail, authRateLimit, now: clock }),
     )
     .route('/api/orders', orderRoutes())
-    .route('/api/admin', adminRoutes({ now: clock, removeStoredFile }));
+    .route('/api/admin', adminRoutes({ now: clock, removeStoredFile, ai }));
 
   // Export History (server/05) mounts whenever storage is configured; the
   // Server Export API additionally needs its worker options. A composition

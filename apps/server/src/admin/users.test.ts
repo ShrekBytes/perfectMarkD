@@ -5,6 +5,7 @@ import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { LTC_RATE_KEY, WALLETS_KEY, setSetting } from '../db/settings.js';
 import {
+  aiUsage,
   entitlements,
   exportUsage,
   exportsHistory,
@@ -330,6 +331,13 @@ describe('GET /api/admin/users/:id', () => {
         count: 4,
       })
       .run();
+    db.insert(aiUsage)
+      .values({
+        userId: userIdFor(db, 'reader@example.com'),
+        period: '2026-09',
+        count: 12,
+      })
+      .run();
     const admin = await adminSignedIn(app);
 
     const res = await getJson(
@@ -344,6 +352,7 @@ describe('GET /api/admin/users/:id', () => {
         email: string;
         entitlement: unknown;
         usage: Record<string, number>;
+        aiUsage: Record<string, number>;
         orders: Array<Record<string, unknown>>;
       };
     };
@@ -355,6 +364,13 @@ describe('GET /api/admin/users/:id', () => {
       comps: 0,
       allowance: 0,
     });
+    // AI Actions have their own counter and their own allowance (03).
+    expect(user.aiUsage).toEqual({
+      period: '2026-09',
+      used: 12,
+      allowance: 0,
+      remaining: 0,
+    });
     expect(user.orders).toHaveLength(1);
     expect(user.orders[0]).toMatchObject({
       id: orderId,
@@ -362,6 +378,44 @@ describe('GET /api/admin/users/:id', () => {
       referenceCode: expect.any(String),
       amountExpected: '9',
       status: 'pending',
+    });
+  });
+
+  it("shows the user's AI Action count and remaining allowance for the plan", async () => {
+    const { app, db } = usersApp({
+      adminEmail: 'owner@example.com',
+      now: () => NOW,
+    });
+    await signedIn(app);
+    seedEntitlement(
+      db,
+      userIdFor(db, 'reader@example.com'),
+      'pro',
+      '2027-01-05T00:00:00.000Z',
+    );
+    db.insert(aiUsage)
+      .values({
+        userId: userIdFor(db, 'reader@example.com'),
+        period: '2026-09',
+        count: 12,
+      })
+      .run();
+    const admin = await adminSignedIn(app);
+
+    const res = await getJson(
+      app,
+      `/api/admin/users/${userIdFor(db, 'reader@example.com')}`,
+      admin,
+    );
+
+    const { user } = (await res.json()) as {
+      user: { aiUsage: Record<string, number> };
+    };
+    expect(user.aiUsage).toEqual({
+      period: '2026-09',
+      used: 12,
+      allowance: 100,
+      remaining: 88,
     });
   });
 
@@ -881,6 +935,9 @@ describe('DELETE /api/admin/users/:id', () => {
         .from(exportUsage)
         .where(eq(exportUsage.userId, doomedId))
         .all(),
+    ).toEqual([]);
+    expect(
+      db.select().from(aiUsage).where(eq(aiUsage.userId, doomedId)).all(),
     ).toEqual([]);
     expect(
       db

@@ -3,10 +3,18 @@ import { eq } from 'drizzle-orm';
 import { createApp, type AppType } from './index.js';
 import { createTestDatabase, removeTestDatabase } from './db/testing.js';
 import type { AppDatabase } from './db/database.js';
-import { entitlements, exportUsage, users } from './db/schema.js';
+import { aiUsage, entitlements, exportUsage, users } from './db/schema.js';
 import { usagePeriod } from './quota.js';
+import {
+  AI_PROVIDER_KEY,
+  DEFAULT_AI_PROVIDER_CONFIG,
+  LIMITS_KEY,
+  setSetting,
+} from './db/settings.js';
 
 const SESSION_SECRET = 'test-session-secret';
+
+const NOW = new Date('2026-09-11T00:00:00.000Z');
 
 let cleanup: (() => void) | undefined;
 afterEach(() => {
@@ -14,7 +22,13 @@ afterEach(() => {
   cleanup = undefined;
 });
 
-function makeApp(options: { adminEmail?: string } = {}): {
+function makeApp(
+  options: {
+    adminEmail?: string;
+    now?: () => Date;
+    ai?: { apiKey?: string | null };
+  } = {},
+): {
   app: AppType;
   db: AppDatabase;
 } {
@@ -25,6 +39,8 @@ function makeApp(options: { adminEmail?: string } = {}): {
     log: () => {},
     sessionSecret: SESSION_SECRET,
     adminEmail: options.adminEmail ?? null,
+    now: options.now,
+    ai: options.ai,
   });
   return { app, db };
 }
@@ -82,6 +98,14 @@ interface MeResponse {
   expiresAt: string | null;
   quota: { used: number; limit: number };
   flags: Record<string, boolean>;
+  ai: {
+    configured: boolean;
+    included: boolean;
+    access: boolean;
+    remaining: number;
+    period: string;
+    resetsAt: string;
+  };
 }
 
 async function getMe(app: AppType, cookie?: string): Promise<Response> {
@@ -117,6 +141,16 @@ describe('GET /api/me', () => {
         bannerImages: false,
         backgroundImage: false,
         customFonts: false,
+      },
+      // ai-transforms/03: no key in the environment, no plan — AI is off,
+      // the caller's own switch stays on.
+      ai: {
+        configured: false,
+        included: false,
+        access: true,
+        remaining: 0,
+        period: usagePeriod(new Date()),
+        resetsAt: expect.any(String),
       },
     });
   });
@@ -238,5 +272,158 @@ describe('GET /api/me', () => {
 
     const me = (await (await getMe(app, cookie)).json()) as MeResponse;
     expect(me.isAdmin).toBe(true);
+  });
+});
+
+describe('GET /api/me — AI state (ai-transforms/03)', () => {
+  /** A configured instance: key in the environment and a model chosen. */
+  function configureAi(db: AppDatabase, model = 'vendor/model'): void {
+    setSetting(db, AI_PROVIDER_KEY, {
+      ...DEFAULT_AI_PROVIDER_CONFIG,
+      model,
+    });
+  }
+
+  async function meFor(
+    options: Parameters<typeof makeApp>[0] = {},
+    setup?: (db: AppDatabase, email: string) => void,
+  ): Promise<{ me: MeResponse; db: AppDatabase }> {
+    const { app, db } = makeApp({ now: () => NOW, ...options });
+    const email = `u${Math.random().toString(36).slice(2)}@test.dev`;
+    const cookie = await registerViaApi(app, email);
+    if (options.ai?.apiKey) configureAi(db);
+    setup?.(db, email);
+    const me = (await (await getMe(app, cookie)).json()) as MeResponse;
+    return { me, db };
+  }
+
+  it('reports configured, included, and the remaining allowance for a paid caller', async () => {
+    const { me } = await meFor({ ai: { apiKey: 'test-key' } }, (db, email) => {
+      grant(db, email, 'pro', 30);
+      const userId = db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .get()!.id;
+      db.insert(aiUsage).values({ userId, period: '2026-09', count: 7 }).run();
+    });
+
+    expect(me.ai).toEqual({
+      configured: true,
+      included: true,
+      access: true,
+      remaining: 93,
+      period: '2026-09',
+      resetsAt: '2026-10-01T00:00:00.000Z',
+    });
+  });
+
+  it('keeps the AI counter separate from the Server Export quota', async () => {
+    const { me } = await meFor({ ai: { apiKey: 'test-key' } }, (db, email) => {
+      grant(db, email, 'pro', 30);
+      const userId = db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .get()!.id;
+      db.insert(exportUsage)
+        .values({ userId, period: '2026-09', count: 9, comps: 5 })
+        .run();
+      db.insert(aiUsage).values({ userId, period: '2026-09', count: 2 }).run();
+    });
+
+    expect(me.quota).toEqual({ used: 9, limit: 305 });
+    expect(me.ai.remaining).toBe(98);
+  });
+
+  it('reports the instance unconfigured when the environment has no key', async () => {
+    const { me } = await meFor({}, (db, email) => {
+      grant(db, email, 'premium', 30);
+      configureAi(db);
+    });
+    // The plan still includes AI; the instance cannot serve it, and nothing
+    // user-facing may upsell what the operator cannot deliver.
+    expect(me.ai.configured).toBe(false);
+    expect(me.ai.included).toBe(true);
+  });
+
+  it('the kill switch disables AI even with a key present', async () => {
+    const { me } = await meFor({ ai: { apiKey: 'test-key' } }, (db, email) => {
+      grant(db, email, 'pro', 30);
+      setSetting(db, AI_PROVIDER_KEY, {
+        ...DEFAULT_AI_PROVIDER_CONFIG,
+        model: 'vendor/model',
+        enabled: false,
+      });
+    });
+    expect(me.ai.configured).toBe(false);
+  });
+
+  it('an unchosen model leaves AI unconfigured', async () => {
+    const { me } = await meFor({ ai: { apiKey: 'test-key' } }, (db, email) => {
+      grant(db, email, 'pro', 30);
+      // The seeded default: enabled with an empty model.
+      configureAi(db, '');
+    });
+    expect(me.ai.configured).toBe(false);
+  });
+
+  it('a zero allowance means the plan does not include AI', async () => {
+    const { me } = await meFor({ ai: { apiKey: 'test-key' } }, (db, email) => {
+      grant(db, email, 'pro', 30);
+      setSetting(db, LIMITS_KEY, {
+        pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 0 },
+        premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
+      });
+    });
+    expect(me.ai.included).toBe(false);
+    expect(me.ai.remaining).toBe(0);
+  });
+
+  it('an expired plan stops including AI even with usage on file', async () => {
+    const { me } = await meFor({ ai: { apiKey: 'test-key' } }, (db, email) => {
+      const userId = db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .get()!.id;
+      // Expired relative to the injected NOW (2026-09-11), not wall time.
+      db.insert(entitlements)
+        .values({
+          userId,
+          plan: 'pro',
+          expiresAt: new Date('2026-08-01T00:00:00.000Z'),
+        })
+        .run();
+      db.insert(aiUsage).values({ userId, period: '2026-09', count: 3 }).run();
+    });
+    expect(me.ai.included).toBe(false);
+    expect(me.ai.remaining).toBe(0);
+  });
+
+  it("reports the caller's AI Access switch", async () => {
+    const { me } = await meFor({ ai: { apiKey: 'test-key' } }, (db, email) => {
+      grant(db, email, 'pro', 30);
+      db.update(users)
+        .set({ aiAccess: false })
+        .where(eq(users.email, email))
+        .run();
+    });
+    expect(me.ai.access).toBe(false);
+  });
+
+  it("last period's AI usage does not carry into remaining", async () => {
+    const { me } = await meFor({ ai: { apiKey: 'test-key' } }, (db, email) => {
+      grant(db, email, 'premium', 30);
+      const userId = db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .get()!.id;
+      db.insert(aiUsage)
+        .values({ userId, period: '2026-08', count: 299 })
+        .run();
+    });
+    expect(me.ai.remaining).toBe(300);
   });
 });

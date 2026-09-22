@@ -23,7 +23,8 @@ import {
 } from '../db/schema.js';
 import type { AppDatabase } from '../db/database.js';
 import { asRecord, parseJson } from '../request-body.js';
-import { quotaState, usagePeriod } from '../quota.js';
+import { quotaState, usagePeriod, type EntitlementLike } from '../quota.js';
+import { aiUsageState } from '../ai/state.js';
 import { expiryForGrant } from './entitlement.js';
 import { parseGrant } from './grant.js';
 
@@ -88,6 +89,15 @@ export interface UsageView {
   allowance: number;
 }
 
+/** This period's AI Action usage, as the user detail shows it (03). */
+export interface AiUsageView {
+  period: string;
+  used: number;
+  /** The plan's monthly AI Allowance while the Entitlement is active. */
+  allowance: number;
+  remaining: number;
+}
+
 export interface AdminUserView {
   id: number;
   email: string;
@@ -95,6 +105,7 @@ export interface AdminUserView {
   createdAt: string;
   entitlement: EntitlementView | null;
   usage: UsageView;
+  aiUsage: AiUsageView;
 }
 
 export interface AdminUserDetailView extends AdminUserView {
@@ -154,6 +165,15 @@ function entitlementRow(db: AppDatabase, userId: number) {
     .get();
 }
 
+/** The shared quota/AI math shape for an Entitlement view; null without one. */
+function usageEntitlement(
+  entitlement: EntitlementView | null,
+): EntitlementLike {
+  return entitlement
+    ? { plan: entitlement.plan, expiresAt: new Date(entitlement.expiresAt) }
+    : null;
+}
+
 function usageFor(
   db: AppDatabase,
   userId: number,
@@ -166,9 +186,7 @@ function usageFor(
   const state = quotaState(
     db,
     userId,
-    entitlement
-      ? { plan: entitlement.plan, expiresAt: new Date(entitlement.expiresAt) }
-      : null,
+    usageEntitlement(entitlement),
     limits,
     now,
   );
@@ -177,6 +195,30 @@ function usageFor(
     used: state.used,
     comps: state.comps,
     allowance: state.limit,
+  };
+}
+
+function aiUsageFor(
+  db: AppDatabase,
+  userId: number,
+  limits: ReturnType<typeof getPlanLimits>,
+  now: Date,
+  entitlement: EntitlementView | null,
+): AiUsageView {
+  // The same AI math /api/me reports (ai-transforms/03), so support sees the
+  // count the user sees — in their own counter, never mixed with exports.
+  const state = aiUsageState(
+    db,
+    userId,
+    usageEntitlement(entitlement),
+    limits,
+    now,
+  );
+  return {
+    period: state.period,
+    used: state.used,
+    allowance: state.allowance,
+    remaining: state.remaining,
   };
 }
 
@@ -194,6 +236,7 @@ function userView(
     createdAt: user.createdAt.toISOString(),
     entitlement,
     usage: usageFor(db, user.id, limits, now, entitlement),
+    aiUsage: aiUsageFor(db, user.id, limits, now, entitlement),
   };
 }
 

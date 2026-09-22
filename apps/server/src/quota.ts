@@ -27,9 +27,12 @@ export function usagePeriod(now: Date): string {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+/** The Entitlement fields the quota and AI math read; null without one. */
+export type EntitlementLike = { plan: string; expiresAt: Date } | null;
+
 /** An Entitlement expiring exactly now counts as expired. */
 export function isEntitlementActive(
-  entitlement: { plan: string; expiresAt: Date } | null,
+  entitlement: EntitlementLike,
   now: Date,
 ): entitlement is { plan: string; expiresAt: Date } {
   return (
@@ -69,7 +72,7 @@ export interface QuotaState {
 export function quotaState(
   db: AppDatabase,
   userId: number,
-  entitlement: { plan: string; expiresAt: Date } | null,
+  entitlement: EntitlementLike,
   limits: PlanLimits,
   now: Date,
 ): QuotaState {

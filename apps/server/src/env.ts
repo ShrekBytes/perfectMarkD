@@ -28,6 +28,13 @@ export interface ServerEnv {
    * land in History, so a deployment without the key must not boot quietly.
    */
   historyEncryptionKey: string | null;
+  /**
+   * The AI provider key (ADR-0008): environment configuration only, never
+   * written to settings, never returned by an endpoint, never logged. Absent
+   * means AI is not configured — a fresh Self-Hosted Instance has no AI until
+   * its operator supplies one. Rotating it needs a restart.
+   */
+  aiApiKey: string | null;
 }
 
 const DEFAULT_DB_PATH = './data/perfectmarkd.db';
@@ -63,6 +70,7 @@ export function loadEnv(
     ),
     historyDir: nonEmpty(source.HISTORY_DIR) ?? DEFAULT_HISTORY_DIR,
     historyEncryptionKey: nonEmpty(source.HISTORY_ENCRYPTION_KEY),
+    aiApiKey: nonEmpty(source.AI_API_KEY),
   };
 }
 

@@ -14,6 +14,7 @@ function adminUser(overrides: Partial<AdminUser> = {}): AdminUser {
     createdAt: '2026-08-01T00:00:00.000Z',
     entitlement: { plan: 'pro', expiresAt: '2027-01-05T00:00:00.000Z' },
     usage: { period: '2026-09', used: 12, comps: 0, allowance: 300 },
+    aiUsage: { period: '2026-09', used: 4, allowance: 100, remaining: 96 },
     ...overrides,
   };
 }

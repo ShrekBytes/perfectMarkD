@@ -13,6 +13,7 @@ import {
   usersRoutes,
 } from './users.js';
 import { settingsRoutes } from './settings-routes.js';
+import type { AiContext } from '../ai/context.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin panel API (billing/02): the Verification queue and audit trail behind
@@ -30,6 +31,8 @@ export interface AdminRoutesOptions {
   now?: () => Date;
   /** Removes an Export History file on account deletion (see usersRoutes). */
   removeStoredFile?: (storedPath: string) => void;
+  /** The AI context for the settings panel's Test connection (03). */
+  ai?: AiContext;
 }
 
 /** The largest reject reason a decision accepts; it is advisory text, not data. */
@@ -59,6 +62,7 @@ function parseReason(body: unknown): string | { error: string } {
 export function adminRoutes({
   now = () => new Date(),
   removeStoredFile,
+  ai,
 }: AdminRoutesOptions = {}) {
   const app = new Hono<AppEnv>();
 
@@ -288,7 +292,7 @@ export function adminRoutes({
   });
 
   app.route('/users', usersRoutes({ now, removeStoredFile }));
-  app.route('/settings', settingsRoutes({ now }));
+  app.route('/settings', settingsRoutes({ now, ai }));
 
   return app;
 }

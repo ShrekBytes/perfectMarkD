@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getAdminUser, revokeEntitlement, type AdminUserDetail } from './api';
+import {
+  getAdminUser,
+  revokeEntitlement,
+  type AdminUserDetail,
+  type AiUsageView,
+} from './api';
 import { orderDate, STATUS_BADGE, STATUS_LABEL } from '../billing/payment';
 import { planName } from '../pricing/plans';
 import { Dialog } from '../shell/Dialog';
@@ -10,6 +15,17 @@ import { DeleteAccountDialog } from './DeleteAccountDialog';
 import type { OrderStatus } from '../billing/api';
 
 type DetailDialog = 'grant' | 'revoke' | 'comp' | 'reset' | 'delete' | null;
+
+/** One line for the user's AI Action count, in their own counter (03). */
+function aiUsageLine(ai: AiUsageView): string {
+  if (ai.allowance > 0) {
+    return `${ai.used} of ${ai.allowance} used (${ai.period}) — ${ai.remaining} remaining`;
+  }
+  if (ai.used > 0) {
+    return `${ai.used} used (${ai.period}) — no AI allowance on this plan`;
+  }
+  return `None this period (${ai.period}).`;
+}
 
 /**
  * The admin's view of one user (billing/03): their Entitlement, this period's
@@ -139,6 +155,13 @@ export function UserDetail({
             Comp quota
           </button>
         </div>
+      </div>
+
+      <div className="mt-2 rounded-pane border border-hairline bg-surface p-3">
+        <p className="text-xs font-medium text-ink-soft">AI Actions</p>
+        <p data-testid="user-ai-usage" className="mt-1 text-sm text-ink">
+          {aiUsageLine(user.aiUsage)}
+        </p>
       </div>
 
       <div className="mt-2 rounded-pane border border-hairline bg-surface p-3">

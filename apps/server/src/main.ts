@@ -30,6 +30,9 @@ const app = createApp({
   db,
   sessionSecret: env.sessionSecret,
   adminEmail: env.adminEmail,
+  // AI (ai-transforms/03): the provider key is environment configuration
+  // only (ADR-0008); absent means the instance reports AI as unconfigured.
+  ai: { apiKey: env.aiApiKey },
   // Server Export (server/03): the in-process worker drives Chromium against
   // the app's /export route. In production the same origin serves the API and
   // the built SPA (server/06); in development point EXPORT_ORIGIN at the web

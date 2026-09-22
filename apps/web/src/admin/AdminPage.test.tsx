@@ -25,10 +25,23 @@ const SEED_SETTINGS = {
     premium: { monthly: 7, durations: { 1: 7, 3: 21, 6: 42, 12: 70 } },
   },
   limits: {
-    pro: { pageCap: 300, quotaMonthly: 300 },
-    premium: { pageCap: 1000, quotaMonthly: 1000 },
+    pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 100 },
+    premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
   },
   ltcRateUsdt: null,
+  aiProvider: {
+    enabled: true,
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: '',
+    stylesheetModel: null,
+    reasoningEffort: 'medium',
+    contextWindow: 128000,
+    maxOutputTokens: 16000,
+    maxInputCharacters: 60000,
+    timeoutSeconds: 60,
+    burstPerMinute: 10,
+  },
+  aiKeyPresent: false,
 };
 
 beforeEach(() => {
