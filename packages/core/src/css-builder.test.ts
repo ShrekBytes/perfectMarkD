@@ -15,6 +15,7 @@ import {
   customFontFamilies,
   resolvePageDims,
   resolvePageGeometry,
+  stripPageAtRules,
 } from './css-builder';
 import {
   DEFAULT_SETTINGS,
@@ -331,6 +332,132 @@ describe('buildDocCSS', () => {
   it('sets RTL direction only when requested', () => {
     expect(buildDocCSS(DEFAULT_SETTINGS)).not.toContain('direction: rtl');
     expect(buildDocCSS(DEFAULT_SETTINGS, true)).toContain('direction: rtl;');
+  });
+});
+
+// ─── Custom Stylesheet layer (ai-transforms/01) ──────────────────────────────
+
+describe('stripPageAtRules', () => {
+  it('strips a plain @page block and keeps the surrounding rules', () => {
+    const css =
+      'p { margin: 0; }\n@page { size: A3 landscape; margin: 2cm; }\nh2 { color: red; }';
+    expect(stripPageAtRules(css)).toBe(
+      'p { margin: 0; }\n\nh2 { color: red; }',
+    );
+  });
+
+  it('strips @page rules with pseudo-page selectors', () => {
+    const css = '@page :first { margin: 0; } body { color: blue; }';
+    expect(stripPageAtRules(css)).toBe(' body { color: blue; }');
+  });
+
+  it('strips @page blocks with nested margin-box braces', () => {
+    const css =
+      '@page { size: 300px 300px; @top-center { content: "x"; } } h1 { margin: 0; }';
+    expect(stripPageAtRules(css)).toBe(' h1 { margin: 0; }');
+  });
+
+  it('is case-insensitive and matches the token, not a prefix', () => {
+    expect(stripPageAtRules('@PAGE { size: A3; } a { b: c; }')).toBe(
+      ' a { b: c; }',
+    );
+    // @pagex is not an @page rule.
+    expect(stripPageAtRules('@pagex { size: A3; }')).toBe(
+      '@pagex { size: A3; }',
+    );
+  });
+
+  it('strips a malformed blockless rule to its semicolon', () => {
+    expect(stripPageAtRules('@page; a { b: c; }')).toBe(' a { b: c; }');
+  });
+
+  it('strips an unclosed @page block to the end of the text', () => {
+    expect(stripPageAtRules('a { b: c; } @page { size: A3')).toBe(
+      'a { b: c; } ',
+    );
+  });
+
+  it('leaves @page inside a comment or string alone', () => {
+    const commented = '/* use @page { size: A3 } here */ p { margin: 0; }';
+    expect(stripPageAtRules(commented)).toBe(commented);
+    const inString = '.mpdf-doc::after { content: "@page { size: A3 }"; }';
+    expect(stripPageAtRules(inString)).toBe(inString);
+  });
+
+  it('leaves ordinary CSS untouched', () => {
+    const css = '.mpdf-doc h2 { color: #123456; }\n@media print { p { } }';
+    expect(stripPageAtRules(css)).toBe(css);
+  });
+});
+
+describe('buildDocCSS — Custom Stylesheet layer', () => {
+  const customCSS = '.mpdf-doc h2 { color: #123456; }';
+
+  it('appends the stylesheet after the generated rules when the layer is on', () => {
+    const css = buildDocCSS(
+      settings({
+        customStylesheet: customCSS,
+        customStylesheetEnabled: true,
+      }),
+    );
+    expect(css).toContain('/* Custom Stylesheet */');
+    expect(css).toContain(customCSS);
+    // After — not interleaved with — the generated rules.
+    expect(css.indexOf(customCSS)).toBeGreaterThan(
+      css.indexOf('.mpdf-doc .mermaid svg'),
+    );
+  });
+
+  it('appends nothing when the layer is off or the CSS is blank', () => {
+    const base = buildDocCSS(DEFAULT_SETTINGS);
+    expect(
+      buildDocCSS(
+        settings({
+          customStylesheet: customCSS,
+          customStylesheetEnabled: false,
+        }),
+      ),
+    ).toBe(base);
+    expect(
+      buildDocCSS(
+        settings({ customStylesheet: '  \n ', customStylesheetEnabled: true }),
+      ),
+    ).toBe(base);
+  });
+
+  it('strips @page rules from the appended stylesheet', () => {
+    const css = buildDocCSS(
+      settings({
+        customStylesheet:
+          '@page { size: 300px 300px; } .mpdf-doc p { margin: 0; }',
+        customStylesheetEnabled: true,
+      }),
+    );
+    expect(css).not.toContain('@page');
+    expect(css).not.toContain('300px 300px');
+    expect(css).toContain('.mpdf-doc p { margin: 0; }');
+  });
+
+  it('neutralizes </style> sequences in the appended stylesheet', () => {
+    const css = buildDocCSS(
+      settings({
+        customStylesheet: `.mpdf-doc::after { content: "</style>"; }`,
+        customStylesheetEnabled: true,
+      }),
+    );
+    expect(css).toContain('<\\/style>');
+    expect(css).not.toContain('</style>');
+  });
+
+  it('keeps the layer out of the generated rules: off and on differ only in the tail', () => {
+    const off = buildDocCSS(DEFAULT_SETTINGS);
+    const on = buildDocCSS(
+      settings({
+        customStylesheet: customCSS,
+        customStylesheetEnabled: true,
+      }),
+    );
+    expect(on.startsWith(off)).toBe(true);
   });
 });
 

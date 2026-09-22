@@ -9,8 +9,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Bump when the shape of DocumentSettings changes; persisted settings carry
- *  the version they were written with so migrations can branch on it. */
-export const SETTINGS_VERSION = 1;
+ *  the version they were written with so migrations can branch on it.
+ *  v2: customStylesheet + customStylesheetEnabled (ai-transforms/01). */
+export const SETTINGS_VERSION = 2;
 
 export const PAGE_SIZES: Record<string, { w: number; h: number }> = {
   A4: { w: 794, h: 1123 },
@@ -124,6 +125,14 @@ export interface DocumentSettings extends DocStyle {
   backgroundImageOpacity: number;
   /** When true, headings H1–H6 are embedded as a bookmark tree in the exported PDF. */
   includeOutline: boolean;
+
+  // ── Custom Stylesheet (the user's own CSS layer) ──────────────────────────
+  /** The user's CSS, appended after the generated rules by the CSS builder.
+   *  Never a style value: the layer sits over whatever Preset is chosen. */
+  customStylesheet: string;
+  /** Whether the Custom Stylesheet layer is applied. Only ever true while
+   *  customStylesheet is non-empty — emptying the box turns the layer off. */
+  customStylesheetEnabled: boolean;
 }
 
 // ─── Style Presets ────────────────────────────────────────────────────────────
@@ -384,6 +393,9 @@ export const DEFAULT_SETTINGS: DocumentSettings = {
   backgroundImageOpacity: 1,
   // Outline / bookmarks
   includeOutline: true,
+  // Custom Stylesheet layer (off until a user writes CSS and turns it on)
+  customStylesheet: '',
+  customStylesheetEnabled: false,
 };
 
 /** Color pickers in the Colors settings group. Used to reset only those
@@ -486,6 +498,15 @@ export function validate(settings: DocumentSettings): DocumentSettings {
 
   // Background image opacity is a 0–1 fraction.
   s.backgroundImageOpacity = Math.min(1, Math.max(0, s.backgroundImageOpacity));
+
+  // Custom Stylesheet fields: documents saved before v2 lack them — fill
+  // from the defaults (the same repair the server payload applies). The
+  // layer is on only while there is CSS to apply.
+  if (typeof s.customStylesheet !== 'string') s.customStylesheet = '';
+  if (typeof s.customStylesheetEnabled !== 'boolean') {
+    s.customStylesheetEnabled = false;
+  }
+  if (!s.customStylesheet.trim()) s.customStylesheetEnabled = false;
 
   return s;
 }

@@ -261,6 +261,50 @@ describe('editing and autosave', () => {
     reader.close();
   });
 
+  it('persists the Custom Stylesheet fields through a reload (ai-transforms/01)', async () => {
+    const { store, reset } = await readyStore();
+
+    store.getState().updateActive({
+      settings: {
+        customStylesheet: '.mpdf-doc h2 { letter-spacing: 0.3em; }',
+        customStylesheetEnabled: true,
+      },
+    });
+    await store.getState().flush();
+    reset();
+
+    const { store: reloaded } = await readyStore();
+    expect(reloaded.getState().settings.customStylesheet).toBe(
+      '.mpdf-doc h2 { letter-spacing: 0.3em; }',
+    );
+    expect(reloaded.getState().settings.customStylesheetEnabled).toBe(true);
+  });
+
+  it('fills the Custom Stylesheet fields from the defaults for a document saved before them', async () => {
+    // A v1-shaped record: the two fields simply don't exist on the persisted
+    // settings. The load-time repair (validate) fills them in.
+    const writer = await dbApi.openDatabase();
+    const legacy = { ...DEFAULT_SETTINGS } as Record<string, unknown>;
+    delete legacy.customStylesheet;
+    delete legacy.customStylesheetEnabled;
+    await dbApi.putDocument(writer, {
+      id: 'legacy-1',
+      name: 'Legacy doc',
+      markdown: '# Legacy',
+      settings: legacy as unknown as typeof DEFAULT_SETTINGS,
+      assetIds: [],
+      createdAt: T0,
+      updatedAt: T0,
+      pageCount: null,
+    });
+    writer.close();
+
+    const { store } = await readyStore();
+    await store.getState().openDocument('legacy-1');
+    expect(store.getState().settings.customStylesheet).toBe('');
+    expect(store.getState().settings.customStylesheetEnabled).toBe(false);
+  });
+
   it('ignores blank renames', async () => {
     const { store } = await readyStore();
 

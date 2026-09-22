@@ -25,11 +25,18 @@ test('gated controls show locks that open the pricing modal', async ({
     page.getByRole('button', { name: 'Background image (paid feature)' }),
   ).toBeVisible();
 
-  // Style tab: custom fonts + custom stylesheet
+  // Style tab: the custom-fonts lock in its section + the Custom Stylesheet
+  // tile's lock in the gallery (ai-transforms/01)
   await openInspectorTab(page, 'Style');
   await expect(
     page.getByRole('button', { name: 'Custom fonts (paid feature)' }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Custom stylesheet (paid feature)' }),
+  ).toBeVisible();
+
+  // Stylesheet tab: the locked body's lock (same gate, its own surface)
+  await openInspectorTab(page, 'Stylesheet');
   await expect(
     page.getByRole('button', { name: 'Custom stylesheet (paid feature)' }),
   ).toBeVisible();

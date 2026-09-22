@@ -54,6 +54,17 @@ function mePayload(overrides: Partial<MePayload> = {}): MePayload {
   };
 }
 
+/** Seeds a signed-in Pro account — the flags /api/me reported. */
+function unlockAsPro(): void {
+  useAccountStore.setState({
+    user: { email: 'a@b.co', isAdmin: false },
+    entitlement: { plan: 'pro', expiresAt: '2026-10-01T00:00:00.000Z' },
+    quota: { used: 3, limit: 300 },
+    flags: OPEN_FLAGS,
+    status: 'ready',
+  });
+}
+
 const activeSettings = () => useDocumentStore.getState().settings;
 
 /** Switches to a blank document so default-value assertions see DEFAULT_SETTINGS,
@@ -72,7 +83,7 @@ function optionLabels(select: HTMLElement): string[] {
 }
 
 describe('Inspector tabs', () => {
-  it('renders the three tabs and swaps panels', async () => {
+  it('renders the four tabs and swaps panels', async () => {
     const user = userEvent.setup();
     render(<Inspector />);
 
@@ -91,6 +102,16 @@ describe('Inspector tabs', () => {
       screen.queryByRole('tabpanel', { name: 'Page settings' }),
     ).not.toBeInTheDocument();
 
+    // The Stylesheet tab's visible label is one word; its accessible name is
+    // the feature's glossary name (ai-transforms/01).
+    await user.click(screen.getByRole('tab', { name: 'Custom stylesheet' }));
+    expect(
+      screen.getByRole('tab', { name: 'Custom stylesheet' }),
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(
+      screen.getByRole('tabpanel', { name: 'Custom stylesheet settings' }),
+    ).toBeInTheDocument();
+
     await user.click(screen.getByRole('tab', { name: 'Header/Footer' }));
     expect(
       screen.getByRole('tabpanel', { name: 'Header/Footer settings' }),
@@ -104,7 +125,7 @@ describe('Inspector tabs', () => {
     render(<Inspector />);
     expect(
       screen.getByText(
-        'Open a document to tune its page, style, and header/footer.',
+        'Open a document to tune its page, style, stylesheet, and header/footer.',
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
@@ -350,18 +371,24 @@ describe('Style tab', () => {
     expect(activeSettings().codeFontFamily).toBe('Consolas, monospace');
   });
 
-  it('locks custom fonts and the custom stylesheet', async () => {
+  it('locks custom fonts in the section and the stylesheet at its tile', async () => {
     render(<Inspector />);
     fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
 
     expect(
       screen.getByRole('button', { name: 'Custom fonts (paid feature)' }),
     ).toBeInTheDocument();
+    // The Custom Stylesheet's lock is the gallery tile (ai-transforms/01) —
+    // the inert "Custom (Pro)" rows are gone.
     expect(
       screen.getByRole('button', {
         name: 'Custom stylesheet (paid feature)',
       }),
     ).toBeInTheDocument();
+    expect(screen.getAllByTestId('stylesheet-tile')).toHaveLength(1);
+    // The inert "Custom (Pro)" section is gone — no placeholder rows remain.
+    expect(screen.queryByText('Custom (Pro)')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('gate-included')).not.toBeInTheDocument();
   });
 });
 
@@ -560,17 +587,6 @@ describe('unlocked gates (billing/04)', () => {
     resetAccountStoreForTests();
   });
 
-  /** Seeds a signed-in Pro account — the flags /api/me reported. */
-  function unlockAsPro(): void {
-    useAccountStore.setState({
-      user: { email: 'a@b.co', isAdmin: false },
-      entitlement: { plan: 'pro', expiresAt: '2026-10-01T00:00:00.000Z' },
-      quota: { used: 3, limit: 300 },
-      flags: OPEN_FLAGS,
-      status: 'ready',
-    });
-  }
-
   /** The hidden file input a GateImagePicker's button drives. */
   function fileInputBehind(button: HTMLElement): HTMLInputElement {
     const input =
@@ -590,13 +606,16 @@ describe('unlocked gates (billing/04)', () => {
     ).not.toBeInTheDocument();
 
     // Style tab: fonts have their live upload control (billing/05), the
-    // stylesheet is still the ai-transforms placeholder, nothing locked.
+    // stylesheet has its gallery tile (ai-transforms/01), nothing locked.
     fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
-    expect(screen.getByTestId('gate-included')).toBeInTheDocument();
     expect(screen.queryByTestId('faux-upload')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Upload custom font' }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId('stylesheet-tile')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
 
     // Page tab: Custom… is selectable.
     fireEvent.click(screen.getByRole('tab', { name: 'Page' }));
@@ -901,5 +920,188 @@ describe('unlocked gates (billing/04)', () => {
     );
     // …and the shell gets its clear notice.
     expect(useAccountStore.getState().planEndedNotice).toBe(true);
+  });
+});
+
+describe('Custom Stylesheet (ai-transforms/01)', () => {
+  afterEach(() => {
+    resetAccountStoreForTests();
+  });
+
+  function openStyleTab(): void {
+    fireEvent.click(screen.getByRole('tab', { name: 'Style' }));
+  }
+
+  const CSS = '.mpdf-doc h2 { letter-spacing: 0.3em; }';
+
+  /** Writes the stylesheet text (layer off) into the store before render. */
+  function withCSS(): void {
+    act(() => {
+      useDocumentStore
+        .getState()
+        .updateActive({ settings: { customStylesheet: CSS } });
+    });
+  }
+
+  describe('gallery tile — the four states', () => {
+    it('layer off with CSS present: the click turns the layer on and the Preset stays lit', async () => {
+      unlockAsPro();
+      withCSS();
+      const user = userEvent.setup();
+      render(<Inspector />);
+      openStyleTab();
+
+      const tile = screen.getByTestId('stylesheet-tile');
+      expect(tile).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByRole('radio', { name: /default/i })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+
+      await user.click(tile);
+      expect(activeSettings().customStylesheetEnabled).toBe(true);
+      expect(screen.getByTestId('stylesheet-tile')).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      // The layer rides over the Preset: the radio is untouched.
+      expect(screen.getByRole('radio', { name: /default/i })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    });
+
+    it('layer on: the click turns it off and keeps the CSS', async () => {
+      unlockAsPro();
+      act(() => {
+        useDocumentStore.getState().updateActive({
+          settings: { customStylesheet: CSS, customStylesheetEnabled: true },
+        });
+      });
+      const user = userEvent.setup();
+      render(<Inspector />);
+      openStyleTab();
+
+      await user.click(screen.getByTestId('stylesheet-tile'));
+      expect(activeSettings().customStylesheetEnabled).toBe(false);
+      // Turning the layer off keeps the text — switching looks back and forth
+      // is cheap.
+      expect(activeSettings().customStylesheet).toBe(CSS);
+    });
+
+    it('layer off with an empty box: the click moves the Inspector to the Stylesheet tab', async () => {
+      unlockAsPro();
+      const user = userEvent.setup();
+      render(<Inspector />);
+      openStyleTab();
+
+      await user.click(screen.getByTestId('stylesheet-tile'));
+      expect(
+        screen.getByRole('tabpanel', { name: 'Custom stylesheet settings' }),
+      ).toBeInTheDocument();
+    });
+
+    it('not entitled: the tile is a lock that opens the pricing modal', async () => {
+      // Signed out (LOCKED_FLAGS) — the standing state for Free users.
+      const user = userEvent.setup();
+      render(<Inspector />);
+      openStyleTab();
+
+      const tile = screen.getByRole('button', {
+        name: 'Custom stylesheet (paid feature)',
+      });
+      await user.click(tile);
+      expect(
+        screen.getByRole('dialog', { name: /plans and pricing/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('Stylesheet tab', () => {
+    it('edits the stylesheet as text into the store', async () => {
+      unlockAsPro();
+      render(<Inspector />);
+      fireEvent.click(screen.getByRole('tab', { name: 'Custom stylesheet' }));
+
+      const box = screen.getByTestId('stylesheet-box');
+      // A real textarea — selection, undo, and paste are the platform's.
+      expect(box.tagName).toBe('TEXTAREA');
+      // fireEvent: userEvent.type reads the CSS braces as key syntax.
+      fireEvent.change(box, { target: { value: CSS } });
+      expect(activeSettings().customStylesheet).toBe(CSS);
+    });
+
+    it('emptying the box turns the layer off automatically', async () => {
+      unlockAsPro();
+      act(() => {
+        useDocumentStore.getState().updateActive({
+          settings: { customStylesheet: CSS, customStylesheetEnabled: true },
+        });
+      });
+      const user = userEvent.setup();
+      render(<Inspector />);
+      await user.click(screen.getByRole('tab', { name: 'Custom stylesheet' }));
+
+      await user.clear(screen.getByTestId('stylesheet-box'));
+      expect(activeSettings().customStylesheetEnabled).toBe(false);
+      expect(activeSettings().customStylesheet).toBe('');
+    });
+
+    it('shows the layer state, and the switch waits for CSS to exist', async () => {
+      unlockAsPro();
+      const user = userEvent.setup();
+      render(<Inspector />);
+      await user.click(screen.getByRole('tab', { name: 'Custom stylesheet' }));
+
+      // No CSS yet: the switch is off and inert — the tile routes there
+      // first, and typing is the way to earn the layer.
+      const apply = screen.getByRole('checkbox', { name: 'Apply to pages' });
+      expect(apply).not.toBeChecked();
+      expect(apply).toBeDisabled();
+
+      fireEvent.change(screen.getByTestId('stylesheet-box'), {
+        target: { value: CSS },
+      });
+      expect(
+        screen.getByRole('checkbox', { name: 'Apply to pages' }),
+      ).toBeEnabled();
+
+      await user.click(
+        screen.getByRole('checkbox', { name: 'Apply to pages' }),
+      );
+      expect(activeSettings().customStylesheetEnabled).toBe(true);
+      expect(
+        screen.getByRole('checkbox', { name: 'Apply to pages' }),
+      ).toBeChecked();
+    });
+
+    it('says plainly that page geometry is a Page-tab setting and @page is ignored', async () => {
+      unlockAsPro();
+      render(<Inspector />);
+      fireEvent.click(screen.getByRole('tab', { name: 'Custom stylesheet' }));
+
+      expect(
+        screen.getByText(/page size and margins are page-tab settings/i),
+      ).toBeInTheDocument();
+    });
+
+    it('a user without the feature sees the locked body instead', async () => {
+      const user = userEvent.setup();
+      render(<Inspector />);
+      await user.click(screen.getByRole('tab', { name: 'Custom stylesheet' }));
+
+      // No box, no switch — the body states what the plan includes and the
+      // lock opens the pricing modal.
+      expect(screen.queryByTestId('stylesheet-box')).not.toBeInTheDocument();
+      expect(screen.getByText(/part of pro and premium/i)).toBeInTheDocument();
+      await user.click(
+        screen.getByRole('button', {
+          name: 'Custom stylesheet (paid feature)',
+        }),
+      );
+      expect(
+        screen.getByRole('dialog', { name: /plans and pricing/i }),
+      ).toBeInTheDocument();
+    });
   });
 });

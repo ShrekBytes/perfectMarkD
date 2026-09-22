@@ -117,6 +117,99 @@ export function escapeCSSForStyle(css: string): string {
   return css.replace(/<\/style/gi, '<\\/style');
 }
 
+// ─── Custom Stylesheet sanitisation (ai-transforms/01) ───────────────────────
+
+/** Index just past the string literal opening at `i` (backslash escapes
+ *  honored); the caller guarantees `css[i]` is a quote character. */
+function skipCssString(css: string, i: number): number {
+  let j = i + 1;
+  while (j < css.length) {
+    if (css[j] === '\\') j += 2;
+    else if (css[j] === css[i]) return j + 1;
+    else j++;
+  }
+  return css.length;
+}
+
+/** Index just past the comment opening at `i` (`/*`), or the end of the text
+ *  when the comment never closes. */
+function skipCssComment(css: string, i: number): number {
+  const end = css.indexOf('*/', i + 2);
+  return end === -1 ? css.length : end + 2;
+}
+
+const AT_PAGE = /^@page(?![a-z0-9-])/i;
+
+/**
+ * Removes every `@page` at-rule from CSS text. The printed page size and
+ * margins are Page-tab settings written by the export itself; a user's
+ * `@page { size: A3 }` obeyed in print but ignored by the preview's page
+ * boxes would silently diverge the two, so the rules are stripped before the
+ * stylesheet reaches any consumer. String literals and comments are skipped
+ * (an `@page` mentioned inside one survives); a malformed rule without a
+ * block is cut to its terminating semicolon, and an unclosed block runs to
+ * the end of the text.
+ */
+export function stripPageAtRules(css: string): string {
+  let out = '';
+  let i = 0;
+  while (i < css.length) {
+    const ch = css[i]!;
+    if (ch === '/' && css[i + 1] === '*') {
+      const stop = skipCssComment(css, i);
+      out += css.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const stop = skipCssString(css, i);
+      out += css.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    // The slice needs only the token plus one boundary character — the
+    // regex's lookahead reads exactly that far.
+    if (ch === '@' && AT_PAGE.test(css.slice(i, i + '@page'.length + 1))) {
+      // Consume the rule: through the matching `}` of its block (margin
+      // boxes nest one level of braces), or through the next `;` when there
+      // is no block.
+      let depth = 0;
+      let j = i + '@page'.length;
+      let consumed = false;
+      while (j < css.length) {
+        const c = css[j]!;
+        if (c === '"' || c === "'") {
+          j = skipCssString(css, j);
+          continue;
+        }
+        if (c === '/' && css[j + 1] === '*') {
+          j = skipCssComment(css, j);
+          continue;
+        }
+        if (c === '{') depth++;
+        else if (c === '}') {
+          depth--;
+          if (depth === 0) {
+            j++;
+            consumed = true;
+            break;
+          }
+        } else if (c === ';' && depth === 0) {
+          j++;
+          consumed = true;
+          break;
+        }
+        j++;
+      }
+      i = consumed ? j : css.length;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
 /** Maps a `backgroundImageSize` setting value to its CSS `background-size`
  *  and `background-repeat` values. Centralises logic shared by the preview
  *  and export render paths. */
@@ -334,14 +427,19 @@ export function buildHFInnerHTML(
 
 /** Builds the full `.mpdf-doc` stylesheet (typography, tables, GFM alerts,
  *  mermaid, code blocks) shared verbatim by the preview shadow DOM and the
- *  export print HTML. */
+ *  export print HTML. When the Custom Stylesheet layer is on, the user's CSS
+ *  is appended after the generated rules — the one seam every consumer
+ *  (pagination measurement, Paper Canvas, Client Export, Server Export)
+ *  inherits, so all four render identically. `@page` at-rules are stripped
+ *  (page size and margins are Page-tab settings) and `</style>` sequences
+ *  neutralized before the text joins the sheet. */
 export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
   const hs = s.headingScale;
   const fontFamily = resolveFont(s);
   const tableHeaderTextColor =
     hexLuminance(s.tableHeaderBg) < 0.35 ? '#fff' : s.headingColor;
 
-  return `
+  const generated = `
   .mpdf-doc {
     font-family: ${fontFamily};
     font-size: ${s.fontSize}px;
@@ -500,4 +598,13 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
     display: block;
   }
   `.trim();
+
+  // The Custom Stylesheet rides last so its rules win the cascade at equal
+  // specificity against the generated ones. Empty CSS (or the layer off)
+  // appends nothing — the sheet is byte-identical to a document without one.
+  if (!s.customStylesheetEnabled || !s.customStylesheet.trim())
+    return generated;
+
+  const custom = escapeCSSForStyle(stripPageAtRules(s.customStylesheet)).trim();
+  return `${generated}\n\n/* Custom Stylesheet */\n${custom}`;
 }

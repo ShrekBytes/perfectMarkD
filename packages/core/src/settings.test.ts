@@ -54,8 +54,8 @@ describe('PRESETS', () => {
 
 describe('DEFAULT_SETTINGS', () => {
   it('carries the current settings version', () => {
-    expect(SETTINGS_VERSION).toBe(1);
-    expect(DEFAULT_SETTINGS.settingsVersion).toBe(1);
+    expect(SETTINGS_VERSION).toBe(2);
+    expect(DEFAULT_SETTINGS.settingsVersion).toBe(2);
   });
 
   it('adopts the default preset as its style', () => {
@@ -74,6 +74,10 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.footerImageRef).toBe('');
     expect(DEFAULT_SETTINGS.backgroundImageRef).toBe('');
     expect(DEFAULT_SETTINGS.backgroundImageOpacity).toBe(1);
+    // Custom Stylesheet layer (ai-transforms/01): off and empty for a new
+    // document.
+    expect(DEFAULT_SETTINGS.customStylesheet).toBe('');
+    expect(DEFAULT_SETTINGS.customStylesheetEnabled).toBe(false);
   });
 
   it('drops previewScale (a UI concern that lives in apps/web)', () => {
@@ -162,6 +166,36 @@ describe('validate — clamping', () => {
       validate(settings({ backgroundImageOpacity: 0.4 }))
         .backgroundImageOpacity,
     ).toBe(0.4);
+  });
+
+  it('fills the Custom Stylesheet fields for a document saved before v2', () => {
+    // The pre-v2 shape: the two fields simply don't exist on the persisted
+    // object. validate() is the load-time repair — the fields come back
+    // filled from the defaults.
+    const legacy: Record<string, unknown> = { ...settings({}) };
+    delete legacy.customStylesheet;
+    delete legacy.customStylesheetEnabled;
+    const v = validate(legacy as unknown as DocumentSettings);
+    expect(v.customStylesheet).toBe('');
+    expect(v.customStylesheetEnabled).toBe(false);
+  });
+
+  it('turns the Custom Stylesheet layer off when its CSS is empty', () => {
+    expect(
+      validate(settings({ customStylesheet: '' })).customStylesheetEnabled,
+    ).toBe(false);
+    expect(
+      validate(settings({ customStylesheet: '   \n  ' }))
+        .customStylesheetEnabled,
+    ).toBe(false);
+    expect(
+      validate(
+        settings({
+          customStylesheet: '.mpdf-doc h2 { color: #123456; }',
+          customStylesheetEnabled: true,
+        }),
+      ).customStylesheetEnabled,
+    ).toBe(true);
   });
 
   it('returns a repaired copy without mutating its input', () => {

@@ -22,12 +22,15 @@ import type { FeatureFlags } from '../auth/flags';
 
 /** What every tab receives: the live settings snapshot, the write-back
  *  channel (a partial settings patch the store merges), the pricing-modal
- *  opener for locked controls, the feature flags deciding which gates are
- *  open (billing/04), and the image ingest for the unlocked upload gates. */
+ *  opener for locked controls, the Stylesheet-tab mover (the preset
+ *  gallery's Custom stylesheet tile routes its empty-CSS click there),
+ *  the feature flags deciding which gates are open (billing/04), and the
+ *  image ingest for the unlocked upload gates. */
 export interface TabProps {
   settings: DocumentSettings;
   set: (patch: Partial<DocumentSettings>) => void;
   onOpenPricing: () => void;
+  onOpenStylesheet: () => void;
   flags: FeatureFlags;
   addImage: (file: File) => Promise<AddAssetResult>;
 }
@@ -524,19 +527,6 @@ export function GateImagePicker({
           if (file) handleFile(file);
         }}
       />
-    </span>
-  );
-}
-
-/**
- * The unlocked state for gates whose real control billing/05 still builds
- * (custom stylesheet): the lock is gone — the plan includes the feature —
- * and there is nothing to edit here yet.
- */
-export function IncludedNote() {
-  return (
-    <span data-testid="gate-included" className="text-[11px] text-ink-faint">
-      Included with your plan
     </span>
   );
 }

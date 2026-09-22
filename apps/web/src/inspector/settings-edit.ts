@@ -67,3 +67,36 @@ export function fontChange(
   const family = value.slice(CUSTOM_FONT_PREFIX.length).trim();
   return { [familyField]: '__custom__', [nameField]: family };
 }
+
+// ─── Custom Stylesheet layer (ai-transforms/01) ──────────────────────────────
+// The layer is a switch beside the CSS, never a style value: turning it on
+// and off must leave the text (and the chosen Preset) untouched.
+
+/** The layer can only be on while there is CSS to apply — emptying the box
+ *  turns it off automatically, so the gallery never claims the paper is
+ *  styled when it isn't. */
+export const stylesheetHasCSS = (s: DocumentSettings): boolean =>
+  !!s.customStylesheet.trim();
+
+/** Edits the Custom Stylesheet text. A non-empty edit leaves the layer's
+ *  state alone (typing while off stays off — the tile turns the layer on);
+ *  emptying the box turns it off. */
+export function editStylesheet(
+  s: DocumentSettings,
+  css: string,
+): Partial<DocumentSettings> {
+  return {
+    customStylesheet: css,
+    customStylesheetEnabled: css.trim() ? s.customStylesheetEnabled : false,
+  };
+}
+
+/** Switches the layer on or off. Turning on without CSS is a no-op — the
+ *  tile routes that click to the Stylesheet tab instead, and the tab's
+ *  toggle sits disabled until there is something to apply. */
+export function setStylesheetEnabled(
+  s: DocumentSettings,
+  on: boolean,
+): Partial<DocumentSettings> {
+  return { customStylesheetEnabled: on && stylesheetHasCSS(s) };
+}

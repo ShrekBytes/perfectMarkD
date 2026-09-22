@@ -170,6 +170,24 @@ describe('runDocumentPipeline', () => {
     expect(result.docCSS).toBe(buildDocCSS(DEFAULT_SETTINGS, true));
   });
 
+  it('measures against the Custom Stylesheet: one sheet, shared by every consumer (ai-transforms/01)', async () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      customStylesheet:
+        '@page { size: 300px 300px; } .mpdf-doc h2 { letter-spacing: 0.3em; }',
+      customStylesheetEnabled: true,
+    };
+    const result = await runDocumentPipeline('# One\n\ntext', settings, {
+      title: 'Doc',
+    });
+    // The pipeline's sheet is exactly what buildDocCSS emits — the string the
+    // pagination sandbox measured against, the Paper Canvas adopts, and both
+    // export paths embed. One stylesheet, four consumers.
+    expect(result.docCSS).toBe(buildDocCSS(settings, false));
+    expect(result.docCSS).toContain('letter-spacing: 0.3em');
+    expect(result.docCSS).not.toContain('@page');
+  });
+
   it('exposes the shared page geometry for the settings', async () => {
     const result = await runDocumentPipeline('hi', DEFAULT_SETTINGS, {
       title: 'Doc',

@@ -1,10 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// The Inspector: the right-hand settings panel with its three tabs (Page /
-// Style / Header-Footer). Every edit flows through updateActive — the Paper
-// Canvas re-renders on the settings reference change (debounced there), and
-// the store autosaves. The paid-feature gates read the entitlement flags from
-// GET /api/me (billing/04): locked controls show a lock glyph that opens the
-// pricing modal; open ones are live — expiry re-locks them gracefully.
+// The Inspector: the right-hand settings panel with its four tabs (Page /
+// Style / Stylesheet / Header-Footer). Every edit flows through updateActive —
+// the Paper Canvas re-renders on the settings reference change (debounced
+// there), and the store autosaves. The paid-feature gates read the
+// entitlement flags from GET /api/me (billing/04): locked controls show a
+// lock glyph that opens the pricing modal; open ones are live — expiry
+// re-locks them gracefully.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react';
@@ -16,15 +17,27 @@ import { SlidersIcon } from '../shell/icons';
 import { PricingModal } from '../pricing/PricingModal';
 import { PageTab } from './PageTab';
 import { StyleTab } from './StyleTab';
+import { StylesheetTab } from './StylesheetTab';
 import { HeaderFooterTab } from './HeaderFooterTab';
 import type { TabProps } from './controls';
 
-const TABS = ['Page', 'Style', 'Header-Footer'] as const;
+const TABS = ['Page', 'Style', 'Stylesheet', 'Header-Footer'] as const;
 type TabId = (typeof TABS)[number];
+
+/** Visible label and accessible name per tab. The Stylesheet tab's accessible
+ *  name is the feature's glossary name — "Custom stylesheet" — while its
+ *  visible label stays one word like its neighbours. */
+const TAB_META: Record<TabId, { label: string; name: string }> = {
+  Page: { label: 'Page', name: 'Page' },
+  Style: { label: 'Style', name: 'Style' },
+  Stylesheet: { label: 'Stylesheet', name: 'Custom stylesheet' },
+  'Header-Footer': { label: 'Header/Footer', name: 'Header/Footer' },
+};
 
 const TAB_PANELS: Record<TabId, (props: TabProps) => React.ReactElement> = {
   Page: PageTab,
   Style: StyleTab,
+  Stylesheet: StylesheetTab,
   'Header-Footer': HeaderFooterTab,
 };
 
@@ -51,7 +64,7 @@ export function Inspector({ gauge = null }: InspectorProps) {
       <EmptyState
         icon={<SlidersIcon />}
         title="Inspector"
-        hint="Open a document to tune its page, style, and header/footer."
+        hint="Open a document to tune its page, style, stylesheet, and header/footer."
       />
     );
   }
@@ -78,6 +91,7 @@ export function Inspector({ gauge = null }: InspectorProps) {
               type="button"
               role="tab"
               aria-selected={tab === id}
+              aria-label={TAB_META[id].name}
               data-testid={`inspector-tab-${id}`}
               onClick={() => setTab(id)}
               className={`touch-target h-7 rounded-control px-2.5 text-xs font-medium transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
@@ -86,7 +100,7 @@ export function Inspector({ gauge = null }: InspectorProps) {
                   : 'text-ink-soft hover:bg-surface-hover hover:text-ink'
               }`}
             >
-              {id === 'Header-Footer' ? 'Header/Footer' : id}
+              {TAB_META[id].label}
             </button>
           ))}
         </div>
@@ -107,13 +121,14 @@ export function Inspector({ gauge = null }: InspectorProps) {
 
       <div
         role="tabpanel"
-        aria-label={`${tab === 'Header-Footer' ? 'Header/Footer' : tab} settings`}
+        aria-label={`${TAB_META[tab].name} settings`}
         className="min-h-0 flex-1 overflow-y-auto"
       >
         <TabPanel
           settings={settings}
           set={set}
           onOpenPricing={() => setPricingOpen(true)}
+          onOpenStylesheet={() => setTab('Stylesheet')}
           flags={flags}
           addImage={addAsset}
         />

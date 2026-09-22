@@ -1,20 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Inspector → Style tab: preset gallery (visual thumbnails), typography,
-// colors, and the code-font group (Shiki theme catalog + ligatures).
+// Inspector → Style tab: preset gallery (visual thumbnails) with the Custom
+// Stylesheet layer tile, typography, colors, and the code-font group (Shiki
+// theme catalog + ligatures) plus the custom-font library gate (billing/05).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect } from 'react';
-import { CODE_THEMES, PRESETS } from '@perfectmarkd/core';
-import { applyPreset, customFontValue, fontChange } from './settings-edit';
+import { CODE_THEMES, extractDocStyle, PRESETS } from '@perfectmarkd/core';
+import {
+  applyPreset,
+  customFontValue,
+  fontChange,
+  setStylesheetEnabled,
+  stylesheetHasCSS,
+} from './settings-edit';
 import { PresetThumb } from './PresetThumb';
 import { BODY_FONTS, CODE_FONTS } from './fonts';
 import { useCustomFontStore } from '../fonts/store';
+import { LockIcon } from '../shell/icons';
 import {
   ColorInput,
   Field,
   FauxUploadButton,
   GateFontPicker,
-  IncludedNote,
   LockedRow,
   NumberInput,
   Section,
@@ -75,7 +82,59 @@ const codeThemeOptions = CODE_THEMES.map((theme) => ({
  *  a 4-across grid of presets is one glance instead of a scroll. */
 const TILE_THUMB = { width: 60, height: 80 };
 
-export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
+/** One gallery tile's shell — the frame, the thumb at the tile footprint with
+ *  an `overlay` riding it, and the caption. Shared by the preset radios and
+ *  the Custom Stylesheet layer tile (entitled and locked variants): the
+ *  frames, thumbs, and captions are one shape, and only the semantics differ
+ *  (a radio for a Preset, a pressed toggle for the layer, a priced lock). */
+function GalleryTile({
+  selected,
+  caption,
+  thumb,
+  overlay,
+  ...rest
+}: {
+  /** Lights the frame and the caption (the system's selected-tile treatment). */
+  selected: boolean;
+  caption: string;
+  thumb: React.ReactNode;
+  /** Positions itself against the thumb (a chip, a lock badge); omit for none. */
+  overlay?: React.ReactNode;
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'type'>) {
+  return (
+    <button
+      type="button"
+      {...rest}
+      className={`flex flex-col items-center gap-1 rounded-pane border p-1 transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
+        selected
+          ? 'border-ink bg-canvas'
+          : 'border-hairline hover:border-hairline-strong'
+      }`}
+    >
+      <span className="relative">
+        {thumb}
+        {overlay}
+      </span>
+      <span
+        className={`truncate text-[11px] ${
+          selected ? 'font-medium text-ink' : 'text-ink-soft'
+        }`}
+      >
+        {caption}
+      </span>
+    </button>
+  );
+}
+
+/** The Style tab's controls; the tile needs the Stylesheet-tab mover, which
+ *  rides on TabProps like the pricing opener. */
+export function StyleTab({
+  settings,
+  set,
+  onOpenPricing,
+  onOpenStylesheet,
+  flags,
+}: TabProps) {
   const fonts = useCustomFontStore((state) => state.fonts);
   const loadFonts = useCustomFontStore((state) => state.load);
   const addFont = useCustomFontStore((state) => state.add);
@@ -105,38 +164,86 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
         {/* auto-fill: the pane is resizable (260px floor), so the grid decides
             its own column count from the room it has — 4 across at the default
             width, 3 at the minimum — instead of leaving a lone preset stranded
-            on the last row. */}
+            on the last row. The radiogroup wraps only the preset radios
+            (display: contents keeps them in this one grid); the Custom
+            Stylesheet tile is not a Preset, so it sits beside the group as a
+            plain toggle. */}
         <div
-          role="radiogroup"
-          aria-label="Preset"
           data-testid="preset-gallery"
           className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-1.5"
         >
-          {Object.entries(PRESETS).map(([key, style]) => {
-            const active = settings.preset === key;
-            return (
-              <button
+          <div role="radiogroup" aria-label="Preset" className="contents">
+            {Object.entries(PRESETS).map(([key, style]) => (
+              <GalleryTile
                 key={key}
-                type="button"
                 role="radio"
-                aria-checked={active}
+                aria-checked={settings.preset === key}
                 title={style.name}
+                selected={settings.preset === key}
+                caption={style.name}
+                thumb={<PresetThumb style={style} {...TILE_THUMB} />}
                 onClick={() => set(applyPreset(settings, key))}
-                className={`flex flex-col items-center gap-1 rounded-pane border p-1 transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 ${
-                  active
-                    ? 'border-ink bg-canvas'
-                    : 'border-hairline hover:border-hairline-strong'
-                }`}
-              >
-                <PresetThumb style={style} {...TILE_THUMB} />
-                <span
-                  className={`truncate text-[11px] ${active ? 'font-medium text-ink' : 'text-ink-soft'}`}
-                >
-                  {style.name}
+              />
+            ))}
+          </div>
+          {/* The Custom Stylesheet layer tile (ai-transforms/01): not a
+              Preset — it sits over whatever Preset is lit, so it sketches the
+              current look with a CSS chip and never unselects the radio. */}
+          {flags.customStylesheet ? (
+            <GalleryTile
+              aria-pressed={settings.customStylesheetEnabled}
+              title="Custom stylesheet"
+              data-testid="stylesheet-tile"
+              selected={settings.customStylesheetEnabled}
+              caption="Custom stylesheet"
+              thumb={
+                <PresetThumb
+                  style={extractDocStyle(settings)}
+                  {...TILE_THUMB}
+                />
+              }
+              overlay={
+                <span className="absolute right-0.5 top-0.5 rounded-control border border-hairline-strong bg-canvas px-1 font-mono text-[11px] leading-3.5 text-ink">
+                  CSS
                 </span>
-              </button>
-            );
-          })}
+              }
+              onClick={() =>
+                stylesheetHasCSS(settings)
+                  ? set(
+                      setStylesheetEnabled(
+                        settings,
+                        !settings.customStylesheetEnabled,
+                      ),
+                    )
+                  : onOpenStylesheet()
+              }
+            />
+          ) : (
+            <GalleryTile
+              aria-label="Custom stylesheet (paid feature)"
+              title="Custom stylesheet needs a paid plan — open plans to compare"
+              data-testid="stylesheet-tile"
+              selected={false}
+              caption="Custom stylesheet"
+              thumb={
+                <PresetThumb
+                  style={extractDocStyle(settings)}
+                  {...TILE_THUMB}
+                />
+              }
+              overlay={
+                /* The gate lock as a tile badge: a glyph over the thumb — the
+                   tab body's chip form would drown a 60×80 sketch. Clicking
+                   opens the pricing modal, never a signup wall. */
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-control border border-hairline-strong bg-canvas text-ink">
+                    <LockIcon />
+                  </span>
+                </span>
+              }
+              onClick={onOpenPricing}
+            />
+          )}
         </div>
       </Section>
 
@@ -305,12 +412,10 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
         />
       </Section>
 
-      <Section title="Custom (Pro)">
-        {/* The custom-stylesheet UI is ai-transforms/01's ticket (the engine
-            field + Stylesheet Inspector tab live there); until then the
-            unlocked state says what the plan includes instead of showing a
-            lock a paying user can't act on. Custom fonts (billing/05) are
-            live: the library uploads here, the pickers above list it. */}
+      {/* The Custom Stylesheet's home is its own Inspector tab and the
+          gallery tile above (ai-transforms/01); this section keeps the
+          custom-font library (billing/05). */}
+      <Section title="Custom fonts">
         {flags.customFonts ? (
           <Field label="Custom fonts">
             <GateFontPicker
@@ -323,17 +428,6 @@ export function StyleTab({ settings, set, onOpenPricing, flags }: TabProps) {
         ) : (
           <LockedRow
             label="Custom fonts"
-            onOpenPricing={onOpenPricing}
-            control={<FauxUploadButton label="Upload…" />}
-          />
-        )}
-        {flags.customStylesheet ? (
-          <Field label="Custom stylesheet">
-            <IncludedNote />
-          </Field>
-        ) : (
-          <LockedRow
-            label="Custom stylesheet"
             onOpenPricing={onOpenPricing}
             control={<FauxUploadButton label="Upload…" />}
           />

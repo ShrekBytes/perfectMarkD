@@ -125,7 +125,7 @@ The central preview area showing paginated pages exactly as they will print.
 _Avoid_: viewer, preview pane
 
 **Inspector**:
-The right-hand settings panel with its three tabs: Page, Style, Header/Footer.
+The right-hand settings panel with its four tabs: Page, Style, Stylesheet, Header/Footer.
 _Avoid_: settings, sidebar
 
 **Library**:

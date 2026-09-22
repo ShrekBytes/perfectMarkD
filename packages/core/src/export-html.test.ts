@@ -243,4 +243,26 @@ describe('buildExportHTML', () => {
     );
     expect(html).not.toContain('inset:0;');
   });
+
+  it('carries the Custom Stylesheet in the print CSS, stripped of @page (ai-transforms/01)', () => {
+    const s = settings({
+      customStylesheet:
+        '@page { size: 300px 300px; } .mpdf-doc h2 { letter-spacing: 0.3em; }',
+      customStylesheetEnabled: true,
+    });
+    const html = buildExportHTML(twoPageLayouts(s), s, resolveNothing);
+    // The user's rule reaches the print document…
+    expect(html).toContain('.mpdf-doc h2 { letter-spacing: 0.3em; }');
+    // …while the settings' own @page sizing is the only @page left, so the
+    // printed page geometry is the Page tab's, never the stylesheet's.
+    expect(html.match(/@page \{/g)).toHaveLength(1);
+    expect(html).toContain('@page { size: 794px 1123px; margin: 0; }');
+    // Layer off: the rule is gone from the print document entirely.
+    const off = buildExportHTML(
+      twoPageLayouts({ ...s, customStylesheetEnabled: false }),
+      { ...s, customStylesheetEnabled: false },
+      resolveNothing,
+    );
+    expect(off).not.toContain('letter-spacing: 0.3em');
+  });
 });

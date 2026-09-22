@@ -44,11 +44,11 @@ export async function waitForCanvasSettled(page: Page): Promise<void> {
   await page.evaluate(() => document.fonts.ready);
 }
 
-/** Switches the Inspector to the given tab (visible label of the third tab is
- *  "Header/Footer"; the testid uses the internal id `Header-Footer`). */
+/** Switches the Inspector to the given tab (visible labels; the testid uses
+ *  the internal id, where the Stylesheet tab is `Stylesheet`). */
 export async function openInspectorTab(
   page: Page,
-  tab: 'Page' | 'Style' | 'Header-Footer',
+  tab: 'Page' | 'Style' | 'Stylesheet' | 'Header-Footer',
 ): Promise<void> {
   await page.getByTestId(`inspector-tab-${tab}`).click();
 }

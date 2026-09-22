@@ -25,6 +25,7 @@ import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { exportJobs, users, type ExportJob, type Plan } from '../db/schema.js';
 import { PayloadStore, ResultStore, insertExportJob } from './queue.js';
+import type { ExportPayload } from './payload.js';
 import { createPlaywrightRenderer } from './render.js';
 import { ExportWorker } from './worker.js';
 
@@ -231,10 +232,11 @@ async function enqueueJob(
   db: AppDatabase,
   id: string,
   payloads: PayloadStore,
+  exportPayload: ExportPayload = payload,
 ): Promise<void> {
   const userId = await makeUser(db);
   insertExportJob(db, { id, userId, plan: 'pro' as Plan, now: new Date() });
-  payloads.hold(id, payload);
+  payloads.hold(id, exportPayload);
 }
 
 describe('Server Export end-to-end (real Chromium)', () => {
@@ -284,6 +286,70 @@ describe('Server Export end-to-end (real Chromium)', () => {
     }
     expect(baseFonts.some((name) => name.includes('IBMPlexMono'))).toBe(true);
     worker.stop();
+  });
+
+  it('renders a Custom Stylesheet document: the rules reach print, @page does not (ai-transforms/01)', async () => {
+    const { db, dir } = createTestDatabase();
+    cleanupDb?.();
+    cleanupDb = () => removeTestDatabase(dir);
+
+    // The same markdown rendered twice — layer off, then on with a
+    // stylesheet that both enlarges the body text and tries to re-size the
+    // page. The regression this test pins: the text rule must apply
+    // everywhere while the @page rule is ignored, so the PDF's page geometry
+    // stays exactly what the settings wrote (the preview's page boxes).
+    const markdown = `# Stylesheet doc\n\n${Array.from(
+      { length: 12 },
+      (_, i) => `Paragraph ${i + 1} carries words enough to fill a line.`,
+    ).join('\n\n')}\n`;
+    const payloadWith = (enabled: boolean) => ({
+      title: 'E2E Stylesheet',
+      markdown,
+      settings: {
+        ...DEFAULT_SETTINGS,
+        customStylesheet:
+          '@page { size: 500px 700px; } p { font-size: 40px; line-height: 2; }',
+        customStylesheetEnabled: enabled,
+      } as DocumentSettings,
+      pageCount: 1,
+      assets: {},
+      fonts: [],
+    });
+
+    const payloads = new PayloadStore();
+    const results = new ResultStore();
+    const worker = new ExportWorker({
+      db,
+      payloads,
+      results,
+      renderPdf: renderer.renderPdf,
+    });
+    worker.start();
+
+    await enqueueJob(db, 'e2e-ss-off', payloads, payloadWith(false));
+    await enqueueJob(db, 'e2e-ss-on', payloads, payloadWith(true));
+    worker.notify();
+
+    const off = await pollJob(db, 'e2e-ss-off');
+    const on = await pollJob(db, 'e2e-ss-on');
+    expect(off.status).toBe('done');
+    expect(on.status).toBe('done');
+    worker.stop();
+
+    const baseDoc = await PDFDocument.load(results.get('e2e-ss-off')!);
+    const styledDoc = await PDFDocument.load(results.get('e2e-ss-on')!);
+    // The user's rules reached the print pipeline: the enlarged body text
+    // paginates to more pages than the base render.
+    expect(styledDoc.getPageCount()).toBeGreaterThan(baseDoc.getPageCount());
+    // …while the stylesheet's @page rule did not: both PDFs keep the A4
+    // geometry (px at 96 dpi printed as pt at 72 dpi) — the one divergence
+    // this feature must never produce.
+    for (const doc of [baseDoc, styledDoc]) {
+      for (const page of doc.getPages()) {
+        expect(page.getWidth()).toBeCloseTo(794 * 0.75, 0);
+        expect(page.getHeight()).toBeCloseTo(1123 * 0.75, 0);
+      }
+    }
   });
 
   it('fails a job that never renders with the typed render_timeout code', async () => {

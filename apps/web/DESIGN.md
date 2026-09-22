@@ -1,8 +1,8 @@
 # PerfectMarkD — DESIGN.md (Light Table world)
 
-*Rewritten 2026 by the impeccable redesign pass. This file is ground truth: when
+_Rewritten 2026 by the impeccable redesign pass. This file is ground truth: when
 code and this file disagree, either the code is wrong or this file is stale —
-fix one of them, never neither.*
+fix one of them, never neither._
 
 ## Overview
 
@@ -41,24 +41,24 @@ A cool graphite workspace with no accent hue. The paper is the color.
 
 ### Chrome (light / dark)
 
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `--canvas` | `#e9eaec` | `#17181a` | the bench — Paper Canvas backdrop |
-| `--surface` | `#f4f5f6` | `#222427` | top bar, panes, dialogs, drawer |
-| `--surface-hover` | `#e4e6e8` | `#2e3134` | hover fill on quiet controls |
-| `--page` | `#ffffff` | `#ffffff` | the paper. Never themed. |
-| `--field` | `#ffffff` | `#17181a` | typed-into surfaces (flips with theme) |
-| `--ink` | `#1c1e21` | `#e8eaec` | body text, headings |
-| `--ink-soft` | `#565a60` | `#a6abb1` | secondary text, labels |
-| `--ink-faint` | `#646a71` | `#8d9298` | tertiary text, crop marks (AA on all surfaces incl. the canvas bench) |
-| `--hairline` | `#dcdee1` | `#34373a` | every structural divider |
-| `--hairline-strong` | `#c8cbcf` | `#474b4f` | rules that must hold their own |
-| `--accent` | `#1c1e21` | `#e8eaec` | "accent" = graphite: focus rings, caret, links |
-| `--accent-strong` | `#1c1e21` | `#e8eaec` | filled-control fill (inverts in dark) |
-| `--accent-deep` | `#04060a` | `#f8f9fa` | filled-control hover/active |
-| `--accent-soft` | `8% ink` | `12% ink` | selection wash, subtle tints |
-| `--accent-ink` | `#ffffff` | `#17181a` | text on filled controls |
-| `--danger` | `#c4321f` | `#f07a6a` | destructive actions, failure text only |
+| Token               | Light     | Dark      | Role                                                                  |
+| ------------------- | --------- | --------- | --------------------------------------------------------------------- |
+| `--canvas`          | `#e9eaec` | `#17181a` | the bench — Paper Canvas backdrop                                     |
+| `--surface`         | `#f4f5f6` | `#222427` | top bar, panes, dialogs, drawer                                       |
+| `--surface-hover`   | `#e4e6e8` | `#2e3134` | hover fill on quiet controls                                          |
+| `--page`            | `#ffffff` | `#ffffff` | the paper. Never themed.                                              |
+| `--field`           | `#ffffff` | `#17181a` | typed-into surfaces (flips with theme)                                |
+| `--ink`             | `#1c1e21` | `#e8eaec` | body text, headings                                                   |
+| `--ink-soft`        | `#565a60` | `#a6abb1` | secondary text, labels                                                |
+| `--ink-faint`       | `#646a71` | `#8d9298` | tertiary text, crop marks (AA on all surfaces incl. the canvas bench) |
+| `--hairline`        | `#dcdee1` | `#34373a` | every structural divider                                              |
+| `--hairline-strong` | `#c8cbcf` | `#474b4f` | rules that must hold their own                                        |
+| `--accent`          | `#1c1e21` | `#e8eaec` | "accent" = graphite: focus rings, caret, links                        |
+| `--accent-strong`   | `#1c1e21` | `#e8eaec` | filled-control fill (inverts in dark)                                 |
+| `--accent-deep`     | `#04060a` | `#f8f9fa` | filled-control hover/active                                           |
+| `--accent-soft`     | `8% ink`  | `12% ink` | selection wash, subtle tints                                          |
+| `--accent-ink`      | `#ffffff` | `#17181a` | text on filled controls                                               |
+| `--danger`          | `#c4321f` | `#f07a6a` | destructive actions, failure text only                                |
 
 ### Named Rules
 
@@ -143,11 +143,11 @@ Two authored breakpoints, both tokens of the system rather than incidental
 properties of flexbox. The first is **content-driven**: it is the three panes'
 own minimum width, which is exactly where the composition breaks.
 
-| Width | Layout |
-|---|---|
-| **≥ 860px** — *wide* | Three panes as columns. `860 = 280 + 320 + 260`. Dividers, collapse chevrons, fullscreen-canvas mode, autosave **and** gauge in the bar, the full Library / theme / quota / Export / account cluster, and the document name as an inline-edit field. |
-| **< 860px** — *compact* | One pane at a time behind the **Pane Switcher** (Editor · Paper · Inspector), full width. Every pane stays mounted; the inactive ones are hidden. The name becomes a readout that opens the **Rename dialog**, and the gauge moves to the Inspector header. `SHELL_WIDE_MIN` in `shell/pane-layout.ts`. |
-| **< 480px** (`roomy`) | The wordmark yields the bar to the document name and the Export action. The switcher row carries the autosave readout. |
+| Width                   | Layout                                                                                                                                                                                                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **≥ 860px** — _wide_    | Three panes as columns. `860 = 280 + 320 + 260`. Dividers, collapse chevrons, fullscreen-canvas mode, autosave **and** gauge in the bar, the full Library / theme / quota / Export / account cluster, and the document name as an inline-edit field.                                                    |
+| **< 860px** — _compact_ | One pane at a time behind the **Pane Switcher** (Editor · Paper · Inspector), full width. Every pane stays mounted; the inactive ones are hidden. The name becomes a readout that opens the **Rename dialog**, and the gauge moves to the Inspector header. `SHELL_WIDE_MIN` in `shell/pane-layout.ts`. |
+| **< 480px** (`roomy`)   | The wordmark yields the bar to the document name and the Export action. The switcher row carries the autosave readout.                                                                                                                                                                                  |
 
 **Named rules:**
 
@@ -163,7 +163,7 @@ own minimum width, which is exactly where the composition breaks.
   Paper view's labels and the Library rows, and the Server Export allowance in
   the Export menu. The gauge's compact surrogate is the Inspector header
   readout — the one place a phone user goes to change the paper — and it is
-  rendered *only* in compact, so the same facts never appear twice on screen.
+  rendered _only_ in compact, so the same facts never appear twice on screen.
 - **Compact never edits in a sliver.** Where a wide-layout inline control cannot
   hold its content at phone widths, it stops being an inline control: the
   document name becomes a tap-to-rename readout over a full-width field in the
@@ -190,7 +190,7 @@ overflow, the account dropdown, the Export dropdown), the shared Dialog and its
 close button, the Library drawer, every dialog body (the upgrade flow, the
 rename dialog, the print hint), the Account page's fields and rows, the
 payment and auth fields, the copy buttons, and the quota chip. An overlay is
-where a phone user goes to *act*, so it is not exempt. `e2e/shell-compact.spec.ts`
+where a phone user goes to _act_, so it is not exempt. `e2e/shell-compact.spec.ts`
 sweeps the visible controls at 320px and fails on any box under the floor.
 
 The Inspector's 24px field micro-controls stay exempt — 12px text on a 24–27px
@@ -205,7 +205,7 @@ Depth declared once per surface — a hairline **or** a shadow, never both as
 decoration. The paper is the exception (it is a physical object): a 1px contact
 shadow plus a wide ambient one, slightly deepened from the old world
 (`0 1px 2px rgb(0 0 0/0.10), 0 12px 32px rgb(0 0 0/0.16)`) so the sheet reads
-as lit *on* the bench. Shadows: `shadow-sm` raised controls, `shadow-lg`
+as lit _on_ the bench. Shadows: `shadow-sm` raised controls, `shadow-lg`
 floating layers, `shadow-xl` modals.
 
 **Motion:** one curve, one duration — `cubic-bezier(0,0,0.2,1)` at 150ms, on
@@ -258,7 +258,7 @@ column instead of hopping between two edges. The axis belongs to
   row's — and carry no spinner chrome (stepping a page size by 1mm is not a
   real interaction; keyboard arrows still step). Selects and text inputs fill
   the column, because the chosen option is the longest text in the row.
-- Toggle rows: the switch sits on the control axis and the *whole row* is the
+- Toggle rows: the switch sits on the control axis and the _whole row_ is the
   label, so the hit target is the full row and there is exactly one name for
   the checkbox. A field's label lives left of the axis; a toggle's lives
   right of it. The visual is a rectangular 32×16 graphite switch (2px radii,
@@ -308,7 +308,10 @@ decides its own column count from the pane's width (4 across at the default,
 A graphite chip, not faint text: 24px, 11px semibold Ink on a `--canvas` fill
 with a `--hairline-strong` border, lock glyph + "Pro". Hover inverts to the
 graphite fill with light ink; gated controls render disabled-but-visible;
-clicking opens the pricing modal, never a signup wall.
+clicking opens the pricing modal, never a signup wall. On a preset-gallery
+tile the lock drops the chip and rides the thumb as a small glyph-only badge
+centered on the sketch — a chip that size would drown a 60×80 thumbnail; the
+tile's accessible name carries the "(paid feature)" suffix instead.
 
 ### Zoom Pill
 
@@ -334,7 +337,7 @@ desktop account dropdown so the two can never drift. Export stays out of it and
 remains the bar's only filled control.
 
 **Menus are 224px wide (`w-56`), never shrink-to-fit, and clamp to
-`calc(100vw − 1rem)`.** The compact overflow is anchored to the *viewport*
+`calc(100vw − 1rem)`.** The compact overflow is anchored to the _viewport_
 (`fixed right-2`, below the bar plus the safe-area inset) rather than to its
 trigger, because the trigger sits ~44px from the bar's right edge and a
 224px trigger-anchored dropdown hangs half its labels off a 320px screen. The
