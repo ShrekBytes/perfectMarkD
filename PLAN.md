@@ -55,12 +55,12 @@ Server Export payloads are processed in memory and deleted immediately after ren
 
 ## 2. Design language
 
-**Excalidraw's low-chrome simplicity with modern polish.** The chrome recedes; editor and paper are the product.
+**Excalidraw's low-chrome simplicity with modern polish.** The chrome recedes; editor and paper are the product. This section is the strategic stance; the concrete visual system — "The Light Table" — is **binding in [`apps/web/DESIGN.md`](apps/web/DESIGN.md)**, which is ground truth whenever the two disagree.
 
-- **Layout** — three collapsible panes: CodeMirror editor (~38%) · Paper Canvas (warm-gray backdrop, centered white pages with soft ambient shadows) · Inspector (320px settings panel). All collapse; one click gives a fullscreen canvas.
-- **Inspector tabs**: **Page** (size, orientation, margins, frame, background image), **Style** (preset gallery as visual thumbnails — small rendered page previews, not a dropdown — plus typography, colors, code theme), **Header/Footer** (text, alignment, page numbers, banner image). Paid controls show a 🔒 that opens the pricing modal — never a signup wall.
-- **Chrome**: top bar = wordmark, editable doc name, Library, dark-mode toggle, quota chip (paid), `⬇ Export ▾` split button (main click = Client Export print flow; dropdown = Server Export). Floating zoom pill on the canvas. No card grids, no decorative clutter.
-- **Type & color**: Inter for UI; accent violet `#7c6af7` (the plugin's identity); 1px hairline borders, 8–10px radii, subtle motion (150–200ms ease-out).
+- **Layout** — three collapsible panes: CodeMirror editor (~38%, min 280px) · Paper Canvas (cool graphite backdrop, centered white pages with ambient shadows; min 320px) · Inspector (320px settings panel, min 260px). All collapse; one click gives a fullscreen canvas.
+- **Inspector tabs**: **Page** (size, orientation, margins, frame, background image), **Style** (preset gallery as visual thumbnails — small rendered page previews, not a dropdown — plus typography, colors, code theme), **Header/Footer** (text, alignment, page numbers, banner image). Paid controls show a lock that opens the pricing modal — never a signup wall.
+- **Chrome**: top bar = wordmark, editable doc name, Library, theme switch, quota chip (paid), `Export ▾` split button (main click = Client Export print flow; dropdown = Server Export). Floating zoom pill on the canvas. No card grids, no decorative clutter.
+- **Visual identity**: graphite monochrome chrome with no accent hue (color belongs to the document), IBM Plex Sans/Mono, 2px radii, 150ms ease-out motion, and corner crop marks on every preview page. See `apps/web/DESIGN.md` for the full token set and rules.
 - **Dark mode**: chrome darkens; pages stay white paper (unless the document's preset is Dark).
 - **Onboarding**: first visit loads a polished multi-page sample document (headings, table, highlighted code, math, mermaid, page numbers) so the preview wows in two seconds; "Start blank" / "Import .md" actions; sample dismissible forever.
 - Desktop-first. Tablet usable, phone degraded-but-functional.
@@ -91,7 +91,7 @@ Server Export payloads are processed in memory and deleted immediately after ren
 | **2 — Paid tier** (~2–3 wks) | Server + auth, Server Export pipeline, quotas, upgrade flow + Order submission, admin panel (payments/users/settings/audit), gated-feature unlocks (custom page size, CSS, fonts, banner/background images), Export History | Payments go live |
 | **3 — Polish & launch ops** (~1–2 wks) | Umami analytics, docs page, backups + restore runbook, perf guards (large-doc warning, lazy Shiki, mermaid caching), deploy hardening, launch checklist | Full launch |
 
-Workstreams & tickets live in `.scratch/`: [`engine-port`](.scratch/engine-port/spec.md) · [`editor-app`](.scratch/editor-app/spec.md) · [`server`](.scratch/server/spec.md) · [`billing`](.scratch/billing/spec.md) · [`launch`](.scratch/launch/spec.md) · [`ai-transforms`](.scratch/ai-transforms/spec.md). **Execution order comes from each ticket's `Blocked by:` line** — work the frontier: any ticket whose blockers are resolved, lowest number first.
+Workstreams & tickets live in `.scratch/`: [`account-page`](.scratch/account-page/spec.md) · [`ai-transforms`](.scratch/ai-transforms/spec.md) · [`billing`](.scratch/billing/spec.md) · [`docs-page`](.scratch/docs-page/spec.md) · [`launch`](.scratch/launch/spec.md) · [`launch-chrome`](.scratch/launch-chrome/spec.md). **Execution order comes from each ticket's `Blocked by:` line** — work the frontier: any ticket whose blockers are resolved, lowest number first.
 
 ## 5. Risks & mitigations
 
