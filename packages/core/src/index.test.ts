@@ -9,6 +9,7 @@ it('exposes the public engine surface from the package index', () => {
   expect(api).toContain('DEFAULT_SETTINGS');
   expect(api).toContain('buildExportHTML');
   expect(api).toContain('resolvePageGeometry');
+  expect(api).toContain('estimateAiSize');
   // The scaffold placeholder is gone.
   expect(api).not.toContain('hello');
 });
