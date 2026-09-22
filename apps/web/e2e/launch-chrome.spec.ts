@@ -83,7 +83,13 @@ test('an unknown route renders the 404 with a working link back to the editor', 
   expect(new URL(page.url()).pathname).toBe('/');
 });
 
-for (const path of ['/pricing', '/about', '/privacy', '/definitely-not-a-page']) {
+for (const path of [
+  '/pricing',
+  '/about',
+  '/privacy',
+  '/docs',
+  '/definitely-not-a-page',
+]) {
   test(`the footer renders with its links at ${path}`, async ({ page }) => {
     await page.goto(path);
     const footer = footerOf(page);
@@ -96,8 +102,9 @@ for (const path of ['/pricing', '/about', '/privacy', '/definitely-not-a-page'])
       footer.getByRole('link', { name: /Advanced PDF Export plugin/ }),
     ).toBeVisible();
 
-    // Links to the static surfaces (Docs joins them via the docs-page spec).
+    // Links to the static surfaces (Docs joined via the docs-page spec).
     await expect(footer.getByRole('link', { name: 'Pricing' })).toBeVisible();
+    await expect(footer.getByRole('link', { name: 'Docs' })).toBeVisible();
     await expect(footer.getByRole('link', { name: 'About' })).toBeVisible();
     await expect(footer.getByRole('link', { name: 'Privacy' })).toBeVisible();
   });

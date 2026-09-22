@@ -78,6 +78,26 @@ it.each([
   expect(screen.queryByTestId('export-split')).not.toBeInTheDocument();
 });
 
+it('renders the docs page at /docs', async () => {
+  window.history.pushState({}, '', '/docs');
+  render(<App />);
+
+  expect(
+    screen.getByRole('heading', { name: 'Docs', level: 1 }),
+  ).toBeInTheDocument();
+
+  // The section nav generates from the rendered headings once the single
+  // markdown source has come through the engine's renderer.
+  expect(
+    await screen.findByRole('link', { name: 'Getting started' }),
+  ).toBeInTheDocument();
+  const nav = screen.getByRole('navigation', { name: 'Sections' });
+  expect(nav.querySelectorAll('a').length).toBeGreaterThan(3);
+
+  // The editor must not mount behind the page.
+  expect(screen.queryByTestId('export-split')).not.toBeInTheDocument();
+});
+
 it('renders the account page at /account', async () => {
   window.history.pushState({}, '', '/account');
   useAccountStore.setState({

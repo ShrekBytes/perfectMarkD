@@ -1,0 +1,157 @@
+/* Docs page prose (docs-page spec). The engine's markdown renderer outputs
+ * plain web HTML — no pagination, no shadow DOM — so these are real CSS rules
+ * scoped under .docs-prose rather than Tailwind utilities, mirroring
+ * editor.css. All colors come from the design tokens so dark mode works
+ * without extra rules. */
+
+.docs-prose {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Headline (DESIGN.md → Hierarchy): the static pages' h1. */
+.docs-prose h1 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+
+/* Section head (DESIGN.md → Hierarchy), the docs page's primary structure. */
+.docs-prose h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 32px 0 8px;
+  /* Hash links land the heading clear of the viewport edge. */
+  scroll-margin-top: 16px;
+}
+
+/* Title size, weight 600: subsections inside a long reference. */
+.docs-prose h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 6px;
+  scroll-margin-top: 16px;
+}
+
+.docs-prose p {
+  margin: 0 0 12px;
+}
+
+/* Tailwind's preflight strips list styling globally; the prose puts the
+ * markers back. */
+.docs-prose ul,
+.docs-prose ol {
+  margin: 0 0 12px;
+  padding-inline-start: 1.4em;
+}
+
+.docs-prose ul {
+  list-style: disc;
+}
+
+.docs-prose ol {
+  list-style: decimal;
+}
+
+.docs-prose li {
+  margin-bottom: 4px;
+}
+
+.docs-prose a {
+  color: var(--ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--hairline);
+  text-underline-offset: 2px;
+}
+
+.docs-prose a:hover {
+  text-decoration-color: var(--ink);
+}
+
+.docs-prose strong {
+  font-weight: 600;
+}
+
+.docs-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--surface-hover);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.docs-prose pre {
+  /* Shiki's inline theme colors stay (the tokens carry the highlighting);
+   * the frame keeps the block legible on the dark bench. */
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  padding: 10px 12px;
+}
+
+.docs-prose pre code {
+  background: none;
+  padding: 0;
+  /* "Editor code" from DESIGN.md → Hierarchy. */
+  font-size: 13.5px;
+}
+
+.docs-prose blockquote {
+  border-inline-start: 3px solid var(--hairline-strong);
+  color: var(--ink-soft);
+  font-style: italic;
+  margin: 0 0 12px;
+  padding-inline: 1em 0;
+}
+
+.docs-prose table {
+  border-collapse: collapse;
+  margin: 0 0 12px;
+  width: 100%;
+}
+
+.docs-prose th,
+.docs-prose td {
+  border: 1px solid var(--hairline);
+  padding: 5px 10px;
+  text-align: start;
+  vertical-align: top;
+}
+
+.docs-prose th {
+  background: var(--surface-hover);
+  font-weight: 600;
+}
+
+.docs-prose img {
+  max-width: 100%;
+}
+
+.docs-prose hr {
+  border: none;
+  border-top: 1px solid var(--hairline);
+  margin: 24px 0;
+}
+
+/* Diagrams render as top-level SVGs (the renderer swaps the fence's
+ * placeholder for the markup directly). A white card keeps the diagram's
+ * dark strokes legible in dark mode — the paper stays white in both themes. */
+.docs-prose > svg {
+  background: var(--page);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  display: block;
+  height: auto;
+  margin: 0 auto 12px;
+  max-width: 100%;
+  padding: 8px;
+}
+
+/* Display math can outrun a phone column; scroll, never clip. */
+.docs-prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}

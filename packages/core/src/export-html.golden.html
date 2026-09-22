@@ -22,6 +22,21 @@
       }
       .mpdf-export-page:last-child { page-break-after: avoid; break-after: avoid; }
       .mpdf-doc {
+    /* The styling reference's stable contract: the Document's current style
+     * values, mirrored for a Custom Stylesheet to read. Redefining one
+     * changes nothing — the generated rules set their values directly. */
+    --mpdf-font: Georgia, serif;
+    --mpdf-font-size: 13px;
+    --mpdf-line-height: 1.85;
+    --mpdf-paragraph-spacing: 0.65em;
+    --mpdf-body-color: #1a1a2e;
+    --mpdf-heading-color: #0d0d1a;
+    --mpdf-bold-color: #1a1a2e;
+    --mpdf-accent: #1c1e21;
+    --mpdf-code-background: #f0f1f2;
+    --mpdf-code-font: 'Courier New', monospace;
+    --mpdf-blockquote-background: transparent;
+    --mpdf-table-header-background: #f0f1f2;
     font-family: Georgia, serif;
     font-size: 13px;
     line-height: 1.85;

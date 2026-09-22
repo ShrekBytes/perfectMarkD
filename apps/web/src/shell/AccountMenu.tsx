@@ -28,9 +28,26 @@ export function AccountMenuItems({ onClose }: AccountMenuItemsProps) {
 
   if (!user) {
     return (
-      <Link to="/login" role="menuitem" onClick={onClose} className={itemClasses}>
-        Sign in
-      </Link>
+      <>
+        {/* The catch-all menu carries Docs in both states (docs-page spec):
+            a visitor checks the feature explanations without signing up. */}
+        <Link
+          to="/docs"
+          role="menuitem"
+          onClick={onClose}
+          className={itemClasses}
+        >
+          Docs
+        </Link>
+        <Link
+          to="/login"
+          role="menuitem"
+          onClick={onClose}
+          className={itemClasses}
+        >
+          Sign in
+        </Link>
+      </>
     );
   }
 
@@ -46,6 +63,14 @@ export function AccountMenuItems({ onClose }: AccountMenuItemsProps) {
         className={itemClasses}
       >
         Account
+      </Link>
+      <Link
+        to="/docs"
+        role="menuitem"
+        onClick={onClose}
+        className={itemClasses}
+      >
+        Docs
       </Link>
       <button
         role="menuitem"
@@ -69,8 +94,8 @@ export function AccountMenuItems({ onClose }: AccountMenuItemsProps) {
 /**
  * The top bar's account control (billing/01): a sign-in link when signed out,
  * and when signed in a menu with the account email, the Account page (where
- * the plan's Orders, Export History, and the password form live), and
- * sign-out.
+ * the plan's Orders, Export History, and the password form live), the Docs
+ * page (docs-page spec — the menu is the app's catch-all), and sign-out.
  */
 export function AccountMenu() {
   const user = useAccountStore((state) => state.user);

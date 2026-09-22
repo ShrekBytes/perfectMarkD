@@ -70,10 +70,44 @@ export async function openLibrary(page: Page) {
  *  the editor's input path (and its debounced autosave) is what's exercised. */
 export async function typeAtEditorEnd(page: Page, text: string): Promise<void> {
   await page.locator('.cm-content').click();
+  await moveToEditorEnd(page);
+  await page.keyboard.type(text, { delay: 5 });
+}
+
+/** Moves the CodeMirror caret to the document end (scrolling the tail into
+ *  its virtualized DOM). Platform-conditional, as typeAtEditorEnd needs. */
+export async function moveToEditorEnd(page: Page): Promise<void> {
   await page.keyboard.press(
     process.platform === 'darwin' ? 'Meta+End' : 'Control+End',
   );
-  await page.keyboard.type(text, { delay: 5 });
+}
+
+/** The GET /api/me payload of an entitled Pro account: every gate open. */
+const PRO_ME = {
+  email: 'writer@example.com',
+  isAdmin: false,
+  plan: 'pro',
+  expiresAt: '2030-01-01T00:00:00.000Z',
+  quota: { used: 0, limit: 300 },
+  flags: {
+    customPageSize: true,
+    customStylesheet: true,
+    bannerImages: true,
+    backgroundImage: true,
+    customFonts: true,
+  },
+};
+
+/** Unlocks the paid gates for the run: /api/me answers with an entitled Pro
+ *  payload (billing/04's flags), so the Inspector's gated controls render. */
+export async function unlockAsPro(page: Page): Promise<void> {
+  await page.route('**/api/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(PRO_ME),
+    }),
+  );
 }
 
 /** Reads a computed style property from the page box inside the first page's

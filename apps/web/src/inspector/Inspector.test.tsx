@@ -1085,6 +1085,18 @@ describe('Custom Stylesheet (ai-transforms/01)', () => {
       ).toBeInTheDocument();
     });
 
+    it('links the footer line to the styling reference (ai-transforms/02)', async () => {
+      unlockAsPro();
+      render(<Inspector />);
+      fireEvent.click(screen.getByRole('tab', { name: 'Custom stylesheet' }));
+
+      // A router Link to the Docs page's anchor: the History-API swap keeps
+      // the open Document — a full reload would be a loss risk.
+      expect(
+        screen.getByRole('link', { name: 'Styling reference' }),
+      ).toHaveAttribute('href', '/docs#styling-reference');
+    });
+
     it('a user without the feature sees the locked body instead', async () => {
       const user = userEvent.setup();
       render(<Inspector />);

@@ -139,3 +139,7 @@ _Avoid_: profile, dashboard, workspace
 **Docs**:
 The single page explaining every feature and how to use the editor. Distinct from the onboarding sample Document, which demos the engine inside the editor itself.
 _Avoid_: tutorial, guide, help
+
+**Styling reference**:
+The Docs page's section documenting the stable contract a Custom Stylesheet may rely on: the `.mpdf-doc`-scoped CSS variables and content selectors the engine emits. Maintained with the engine — a drift test fails the build if it names something the engine stopped emitting. The Stylesheet tab's footer line links to it.
+_Avoid_: CSS docs, class list, API reference

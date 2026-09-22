@@ -2,11 +2,14 @@
 // Inspector → Stylesheet tab (ai-transforms/01): the Custom Stylesheet's home
 // — the CSS box (monospace, its own scroll, roughly the top half; the AI
 // conversation lands below it in ai-transforms/06) with the layer's on/off
-// state, and the plain statement that page geometry belongs to the Page tab.
-// Without the entitlement the body says what the plan includes and opens the
-// pricing modal — never a signup wall.
+// state, and the footer line stating that page geometry belongs to the Page
+// tab and linking to the styling reference (ai-transforms/02). Without the
+// entitlement the body says what the plan includes and opens the pricing
+// modal — never a signup wall.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { STYLING_REFERENCE_ANCHOR } from '@perfectmarkd/core';
+import { Link } from '../router';
 import { GateLock, ToggleRow } from './controls';
 import {
   editStylesheet,
@@ -68,9 +71,19 @@ export function StylesheetTab({
         />
         {/* The guardrail, in the box's own voice: geometry is a Page-tab
             setting, and an obeyed-in-print-only @page rule would silently
-            split preview from print — so the engine strips them. */}
+            split preview from print — so the engine strips them. The footer
+            line also links to the styling reference (ai-transforms/02), the
+            Docs page section documenting the stable contract. A router Link,
+            so the swap keeps the open Document (it autosaves and survives the
+            round trip). */}
         <p className="text-[11px] leading-4 text-ink-faint">
-          Page size and margins are Page-tab settings; @page rules are ignored.
+          Page size and margins are Page-tab settings; @page rules are ignored.{' '}
+          <Link
+            to={`/docs#${STYLING_REFERENCE_ANCHOR}`}
+            className="font-medium text-ink underline decoration-hairline underline-offset-2 transition-colors duration-150 outline-offset-2 outline-accent hover:decoration-ink focus-visible:outline-2"
+          >
+            Styling reference
+          </Link>
         </p>
       </div>
     </div>

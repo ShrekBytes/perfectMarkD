@@ -441,6 +441,21 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
 
   const generated = `
   .mpdf-doc {
+    /* The styling reference's stable contract: the Document's current style
+     * values, mirrored for a Custom Stylesheet to read. Redefining one
+     * changes nothing — the generated rules set their values directly. */
+    --mpdf-font: ${fontFamily};
+    --mpdf-font-size: ${s.fontSize}px;
+    --mpdf-line-height: ${s.lineHeight};
+    --mpdf-paragraph-spacing: ${s.paragraphSpacing}em;
+    --mpdf-body-color: ${s.bodyColor};
+    --mpdf-heading-color: ${s.headingColor};
+    --mpdf-bold-color: ${s.boldColor};
+    --mpdf-accent: ${s.accentColor};
+    --mpdf-code-background: ${s.codeBackground};
+    --mpdf-code-font: ${resolveCodeFont(s)};
+    --mpdf-blockquote-background: ${s.blockquoteBg};
+    --mpdf-table-header-background: ${s.tableHeaderBg};
     font-family: ${fontFamily};
     font-size: ${s.fontSize}px;
     line-height: ${s.lineHeight};

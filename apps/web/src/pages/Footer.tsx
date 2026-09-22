@@ -6,11 +6,11 @@ const plainLink =
 
 /**
  * The shared footer for the site's non-editor surfaces: pricing, About,
- * Privacy, and the 404 (Docs hangs off it via the docs-page spec). It carries
- * the pricing page's original colophon — the AGPL badge, GitHub, and the
- * plugin-successor link — plus links to the static surfaces, so any of them
- * can reach the others. The editor and the auth pages render no footer: the
- * drop-in experience stays uncluttered.
+ * Privacy, Docs, and the 404. It carries the pricing page's original
+ * colophon — the AGPL badge, GitHub, and the plugin-successor link — plus
+ * links to the static surfaces, so any of them can reach the others. The
+ * editor and the auth pages render no footer: the drop-in experience stays
+ * uncluttered.
  */
 export function Footer() {
   return (
@@ -26,6 +26,9 @@ export function Footer() {
       </a>
       <Link to="/pricing" className={plainLink}>
         Pricing
+      </Link>
+      <Link to="/docs" className={plainLink}>
+        Docs
       </Link>
       <Link to="/about" className={plainLink}>
         About

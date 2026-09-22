@@ -6,3 +6,4 @@ export * from './export-html.js';
 export * from './paginator.js';
 export * from './render.js';
 export * from './settings.js';
+export * from './styling-reference.js';
