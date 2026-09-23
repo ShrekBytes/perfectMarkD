@@ -182,7 +182,9 @@ export function useAiCommand(
 
   const documentText = useCallback((): string => {
     const view = getEditor();
-    return view ? view.state.doc.toString() : useDocumentStore.getState().markdown;
+    return view
+      ? view.state.doc.toString()
+      : useDocumentStore.getState().markdown;
   }, [getEditor]);
 
   const computeScope = useCallback(
@@ -449,7 +451,6 @@ export function useAiCommand(
         );
       }
 
-
       // A section too large for one Action is refused before anything is spent
       // (spec §Tier 3): the plan stops and says what remains. A step sends its
       // own section, its brief, and nothing else — no digest, no rest of the
@@ -632,7 +633,11 @@ export function useAiCommand(
     setApplyError(null);
     setRequest({ status: 'idle' });
     if (!state) return;
-    setPlan({ ...state, phase: 'stopped', note: planSummary(state, 'Stopped.') });
+    setPlan({
+      ...state,
+      phase: 'stopped',
+      note: planSummary(state, 'Stopped.'),
+    });
   }, []);
 
   const closePlan = useCallback(() => {

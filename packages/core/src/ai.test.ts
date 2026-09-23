@@ -931,7 +931,9 @@ describe('decideAiLadder', () => {
     if (decision.tier !== 3) return;
     expect(decision.paragraphRange).toEqual({
       from: documentText.indexOf('The paragraph'),
-      to: documentText.indexOf('The paragraph') + 'The paragraph the caret is in.'.length,
+      to:
+        documentText.indexOf('The paragraph') +
+        'The paragraph the caret is in.'.length,
     });
   });
 
@@ -1241,9 +1243,23 @@ describe('parseAiPlan', () => {
 
 describe('findPlanStepSection', () => {
   it('resolves a step by heading after the Document has moved', () => {
-    const before = extractSections(reply(['# One', '', 'Body.', '', '## Two', '', 'Body.']));
+    const before = extractSections(
+      reply(['# One', '', 'Body.', '', '## Two', '', 'Body.']),
+    );
     const after = extractSections(
-      reply(['# Preamble added later', '', 'Body.', '', '# One', '', 'Body.', '', '## Two', '', 'Body.']),
+      reply([
+        '# Preamble added later',
+        '',
+        'Body.',
+        '',
+        '# One',
+        '',
+        'Body.',
+        '',
+        '## Two',
+        '',
+        'Body.',
+      ]),
     );
     const step = { sectionIndex: 1, heading: 'Two', change: 'add a table' };
     expect(findPlanStepSection(before, step)?.heading).toBe('Two');
@@ -1252,7 +1268,9 @@ describe('findPlanStepSection', () => {
   });
 
   it('resolves the no-heading section by the plan index', () => {
-    const sections = extractSections(reply(['Loose notes.', '', '# One', '', 'Body.']));
+    const sections = extractSections(
+      reply(['Loose notes.', '', '# One', '', 'Body.']),
+    );
     const step = { sectionIndex: 0, heading: null, change: 'move this' };
     expect(findPlanStepSection(sections, step)?.text).toBe('Loose notes.');
   });
@@ -1294,7 +1312,17 @@ describe('sectionLabels', () => {
 
   it('numbers heading-less sections when there is more than one', () => {
     const sections = extractSections(
-      reply(['Loose notes.', '', '///', '', 'More notes.', '', '///', '', 'Last.']),
+      reply([
+        'Loose notes.',
+        '',
+        '///',
+        '',
+        'More notes.',
+        '',
+        '///',
+        '',
+        'Last.',
+      ]),
     );
     expect(sectionLabels(sections)).toEqual([
       '(no heading 1)',
@@ -1311,4 +1339,3 @@ describe('sectionLabels', () => {
     expect(findPlanStepSection(sections, step)?.text).toBe('Third.');
   });
 });
-

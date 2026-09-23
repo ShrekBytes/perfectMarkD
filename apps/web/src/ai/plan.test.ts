@@ -50,9 +50,9 @@ describe('stepsRemaining', () => {
 
 describe('planSummary', () => {
   it('says what was applied and what remains', () => {
-    expect(
-      planSummary(plan({ at: 1, accepted: 1 }), 'Stopped.'),
-    ).toBe('Stopped. 1 of 2 steps applied; 1 step remains.');
+    expect(planSummary(plan({ at: 1, accepted: 1 }), 'Stopped.')).toBe(
+      'Stopped. 1 of 2 steps applied; 1 step remains.',
+    );
   });
 
   it('drops the remainder when the run reached the end', () => {
@@ -63,7 +63,10 @@ describe('planSummary', () => {
 
   it('speaks of one step in the singular', () => {
     expect(
-      planSummary(plan({ steps: STEPS.slice(0, 1), at: 1, accepted: 1 }), 'Done.'),
+      planSummary(
+        plan({ steps: STEPS.slice(0, 1), at: 1, accepted: 1 }),
+        'Done.',
+      ),
     ).toBe('Done. 1 of 1 step applied.');
   });
 });

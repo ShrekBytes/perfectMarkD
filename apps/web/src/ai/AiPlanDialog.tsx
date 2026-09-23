@@ -130,13 +130,16 @@ export function AiPlanDialog({
         </div>
       ) : plan.phase === 'running' ? (
         <div>
-          <p className="text-xs leading-5 text-ink-soft" data-testid="ai-plan-progress">
+          <p
+            className="text-xs leading-5 text-ink-soft"
+            data-testid="ai-plan-progress"
+          >
             Step {plan.at + 1} of {plan.steps.length}
             {busy ? ' · working…' : ''}
           </p>
           <p className="mt-1 text-[11px] leading-4 text-ink-faint">
-            {left} {stepNoun(left)} left in this plan. Each one
-            is its own AI Action.
+            {left} {stepNoun(left)} left in this plan. Each one is its own AI
+            Action.
           </p>
           <div className="mt-4 flex items-center gap-2">
             <button type="button" onClick={onStop} className={BUTTON}>

@@ -384,9 +384,7 @@ export function EditorPane({
           retryBlocked={ai.retryBlocked}
           error={ai.request.status === 'error' ? ai.request.message : null}
           plan={
-            ai.review.plan
-              ? { ...ai.review.plan, onStop: ai.stopPlan }
-              : null
+            ai.review.plan ? { ...ai.review.plan, onStop: ai.stopPlan } : null
           }
           onAccept={ai.accept}
           onReject={ai.reject}

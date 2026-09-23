@@ -352,7 +352,13 @@ describe('the size ladder', () => {
   it('offers an AI Plan for a document too large for one action', async () => {
     const user = userEvent.setup();
     const { onPlan, onSubmit } = show({
-      ladder: { tier: 2, kind: 'plan', digest: '- One (h1, 40 words): x', sections: [], characters: 9_000 },
+      ladder: {
+        tier: 2,
+        kind: 'plan',
+        digest: '- One (h1, 40 words): x',
+        sections: [],
+        characters: 9_000,
+      },
     });
     expect(screen.getByTestId('ai-ladder')).toHaveTextContent(
       'An AI Plan works through it one section at a time',
@@ -400,7 +406,13 @@ describe('the size ladder', () => {
     render(
       <AiPromptPopover
         command="markdown"
-        scope={{ ...scope, kind: 'selection', from: 0, to: 40, text: 'x'.repeat(40) }}
+        scope={{
+          ...scope,
+          kind: 'selection',
+          from: 0,
+          to: 40,
+          text: 'x'.repeat(40),
+        }}
         ai={ai()}
         gate="ready"
         ladder={{

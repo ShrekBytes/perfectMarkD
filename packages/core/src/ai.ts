@@ -627,7 +627,12 @@ export type AiLadderDecision =
 export interface AiLadderInput {
   /** The whole Document, as the editor has it. */
   documentText: string;
-  target: { kind: 'document' | 'selection'; text: string; from: number; to: number };
+  target: {
+    kind: 'document' | 'selection';
+    text: string;
+    from: number;
+    to: number;
+  };
   /** The instruction, which counts toward the window with everything sent. */
   instruction?: string;
   budgets: AiBudgets;
@@ -716,7 +721,12 @@ export function decideAiLadder(input: AiLadderInput): AiLadderDecision {
     budgets,
   });
   if (whole.ok) {
-    return { tier: 0, kind: 'all', characters: targetCharacters, context: rest };
+    return {
+      tier: 0,
+      kind: 'all',
+      characters: targetCharacters,
+      context: rest,
+    };
   }
 
   const others = extractSections(documentText).filter(

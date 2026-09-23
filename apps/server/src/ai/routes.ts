@@ -601,7 +601,11 @@ function instructionOrNull(value: unknown): string | null {
  */
 function tooLong(c: Context<AppEnv>, refusal: AiSizeRefusal): Response {
   return c.json(
-    { error: refusal.message, code: AI_ERROR_CODES.inputTooLong, refusal: refusal.code },
+    {
+      error: refusal.message,
+      code: AI_ERROR_CODES.inputTooLong,
+      refusal: refusal.code,
+    },
     413,
   );
 }

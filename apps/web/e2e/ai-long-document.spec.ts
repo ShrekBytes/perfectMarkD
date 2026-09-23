@@ -104,7 +104,10 @@ async function routeAi(page: Page): Promise<void> {
       body: JSON.stringify({
         proposal: {
           kind: 'replace',
-          text: step === undefined ? 'REWRITTEN PASSAGE' : `REWRITTEN SECTION ${step}`,
+          text:
+            step === undefined
+              ? 'REWRITTEN PASSAGE'
+              : `REWRITTEN SECTION ${step}`,
         },
         remaining: 98,
       }),

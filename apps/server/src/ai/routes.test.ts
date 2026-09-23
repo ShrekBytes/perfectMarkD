@@ -668,7 +668,9 @@ describe('POST /api/ai/markdown — the AI Plan', () => {
     expect(await aiUsageCount(db, userId)).toBe(1);
 
     // The plan was produced from the outline alone: no Document text is sent.
-    const sent = calls[0]!.messages.map((message) => message.content).join('\n');
+    const sent = calls[0]!.messages
+      .map((message) => message.content)
+      .join('\n');
     expect(sent).toContain('The report opens with the problem.');
     expect(sent).toContain('We ran three experiments.');
     expect(sent).not.toContain('<document>');
@@ -792,7 +794,9 @@ describe('POST /api/ai/markdown — a plan step', () => {
     expect(body.remaining).toBe(99);
     expect(await aiUsageCount(db, userId)).toBe(1);
 
-    const sent = calls[0]!.messages.map((message) => message.content).join('\n');
+    const sent = calls[0]!.messages
+      .map((message) => message.content)
+      .join('\n');
     expect(sent).toContain('step 2 of 2 of a plan');
     expect(sent).toContain('1. Introduction: cut the problem statement');
     expect(sent).toContain('2. Methods: convert the experiment list');
@@ -805,7 +809,10 @@ describe('POST /api/ai/markdown — a plan step', () => {
     const res = await postJson(
       app,
       '/api/ai/markdown',
-      { ...STEP_BODY, plan: { index: 5, steps: [{ heading: 'One', change: 'x' }] } },
+      {
+        ...STEP_BODY,
+        plan: { index: 5, steps: [{ heading: 'One', change: 'x' }] },
+      },
       cookie,
     );
     expect(res.status).toBe(400);

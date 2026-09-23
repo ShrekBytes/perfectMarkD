@@ -133,7 +133,6 @@ export function buildPlanMessages(input: PlanPromptInput): AiMessage[] {
   ];
 }
 
-
 export interface MarkdownPromptInput {
   instruction: string;
   targetKind: AiTargetKind;

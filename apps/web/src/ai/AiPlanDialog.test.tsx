@@ -12,7 +12,11 @@ afterEach(() => {
 });
 
 const STEPS: AiPlanStep[] = [
-  { sectionIndex: 0, heading: 'Introduction', change: 'cut it to two sentences' },
+  {
+    sectionIndex: 0,
+    heading: 'Introduction',
+    change: 'cut it to two sentences',
+  },
   { sectionIndex: 1, heading: 'Methods', change: 'turn the list into a table' },
   { sectionIndex: 2, heading: null, change: 'move the notes after Methods' },
 ];
@@ -60,9 +64,7 @@ function show(
 describe('the approval surface', () => {
   it('lists the plan section by section with what changes in each', () => {
     show();
-    expect(
-      screen.getByRole('dialog', { name: 'AI Plan' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'AI Plan' })).toBeInTheDocument();
     expect(screen.getByText('Introduction')).toBeInTheDocument();
     expect(screen.getByText('cut it to two sentences')).toBeInTheDocument();
     expect(screen.getByText('Methods')).toBeInTheDocument();
@@ -93,7 +95,7 @@ describe('the approval surface', () => {
     await user.click(screen.getAllByRole('checkbox')[1]!);
     await user.click(screen.getByRole('button', { name: 'Run 2 of 3 steps' }));
     expect(onApprove).toHaveBeenCalledTimes(1);
-    expect([...onApprove.mock.calls[0]![0] as Set<number>]).toEqual([0, 2]);
+    expect([...(onApprove.mock.calls[0]![0] as Set<number>)]).toEqual([0, 2]);
   });
 
   it('refuses to run with nothing checked', async () => {
@@ -102,7 +104,9 @@ describe('the approval surface', () => {
     for (const checkbox of screen.getAllByRole('checkbox')) {
       await user.click(checkbox);
     }
-    expect(screen.getByRole('button', { name: 'Run 0 of 3 steps' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Run 0 of 3 steps' }),
+    ).toBeDisabled();
     expect(onApprove).not.toHaveBeenCalled();
   });
 
