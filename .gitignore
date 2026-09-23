@@ -18,6 +18,9 @@ data/
 .DS_Store
 *.log
 
+# Command-runner scratch files (one empty file per shell command, repo root)
+_tmp_*
+
 # Playwright artifacts (web E2E; baselines under apps/web/e2e/*.snapshots are committed)
 apps/web/test-results/
 apps/web/playwright-report/
