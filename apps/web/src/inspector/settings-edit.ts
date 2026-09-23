@@ -100,3 +100,21 @@ export function setStylesheetEnabled(
 ): Partial<DocumentSettings> {
   return { customStylesheetEnabled: on && stylesheetHasCSS(s) };
 }
+
+/** Writes an accepted AI stylesheet proposal into the box.
+ *
+ *  The proposal was drawn on the paper while it was under review (the
+ *  provisional render, ai-transforms/06), and the spec's rule is that it is
+ *  reverted on Reject — so Accept is what keeps it. Writing the box with the
+ *  layer off would make the accepted look vanish at the moment of accepting,
+ *  which is the one thing the review surface exists to prevent. The switch is
+ *  right there in the tab, so the turn-on is visible, not silent; an accepted
+ *  empty stylesheet turns the layer off, as emptying the box always does. */
+export function applyStylesheetProposal(
+  css: string,
+): Partial<DocumentSettings> {
+  return {
+    customStylesheet: css,
+    customStylesheetEnabled: css.trim() !== '',
+  };
+}

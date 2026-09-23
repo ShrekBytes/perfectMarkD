@@ -34,6 +34,15 @@ export interface AiChangeSet {
 export type ApplyResult =
   { ok: true; text: string } | { ok: false; reason: string };
 
+/**
+ * The target a stylesheet proposal was computed against: the whole box, as it
+ * stood when the request was sent. A replace proposal is one change, so the
+ * target's text is both the diff's "before" and the staleness baseline.
+ */
+export function stylesheetTarget(css: string): AiTarget {
+  return { kind: 'document', text: css, from: 0, to: css.length };
+}
+
 /** Builds the change set the review dialog renders. */
 export function buildChangeSet(
   target: AiTarget,

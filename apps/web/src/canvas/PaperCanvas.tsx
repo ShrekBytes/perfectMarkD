@@ -13,6 +13,7 @@ import {
 import { ensureCustomFontsLoaded } from '../fonts/loader';
 import { openDatabase } from '../documents/db';
 import { useDocumentStore } from '../documents/store';
+import { useStylesheetPreview } from '../ai/conversation';
 import { EmptyState } from '../shell/EmptyState';
 import {
   CloseIcon,
@@ -157,6 +158,14 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   const settings = useDocumentStore((state) => state.settings);
   const docCount = useDocumentStore((state) => state.docs.length);
   const createDocument = useDocumentStore((state) => state.createDocument);
+  /**
+   * A stylesheet proposal under review (ai-transforms/06): the paper is drawn
+   * with the proposed CSS so the user judges the look, not the CSS. It is a
+   * render-only override — the Document's settings are never touched, and
+   * deciding the proposal (Accept or Reject) drops the override, so the paper
+   * returns to the box either way.
+   */
+  const preview = useStylesheetPreview(activeId);
 
   const [zoom, setZoom] = useState(1);
   const [rendering, setRendering] = useState(false);
@@ -195,6 +204,16 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       settings: docSettings,
       name,
     } = store;
+    // The provisional stylesheet, applied to this render only: the pipeline
+    // measures and draws with it, and nothing is written to the Document.
+    const renderSettings: DocumentSettings =
+      preview === null
+        ? docSettings
+        : {
+            ...docSettings,
+            customStylesheet: preview,
+            customStylesheetEnabled: true,
+          };
     setRendering(true);
     try {
       // One resolver per document: its blob URLs die with the doc switch.
@@ -214,7 +233,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       await ensureCustomFontsLoaded(docSettings);
       if (token !== tokenRef.current) return;
 
-      const result = await runDocumentPipeline(md, docSettings, {
+      const result = await runDocumentPipeline(md, renderSettings, {
         title: name,
         renderMermaid,
       });
@@ -244,7 +263,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       headingIndexRef.current = mountPageSlots(
         pagesEl,
         result,
-        docSettings,
+        renderSettings,
         resolver,
         zoom,
       );
@@ -267,7 +286,8 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
     }
   };
 
-  // Debounced auto-render on any input that affects the pages.
+  // Debounced auto-render on any input that affects the pages — including a
+  // stylesheet proposal arriving, being replaced by a Retry, or being decided.
   useEffect(() => {
     if (status !== 'ready') return;
     debounceRef.current = setTimeout(() => {
@@ -280,7 +300,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
         debounceRef.current = null;
       }
     };
-  }, [markdown, settings, activeId, status]);
+  }, [markdown, settings, activeId, status, preview]);
 
   // Document switch (and unmount): drop stale pages immediately — never show
   // another document's pages — cancel in-flight work, release the document's

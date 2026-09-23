@@ -40,7 +40,12 @@ import {
   aiUsageState,
   incrementAiUsage,
 } from './state.js';
-import { buildMarkdownMessages, buildStylesheetMessages } from './prompts.js';
+import {
+  buildMarkdownMessages,
+  buildStylesheetMessages,
+  replayHistory,
+  type StylesheetHistoryTurn,
+} from './prompts.js';
 
 export interface AiRoutesOptions {
   /** The environment key and the provider seam. */
@@ -90,6 +95,8 @@ interface MarkdownRequest {
 interface StylesheetRequest {
   instruction: string;
   css: string;
+  /** The earlier turns the client replayed, oldest first. */
+  history: StylesheetHistoryTurn[];
 }
 
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -162,7 +169,7 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
     const sized = sizeDecision(
       parsed.value.css,
       parsed.value.instruction,
-      null,
+      historyText(parsed.value.history),
       gate.config,
     );
     if (!sized.ok) {
@@ -190,6 +197,7 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
       messages: buildStylesheetMessages({
         instruction: parsed.value.instruction,
         css: parsed.value.css,
+        history: parsed.value.history,
       }),
       maxOutputTokens: gate.config.maxOutputTokens,
       reasoningEffort: gate.config.reasoningEffort,
@@ -397,7 +405,49 @@ function parseStylesheetRequest(body: unknown): Parsed<StylesheetRequest> {
   if (typeof record.css !== 'string') {
     return { ok: false, error: 'The stylesheet text is missing.' };
   }
-  return { ok: true, value: { instruction, css: record.css } };
+  const history = parseStylesheetHistory(record.history);
+  if (!history.ok) return { ok: false, error: history.error };
+  return {
+    ok: true,
+    value: { instruction, css: record.css, history: history.value },
+  };
+}
+
+/**
+ * The conversation the client replayed (spec §Where the stylesheet lives). More
+ * turns than are replayed are accepted and trimmed by `replayHistory`, the one
+ * place the rule lives; a turn that is not an instruction plus a reply is a
+ * malformed request.
+ */
+function parseStylesheetHistory(
+  value: unknown,
+): Parsed<StylesheetHistoryTurn[]> {
+  if (value === undefined || value === null) return { ok: true, value: [] };
+  if (!Array.isArray(value)) {
+    return { ok: false, error: 'The conversation history must be a list.' };
+  }
+  const malformed = {
+    ok: false as const,
+    error: 'The conversation history is malformed.',
+  };
+  const turns: StylesheetHistoryTurn[] = [];
+  for (const entry of value) {
+    const turn = asRecord(entry);
+    if (turn === null) return malformed;
+    const instruction = instructionOrNull(turn.instruction);
+    if (instruction === null || typeof turn.reply !== 'string') {
+      return malformed;
+    }
+    turns.push({ instruction, reply: turn.reply });
+  }
+  return { ok: true, value: turns };
+}
+
+/** The history as the size estimator sees it: instruction plus reply. */
+function historyText(history: StylesheetHistoryTurn[]): string | null {
+  const replayed = replayHistory(history);
+  if (replayed.length === 0) return null;
+  return replayed.map((turn) => `${turn.instruction}${turn.reply}`).join('');
 }
 
 function instructionOrNull(value: unknown): string | null {

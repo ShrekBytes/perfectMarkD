@@ -1,17 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Inspector → Stylesheet tab (ai-transforms/01): the Custom Stylesheet's home
-// — the CSS box (monospace, its own scroll, roughly the top half; the AI
-// conversation lands below it in ai-transforms/06) with the layer's on/off
-// state, and the footer line stating that page geometry belongs to the Page
-// tab and linking to the styling reference (ai-transforms/02). Without the
-// entitlement the body says what the plan includes and opens the pricing
-// modal — never a signup wall.
+// — the CSS box (monospace, its own scroll, roughly the top half), the AI
+// block below it (ai-transforms/06: the conversation, with its own states,
+// because the box works whether or not AI does), and a footer line stating
+// that page geometry belongs to the Page tab and linking to the styling
+// reference (ai-transforms/02). Without the entitlement the body says what the
+// plan includes and opens the pricing modal — never a signup wall.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { STYLING_REFERENCE_ANCHOR } from '@perfectmarkd/core';
 import { Link } from '../router';
+import { useDocumentStore } from '../documents/store';
 import { GateLock, ToggleRow } from './controls';
+import { StylesheetAiBlock } from './StylesheetAiBlock';
 import {
+  applyStylesheetProposal,
   editStylesheet,
   setStylesheetEnabled,
   stylesheetHasCSS,
@@ -24,6 +27,8 @@ export function StylesheetTab({
   onOpenPricing,
   flags,
 }: TabProps) {
+  const docId = useDocumentStore((state) => state.activeId);
+
   if (!flags.customStylesheet) {
     return (
       <div className="px-3 py-3">
@@ -44,8 +49,7 @@ export function StylesheetTab({
 
   return (
     <div className="flex h-full min-h-0 flex-col px-3 py-3">
-      {/* Roughly the top half (the AI block below it arrives with
-          ai-transforms/06): its own scroll, so a long stylesheet never
+      {/* Roughly the top half: its own scroll, so a long stylesheet never
           pushes the state row out of view. A native textarea — selection,
           undo, and paste are the platform's, not ours. */}
       <div className="flex min-h-32 grow basis-1/2 flex-col">
@@ -69,6 +73,19 @@ export function StylesheetTab({
           label="Apply to pages"
           disabled={!hasCSS}
         />
+      </div>
+
+      {/* The AI conversation (ai-transforms/06). It states its own condition —
+          locked, off, exhausted, unavailable, ready — because the box above
+          works whether or not AI does. */}
+      <StylesheetAiBlock
+        docId={docId}
+        css={settings.customStylesheet}
+        onApply={(css) => set(applyStylesheetProposal(css))}
+        onOpenPricing={onOpenPricing}
+      />
+
+      <div className="shrink-0 pt-2">
         {/* The guardrail, in the box's own voice: geometry is a Page-tab
             setting, and an obeyed-in-print-only @page rule would silently
             split preview from print — so the engine strips them. The footer

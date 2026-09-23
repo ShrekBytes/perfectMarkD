@@ -102,12 +102,41 @@ export function buildMarkdownMessages(input: MarkdownPromptInput): AiMessage[] {
   ];
 }
 
+/** One earlier turn of the stylesheet conversation, as it is replayed. */
+export interface StylesheetHistoryTurn {
+  instruction: string;
+  /** The stylesheet the reply proposed. */
+  reply: string;
+}
+
+/**
+ * How many earlier turns ride along with a stylesheet request (spec §Where the
+ * stylesheet lives: "the box's current text plus the last three exchanges").
+ * Older turns add cost and no signal — the box is the source of truth.
+ */
+export const MAX_STYLESHEET_HISTORY = 3;
+
+/** The turns a request actually replays: the newest few, oldest first. */
+export function replayHistory(
+  history: StylesheetHistoryTurn[] = [],
+): StylesheetHistoryTurn[] {
+  return history.slice(-MAX_STYLESHEET_HISTORY);
+}
+
 export interface StylesheetPromptInput {
   instruction: string;
   /** The stylesheet as it stands; empty when the user has none yet. */
   css: string;
+  /** Earlier turns, oldest first; only the last few are replayed. */
+  history?: StylesheetHistoryTurn[];
 }
 
+/**
+ * Assembles the stylesheet messages: the system prompt, the earlier turns as a
+ * plain conversation, then the request — which carries the stylesheet as it
+ * stands *now*, so a hand edit between turns is always what the model sees
+ * (spec §The AI block is a conversation; the box is authoritative).
+ */
 export function buildStylesheetMessages(
   input: StylesheetPromptInput,
 ): AiMessage[] {
@@ -115,6 +144,10 @@ export function buildStylesheetMessages(
     input.css.trim() === '' ? '(empty — no stylesheet yet)' : input.css;
   return [
     { role: 'system', content: AI_STYLESHEET_SYSTEM_PROMPT },
+    ...replayHistory(input.history).flatMap((turn): AiMessage[] => [
+      { role: 'user', content: `Instruction: ${turn.instruction}` },
+      { role: 'assistant', content: turn.reply },
+    ]),
     {
       role: 'user',
       content: [

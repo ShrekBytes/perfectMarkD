@@ -3,8 +3,14 @@ import '@testing-library/jest-dom/vitest';
 import { EditorView } from '@codemirror/view';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorPane } from './EditorPane';
+import * as aiApi from '../ai/api';
+import * as authApi from '../auth/api';
+import {
+  resetStylesheetConversationForTests,
+  useStylesheetConversation,
+} from '../ai/conversation';
 import { UNCONFIGURED_AI, type AiAccountState } from '../ai/types';
 import { useAccountStore } from '../auth/account-store';
 import {
@@ -284,5 +290,222 @@ describe('a paste', () => {
     expect(useDocumentStore.getState().markdown).toContain('/ai');
     expect(screen.queryByTestId('ai-hint')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ai-prompt')).not.toBeInTheDocument();
+  });
+});
+
+describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
+  const CSS = '.mpdf-doc h1 { letter-spacing: 0.3em; }';
+  const PROPOSED = '.mpdf-doc h1 { letter-spacing: 0.05em; }';
+
+  /** A route that answers with a rewritten stylesheet, recording requests. */
+  function routeStylesheet(text: string = PROPOSED) {
+    const requests: aiApi.StylesheetRequest[] = [];
+    vi.spyOn(aiApi, 'requestStylesheet').mockImplementation((async (
+      request: aiApi.StylesheetRequest,
+    ) => {
+      requests.push(request);
+      return { proposal: { kind: 'replace' as const, text }, remaining: 99 };
+    }) as unknown as typeof aiApi.requestStylesheet);
+    return requests;
+  }
+
+  /** A route that never answers until it is aborted, as fetch behaves. */
+  function routeStylesheetPending() {
+    vi.spyOn(aiApi, 'requestStylesheet').mockImplementation(
+      ((request: aiApi.StylesheetRequest, signal?: AbortSignal) =>
+        new Promise<never>((_resolve, reject) => {
+          signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          );
+        })) as unknown as typeof aiApi.requestStylesheet,
+    );
+  }
+
+  beforeEach(() => {
+    vi.spyOn(authApi, 'me').mockRejectedValue(new Error('offline'));
+    act(() => {
+      useDocumentStore
+        .getState()
+        .updateActive({ settings: { customStylesheet: CSS } });
+    });
+  });
+
+  afterEach(() => {
+    resetStylesheetConversationForTests();
+    vi.restoreAllMocks();
+  });
+
+  /** The active Document's turns. */
+  const turns = () => {
+    const docId = useDocumentStore.getState().activeId!;
+    return useStylesheetConversation.getState().turns[docId] ?? [];
+  };
+
+  async function askForStylesheet(
+    user: ReturnType<typeof userEvent.setup>,
+    instruction: string,
+  ): Promise<void> {
+    await focusAndType(user, '/ss');
+    expect(screen.getByTestId('ai-hint')).toHaveTextContent(
+      'Edit the Custom stylesheet',
+    );
+    await user.keyboard(' ');
+    await user.type(screen.getByTestId('ai-prompt-input'), instruction);
+    await user.keyboard('{Enter}');
+  }
+
+  it('names the stylesheet as the target, not the Document', async () => {
+    seedAi();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    await focusAndType(user, '/ss');
+    await user.keyboard(' ');
+
+    const panel = screen.getByTestId('ai-prompt');
+    expect(panel).toHaveTextContent('Custom stylesheet');
+    expect(panel).not.toHaveTextContent('Whole document');
+  });
+
+  it('joins the Document’s conversation: the box is sent, Accept writes it', async () => {
+    seedAi();
+    const route = routeStylesheet();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    await askForStylesheet(user, 'tighter spacing');
+
+    const dialog = await screen.findByTestId('ai-review-dialog');
+    expect(dialog).toHaveTextContent(CSS);
+    expect(dialog).toHaveTextContent(PROPOSED);
+    expect(route).toEqual([
+      { instruction: 'tighter spacing', css: CSS, history: [] },
+    ]);
+    // The turn is in the log while it is still under review, and nothing has
+    // been written to the box yet.
+    expect(turns()).toHaveLength(1);
+    expect(turns()[0]).toMatchObject({
+      instruction: 'tighter spacing',
+      against: CSS,
+      status: 'proposal',
+      reply: PROPOSED,
+      decision: null,
+    });
+    expect(useDocumentStore.getState().settings.customStylesheet).toBe(CSS);
+
+    await user.click(screen.getByRole('button', { name: 'Accept (1)' }));
+
+    expect(useDocumentStore.getState().settings.customStylesheet).toBe(
+      PROPOSED,
+    );
+    expect(turns()[0]).toMatchObject({ decision: 'accepted' });
+  });
+
+  it('Reject decides the turn and leaves the box exactly as it was', async () => {
+    seedAi();
+    routeStylesheet();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    await askForStylesheet(user, 'tighter spacing');
+    await screen.findByTestId('ai-review-dialog');
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+
+    expect(useDocumentStore.getState().settings.customStylesheet).toBe(CSS);
+    expect(turns()[0]).toMatchObject({ decision: 'rejected' });
+  });
+
+  it('replays the last three exchanges of this Document’s conversation', async () => {
+    seedAi();
+    const route = routeStylesheet();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    for (const instruction of ['one', 'two', 'three', 'four']) {
+      await askForStylesheet(user, instruction);
+      await screen.findByTestId('ai-review-dialog');
+      await user.click(screen.getByRole('button', { name: 'Reject' }));
+    }
+
+    const last = route.at(-1)!;
+    expect(last.history?.map((turn) => turn.instruction)).toEqual([
+      'one',
+      'two',
+      'three',
+    ]);
+  });
+
+  it('leaves no trace of a cancelled request: nothing produced, nothing counted', async () => {
+    seedAi();
+    routeStylesheetPending();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    await focusAndType(user, '/ss');
+    await user.keyboard(' ');
+    await user.type(screen.getByTestId('ai-prompt-input'), 'tighter spacing');
+    await user.keyboard('{Enter}');
+    expect(turns()).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(turns()).toHaveLength(0);
+    expect(useDocumentStore.getState().settings.customStylesheet).toBe(CSS);
+  });
+
+  it('refuses a proposal that belongs to a Document the user has left', async () => {
+    seedAi();
+    routeStylesheet();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    await askForStylesheet(user, 'a warmer accent');
+    await screen.findByTestId('ai-review-dialog');
+
+    // The review survives a Document switch, but it belongs to the Document it
+    // was computed against — writing it into the new one would be silent
+    // cross-Document damage.
+    await act(async () => {
+      await useDocumentStore.getState().createDocument();
+    });
+
+    expect(screen.getByTestId('ai-accept-reason')).toHaveTextContent(
+      'belongs to another document',
+    );
+    expect(screen.getByRole('button', { name: 'Accept (1)' })).toBeDisabled();
+    expect(useDocumentStore.getState().settings.customStylesheet).toBe('');
+  });
+
+  it('returns focus to the caret after accepting', async () => {
+    seedAi();
+    routeStylesheet();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    await askForStylesheet(user, 'a warmer accent');
+    await screen.findByTestId('ai-review-dialog');
+    await user.click(screen.getByRole('button', { name: 'Accept (1)' }));
+
+    expect(
+      editorView().hasFocus ||
+        document.activeElement?.closest('.cm-editor') !== null,
+    ).toBe(true);
+  });
+
+  it('never touches the Inspector: no tab is switched, no pane moved', async () => {
+    seedAi();
+    routeStylesheet();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    // The editor surface has no Inspector at all; the Stylesheet tab's block
+    // reads the same conversation. Nothing here can move the Inspector's tab.
+    await askForStylesheet(user, 'tighter spacing');
+    await screen.findByTestId('ai-review-dialog');
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(turns()).toHaveLength(1);
   });
 });

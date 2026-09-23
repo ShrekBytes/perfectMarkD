@@ -9,9 +9,9 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { AiScope } from '@perfectmarkd/core';
-import { Link } from '../router';
 import { useEscapeLayer } from '../shell/focus';
 import { AI_COMMANDS } from './trigger';
+import { FirstUseNotice } from './FirstUseNotice';
 import { periodLabel, resetDate } from './format';
 import type { AiAccountState, AiCommand } from './types';
 
@@ -39,31 +39,19 @@ interface AiPromptPopoverProps {
 }
 
 /**
- * The one-line disclosure (spec §First-use disclosure): shown until the account
- * has recorded it, on the first AI Action only. It is a notice, not a gate —
- * the request still proceeds.
+ * The AI Scope readout: which part of the Document, and how big. `/ss` targets
+ * the Custom Stylesheet rather than a range, so it names that instead.
  */
-function firstUseNotice() {
-  return (
-    <p className="mt-2 text-[11px] leading-4 text-ink-faint">
-      Your text is sent to an external AI provider for this action.{' '}
-      <Link
-        to="/privacy"
-        onClick={(event) => event.stopPropagation()}
-        className="font-medium text-ink underline decoration-hairline underline-offset-2 outline-offset-2 outline-accent hover:decoration-ink focus-visible:outline-2"
-      >
-        How your data is handled
-      </Link>
-    </p>
-  );
-}
-
-/** The AI Scope readout: which part of the Document, and how big. */
-function scopeReadout(scope: AiScope, cap: number) {
+function scopeReadout(command: AiCommand, scope: AiScope, cap: number) {
   const overCap = scope.size.characters > cap;
   return (
     <p className="mt-0.5 text-[11px] leading-4 text-ink-soft">
-      {scope.kind === 'selection' ? 'Selection' : 'Whole document'} ·{' '}
+      {command === 'stylesheet'
+        ? 'Custom stylesheet'
+        : scope.kind === 'selection'
+          ? 'Selection'
+          : 'Whole document'}{' '}
+      ·{' '}
       <span className="font-mono tabular-nums">
         {scope.size.characters.toLocaleString('en-US')}
       </span>{' '}
@@ -129,7 +117,9 @@ export function AiPromptPopover({
         </h2>
       </div>
 
-      <div className="mt-2">{scopeReadout(scope, ai.maxInputCharacters)}</div>
+      <div className="mt-2">
+        {scopeReadout(command, scope, ai.maxInputCharacters)}
+      </div>
 
       {gate === 'not_entitled' ? (
         <div className="mt-2">
@@ -183,7 +173,7 @@ export function AiPromptPopover({
             className="mt-2 w-full resize-y rounded-control border border-hairline bg-field px-2 py-1.5 text-xs text-ink outline-none transition-colors duration-150 focus:border-accent disabled:opacity-60"
           />
 
-          {!ai.disclosureSeen && firstUseNotice()}
+          {!ai.disclosureSeen && <FirstUseNotice />}
 
           {request.status === 'error' && (
             <p role="alert" className="mt-2 text-[11px] leading-4 text-danger">

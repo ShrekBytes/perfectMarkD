@@ -486,6 +486,85 @@ describe('POST /api/ai/stylesheet', () => {
     });
     expect(models).toEqual(['vendor/cheap']);
   });
+
+  it('replays the last three exchanges and the box as it stands now', async () => {
+    const calls: AiCompletionRequest[] = [];
+    const { app, db } = makeApp({
+      provider: fakeProvider(async (request) => {
+        calls.push(request);
+        return okReply('.mpdf-doc h1 { border-width: 1px; }');
+      }),
+    });
+    const { cookie } = await paidUser(app, db);
+    const res = await postJson(
+      app,
+      '/api/ai/stylesheet',
+      {
+        instruction: 'Not like that — thinner rules',
+        css: '.mpdf-doc h1 { border-width: 3px; }',
+        history: [
+          { instruction: 'One', reply: 'a {}' },
+          { instruction: 'Two', reply: 'b {}' },
+          { instruction: 'Three', reply: 'c {}' },
+          { instruction: 'Four', reply: 'd {}' },
+        ],
+      },
+      cookie,
+    );
+    expect(res.status).toBe(200);
+    const contents = calls[0]!.messages.map((message) => message.content);
+    expect(calls[0]!.messages[0]!.role).toBe('system');
+    // Only the last three turns ride along; the oldest is dropped.
+    expect(contents.join('\n')).not.toContain('Instruction: One');
+    expect(contents).toContain('Instruction: Two');
+    // The request carries the box's current text, so a hand edit wins over
+    // any earlier reply.
+    expect(contents.at(-1)).toContain('.mpdf-doc h1 { border-width: 3px; }');
+  });
+
+  it('accepts a request with no history at all', async () => {
+    const { app, db } = makeApp({
+      provider: fakeProvider(async () => okReply('h1 { color: red; }')),
+    });
+    const { cookie } = await paidUser(app, db);
+    const res = await postJson(
+      app,
+      '/api/ai/stylesheet',
+      STYLESHEET_BODY,
+      cookie,
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it('refuses a malformed history', async () => {
+    const { app, db } = makeApp();
+    const { cookie } = await paidUser(app, db);
+    for (const history of ['not a list', [{ instruction: 'One' }], [42]]) {
+      const res = await postJson(
+        app,
+        '/api/ai/stylesheet',
+        { ...STYLESHEET_BODY, history },
+        cookie,
+      );
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('refuses a stylesheet with no usable reply, counting nothing', async () => {
+    const { app, db } = makeApp({
+      provider: fakeProvider(async () => okReply('   ')),
+    });
+    const { cookie, userId } = await paidUser(app, db);
+    const res = await postJson(
+      app,
+      '/api/ai/stylesheet',
+      STYLESHEET_BODY,
+      cookie,
+    );
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ code: 'ai_invalid_response' });
+    expect(await aiUsageCount(db, userId)).toBe(0);
+  });
 });
 
 describe('PUT /api/ai/access', () => {

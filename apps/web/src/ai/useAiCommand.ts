@@ -7,6 +7,11 @@
 // (spec §Data model). A refused, failed, or truncated Action leaves the
 // Document and the allowance alone; only a usable proposal becomes an AI
 // Proposal in the review dialog.
+//
+// `/ss` is the same interaction aimed at the Custom Stylesheet, so its turns
+// join the per-Document conversation the Stylesheet tab shows
+// (ai-transforms/06): the same log, the same proposal, the same provisional
+// paper — without moving the Inspector to another tab.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useRef, useState } from 'react';
@@ -15,8 +20,14 @@ import type { EditorView } from '@codemirror/view';
 import { errorToMessage } from '../api/client';
 import { useDocumentStore } from '../documents/store';
 import { useAccountStore, useAiState } from '../auth/account-store';
-import { editStylesheet } from '../inspector/settings-edit';
+import { applyStylesheetProposal } from '../inspector/settings-edit';
 import { requestMarkdown, requestStylesheet } from './api';
+import {
+  recentExchanges,
+  turnsFor,
+  useStylesheetConversation,
+  type StylesheetDecision,
+} from './conversation';
 import {
   applyProposal,
   buildChangeSet,
@@ -46,6 +57,12 @@ export interface AiReviewState {
   instruction: string;
   removed: string;
   at: number;
+  /**
+   * The Document the proposal belongs to, and its turn in that Document's
+   * stylesheet conversation — null for `/ai`, which has no conversation.
+   */
+  docId: string | null;
+  turnId: number | null;
   /**
    * Bumped per proposal so the dialog's own state (which changes are checked,
    * whether the long diff is expanded) resets when a Retry returns a new one.
@@ -107,6 +124,15 @@ export function useAiCommand(
   // Re-render when the Document changes so staleness is recomputed live.
   const markdown = useDocumentStore((state) => state.markdown);
   const settings = useDocumentStore((state) => state.settings);
+  const activeId = useDocumentStore((state) => state.activeId);
+  /**
+   * A proposal belongs to the Document it was computed against, and the review
+   * survives a Document switch (the editor pane does not unmount). Accepting a
+   * foreign proposal would write into the wrong Document, so it is refused
+   * with the reason stated rather than applied.
+   */
+  const foreignReview =
+    review !== null && review.docId !== null && review.docId !== activeId;
 
   const computeScope = useCallback(
     (command: AiCommand): AiScope => {
@@ -190,22 +216,48 @@ export function useAiCommand(
         from: scope.from,
         to: scope.to,
       };
+      // A stylesheet Action is a turn in the Document's conversation: it is
+      // logged before it runs (so the log shows what is being asked), replayed
+      // with the last few turns, and decided by the review dialog.
+      const docId =
+        command === 'stylesheet' ? useDocumentStore.getState().activeId : null;
+      let turnId: number | null = null;
+      let history: ReturnType<typeof recentExchanges> = [];
+      if (docId) {
+        const conversation = useStylesheetConversation.getState();
+        history = recentExchanges(turnsFor(docId));
+        turnId = conversation.start(docId, instruction, target.text);
+      }
+      const dropTurn = () => {
+        if (docId && turnId !== null) {
+          useStylesheetConversation.getState().discard(docId, turnId);
+        }
+      };
       try {
-        const proposal: AiProposal =
-          command === 'stylesheet'
-            ? (
-                await requestStylesheet(
-                  { instruction, css: target.text },
-                  controller.signal,
-                )
-              ).proposal
-            : (
-                await requestMarkdown(
-                  { instruction, target },
-                  controller.signal,
-                )
-              ).proposal;
-        if (controller.signal.aborted) return;
+        let proposal: AiProposal;
+        if (command === 'stylesheet') {
+          const result = await requestStylesheet(
+            { instruction, css: target.text, history },
+            controller.signal,
+          );
+          if (controller.signal.aborted) {
+            // Cancelled: the request produced nothing and cost nothing, so the
+            // log keeps no trace of it.
+            dropTurn();
+            return;
+          }
+          proposal = result.proposal;
+          if (docId && turnId !== null) {
+            useStylesheetConversation
+              .getState()
+              .resolve(docId, turnId, result.proposal.text);
+          }
+        } else {
+          proposal = (
+            await requestMarkdown({ instruction, target }, controller.signal)
+          ).proposal;
+          if (controller.signal.aborted) return;
+        }
         abortRef.current = null;
         nonceRef.current += 1;
         setReview({
@@ -215,6 +267,8 @@ export function useAiCommand(
           instruction,
           removed: anchor.removed,
           at: anchor.at,
+          docId,
+          turnId,
           nonce: nonceRef.current,
         });
         setPopup(null);
@@ -223,11 +277,18 @@ export function useAiCommand(
         // reflect the Action the server just counted.
         void useAccountStore.getState().refresh();
       } catch (cause) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          dropTurn();
+          return;
+        }
         abortRef.current = null;
+        const message = errorToMessage(cause);
+        if (docId && turnId !== null) {
+          useStylesheetConversation.getState().fail(docId, turnId, message);
+        }
         // A refusal consumed no allowance, but the remaining count can still
         // have moved (another tab, another Action); refresh either way.
-        setRequest({ status: 'error', message: errorToMessage(cause) });
+        setRequest({ status: 'error', message });
         void useAccountStore.getState().refresh();
       }
     },
@@ -259,17 +320,21 @@ export function useAiCommand(
 
   const accept = useCallback(
     (checked: ReadonlySet<number>) => {
-      if (!review) return;
+      if (!review || foreignReview) return;
       const applied = applyProposal(review.target, review.proposal, checked);
       if (!applied.ok) {
         setApplyError(applied.reason);
         return;
       }
       if (review.command === 'stylesheet') {
-        const current = useDocumentStore.getState().settings;
         useDocumentStore.getState().updateActive({
-          settings: editStylesheet(current, applied.text),
+          settings: applyStylesheetProposal(applied.text),
         });
+        // The turn is decided in the Document's conversation, so the log and
+        // the provisional paper agree with what just happened.
+        decideTurn(review, 'accepted');
+        // The user asked from the editor; put the caret back where it was.
+        getEditor()?.focus();
       } else {
         // A final staleness guard: never write into text it no longer matches.
         const view = getEditor();
@@ -295,17 +360,18 @@ export function useAiCommand(
       setReview(null);
       setApplyError(null);
     },
-    [getEditor, review],
+    [foreignReview, getEditor, review],
   );
 
   const reject = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    if (review) decideTurn(review, 'rejected');
     setReview(null);
     setApplyError(null);
     setRequest({ status: 'idle' });
     getEditor()?.focus();
-  }, [getEditor]);
+  }, [getEditor, review]);
 
   /** Retry: a fresh AI Action with the same prompt, in place. */
   const retry = useCallback(() => {
@@ -319,6 +385,9 @@ export function useAiCommand(
   /** Edit prompt: back to the popup with the prompt intact. */
   const editPrompt = useCallback(() => {
     if (!review) return;
+    // Rewriting the prompt is "not this one": the turn is decided in the log,
+    // so it stops holding the provisional paper while the new prompt is typed.
+    decideTurn(review, 'rejected');
     setReview(null);
     setApplyError(null);
     setPopup({
@@ -331,15 +400,18 @@ export function useAiCommand(
     setRequest({ status: 'idle' });
   }, [computeScope, review]);
 
-  // Staleness for the review dialog: the target text as it stands now.
+  // Staleness for the review dialog: the target text as it stands now. A
+  // foreign review is not checked against the open Document — its reason is
+  // the Document mismatch itself.
   const currentTargetText = review
     ? review.command === 'stylesheet'
       ? settings.customStylesheet
       : markdown.slice(review.target.from, review.target.to)
     : '';
-  const stale = review
-    ? isProposalStale(review.target, currentTargetText)
-    : false;
+  const stale =
+    review && !foreignReview
+      ? isProposalStale(review.target, currentTargetText)
+      : false;
 
   const changeSet = review
     ? buildChangeSet(review.target, review.proposal)
@@ -347,8 +419,13 @@ export function useAiCommand(
 
   const acceptDisabledReason = review
     ? (applyError ??
+      (foreignReview
+        ? 'This proposal belongs to another document. Open that document to decide it.'
+        : null) ??
       (stale
-        ? 'The text this proposal targets has changed — Retry for a fresh proposal.'
+        ? review.command === 'stylesheet'
+          ? 'The stylesheet changed since this was proposed — Retry for a fresh proposal.'
+          : 'The text this proposal targets has changed — Retry for a fresh proposal.'
         : null) ??
       (account && account.remaining <= 0
         ? 'No AI Actions left this period.'
@@ -358,8 +435,10 @@ export function useAiCommand(
 
   const busy = request.status === 'working';
   // Retry is the remedy for a stale proposal, so it stays available there; an
-  // exhausted allowance blocks it, because a resubmission is a fresh Action.
-  const retryBlocked = busy || (!!account && account.remaining <= 0);
+  // exhausted allowance blocks it, because a resubmission is a fresh Action,
+  // and so does a proposal that belongs to a Document the user has left.
+  const retryBlocked =
+    busy || foreignReview || (!!account && account.remaining <= 0);
 
   return {
     editorApiRef,
@@ -387,4 +466,21 @@ export function useAiCommand(
     retry,
     editPrompt,
   };
+}
+
+/**
+ * Decides a stylesheet review's turn in its Document's conversation. `/ai` has
+ * no conversation, so it is a no-op there.
+ */
+function decideTurn(review: AiReviewState, decision: StylesheetDecision): void {
+  if (
+    review.command !== 'stylesheet' ||
+    review.docId === null ||
+    review.turnId === null
+  ) {
+    return;
+  }
+  useStylesheetConversation
+    .getState()
+    .decide(review.docId, review.turnId, decision);
 }

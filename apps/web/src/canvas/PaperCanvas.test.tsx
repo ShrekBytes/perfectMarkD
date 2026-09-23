@@ -11,6 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaperCanvas, type PaperCanvasApi } from './PaperCanvas';
 import * as pipelineModule from './pipeline';
 import {
+  resetStylesheetConversationForTests,
+  useStylesheetConversation,
+} from '../ai/conversation';
+import {
   resetDocumentStoreForTests,
   useDocumentStore,
 } from '../documents/store';
@@ -43,6 +47,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  resetStylesheetConversationForTests();
 });
 
 /** Mounts the canvas and resolves the API the shell holds through the ref. */
@@ -172,6 +177,40 @@ describe('PaperCanvas rendering', () => {
     });
     await flushRender();
     expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('draws a stylesheet proposal provisionally, without writing it to the document', async () => {
+    const spy = vi.spyOn(pipelineModule, 'runDocumentPipeline');
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRender();
+
+    const docId = useDocumentStore.getState().activeId!;
+    const PROPOSED = '.mpdf-doc h1 { letter-spacing: 0.3em; }';
+    let turnId = 0;
+    act(() => {
+      const conversation = useStylesheetConversation.getState();
+      turnId = conversation.start(docId, 'tighter rules', '');
+      conversation.resolve(docId, turnId, PROPOSED);
+    });
+    await flushRender();
+
+    // The paper is drawn with the proposal, layer forced on…
+    const previewed = spy.mock.calls.at(-1)![1];
+    expect(previewed.customStylesheet).toBe(PROPOSED);
+    expect(previewed.customStylesheetEnabled).toBe(true);
+    // …and the Document's own stylesheet is untouched: a preview is never
+    // persisted, and only Accept writes the box.
+    expect(useDocumentStore.getState().settings.customStylesheet).toBe('');
+
+    // Deciding the proposal reverts the paper to what the box holds.
+    act(() => {
+      useStylesheetConversation.getState().decide(docId, turnId, 'rejected');
+    });
+    await flushRender();
+    const reverted = spy.mock.calls.at(-1)![1];
+    expect(reverted.customStylesheet).toBe('');
+    expect(reverted.customStylesheetEnabled).toBe(false);
   });
 
   it('renders immediately on the manual render call (Ctrl/Cmd+Enter path)', async () => {

@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog } from '../shell/Dialog';
 import { AI_COMMANDS } from './trigger';
+import { AiDiff } from './AiDiff';
 import type { AiChange, AiChangeSet } from './proposal';
 import type { AiCommand } from './types';
 
@@ -61,47 +62,8 @@ function ChangeRow({ change, checked, onToggle }: ChangeRowProps) {
         />
         Change {change.id + 1}
       </label>
-      <div className="mt-1.5 overflow-x-auto rounded-control border border-hairline bg-canvas font-mono text-[11px] leading-5">
-        {change.contextBefore.map((line, index) => (
-          <DiffLine key={`b${index}`} kind="context" text={line} />
-        ))}
-        {change.before.map((line, index) => (
-          <DiffLine key={`del${index}`} kind="del" text={line} />
-        ))}
-        {change.after.map((line, index) => (
-          <DiffLine key={`add${index}`} kind="add" text={line} />
-        ))}
-        {change.contextAfter.map((line, index) => (
-          <DiffLine key={`a${index}`} kind="context" text={line} />
-        ))}
-      </div>
+      <AiDiff change={change} />
     </li>
-  );
-}
-
-function DiffLine({
-  kind,
-  text,
-}: {
-  kind: 'context' | 'del' | 'add';
-  text: string;
-}) {
-  const mark = kind === 'del' ? '−' : kind === 'add' ? '+' : ' ';
-  return (
-    <div
-      className={
-        kind === 'del'
-          ? 'flex gap-2 bg-surface-hover/60 px-2 text-ink-soft'
-          : kind === 'add'
-            ? 'flex gap-2 bg-surface-hover px-2 text-ink'
-            : 'flex gap-2 px-2 text-ink-faint'
-      }
-    >
-      <span aria-hidden="true" className="w-3 shrink-0 select-none text-center">
-        {mark}
-      </span>
-      <span className="whitespace-pre-wrap break-words">{text || ' '}</span>
-    </div>
   );
 }
 
@@ -180,8 +142,9 @@ export function AiReviewDialog({
           </span>
         </p>
         <p className="mt-1 text-[11px] leading-4 text-ink-faint">
-          Nothing is written to your Document until you accept, and an accepted
-          proposal is one undo step.
+          {command === 'stylesheet'
+            ? 'Nothing is written to your stylesheet until you accept. The paper is showing this proposal in the meantime.'
+            : 'Nothing is written to your Document until you accept, and an accepted proposal is one undo step.'}
         </p>
 
         <ul className="mt-3 max-h-[55vh] overflow-y-auto pr-1">

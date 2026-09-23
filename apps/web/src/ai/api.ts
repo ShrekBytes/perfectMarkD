@@ -8,6 +8,7 @@
 
 import { errorFrom, postJson, ApiError } from '../api/client';
 import type { AiMarkdownResult, AiStylesheetResult, AiTarget } from './types';
+import type { StylesheetExchange } from './conversation';
 
 /** The client's name for the shared API error; its `code` names the gate. */
 export { ApiError as AiActionError };
@@ -55,14 +56,25 @@ export async function requestMarkdown(
 
 export interface StylesheetRequest {
   instruction: string;
+  /** The box's current text — the source of truth, never a stale transcript. */
   css: string;
+  /** The earlier turns, oldest first (the last three are replayed). */
+  history?: StylesheetExchange[];
 }
 
 export async function requestStylesheet(
   request: StylesheetRequest,
   signal?: AbortSignal,
 ): Promise<AiStylesheetResult> {
-  const res = await postJson('/api/ai/stylesheet', request, signal);
+  const res = await postJson(
+    '/api/ai/stylesheet',
+    {
+      instruction: request.instruction,
+      css: request.css,
+      history: request.history ?? [],
+    },
+    signal,
+  );
   if (!res.ok) throw await errorFrom(res);
   return (await res.json()) as AiStylesheetResult;
 }

@@ -68,6 +68,63 @@ describe('AI prompts', () => {
     expect(messages[1]?.content).toContain('</stylesheet>');
   });
 
+  it('replays the earlier turns as a conversation, oldest first', () => {
+    const messages = buildStylesheetMessages({
+      instruction: 'Not like that — thinner rules',
+      css: '.mpdf-doc h1 { border-width: 1px; }',
+      history: [
+        { instruction: 'Thinner rules', reply: '.mpdf-doc h1 { border: 0; }' },
+        {
+          instruction: 'Warmer accent',
+          reply: '.mpdf-doc h1 { color: #c00; }',
+        },
+      ],
+    });
+    expect(messages.map((message) => message.role)).toEqual([
+      'system',
+      'user',
+      'assistant',
+      'user',
+      'assistant',
+      'user',
+    ]);
+    expect(messages[1]?.content).toContain('Thinner rules');
+    expect(messages[2]?.content).toContain('.mpdf-doc h1 { border: 0; }');
+    // The request carries the stylesheet as it stands now, not the last reply:
+    // a hand edit between turns is what the model must see.
+    expect(messages[5]?.content).toContain(
+      '.mpdf-doc h1 { border-width: 1px; }',
+    );
+    expect(messages[5]?.content).toContain('Not like that');
+  });
+
+  it('replays only the last three turns', () => {
+    const messages = buildStylesheetMessages({
+      instruction: 'Again',
+      css: '',
+      history: [
+        { instruction: 'One', reply: 'a {}' },
+        { instruction: 'Two', reply: 'b {}' },
+        { instruction: 'Three', reply: 'c {}' },
+        { instruction: 'Four', reply: 'd {}' },
+      ],
+    });
+    // system + three turns + the request.
+    expect(messages).toHaveLength(1 + 3 * 2 + 1);
+    expect(messages[1]?.content).toContain('Two');
+    expect(messages.map((message) => message.content).join('\n')).not.toContain(
+      'Instruction: One',
+    );
+  });
+
+  it('says so when there is no stylesheet yet', () => {
+    const messages = buildStylesheetMessages({
+      instruction: 'Give me a stylesheet',
+      css: '  ',
+    });
+    expect(messages[1]?.content).toContain('(empty — no stylesheet yet)');
+  });
+
   it('never names a provider or a model', () => {
     for (const prompt of [
       AI_MARKDOWN_DOCUMENT_SYSTEM_PROMPT,

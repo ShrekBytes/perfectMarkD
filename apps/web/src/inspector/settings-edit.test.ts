@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyOrientation,
   applyPreset,
+  applyStylesheetProposal,
   customFontValue,
   fontChange,
 } from './settings-edit';
@@ -118,5 +119,24 @@ describe('customFontValue / fontChange (billing/05)', () => {
     expect(
       fontChange(customFontValue('  Inter  '), 'fontFamily', 'customFontName'),
     ).toEqual({ fontFamily: '__custom__', customFontName: 'Inter' });
+  });
+});
+
+describe('applyStylesheetProposal (ai-transforms/06)', () => {
+  it('writes the accepted CSS and turns the layer on', () => {
+    // The proposal was drawn on the paper while under review, so accepting is
+    // what keeps the look: writing the box with the layer off would make it
+    // vanish at the moment of accepting.
+    expect(applyStylesheetProposal('.mpdf-doc h1 { color: teal; }')).toEqual({
+      customStylesheet: '.mpdf-doc h1 { color: teal; }',
+      customStylesheetEnabled: true,
+    });
+  });
+
+  it('turns the layer off for an accepted empty stylesheet', () => {
+    expect(applyStylesheetProposal('   ')).toEqual({
+      customStylesheet: '   ',
+      customStylesheetEnabled: false,
+    });
   });
 });
