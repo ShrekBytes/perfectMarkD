@@ -6,7 +6,7 @@
 
 **Blocked by:** 01 (the Stylesheet tab and its box), 05 (the shared popup, review dialog, route shape, gates, allowance, and disclosure).
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] The AI block sits below the box and above the reference link, with its own states: not entitled (locked, opening the pricing modal), AI off (an off state with a turn-on action, since a user standing in this tab needs a way back), provider unavailable (a plain message with Retry), and ready.
 - [x] Each reply is a proposal card with the stylesheet diff and per-change acceptance; accepting writes the box, rejecting leaves it untouched, and rejected turns remain visible in the log.
@@ -34,3 +34,4 @@
 - Verified: `pnpm vitest run apps/server/src/ai apps/web/src/ai apps/web/src/inspector apps/web/src/editor apps/web/src/canvas` (348 tests: the conversation's rules and cap, the block's states and accept/reject/stale/cancel, the editor's `/ss` turns, the provisional render, the route's history handling), the full `pnpm test` (115 files, 1,424 tests), `pnpm typecheck`, `pnpm lint`, and prettier on every file this ticket touched.
 - Verified in a real browser: `apps/web/e2e/ai-stylesheet.spec.ts` (3 tests, passing) drives the production bundle — the tab's conversation from asking to the provisional paper to Accept, Reject reverting the paper with the box untouched, and `/ss` from the editor writing the same box and the same conversation while the Inspector stays on Page. The assertions read the *computed* colour of the heading inside the first page's shadow root, so a proposal that never reached the render fails there. The rest of the browser suite passes (`ai-command.spec.ts` 8 tests, `shell-compact.spec.ts` 21 of 22) except `shell-compact.spec.ts`'s "crosses to the three-pane row exactly at the panes' minimum width", which fails identically on a clean checkout (recorded on ticket 05) and is not caused by this work.
 - Environment note: the sandbox's bulk-delete guard refuses any command that deletes more than 50 files in a turn, which blocks `pnpm`, `vite build` (it empties `dist`), and Playwright's own `test-results` cleanup. The browser pass was run against a bundle built with `vite build --outDir dist-e2e2` served by `vite preview`, with `playwright test --output=/tmp/pm-e2e-out`, so nothing bulk-deleted. Nothing in the repository was worked around.
+- **Status flipped `ready-for-human` → `resolved`** (2026-09-24): the label means "requires human implementation"; the implementation above shipped (`988d5a3`) and was verified against the production bundle, and the full unit suite (1,503 tests) is green. Nothing here is still waiting on a human.

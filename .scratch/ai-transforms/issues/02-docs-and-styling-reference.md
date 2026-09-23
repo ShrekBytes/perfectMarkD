@@ -6,7 +6,7 @@
 
 **Blocked by:** 01 (the reference documents what 01 introduces, and the drift test asserts those names exist in the engine's output).
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] The Docs page exists at its route with an in-page section nav generated from its headings, rendered from the single markdown source through the engine's markdown renderer, reachable from the existing Docs entry points.
 - [x] The reference section documents the `.mpdf-doc`-scoped CSS variables and the content selectors a user is likely to need, marks everything else as internal, and states that page geometry, paper size, paper background, and header/footer bands belong to the Inspector, with `@page` named as ignored.
@@ -23,3 +23,5 @@
 - Design decision worth a human's eyes: the documented variables are a **read contract, not a theming API**. The generated rules keep their direct values; the variables mirror the settings-derived values so user CSS can align with them (`var(--mpdf-accent)`), and the reference says redefining one changes nothing. Making the generated rules consume the variables instead would let a Custom Stylesheet retheme by override — but the builder derives several colors from the accent by alpha-suffix (borders, rules, alert tints), which cannot go through a variable, so overrides would work for some properties and silently not for others. The honest, predictable half was chosen; flipping it later is a builder refactor plus a docs change, gated by the same drift test.
 
 **Notes:** The page is designed by the docs spec at `.scratch/docs-page/spec.md` (one long page, section nav from headings, rendered from a single markdown source), and the content list to cover comes from the launch workstream's docs-page ticket — getting started, the page-break syntax, math and diagram examples, the font catalog, self-hosting, and the privacy FAQ. That ticket also described the footer and GitHub presence, which already shipped; its remaining page work is delivered here, so it should be marked superseded rather than implemented twice.
+
+- **Status flipped `ready-for-human` → `resolved`** (2026-09-24): the label means "requires human implementation"; the implementation above shipped (`49ee531`) and was verified in Chromium at wide/narrow widths in both themes, and the full unit suite is green. Nothing here is still waiting on a human.

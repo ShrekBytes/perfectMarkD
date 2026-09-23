@@ -16,11 +16,15 @@ machine is awake and online, so uptime is the Admin's home uptime rather than a
 provider's SLA. Home upload bandwidth caps Server Export throughput and is the
 first thing to break under real traffic. And every user request passes through
 Cloudflare's edge — a third party in the path that the application itself makes
-no requests to, which is why the Privacy page must state it plainly instead of
-letting the "no third-party analytics" line imply that no third party is
-involved at all. Against that: zero server rent before there is revenue, and the
-machine is already the dev/prod-parity environment where Chromium, the Compose
-stack, and rootless podman have all been verified.
+no requests to. That transport fact stays out of the user-facing copy (updated
+2026-09-24): the Privacy page names neither Cloudflare nor the hosting topology,
+and its "What is never done" section claims only that no page loads anything
+from another company's server. This supersedes the earlier requirement here,
+and the matching follow-up note on the launch-chrome spec, that the page "must
+state it plainly" — the Admin chose no transport disclosure instead. Against
+that: zero server rent before there is revenue, and the machine is already the
+dev/prod-parity environment where Chromium, the Compose stack, and rootless
+podman have all been verified.
 
 Revisit when availability expectations outgrow a home machine, when bandwidth
 becomes the bottleneck rather than render time, or when a small VPS is trivially

@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] A size estimate over text that is deliberately conservative: roughly four characters per token for Latin text, a tighter ratio when the non-ASCII letter share is high, so a Document in Arabic, Persian, Chinese, or Japanese is refused early rather than sent oversized.
 - [x] Scope resolution over a Document and a cursor or selection: the selection when there is one, otherwise the whole Document, reported with the target text, its size, and its source range.
@@ -25,3 +25,4 @@
 - `parseAnchoredEdits` reads the `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` form in the order given, tolerating prose around the blocks and CRLF line endings, and refuses the whole reply on a broken marker structure or an empty anchor. `applyAnchoredEdits` re-reads the text after each block and refuses the whole change set on the first missing (`not_found`), ambiguous (`ambiguous`), or empty (`empty_search`) anchor, naming it by zero-based `blockIndex` — there is no partially applied result to return, and partial acceptance is expressed by passing only the checked subset. Overlapping readings count as ambiguous (`aa` in `aaa` can be read in two places), so the "exactly once" rule errs toward refusing.
 - `extractSections` splits at every ATX heading and every Page Break; a Page Break splits even inside a fence, because the renderer's `splitMarkdownSections` is fence-unaware and each renderer section starts fresh. Setext and blockquote headings are deliberately not section starts — the feature's dialect is ATX headings — and headings inside fences are ignored. Each section carries its exact source slice in `from`/`to` and reports level, heading text (markers stripped), word count (heading markers excluded), and the first body line. `buildOutlineDigest` turns that list into one line per section — heading (or `(no heading)`), level, word count, first line clipped at 120 code points — with no model call.
 - Verified: `pnpm vitest run packages/core/src/ai.test.ts` (63 tests covering the refusals and the estimator boundaries), the full `pnpm test` (104 files, 1,278 tests), `pnpm typecheck`, and `pnpm lint`. `pnpm format:check` fails on 36 files that are already unformatted on a clean checkout; the new and touched files are prettier-clean.
+- **Status flipped `ready-for-human` → `resolved`** (2026-09-24): the label means "requires human implementation"; the implementation above shipped (`ca99ae0`) and is unit-tested at both ends of the estimator's boundaries, and the full unit suite (1,503 tests) is green. Nothing here is still waiting on a human.

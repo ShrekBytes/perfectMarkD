@@ -6,7 +6,7 @@
 
 **Blocked by:** 03 (provider config, the provider seam, the instance's AI state), 04 (the estimator, scope resolution, and anchored edits).
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] A hint appears for `/a` and `/s` only, accepting with Tab, Enter, or a click; a bare `/` shows nothing; `/aix` and other continuations trigger nothing; matching is case-insensitive and only at a line start or after whitespace, never inside inline or fenced code; pasted text and programmatic edits trigger nothing.
 - [x] `/ai` plus a space opens the popup at the caret with the trigger text removed; Esc restores exactly what was removed, leaving the Document byte-identical; Enter submits, Shift+Enter adds a line, and Cancel aborts a running request.
@@ -38,3 +38,4 @@
   - The exhausted state stated the period and the reset date but not the count the spec asks for. The `ai` block now also reports `allowance` (the plan's monthly AI Allowance) alongside `remaining`, so the popup says "You have used all 100 AI Actions for September 2026. They reset on 2026-10-01." and the Account page says "93 of 100 left this month". The scope readout also moved above the gate branches, so the popup states what would be sent in every state, available or not.
 - Review follow-ups deliberately not taken: the `{removed, at}` trigger anchor and the `command === 'stylesheet'` branch recur in a few places and could each become a shared type or map, and `apps/web/src/ai` and `apps/web/src/editor` import types from each other in both directions. Both are judgement calls with no behaviour attached, so they were left for a change that needs them.
 - `apps/web/src/docs/docs.md` also claimed the self-hosted instance "makes no third-party requests; nothing in it phones home" without qualification, which the AI feature contradicts once an Admin configures a provider. It now names AI as absent-until-configured and adds a Privacy FAQ entry for AI Actions, so no shipped page contradicts the Privacy page.
+- **Status flipped `ready-for-human` → `resolved`** (2026-09-24): the label means "requires human implementation"; the implementation above shipped (`21449c1`) with its review fixes and was verified against the production bundle, and the full unit suite (1,503 tests) is green. Nothing here is still waiting on a human.

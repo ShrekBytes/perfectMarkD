@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] The AI Provider Config is one admin-editable setting with validation that rejects malformed values and accepts valid ones, seeded with defaults, audited on every change, and never echoed back with the key.
 - [x] The provider client is one seam over an OpenAI-compatible chat completion: endpoint, model, messages, an explicit output cap, and reasoning effort; it returns the reply text and the finish reason, and maps every transport and HTTP failure to one provider-error shape. It is injected into the app the way the export renderer already is, so tests run against a fake and nothing in the test suite touches a live API.
@@ -26,5 +26,6 @@ Deliberate decisions and deferrals:
 
 - `users.ai_disclosure_seen` and `users.ai_access` are added by this ticket's migration (spec §Data model); only `ai_access` is read here (the account block). The disclosure flag is written by 05.
 - Upstream error bodies are returned to the caller (`AiProviderError.detail`) and shown in the Admin panel, but not logged here: the only user-flow provider failures are 05's route, which owns server-side logging. The provider seam itself never logs the key, prompt, or reply.
-- The panel does not yet show token equivalents or worst-case cost per AI Action: the character→token estimator lands in 04, and the arithmetic belongs with it. Test connection shows the published price and warns when the configured caps exceed the published numbers.
+- The panel does not yet show token equivalents or worst-case cost per AI Action: the character→token estimator lands in 04, and the arithmetic belongs with it — folded into 08 on 2026-09-24, which now owns the display. Test connection shows the published price and warns when the configured caps exceed the published numbers.
 - `aiConfigured` requires a model id in addition to the key and the kill switch (the seed ships an empty model); adding a key alone does not point the instance at a model the Admin never chose.
+- **Status flipped `ready-for-human` → `resolved`** (2026-09-24): the label means "requires human implementation"; the implementation above shipped (`db91291`) and was verified with the suites and a live browser pass. The one deferred spec item — the panel's token-equivalent and worst-case-cost readout — is folded into ticket 08, which now owns it, so nothing here is still waiting on a human.
