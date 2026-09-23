@@ -41,6 +41,16 @@ const NO_KEY_MESSAGE =
 const NO_MODEL_MESSAGE =
   'No model is configured. Set a model id and save before testing the connection.';
 
+/**
+ * The probe asks for one word, but reasoning tokens come out of the same
+ * completion budget: a reasoning probe capped at a dozen tokens can spend
+ * the whole budget thinking and come back with no reply text
+ * (finish_reason length, content null). The reasoning cap stays small and
+ * explicit, with room for the thinking and the word.
+ */
+const PROBE_CAP_FLAT = 16;
+const PROBE_CAP_REASONING = 512;
+
 /** One minimal chat completion with the configured effort and an explicit
  *  small cap, plus the metadata lookup when the provider serves one. */
 export async function testAiConnection({
@@ -83,7 +93,10 @@ export async function testAiConnection({
       apiKey,
       model: config.model,
       messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
-      maxOutputTokens: Math.min(config.maxOutputTokens, 16),
+      maxOutputTokens: Math.min(
+        config.maxOutputTokens,
+        config.reasoningEffort === 'off' ? PROBE_CAP_FLAT : PROBE_CAP_REASONING,
+      ),
       reasoningEffort: config.reasoningEffort,
       timeoutMs,
     });

@@ -595,15 +595,57 @@ describe('POST /api/admin/settings/ai/test', () => {
       error: null,
       detail: null,
     });
-    // One minimal, explicitly capped request with the configured effort.
+    // One minimal, explicitly capped request with the configured effort: a
+    // reasoning probe needs room for the thinking plus the one-word reply,
+    // because reasoning tokens come out of the same completion budget.
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: 'sk-key',
       model: 'vendor/model',
-      maxOutputTokens: 16,
+      maxOutputTokens: 512,
       reasoningEffort: 'medium',
     });
+  });
+
+  it('caps a reasoning-off probe at one word and respects a smaller configured cap', async () => {
+    const calls: Array<Parameters<AiProvider['complete']>[0]> = [];
+    const provider = fakeProvider({
+      complete: async (request) => {
+        calls.push(request);
+        return { text: 'ok', finishReason: 'stop' };
+      },
+    });
+    const { app } = makeApp({
+      adminEmail: 'owner@example.com',
+      ai: { apiKey: 'sk-key', provider },
+    });
+    const admin = await adminSignedIn(app);
+
+    await postJson(
+      app,
+      '/api/admin/settings/ai/test',
+      {
+        ...DEFAULT_AI_PROVIDER_CONFIG,
+        model: 'vendor/model',
+        reasoningEffort: 'off',
+      },
+      admin,
+    );
+    expect(calls[0]?.maxOutputTokens).toBe(16);
+
+    await postJson(
+      app,
+      '/api/admin/settings/ai/test',
+      {
+        ...DEFAULT_AI_PROVIDER_CONFIG,
+        model: 'vendor/model',
+        reasoningEffort: 'high',
+        maxOutputTokens: 100,
+      },
+      admin,
+    );
+    expect(calls[1]?.maxOutputTokens).toBe(100);
   });
 
   it('reports a provider failure with upstream detail, for the Admin', async () => {
