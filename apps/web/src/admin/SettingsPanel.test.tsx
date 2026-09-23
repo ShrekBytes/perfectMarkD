@@ -292,6 +292,18 @@ it('saves the AI provider config and reports a draft test connection', async () 
 
   await user.type(screen.getByTestId('ai-model'), 'vendor/model');
   await user.selectOptions(screen.getByTestId('ai-reasoning-effort'), 'high');
+
+  // Before Test connection the price is unknown, but the caps' arithmetic is
+  // already stated so the Admin can size them against the model's window.
+  const cost = screen.getByTestId('ai-cost');
+  expect(cost).toHaveTextContent('~30,000 tokens');
+  expect(cost).toHaveTextContent('16,000 tokens');
+  // The write cap is derived from the output budget, never configured.
+  expect(cost).toHaveTextContent('~8,000 tokens');
+  expect(screen.getByTestId('ai-cost-per-action')).toHaveTextContent(
+    'price unknown',
+  );
+
   await user.click(screen.getByTestId('ai-test'));
 
   expect(await screen.findByTestId('ai-test-status')).toHaveTextContent(
@@ -304,6 +316,10 @@ it('saves the AI provider config and reports a draft test connection', async () 
   expect(screen.getByTestId('ai-test-warning')).toHaveTextContent(
     /larger than the model's published completion cap/,
   );
+
+  // Test connection's published rates price one AI Action: 30k input at
+  // $0.15/M + 16k output at $0.60/M = $0.0141.
+  expect(screen.getByTestId('ai-cost-per-action')).toHaveTextContent('$0.0141');
 
   await user.click(screen.getByTestId('ai-save'));
   await waitFor(() =>
@@ -353,6 +369,61 @@ it('shows a failed connection with its message and upstream detail', async () =>
   expect(result).toHaveTextContent('The endpoint did not answer.');
   expect(result).toHaveTextContent('The provider answered with HTTP 401.');
   expect(screen.getByTestId('ai-test-detail')).toHaveTextContent('invalid key');
+  // With no published price the per-Action cost stays unknown rather than
+  // silently zero.
+  expect(screen.getByTestId('ai-cost-per-action')).toHaveTextContent(
+    'price unknown',
+  );
+});
+
+it('prices a per-Action cost from the tested model and re-flags it when the model changes', async () => {
+  const user = userEvent.setup();
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === '/api/admin/settings') {
+      return Promise.resolve(
+        jsonResponse(200, { settings: { ...SEEDED, aiKeyPresent: true } }),
+      );
+    }
+    if (url === '/api/admin/settings/ai/test') {
+      return Promise.resolve(
+        jsonResponse(200, {
+          report: {
+            ok: true,
+            keyPresent: true,
+            model: {
+              id: 'vendor/model',
+              contextLength: 200000,
+              maxOutputTokens: 8000,
+              inputPricePerMillion: 3,
+              outputPricePerMillion: 15,
+            },
+            warnings: [],
+            error: null,
+            detail: null,
+          },
+        }),
+      );
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  render(<SettingsPanel />);
+  await screen.findByTestId('ai-model');
+  await user.type(screen.getByTestId('ai-model'), 'vendor/model');
+  await user.click(screen.getByTestId('ai-test'));
+  await screen.findByTestId('ai-test-status');
+
+  // 30k input at $3/M + 16k output at $15/M = $0.33.
+  expect(screen.getByTestId('ai-cost-per-action')).toHaveTextContent('$0.3300');
+
+  // Editing to another model discards the tested model's price: it is no
+  // longer the rate the draft would be billed at.
+  await user.type(screen.getByTestId('ai-model'), '-other');
+  expect(screen.getByTestId('ai-cost-per-action')).toHaveTextContent(
+    'price unknown',
+  );
 });
 
 it('rejects an AI cap outside the context window client-side before a request', async () => {

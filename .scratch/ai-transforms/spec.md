@@ -1,6 +1,6 @@
 # AI in the editor and in the Custom Stylesheet
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

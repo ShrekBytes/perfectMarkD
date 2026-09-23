@@ -78,12 +78,15 @@ export function Inspector({ gauge = null }: InspectorProps) {
     <div className="flex h-full min-h-0 flex-col">
       {/* px-3, not px-2: the tabs and the sections below share one left edge
           — a 4px jog between the tab row and the first heading reads as a
-          rendering bug, not a style. */}
-      <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-hairline px-3">
+          rendering bug, not a style. The tablist wraps (like the editor
+          toolbar) so four tabs stay inside the Inspector's 260px floor
+          instead of clipping the last one; the row carries a min-height, not
+          a fixed one, so it grows with the wrapped lines. */}
+      <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-1">
         <div
           role="tablist"
           aria-label="Inspector sections"
-          className="flex items-center gap-1"
+          className="flex flex-wrap items-center gap-1"
         >
           {TABS.map((id) => (
             <button

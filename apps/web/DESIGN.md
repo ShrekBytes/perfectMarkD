@@ -180,8 +180,9 @@ authored 28/32px instrument sizes stay desktop/fine-pointer values and are
 pixel-identical there. Bars that hold 28px instruments — the editor toolbar,
 the Inspector tablist, the banner strips, the compact bar — carry
 min-heights, not fixed heights, so they grow with their contents; the editor
-toolbar also wraps (`flex-wrap`), which is what keeps Undo/Redo reachable at
-the 280px editor minimum instead of clipping. The pane dividers widen under
+toolbar and the Inspector tablist also wrap (`flex-wrap`), which is what keeps
+Undo/Redo reachable at the 280px editor minimum and all four Inspector tabs
+inside the 260px pane floor instead of clipping. The pane dividers widen under
 the gate with compensating negative margins (`touch-divider`), preserving
 their net-zero footprint in the 860 arithmetic.
 

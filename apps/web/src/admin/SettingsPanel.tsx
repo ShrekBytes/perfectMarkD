@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { aiBudgets, aiWriteCapTokens } from '@perfectmarkd/core';
 import { ToggleRow } from '../inspector/controls';
+import { aiActionCost, formatActionCost } from './ai-cost';
 import {
   getAdminSettings,
   testAiConnection,
@@ -785,6 +787,8 @@ function AiProviderSection({
         </div>
       </div>
 
+      <AiCostReadout draft={draft} report={report} />
+
       {error && (
         <p
           role="alert"
@@ -825,6 +829,82 @@ function AiProviderSection({
         onSave={() => void onSave()}
       />
     </section>
+  );
+}
+
+/**
+ * The worst-case arithmetic of one AI Action (spec §AI Provider Config): the
+ * input cap through the shared estimator, the output cap as configured, the
+ * write cap derived from it, and what the pair costs at the model's published
+ * rates. Both token figures are labelled estimates; the price is flagged
+ * unknown until Test connection reports both rates, so a pricey model is a
+ * decision rather than a surprise.
+ */
+function AiCostReadout({
+  draft,
+  report,
+}: {
+  draft: AiDraft;
+  report: AiConnectionReport | null;
+}) {
+  const config = toAiConfig(draft);
+  // A draft the server would reject has no arithmetic worth showing; once it
+  // validates, its caps are the numbers to read.
+  if (config === null) return null;
+  const budgets = aiBudgets(config);
+  const cost = aiActionCost(
+    {
+      maxInputCharacters: config.maxInputCharacters,
+      maxOutputTokens: config.maxOutputTokens,
+    },
+    // The price belongs to the model that was tested; a draft edited to a
+    // different model has no published rate until Test connection is run again.
+    report?.model && report.model.id === config.model
+      ? {
+          inputPricePerMillion: report.model.inputPricePerMillion,
+          outputPricePerMillion: report.model.outputPricePerMillion,
+        }
+      : null,
+  );
+  const tokens = (value: number) => value.toLocaleString('en-US');
+  return (
+    <dl
+      data-testid="ai-cost"
+      className="mt-3 space-y-0.5 border-t border-hairline pt-2 text-xs text-ink-soft"
+    >
+      <div className="flex justify-between gap-2">
+        <dt>Input cap, in tokens</dt>
+        <dd className="font-mono tabular-nums text-ink">
+          ~{tokens(cost.inputTokens)} tokens
+        </dd>
+      </div>
+      <div className="flex justify-between gap-2">
+        <dt>Output cap</dt>
+        <dd className="font-mono tabular-nums text-ink">
+          {tokens(cost.outputTokens)} tokens
+        </dd>
+      </div>
+      <div className="flex justify-between gap-2">
+        <dt>Write cap (half the output cap)</dt>
+        <dd className="font-mono tabular-nums text-ink">
+          ~{tokens(aiWriteCapTokens(budgets))} tokens
+        </dd>
+      </div>
+      <div className="flex justify-between gap-2">
+        <dt>Worst-case cost of one AI Action</dt>
+        <dd
+          data-testid="ai-cost-per-action"
+          className="font-mono tabular-nums text-ink"
+        >
+          {cost.usd === null ? 'price unknown' : formatActionCost(cost.usd)}
+        </dd>
+      </div>
+      <div className="pt-0.5 text-[11px] leading-4 text-ink-faint">
+        {cost.usd === null
+          ? 'Token counts are estimates. Run Test connection to read the model’s published price and price one AI Action.'
+          : 'The input count is an estimate at the conservative rate; the output cap is as configured. The price is one AI Action with the input cap full and the whole output cap used.'}
+      </div>
+    </dl>
   );
 }
 

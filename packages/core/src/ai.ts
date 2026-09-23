@@ -62,6 +62,19 @@ export function estimateAiSize(text: string): AiSizeEstimate {
   };
 }
 
+/**
+ * The worst-case token estimate for a character budget with no text to
+ * measure, as the Admin's AI Provider Config needs it: the tighter,
+ * script-aware ratio, so the panel's per-Action arithmetic errs toward
+ * over-estimating rather than promising a cost the model can exceed. It is
+ * the conservative end of `estimateAiSize`'s range, not a second estimator —
+ * the ratio is the same constant that function selects from.
+ */
+export function estimateTokensForCharacters(characters: number): number {
+  if (!Number.isFinite(characters) || characters <= 0) return 0;
+  return Math.ceil(characters / NON_ASCII_CHARS_PER_TOKEN);
+}
+
 // ─── AI Scope resolution ────────────────────────────────────────────────────
 
 /** A selection in the editor, as UTF-16 code-unit offsets into the Document. */
