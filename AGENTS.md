@@ -62,7 +62,7 @@ A web app that turns Markdown into perfectly laid-out PDFs. pnpm monorepo; AGPL-
 ### Project resources
 
 - **Issue tracker:** local Markdown files under `.scratch/<feature>/` — one spec at `.scratch/<feature>/spec.md`, tickets at `.scratch/<feature>/issues/NN-<slug>.md` with a `Status:` line. No GitHub Issues. Work the frontier: a ticket is actionable once every id in its `Blocked by:` line is resolved, lowest number first (see `PLAN.md` §4 and `docs/agents/issue-tracker.md`).
-- **Triage labels:** `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, recorded as `Status:` lines on tickets. See `docs/agents/triage-labels.md`.
+- **Triage labels:** `needs-triage`, `needs-info`, `ready-for-agent`, `resolved`, `ready-for-human`, `wontfix`, recorded as `Status:` lines on tickets. See `docs/agents/triage-labels.md`.
 - **Domain docs:** `CONTEXT.md` (canonical glossary) plus `docs/adr/` (numbered decisions, 0001–0009). See `docs/agents/domain.md`.
 - **Architecture / codebase map:** `README.md` (package layout) and `PLAN.md` §3 (stack) are the map. `apps/web/DESIGN.md` is the binding visual system, and `apps/web/PRODUCT.md` records product scope; `packages/core/src/golden/README.md` explains the paginator regression net.
 - **Commit format:** mostly conventional, `<type>(<scope>): <summary>` (e.g. `fix(web): custom-fonts review findings`, `feat(api): bake headless Chromium into the api image`). History also carries non-standard types (`polish`, `layout`, `redesign`, `clarify`) and occasional free-form messages, so neither is enforced. The most common scope is the ticket id (`server/03`, `launch/03`, `billing/04`) or a surface (`web`, `api`, `docs`, `scratch`); `core` is never used as a scope.
