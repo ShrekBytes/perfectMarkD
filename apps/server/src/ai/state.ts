@@ -9,7 +9,7 @@
 // bookkeeping never depends on the other's.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../db/database.js';
 import {
   aiUsage,
@@ -82,6 +82,12 @@ export interface AiAccountState {
   included: boolean;
   /** The caller's AI Access switch (CONTEXT.md); true by default. */
   access: boolean;
+  /** Whether the once-per-account first-use disclosure has been shown. */
+  disclosureSeen: boolean;
+  /** The character cap one AI Action may send (spec §scope and size). */
+  maxInputCharacters: number;
+  /** The AI Allowance this period's plan grants; zero without a plan. */
+  allowance: number;
   remaining: number;
   period: string;
   /** ISO instant the period resets. */
@@ -93,6 +99,7 @@ export function aiAccountState({
   userId,
   apiKey,
   access,
+  disclosureSeen,
   entitlement,
   limits,
   config,
@@ -102,6 +109,7 @@ export function aiAccountState({
   userId: number;
   apiKey: string | null;
   access: boolean;
+  disclosureSeen: boolean;
   entitlement: EntitlementLike;
   limits: PlanLimits;
   config: AiProviderConfig;
@@ -112,8 +120,32 @@ export function aiAccountState({
     configured: aiConfigured(config, apiKey),
     included: usage.allowance > 0,
     access,
+    disclosureSeen,
+    maxInputCharacters: config.maxInputCharacters,
+    allowance: usage.allowance,
     remaining: usage.remaining,
     period: usage.period,
     resetsAt: aiPeriodResetAt(now).toISOString(),
   };
+}
+
+/**
+ * Counts one AI Action against the caller's current period. Called by the
+ * route only when a usable proposal is produced (spec §AI is a paid
+ * capability): refusals, provider failures, truncation, and unusable replies
+ * never reach this, so a user is charged only for results they received.
+ */
+export function incrementAiUsage(
+  db: AppDatabase,
+  userId: number,
+  now: Date,
+): void {
+  const period = usagePeriod(now);
+  db.insert(aiUsage)
+    .values({ userId, period, count: 1 })
+    .onConflictDoUpdate({
+      target: [aiUsage.userId, aiUsage.period],
+      set: { count: sql`${aiUsage.count} + 1` },
+    })
+    .run();
 }

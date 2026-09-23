@@ -5,8 +5,9 @@
 // message for display.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { errorFrom, postJson, ApiError } from '../api/client';
+import { errorFrom, postJson, putJson, ApiError } from '../api/client';
 import type { FeatureFlags } from './flags';
+import type { AiAccountState } from '../ai/types';
 
 /** The auth client's name for the shared API error. */
 export { ApiError as AuthError };
@@ -51,6 +52,8 @@ export interface MePayload {
   quota: { used: number; limit: number };
   /** The gated Inspector controls (billing/04): which gates are open. */
   flags: FeatureFlags;
+  /** The instance's and the caller's AI state (ai-transforms/05). */
+  ai: AiAccountState;
 }
 
 /**
@@ -74,6 +77,17 @@ export async function changePassword(
     newPassword,
   });
   if (!res.ok) throw await errorFrom(res);
+}
+
+/**
+ * Sets the caller's AI Access switch (spec §AI Access) and returns the fresh
+ * `ai` block. The switch is server-side, so it follows the account.
+ */
+export async function setAiAccess(access: boolean): Promise<AiAccountState> {
+  const res = await putJson('/api/ai/access', { access });
+  if (!res.ok) throw await errorFrom(res);
+  const body = (await res.json()) as { ai: AiAccountState };
+  return body.ai;
 }
 
 async function readUserOrThrow(res: Response): Promise<AuthUser> {

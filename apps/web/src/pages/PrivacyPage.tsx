@@ -7,7 +7,8 @@ const inlineLink =
 
 /**
  * The /privacy page: one short combined page (launch-chrome spec) — what is
- * stored, what is never done, crypto payments keep card data out, the
+ * stored, what leaves the browser (AI Actions are the one third-party
+ * request), what is never done, crypto payments keep card data out, the
  * self-host escape hatch, and a one-line no-warranty caveat standing in for
  * the separate Terms page that doesn't exist.
  */
@@ -51,6 +52,38 @@ export function PrivacyPage() {
           </ul>
         </section>
 
+        <section aria-label="AI Actions" className="mt-6">
+          <h2 className="text-base font-semibold tracking-tight">
+            AI Actions
+          </h2>
+          <p className="mt-2 max-w-prose text-sm text-ink-soft">
+            The <code className="font-mono text-xs">/ai</code> and{' '}
+            <code className="font-mono text-xs">/ss</code> commands are the one
+            place where your text leaves your browser. When you submit one, the
+            text you asked about goes to an external AI provider to produce the
+            proposal — plus, for a large Document, an outline digest of the rest
+            so the result stays consistent with the whole. Only paid plans
+            include AI Actions, and nothing is sent until you submit.
+          </p>
+          <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink-soft">
+            <li>
+              Nothing is stored by us: no prompt, no Document text, no result.
+              The only records are a monthly count of the AI Actions you have
+              used and whether you have seen the first-use notice.
+            </li>
+            <li>
+              Nothing reaches your Document until you accept the proposal, and
+              AI content never reaches Export History, analytics, or logs.
+            </li>
+            <li>
+              How long the provider keeps what it receives is the provider's
+              policy, not ours. If you would rather not send anything, turn AI
+              Access off in your Account — the commands then disappear from the
+              editor.
+            </li>
+          </ul>
+        </section>
+
         <section aria-label="What is never done" className="mt-6">
           <h2 className="text-base font-semibold tracking-tight">
             What is never done
@@ -58,7 +91,9 @@ export function PrivacyPage() {
           <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink-soft">
             <li>
               No third-party analytics, no ad tracking, no fingerprinting. The
-              fonts are self-hosted, so your browser talks to no one else.
+              fonts are self-hosted, so your browser talks to no one else —
+              except when you submit an AI Action, the deliberate exception
+              above.
             </li>
             <li>
               Your PDF content is never read, used, or shared. Server Export

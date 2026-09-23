@@ -7,6 +7,7 @@ import { useAccountStore } from '../auth/account-store';
 import { listOrders, type Order } from '../billing/api';
 import { ErrorBoundary } from '../shell/ErrorBoundary';
 import { PlanSummary } from './PlanSummary';
+import { AiSection } from './AiSection';
 import { OrdersSection } from './OrdersSection';
 import { HistorySection } from './HistorySection';
 import { ChangePasswordForm } from './ChangePasswordForm';
@@ -101,6 +102,9 @@ export function AccountPage() {
                 orders={orders}
                 ordersError={ordersError}
               />
+            </ErrorBoundary>
+            <ErrorBoundary label="The AI section">
+              <AiSection />
             </ErrorBoundary>
             <ErrorBoundary label="The Orders section">
               <OrdersSection

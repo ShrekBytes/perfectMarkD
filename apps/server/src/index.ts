@@ -20,6 +20,7 @@ import { historyRoutes } from './history/routes.js';
 import type { HistoryStore } from './history/store.js';
 import { meRoutes } from './me.js';
 import { resolveAiContext, type AiAppOptions } from './ai/context.js';
+import { aiRoutes } from './ai/routes.js';
 
 export interface AppEnv {
   Variables: {
@@ -169,7 +170,11 @@ export function createApp({
       authRoutes({ sessionSecret, adminEmail, authRateLimit, now: clock }),
     )
     .route('/api/orders', orderRoutes())
-    .route('/api/admin', adminRoutes({ now: clock, removeStoredFile, ai }));
+    .route('/api/admin', adminRoutes({ now: clock, removeStoredFile, ai }))
+    // AI Actions (ai-transforms/05): always mounted so the AI Access switch
+    // and typed gate refusals work even on an instance with no key. The
+    // commands themselves are hidden client-side when unconfigured.
+    .route('/api/ai', aiRoutes({ ai, now: clock, log }));
 
   // Export History (server/05) mounts whenever storage is configured; the
   // Server Export API additionally needs its worker options. A composition

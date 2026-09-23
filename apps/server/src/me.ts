@@ -56,6 +56,7 @@ export function meRoutes({ now = () => new Date(), ai }: MeRoutesOptions = {}) {
         userId: user.id,
         apiKey: ai?.apiKey ?? null,
         access: user.aiAccess,
+        disclosureSeen: user.aiDisclosureSeen,
         entitlement: activeEntitlement,
         limits,
         config: getAiProviderConfig(db),

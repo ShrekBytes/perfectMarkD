@@ -8,6 +8,7 @@ import { useAccountStore } from '../auth/account-store';
 import * as api from '../auth/api';
 import type { MePayload } from '../auth/api';
 import { LOCKED_FLAGS, OPEN_FLAGS } from '../auth/flags';
+import { UNCONFIGURED_AI } from '../ai/types';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
@@ -302,6 +303,7 @@ function mePayload(overrides: Partial<MePayload> = {}): MePayload {
     expiresAt: null,
     quota: { used: 0, limit: 0 },
     flags: LOCKED_FLAGS,
+    ai: UNCONFIGURED_AI,
     ...overrides,
   };
 }

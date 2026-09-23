@@ -102,6 +102,7 @@ interface MeResponse {
     configured: boolean;
     included: boolean;
     access: boolean;
+    disclosureSeen: boolean;
     remaining: number;
     period: string;
     resetsAt: string;
@@ -148,6 +149,9 @@ describe('GET /api/me', () => {
         configured: false,
         included: false,
         access: true,
+        disclosureSeen: false,
+        maxInputCharacters: 60_000,
+        allowance: 0,
         remaining: 0,
         period: usagePeriod(new Date()),
         resetsAt: expect.any(String),
@@ -312,6 +316,9 @@ describe('GET /api/me — AI state (ai-transforms/03)', () => {
       configured: true,
       included: true,
       access: true,
+      disclosureSeen: false,
+      maxInputCharacters: 60_000,
+      allowance: 100,
       remaining: 93,
       period: '2026-09',
       resetsAt: '2026-10-01T00:00:00.000Z',

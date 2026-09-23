@@ -123,7 +123,9 @@ docker compose up -d --build
 ```
 
 Caddy serves the app and reverse-proxies the API. The self-hosted instance
-makes no third-party requests; nothing in it phones home.
+makes no third-party requests; nothing in it phones home. AI is absent until
+you configure a provider yourself, and once you do, AI Actions are the only
+thing that leaves the instance.
 
 ## Privacy FAQ
 
@@ -144,3 +146,10 @@ is no card processor — payments are manual crypto.
 **Do the Docs pages or fonts load from third parties?**
 No. The fonts are self-hosted and these pages are static files from the same
 origin.
+
+**What about AI Actions?**
+They are the one thing that leaves your browser. `/ai` and `/ss` send the
+text you submit — and, for a large Document, an outline digest of the rest —
+to an external AI provider to produce a proposal. Nothing is stored here, and
+the commands do not exist at all on an instance whose Admin has not
+configured a provider.

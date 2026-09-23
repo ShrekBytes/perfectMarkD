@@ -5,6 +5,12 @@ import { EditorView } from '@codemirror/view';
 import type { ComponentType, SVGProps } from 'react';
 import { MAX_ASSET_BYTES } from '../assets/ingest';
 import { useDocumentStore } from '../documents/store';
+import { caretAnchorStyle } from '../ai/anchor';
+import { AiHintPopover } from '../ai/AiHintPopover';
+import { AiPromptPopover } from '../ai/AiPromptPopover';
+import { AiReviewDialog } from '../ai/AiReviewDialog';
+import { useAiCommand } from '../ai/useAiCommand';
+import { PricingModal } from '../pricing/PricingModal';
 import {
   BoldIcon,
   HeadingIcon,
@@ -87,11 +93,22 @@ export function EditorPane({
   onEditorScroll,
 }: EditorPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
   // Latest props for the closures the one-time editor setup captures.
   const handlers = useRef({ onRequestRender, onEditorScroll });
   handlers.current = { onRequestRender, onEditorScroll };
+
+  // The `/ai` and `/ss` surface (ai-transforms/05). The controller reads AI
+  // state from the account store; this pane only renders what it reports.
+  const ai = useAiCommand(() => viewRef.current);
+  // The editor is built once, so its extension keeps the first render's
+  // handlers. These arrows close over a ref instead, so the extension always
+  // reaches the current controller even after the account loads.
+  const aiHandlersRef = useRef(ai.aiHandlers);
+  aiHandlersRef.current = ai.aiHandlers;
+  const [pricingOpen, setPricingOpen] = useState(false);
 
   const markdown = useDocumentStore((state) => state.markdown);
   const stats = useMemo(
@@ -148,6 +165,13 @@ export function EditorPane({
           },
           onRequestRender: () => handlers.current.onRequestRender?.(),
           onImageFiles: handleImageFiles,
+          ai: {
+            enabled: () => aiHandlersRef.current.enabled(),
+            onHintChange: (next) => aiHandlersRef.current.onHintChange(next),
+            onCommandFired: (context) =>
+              aiHandlersRef.current.onCommandFired(context),
+            apiRef: ai.editorApiRef,
+          },
         }),
       }),
     });
@@ -187,7 +211,12 @@ export function EditorPane({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div
+      ref={paneRef}
+      data-testid="editor-pane"
+      /* The AI surfaces anchor to this box, so it is their containing block. */
+      className="relative flex h-full min-h-0 flex-col"
+    >
       <div
         role="toolbar"
         aria-label="Editor formatting"
@@ -259,6 +288,37 @@ export function EditorPane({
 
       <div ref={containerRef} className="pm-editor min-h-0 flex-1" />
 
+      {ai.hint && (
+        <AiHintPopover
+          hint={ai.hint}
+          style={caretAnchorStyle(
+            viewRef.current,
+            ai.hint.from,
+            paneRef.current,
+          )}
+          onAccept={() => ai.editorApiRef.current?.acceptHint()}
+        />
+      )}
+
+      {ai.popup && ai.promptScope && ai.account && (
+        <AiPromptPopover
+          command={ai.popup.command}
+          scope={ai.promptScope}
+          ai={ai.account}
+          gate={ai.gate}
+          request={ai.request}
+          initialInstruction={ai.popup.instruction}
+          style={caretAnchorStyle(
+            viewRef.current,
+            ai.popup.at,
+            paneRef.current,
+          )}
+          onSubmit={ai.submit}
+          onCancel={ai.cancel}
+          onOpenPricing={() => setPricingOpen(true)}
+        />
+      )}
+
       {notice && (
         <p
           role="status"
@@ -289,6 +349,27 @@ export function EditorPane({
           handleImageFiles(files);
         }}
       />
+
+      {ai.review && ai.changeSet && (
+        // Keyed on the proposal's nonce: a Retry returns a new one, and the
+        // dialog's own state (which changes are checked, whether the long diff
+        // is expanded) must start fresh rather than carry over.
+        <AiReviewDialog
+          key={ai.review.nonce}
+          command={ai.review.command}
+          changeSet={ai.changeSet}
+          disabledReason={ai.acceptDisabledReason}
+          busy={ai.request.status === 'working'}
+          retryBlocked={ai.retryBlocked}
+          error={ai.request.status === 'error' ? ai.request.message : null}
+          onAccept={ai.accept}
+          onReject={ai.reject}
+          onRetry={ai.retry}
+          onEditPrompt={ai.editPrompt}
+        />
+      )}
+
+      {pricingOpen && <PricingModal onClose={() => setPricingOpen(false)} />}
     </div>
   );
 }

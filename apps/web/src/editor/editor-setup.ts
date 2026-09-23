@@ -20,6 +20,12 @@ import {
 import { tags as t } from '@lezer/highlight';
 import { isImageFile } from '../assets/ingest';
 import { insertLink, toggleBold, toggleItalic } from './markdown-commands';
+import {
+  createAiTriggerExtension,
+  type AiCommandFired,
+  type AiEditorApi,
+  type AiHint,
+} from './ai-trigger';
 
 /** Matches the engine's section splitter: a `///` marker alone on its line. */
 export function isPageBreakLine(text: string): boolean {
@@ -92,6 +98,13 @@ export interface EditorHandlers {
    *  (undefined for paste — the cursor). Image detection is a cheap pre-filter
    *  here; ingest validation has the final word. */
   onImageFiles(files: File[], pos?: number): void;
+  /** The `/ai` and `/ss` triggers (ai-transforms/05), when the pane wires them. */
+  ai?: {
+    enabled(): boolean;
+    onHintChange(hint: AiHint | null): void;
+    onCommandFired(context: AiCommandFired): void;
+    apiRef: { current: AiEditorApi | null };
+  };
 }
 
 /** Tags the pane's own dispatches that adopt markdown changed elsewhere (doc
@@ -107,6 +120,11 @@ function imageFiles(source: FileList | null | undefined): File[] {
 
 export function createEditorExtensions(handlers: EditorHandlers): Extension[] {
   return [
+    // The /ai and /ss triggers first: their Space/Tab/Enter bindings must win
+    // before the default keymaps (ai-transforms/05).
+    ...(handlers.ai
+      ? [createAiTriggerExtension(handlers.ai, handlers.ai.apiRef)]
+      : []),
     EditorView.lineWrapping,
     history(),
     drawSelection(),

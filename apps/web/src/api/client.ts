@@ -25,12 +25,17 @@ export class ApiError extends Error {
 export const FALLBACK_MESSAGE = 'Something went wrong.';
 export const FALLBACK_CODE = 'fallback';
 
-export function postJson(path: string, payload: unknown): Promise<Response> {
+export function postJson(
+  path: string,
+  payload: unknown,
+  signal?: AbortSignal,
+): Promise<Response> {
   return fetch(path, {
     method: 'POST',
     credentials: 'include',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
+    signal,
   });
 }
 

@@ -9,9 +9,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { logout, me, type MePayload } from './api';
+import { logout, me, setAiAccess, type MePayload } from './api';
 import type { AuthUser } from './api';
 import { LOCKED_FLAGS, type FeatureFlags } from './flags';
+import type { AiAccountState } from '../ai/types';
 
 /** The active Entitlement, as /api/me reports it; null without one. */
 export interface EntitlementState {
@@ -25,6 +26,14 @@ export function useFeatureFlags(): FeatureFlags {
   return useAccountStore((state) => state.flags);
 }
 
+/**
+ * The account store's selector for the AI state (ai-transforms/05). Null
+ * signed out; every AI surface reads this block rather than caching its own.
+ */
+export function useAiState(): AiAccountState | null {
+  return useAccountStore((state) => state.ai);
+}
+
 interface AccountState {
   user: AuthUser | null;
   entitlement: EntitlementState | null;
@@ -36,6 +45,8 @@ interface AccountState {
   quota: { used: number; limit: number } | null;
   /** The gated Inspector controls; locked until /api/me says otherwise. */
   flags: FeatureFlags;
+  /** The instance's and the caller's AI state; null signed out. */
+  ai: AiAccountState | null;
   /**
    * Set when a refresh re-locks a previously-active Entitlement (expiry or
    * revocation) while the user is still signed in — the graceful re-lock's
@@ -56,6 +67,12 @@ interface AccountState {
   /** Records a just-established session (login/register). */
   signedIn: (user: AuthUser) => void;
   signOut: () => Promise<void>;
+  /**
+   * Sets the caller's AI Access switch and stores the fresh `ai` block the
+   * server returns. Rejects (with the server's message) on failure, so the
+   * Account page can show it.
+   */
+  setAiAccess: (access: boolean) => Promise<void>;
   /** Clears the plan-ended notice once the user has seen it. */
   dismissPlanEndedNotice: () => void;
 }
@@ -67,6 +84,7 @@ function splitMe(payload: MePayload | null): {
   entitlement: EntitlementState | null;
   quota: { used: number; limit: number } | null;
   flags: FeatureFlags;
+  ai: AiAccountState | null;
 } {
   // The server pairs plan with a non-null expiry whenever an Entitlement is
   // active; anything else (signed out, or signed in without a plan) has no
@@ -81,6 +99,7 @@ function splitMe(payload: MePayload | null): {
     entitlement,
     quota: payload?.quota ?? null,
     flags: payload?.flags ?? LOCKED_FLAGS,
+    ai: payload?.ai ?? null,
   };
 }
 
@@ -116,6 +135,7 @@ export const useAccountStore = create<AccountState>()((set) => {
     entitlement: null,
     quota: null,
     flags: LOCKED_FLAGS,
+    ai: null,
     planEndedNotice: false,
     status: 'loading',
     load: () => {
@@ -140,8 +160,12 @@ export const useAccountStore = create<AccountState>()((set) => {
         entitlement: null,
         quota: null,
         flags: LOCKED_FLAGS,
+        ai: null,
         planEndedNotice: false,
       });
+    },
+    setAiAccess: async (access) => {
+      set({ ai: await setAiAccess(access) });
     },
     dismissPlanEndedNotice: () => set({ planEndedNotice: false }),
   };
@@ -154,6 +178,7 @@ export function resetAccountStoreForTests(): void {
     entitlement: null,
     quota: null,
     flags: LOCKED_FLAGS,
+    ai: null,
     planEndedNotice: false,
     status: 'loading',
   });
