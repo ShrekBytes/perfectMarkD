@@ -7,7 +7,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { errorFrom, postJson, ApiError } from '../api/client';
-import type { AiMarkdownResult, AiStylesheetResult, AiTarget } from './types';
+import type {
+  AiMarkdownResult,
+  AiPlanBrief,
+  AiPlanResult,
+  AiStylesheetResult,
+  AiTarget,
+} from './types';
 import type { StylesheetExchange } from './conversation';
 
 /** The client's name for the shared API error; its `code` names the gate. */
@@ -28,8 +34,11 @@ export type AiErrorCode =
 export interface MarkdownRequest {
   instruction: string;
   target: AiTarget;
-  /** The outline digest, when the rest of the Document was not sent (07). */
+  /** The rest of the Document: the outline digest when only part is sent, or
+   *  the whole remainder when it fit (07). */
   context?: string | null;
+  /** The approved plan, when this request is one step of an AI Plan run. */
+  plan?: AiPlanBrief | null;
 }
 
 export async function requestMarkdown(
@@ -47,11 +56,43 @@ export async function requestMarkdown(
         to: request.target.to,
       },
       context: request.context ?? null,
+      plan: request.plan ?? null,
     },
     signal,
   );
   if (!res.ok) throw await errorFrom(res);
   return (await res.json()) as AiMarkdownResult;
+}
+
+export interface PlanRequest {
+  instruction: string;
+  /** The outline digest, built locally from the Document's sections. */
+  outline: string;
+  /** The section labels the plan's steps are validated against. */
+  sections: string[];
+}
+
+/**
+ * Asks for an AI Plan (spec §Tier 2): the instruction and the outline digest,
+ * never the Document. The plan comes back for approval; nothing runs until the
+ * user approves it.
+ */
+export async function requestPlan(
+  request: PlanRequest,
+  signal?: AbortSignal,
+): Promise<AiPlanResult> {
+  const res = await postJson(
+    '/api/ai/markdown',
+    {
+      mode: 'plan',
+      instruction: request.instruction,
+      outline: request.outline,
+      sections: request.sections,
+    },
+    signal,
+  );
+  if (!res.ok) throw await errorFrom(res);
+  return (await res.json()) as AiPlanResult;
 }
 
 export interface StylesheetRequest {

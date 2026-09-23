@@ -5,6 +5,8 @@
 // invents a second vocabulary for the same state (spec §Data model).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { AiPlanBrief, AiPlanStep } from '@perfectmarkd/core';
+
 /** The two AI Actions (CONTEXT.md): `/ai` edits markdown; `/ss` edits the
  *  Custom Stylesheet. The kind also selects the route and the model. */
 export type AiCommand = 'markdown' | 'stylesheet';
@@ -21,6 +23,10 @@ export interface AiAccountState {
   disclosureSeen: boolean;
   /** The character cap one AI Action may send (spec §scope and size). */
   maxInputCharacters: number;
+  /** The output cap every request carries; the write cap derives from it. */
+  maxOutputTokens: number;
+  /** The model's window, which everything sent plus the reserve must fit. */
+  contextWindow: number;
   /** The AI Allowance this period's plan grants; zero without a plan. */
   allowance: number;
   /** AI Actions left this period. */
@@ -42,6 +48,8 @@ export const UNCONFIGURED_AI: AiAccountState = {
   access: true,
   disclosureSeen: false,
   maxInputCharacters: 60_000,
+  maxOutputTokens: 16_000,
+  contextWindow: 128_000,
   allowance: 0,
   remaining: 0,
   period: '1970-01',
@@ -65,16 +73,31 @@ export interface AiAnchoredEdit {
   replace: string;
 }
 
-/** What a completed AI Action produced, before review. */
-export type AiProposal =
+/** What an AI Action against markdown or the stylesheet produced, before
+ *  review: anchored edits, or a replacement of the target. */
+export type AiEditProposal =
   | { kind: 'anchored'; edits: AiAnchoredEdit[] }
   | { kind: 'replace'; text: string };
 
+/** Everything an AI Action can produce, before review. A plan is not a change
+ *  to review — it is the work list the user approves first (spec §Tier 2). */
+export type AiProposal = AiEditProposal | { kind: 'plan'; steps: AiPlanStep[] };
+
 /** The markdown route's success payload. */
 export interface AiMarkdownResult {
-  proposal: AiProposal;
+  proposal: AiEditProposal;
   remaining: number;
 }
+
+/** The plan request's success payload. */
+export interface AiPlanResult {
+  proposal: { kind: 'plan'; steps: AiPlanStep[] };
+  remaining: number;
+}
+
+// The plan's own shapes come from the shared module: the client and the server
+// approve, brief, and measure the same steps (spec §Tier 2).
+export type { AiPlanBrief, AiPlanStep };
 
 /** The stylesheet route's success payload (always a whole-CSS replacement). */
 export interface AiStylesheetResult {

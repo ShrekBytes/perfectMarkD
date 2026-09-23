@@ -53,6 +53,8 @@ function makeApp(
     provider?: AiProvider;
     burstPerMinute?: number;
     maxInputCharacters?: number;
+    maxOutputTokens?: number;
+    contextWindow?: number;
   } = {},
 ): { app: AppType; db: AppDatabase } {
   const { db, dir } = createTestDatabase();
@@ -76,6 +78,12 @@ function makeApp(
     ...(options.maxInputCharacters === undefined
       ? {}
       : { maxInputCharacters: options.maxInputCharacters }),
+    ...(options.maxOutputTokens === undefined
+      ? {}
+      : { maxOutputTokens: options.maxOutputTokens }),
+    ...(options.contextWindow === undefined
+      ? {}
+      : { contextWindow: options.contextWindow }),
   };
   setSetting(db, AI_PROVIDER_KEY, config);
   return { app, db };
@@ -600,5 +608,240 @@ describe('PUT /api/ai/access', () => {
     const { app } = makeApp();
     const res = await putJson(app, '/api/ai/access', { access: true });
     expect(res.status).toBe(401);
+  });
+});
+
+// ─── The AI Plan and its steps (ai-transforms/07) ───────────────────────────
+
+const OUTLINE = [
+  '- Introduction (h1, 40 words): The report opens with the problem.',
+  '- Methods (h2, 120 words): We ran three experiments.',
+].join('\n');
+
+const PLAN_SECTIONS = ['Introduction', 'Methods'];
+
+const PLAN_BODY = {
+  mode: 'plan',
+  instruction: 'Make it plainer',
+  outline: OUTLINE,
+  sections: PLAN_SECTIONS,
+};
+
+const PLAN_REPLY = [
+  '- Introduction: cut the problem statement to two sentences',
+  '- Methods: convert the experiment list into a table',
+].join('\n');
+
+describe('POST /api/ai/markdown — the AI Plan', () => {
+  it('returns the plan and counts one AI Action', async () => {
+    const calls: AiCompletionRequest[] = [];
+    const { app, db } = makeApp({
+      provider: fakeProvider(async (request) => {
+        calls.push(request);
+        return okReply(PLAN_REPLY);
+      }),
+    });
+    const { cookie, userId } = await paidUser(app, db);
+
+    const res = await postJson(app, '/api/ai/markdown', PLAN_BODY, cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      proposal: { kind: string; steps: unknown };
+      remaining: number;
+    };
+    expect(body.proposal).toEqual({
+      kind: 'plan',
+      steps: [
+        {
+          sectionIndex: 0,
+          heading: 'Introduction',
+          change: 'cut the problem statement to two sentences',
+        },
+        {
+          sectionIndex: 1,
+          heading: 'Methods',
+          change: 'convert the experiment list into a table',
+        },
+      ],
+    });
+    expect(body.remaining).toBe(99);
+    expect(await aiUsageCount(db, userId)).toBe(1);
+
+    // The plan was produced from the outline alone: no Document text is sent.
+    const sent = calls[0]!.messages.map((message) => message.content).join('\n');
+    expect(sent).toContain('The report opens with the problem.');
+    expect(sent).toContain('We ran three experiments.');
+    expect(sent).not.toContain('<document>');
+    expect(calls[0]?.messages[0]?.content).toContain('You plan edits');
+  });
+
+  it('refuses a plan that names a section nobody has, and counts nothing', async () => {
+    const { app, db } = makeApp({
+      provider: fakeProvider(async () => okReply('- Conclusion: tighten it')),
+    });
+    const { cookie, userId } = await paidUser(app, db);
+    const res = await postJson(app, '/api/ai/markdown', PLAN_BODY, cookie);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({
+      code: 'ai_invalid_response',
+    });
+    expect(await aiUsageCount(db, userId)).toBe(0);
+  });
+
+  it('refuses a truncated plan and counts nothing', async () => {
+    const { app, db } = makeApp({
+      provider: fakeProvider(async () => ({
+        text: PLAN_REPLY,
+        finishReason: 'length',
+      })),
+    });
+    const { cookie, userId } = await paidUser(app, db);
+    const res = await postJson(app, '/api/ai/markdown', PLAN_BODY, cookie);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ code: 'ai_truncated' });
+    expect(await aiUsageCount(db, userId)).toBe(0);
+  });
+
+  it('re-derives the size of the outline rather than trusting the client', async () => {
+    const { app, db } = makeApp({ maxInputCharacters: 10 });
+    const { cookie, userId } = await paidUser(app, db);
+    const res = await postJson(app, '/api/ai/markdown', PLAN_BODY, cookie);
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({
+      code: 'ai_input_too_long',
+      refusal: 'context_over_send_cap',
+    });
+    expect(await aiUsageCount(db, userId)).toBe(0);
+  });
+
+  it('requires an outline and a section list', async () => {
+    const { app, db } = makeApp();
+    const { cookie } = await paidUser(app, db);
+    const noOutline = await postJson(
+      app,
+      '/api/ai/markdown',
+      { ...PLAN_BODY, outline: '  ' },
+      cookie,
+    );
+    expect(noOutline.status).toBe(400);
+    const noSections = await postJson(
+      app,
+      '/api/ai/markdown',
+      { ...PLAN_BODY, sections: [] },
+      cookie,
+    );
+    expect(noSections.status).toBe(400);
+  });
+
+  it('resolves the gates before the provider for a plan too', async () => {
+    const { app, db } = makeApp();
+    const { cookie, userId } = await paidUser(app, db);
+    db.insert(aiUsage).values({ userId, period: PERIOD, count: 100 }).run();
+    const res = await postJson(app, '/api/ai/markdown', PLAN_BODY, cookie);
+    expect(res.status).toBe(402);
+    expect(await res.json()).toMatchObject({
+      code: 'ai_allowance_exhausted',
+    });
+  });
+});
+
+describe('POST /api/ai/markdown — a plan step', () => {
+  const STEP_BODY = {
+    instruction: 'Make it plainer',
+    target: {
+      kind: 'selection',
+      text: '## Methods\n\nWe ran three experiments.',
+      from: 0,
+      to: 37,
+    },
+    plan: {
+      index: 1,
+      steps: [
+        {
+          heading: 'Introduction',
+          change: 'cut the problem statement to two sentences',
+        },
+        {
+          heading: 'Methods',
+          change: 'convert the experiment list into a table',
+        },
+      ],
+    },
+  };
+
+  it('carries the plan as the shared brief and returns the step proposal', async () => {
+    const calls: AiCompletionRequest[] = [];
+    const { app, db } = makeApp({
+      provider: fakeProvider(async (request) => {
+        calls.push(request);
+        return okReply('## Methods\n\n| experiment | result |');
+      }),
+    });
+    const { cookie, userId } = await paidUser(app, db);
+
+    const res = await postJson(app, '/api/ai/markdown', STEP_BODY, cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      proposal: unknown;
+      remaining: number;
+    };
+    expect(body.proposal).toEqual({
+      kind: 'replace',
+      text: '## Methods\n\n| experiment | result |',
+    });
+    expect(body.remaining).toBe(99);
+    expect(await aiUsageCount(db, userId)).toBe(1);
+
+    const sent = calls[0]!.messages.map((message) => message.content).join('\n');
+    expect(sent).toContain('step 2 of 2 of a plan');
+    expect(sent).toContain('1. Introduction: cut the problem statement');
+    expect(sent).toContain('2. Methods: convert the experiment list');
+    expect(sent).toContain('Carry out step 2 only');
+  });
+
+  it('refuses a malformed plan brief', async () => {
+    const { app, db } = makeApp();
+    const { cookie } = await paidUser(app, db);
+    const res = await postJson(
+      app,
+      '/api/ai/markdown',
+      { ...STEP_BODY, plan: { index: 5, steps: [{ heading: 'One', change: 'x' }] } },
+      cookie,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('counts the brief toward the window, not the send cap', async () => {
+    // The brief is overhead the user did not choose: a section that fits is
+    // not refused because the plan it belongs to is long. It still has to fit
+    // the window with everything else.
+    const { app, db } = makeApp({ maxInputCharacters: 40 });
+    const { cookie, userId } = await paidUser(app, db);
+    expect(
+      (await postJson(app, '/api/ai/markdown', STEP_BODY, cookie)).status,
+    ).toBe(200);
+
+    setSetting(db, AI_PROVIDER_KEY, {
+      ...DEFAULT_AI_PROVIDER_CONFIG,
+      model: 'vendor/model',
+      maxOutputTokens: 40,
+      contextWindow: 100,
+    });
+    const res = await postJson(app, '/api/ai/markdown', STEP_BODY, cookie);
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({ refusal: 'send_over_window' });
+    // Only the step that was accepted was counted.
+    expect(await aiUsageCount(db, userId)).toBe(1);
+  });
+
+  it('refuses a step whose section is past the write cap', async () => {
+    const { app, db } = makeApp({ maxOutputTokens: 8 });
+    const { cookie, userId } = await paidUser(app, db);
+    const res = await postJson(app, '/api/ai/markdown', STEP_BODY, cookie);
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({
+      refusal: 'target_over_write_cap',
+    });
+    expect(await aiUsageCount(db, userId)).toBe(0);
   });
 });

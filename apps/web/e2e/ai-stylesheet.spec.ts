@@ -38,6 +38,8 @@ const PRO_AI_ME = {
     access: true,
     disclosureSeen: true,
     maxInputCharacters: 60_000,
+    maxOutputTokens: 16_000,
+    contextWindow: 128_000,
     allowance: 100,
     remaining: 100,
     period: '2026-09',

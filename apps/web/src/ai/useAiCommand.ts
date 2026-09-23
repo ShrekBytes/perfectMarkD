@@ -1,12 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// The AI Action controller for the editor (ai-transforms/05): owns the popup
-// and review state, resolves the AI Scope from the live editor, calls the
-// route, and applies an accepted proposal through the editor's one-edit path.
+// The AI Action controller for the editor (ai-transforms/05, extended by 07):
+// owns the popup, the plan, and the review state, resolves the AI Scope from
+// the live editor, calls the route, and applies an accepted proposal through
+// the editor's one-edit path.
 //
 // It reads AI state from the account store and holds none of its own
 // (spec §Data model). A refused, failed, or truncated Action leaves the
 // Document and the allowance alone; only a usable proposal becomes an AI
 // Proposal in the review dialog.
+//
+// The size ladder runs here, from the shared module, and decides what the
+// popup offers: everything, the target plus an outline of the rest, an AI
+// Plan, or a refusal with the paragraph around the caret offered instead
+// (ai-transforms/07, spec §Scope, the size ladder).
 //
 // `/ss` is the same interaction aimed at the Custom Stylesheet, so its turns
 // join the per-Document conversation the Stylesheet tab shows
@@ -15,13 +21,26 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useRef, useState } from 'react';
-import { resolveAiScope, type AiScope } from '@perfectmarkd/core';
+import {
+  aiBudgets,
+  buildOutlineDigest,
+  checkAiSendSize,
+  decideAiLadder,
+  extractSections,
+  findPlanStepSection,
+  planBriefText,
+  resolveAiScope,
+  resolveParagraphRange,
+  sectionLabels,
+  type AiLadderDecision,
+  type AiScope,
+} from '@perfectmarkd/core';
 import type { EditorView } from '@codemirror/view';
 import { errorToMessage } from '../api/client';
 import { useDocumentStore } from '../documents/store';
 import { useAccountStore, useAiState } from '../auth/account-store';
 import { applyStylesheetProposal } from '../inspector/settings-edit';
-import { requestMarkdown, requestStylesheet } from './api';
+import { requestMarkdown, requestPlan, requestStylesheet } from './api';
 import {
   recentExchanges,
   turnsFor,
@@ -34,9 +53,15 @@ import {
   isProposalStale,
   type AiChangeSet,
 } from './proposal';
+import { planBrief, planSummary, type AiPlanState } from './plan';
 import type { AiEditorApi } from '../editor/ai-trigger';
 import type { AiHint, AiCommandFired } from '../editor/ai-trigger';
-import type { AiAccountState, AiCommand, AiProposal, AiTarget } from './types';
+import type {
+  AiAccountState,
+  AiCommand,
+  AiEditProposal,
+  AiTarget,
+} from './types';
 import type { AiPromptGate, AiRequestState } from './AiPromptPopover';
 
 /** The prompt popup's state: the command, and what Esc must put back. */
@@ -53,7 +78,7 @@ export interface AiPopupState {
 export interface AiReviewState {
   command: AiCommand;
   target: AiTarget;
-  proposal: AiProposal;
+  proposal: AiEditProposal;
   instruction: string;
   removed: string;
   at: number;
@@ -63,6 +88,8 @@ export interface AiReviewState {
    */
   docId: string | null;
   turnId: number | null;
+  /** Set when this proposal is one step of an approved AI Plan. */
+  plan: { at: number; total: number } | null;
   /**
    * Bumped per proposal so the dialog's own state (which changes are checked,
    * whether the long diff is expanded) resets when a Retry returns a new one.
@@ -78,6 +105,7 @@ export interface AiCommandController {
     enabled(): boolean;
     onHintChange(hint: AiHint | null): void;
     onCommandFired(context: AiCommandFired): void;
+    onSelectionChange(): void;
   };
   /** The instance's and the caller's AI state, or null signed out. */
   account: AiAccountState | null;
@@ -89,9 +117,13 @@ export interface AiCommandController {
   hint: AiHint | null;
   popup: AiPopupState | null;
   promptScope: AiScope | null;
+  /** The size ladder's decision for the open popup; null for `/ss`. */
+  ladder: AiLadderDecision | null;
   gate: AiPromptGate;
   request: AiRequestState;
   review: AiReviewState | null;
+  /** The AI Plan awaiting approval, running, or just finished. */
+  plan: AiPlanState | null;
   /** The review's diff, ready to render; null when nothing is under review. */
   changeSet: AiChangeSet | null;
   /** Whether the review's target changed underneath it. */
@@ -101,11 +133,19 @@ export interface AiCommandController {
   /** Whether a Retry is running, or the allowance is spent so it cannot start. */
   retryBlocked: boolean;
   submit(instruction: string): void;
+  /** Asks for an AI Plan instead of running a whole-Document action. */
+  submitPlan(instruction: string): void;
+  /** Works on the paragraph around the caret instead of the refused target. */
+  useParagraphRange(): void;
   cancel(): void;
   accept(checked: ReadonlySet<number>): void;
   reject(): void;
   retry(): void;
   editPrompt(): void;
+  approvePlan(checked: ReadonlySet<number>): void;
+  discardPlan(): void;
+  stopPlan(): void;
+  closePlan(): void;
 }
 
 export function useAiCommand(
@@ -115,12 +155,18 @@ export function useAiCommand(
   const [hint, setHint] = useState<AiHint | null>(null);
   const [popup, setPopup] = useState<AiPopupState | null>(null);
   const [promptScope, setPromptScope] = useState<AiScope | null>(null);
+  const [ladder, setLadder] = useState<AiLadderDecision | null>(null);
   const [request, setRequest] = useState<AiRequestState>({ status: 'idle' });
   const [review, setReview] = useState<AiReviewState | null>(null);
+  const [plan, setPlan] = useState<AiPlanState | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const editorApiRef = useRef<AiEditorApi | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const nonceRef = useRef(0);
+  // The run's own state, readable from an async continuation without the
+  // closure that started it having gone stale.
+  const planRef = useRef<AiPlanState | null>(null);
+  planRef.current = plan;
   // Re-render when the Document changes so staleness is recomputed live.
   const markdown = useDocumentStore((state) => state.markdown);
   const settings = useDocumentStore((state) => state.settings);
@@ -134,6 +180,11 @@ export function useAiCommand(
   const foreignReview =
     review !== null && review.docId !== null && review.docId !== activeId;
 
+  const documentText = useCallback((): string => {
+    const view = getEditor();
+    return view ? view.state.doc.toString() : useDocumentStore.getState().markdown;
+  }, [getEditor]);
+
   const computeScope = useCallback(
     (command: AiCommand): AiScope => {
       if (command === 'stylesheet') {
@@ -143,16 +194,29 @@ export function useAiCommand(
         );
       }
       const view = getEditor();
-      const text = view
-        ? view.state.doc.toString()
-        : useDocumentStore.getState().markdown;
+      const text = documentText();
       const selection = view ? view.state.selection.main : null;
       return resolveAiScope(
         text,
         selection ? { from: selection.from, to: selection.to } : null,
       );
     },
-    [getEditor],
+    [documentText, getEditor],
+  );
+
+  /** The size ladder over the Document, the target, and the account's budgets. */
+  const decideFor = useCallback(
+    (command: AiCommand, scope: AiScope): AiLadderDecision | null => {
+      if (command !== 'markdown' || !account) return null;
+      const view = getEditor();
+      return decideAiLadder({
+        documentText: documentText(),
+        target: scope,
+        budgets: aiBudgets(account),
+        cursor: view ? view.state.selection.main.head : null,
+      });
+    },
+    [account, documentText, getEditor],
   );
 
   // Step 1 (not configured) and step 3 (AI Access off) both mean the commands
@@ -188,10 +252,24 @@ export function useAiCommand(
         at: context.at,
         instruction: '',
       });
-      setPromptScope(computeScope(context.command));
+      const scope = computeScope(context.command);
+      setPromptScope(scope);
+      setLadder(decideFor(context.command, scope));
     },
-    [commandsEnabled, computeScope],
+    [commandsEnabled, computeScope, decideFor],
   );
+
+  /**
+   * The target follows the editor: a selection made while the popup is open
+   * becomes the target, and the ladder is re-decided for it, so what the
+   * readout says is what the request sends.
+   */
+  const onSelectionChange = useCallback(() => {
+    if (!popup || request.status === 'working') return;
+    const scope = computeScope(popup.command);
+    setPromptScope(scope);
+    setLadder(decideFor(popup.command, scope));
+  }, [computeScope, decideFor, popup, request.status]);
 
   /**
    * Runs one AI Action. The anchor (what the trigger removed and where) is
@@ -204,12 +282,33 @@ export function useAiCommand(
       command: AiCommand,
       instruction: string,
       anchor: { removed: string; at: number },
+      /** The scope the popup is showing. It is passed in rather than resolved
+       *  again, so the request sends exactly what the readout said — a scope
+       *  narrowed to a paragraph, or to a selection, would otherwise be
+       *  re-resolved to the whole Document on submit. */
+      shown?: AiScope,
     ) => {
       setRequest({ status: 'working' });
       setApplyError(null);
       const controller = new AbortController();
       abortRef.current = controller;
-      const scope = computeScope(command);
+      const scope = shown ?? computeScope(command);
+      // The ladder decides what is sent. A refused target never reaches the
+      // route — the popup says why and offers the paragraph instead.
+      const decision = decideFor(command, scope);
+      if (decision !== null && decision.tier === 3) {
+        abortRef.current = null;
+        setRequest({ status: 'error', message: decision.refusal.message });
+        return;
+      }
+      const context =
+        decision === null
+          ? null
+          : decision.tier === 0
+            ? decision.context
+            : decision.tier === 1
+              ? decision.digest
+              : null;
       const target: AiTarget = {
         kind: scope.kind,
         text: scope.text,
@@ -234,7 +333,7 @@ export function useAiCommand(
         }
       };
       try {
-        let proposal: AiProposal;
+        let proposal: AiEditProposal;
         if (command === 'stylesheet') {
           const result = await requestStylesheet(
             { instruction, css: target.text, history },
@@ -254,7 +353,10 @@ export function useAiCommand(
           }
         } else {
           proposal = (
-            await requestMarkdown({ instruction, target }, controller.signal)
+            await requestMarkdown(
+              { instruction, target, context },
+              controller.signal,
+            )
           ).proposal;
           if (controller.signal.aborted) return;
         }
@@ -269,6 +371,7 @@ export function useAiCommand(
           at: anchor.at,
           docId,
           turnId,
+          plan: null,
           nonce: nonceRef.current,
         });
         setPopup(null);
@@ -292,19 +395,252 @@ export function useAiCommand(
         void useAccountStore.getState().refresh();
       }
     },
-    [computeScope],
+    [computeScope, decideFor],
   );
 
   const submit = useCallback(
     (instruction: string) => {
-      if (!popup) return;
-      void beginRequest(popup.command, instruction, {
-        removed: popup.removed,
-        at: popup.at,
-      });
+      if (!popup || !promptScope) return;
+      void beginRequest(
+        popup.command,
+        instruction,
+        { removed: popup.removed, at: popup.at },
+        promptScope,
+      );
     },
-    [beginRequest, popup],
+    [beginRequest, popup, promptScope],
   );
+
+  // ─── The AI Plan ──────────────────────────────────────────────────────────
+
+  /**
+   * Runs one plan step: resolves its section against the Document as it stands
+   * now, then asks for that step's own proposal. Everything that can stop the
+   * run stops it here, before an AI Action is spent, and says what remains.
+   */
+  const runPlanStep = useCallback(
+    async (state: AiPlanState, at: number) => {
+      const step = state.steps[at]!;
+      const stop = (note: string) => {
+        setRequest({ status: 'idle' });
+        setPlan({ ...state, phase: 'stopped', at, note });
+      };
+      if (useDocumentStore.getState().activeId !== state.docId) {
+        return stop(
+          planSummary(state, 'That plan belongs to another document.'),
+        );
+      }
+      const section = findPlanStepSection(
+        extractSections(documentText()),
+        step,
+      );
+      if (section === null) {
+        return stop(
+          planSummary(
+            state,
+            'That section is no longer in the document, so the plan stopped.',
+          ),
+        );
+      }
+      const current = useAccountStore.getState().ai;
+      if (current !== null && current.remaining <= 0) {
+        return stop(
+          planSummary(state, 'You have used all your AI Actions this period.'),
+        );
+      }
+
+
+      // A section too large for one Action is refused before anything is spent
+      // (spec §Tier 3): the plan stops and says what remains. A step sends its
+      // own section, its brief, and nothing else — no digest, no rest of the
+      // Document — so it is measured on its own, not through the ladder's
+      // wider tiers, and by the same shared check the server will run.
+      const brief = planBriefText(planBrief(state.steps, at));
+      const check = current
+        ? checkAiSendSize({
+            instruction: state.instruction,
+            targetText: section.text,
+            brief,
+            budgets: aiBudgets(current),
+          })
+        : { ok: true as const };
+      if (!check.ok) {
+        return stop(planSummary(state, check.refusal.message));
+      }
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setRequest({ status: 'working' });
+      try {
+        const result = await requestMarkdown(
+          {
+            instruction: state.instruction,
+            target: {
+              kind: 'selection',
+              text: section.text,
+              from: section.from,
+              to: section.to,
+            },
+            plan: planBrief(state.steps, at),
+          },
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
+        abortRef.current = null;
+        nonceRef.current += 1;
+        setPlan({ ...state, phase: 'running', at });
+        setReview({
+          command: 'markdown',
+          target: {
+            kind: 'selection',
+            text: section.text,
+            from: section.from,
+            to: section.to,
+          },
+          proposal: result.proposal,
+          instruction: state.instruction,
+          removed: '',
+          at: section.from,
+          docId: state.docId,
+          turnId: null,
+          plan: { at, total: state.steps.length },
+          nonce: nonceRef.current,
+        });
+        setRequest({ status: 'idle' });
+        void useAccountStore.getState().refresh();
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        abortRef.current = null;
+        stop(planSummary(state, errorToMessage(cause)));
+        void useAccountStore.getState().refresh();
+      }
+    },
+    [documentText],
+  );
+
+  /** Decides one step and moves the run on: accept keeps it, reject skips it. */
+  const advancePlan = useCallback(
+    (state: AiPlanState, at: number, accepted: boolean) => {
+      const next: AiPlanState = {
+        ...state,
+        at: at + 1,
+        accepted: state.accepted + (accepted ? 1 : 0),
+        rejected: state.rejected + (accepted ? 0 : 1),
+      };
+      if (next.at >= next.steps.length) {
+        setPlan({
+          ...next,
+          phase: 'finished',
+          note: planSummary(next, 'Plan finished.'),
+        });
+        return;
+      }
+      void runPlanStep(next, next.at);
+    },
+    [runPlanStep],
+  );
+
+  const submitPlan = useCallback(
+    (instruction: string) => {
+      if (!popup) return;
+      // A plan belongs to the Document it was planned from, and there is
+      // always one while the editor is open.
+      const docId = useDocumentStore.getState().activeId;
+      if (docId === null) return;
+      const text = documentText();
+      const sections = extractSections(text);
+      setRequest({ status: 'working' });
+      setApplyError(null);
+      const controller = new AbortController();
+      abortRef.current = controller;
+      void (async () => {
+        try {
+          const result = await requestPlan(
+            {
+              instruction,
+              outline: buildOutlineDigest(sections),
+              sections: sectionLabels(sections),
+            },
+            controller.signal,
+          );
+          if (controller.signal.aborted) return;
+          abortRef.current = null;
+          nonceRef.current += 1;
+          setPopup(null);
+          setPromptScope(null);
+          setLadder(null);
+          setPlan({
+            docId,
+            instruction,
+            steps: result.proposal.steps,
+            phase: 'approving',
+            at: 0,
+            accepted: 0,
+            rejected: 0,
+            note: null,
+            nonce: nonceRef.current,
+          });
+          setRequest({ status: 'idle' });
+          void useAccountStore.getState().refresh();
+        } catch (cause) {
+          if (controller.signal.aborted) return;
+          abortRef.current = null;
+          setRequest({ status: 'error', message: errorToMessage(cause) });
+          void useAccountStore.getState().refresh();
+        }
+      })();
+    },
+    [documentText, popup],
+  );
+
+  /** Approves the checked steps and starts the run. A plan never auto-runs. */
+  const approvePlan = useCallback(
+    (checked: ReadonlySet<number>) => {
+      const state = planRef.current;
+      if (!state || state.phase !== 'approving') return;
+      const steps = state.steps.filter((_, index) => checked.has(index));
+      if (steps.length === 0) return;
+      const next: AiPlanState = {
+        ...state,
+        steps,
+        phase: 'running',
+        at: 0,
+        accepted: 0,
+        rejected: 0,
+        note: null,
+      };
+      setPlan(next);
+      void runPlanStep(next, 0);
+    },
+    [runPlanStep],
+  );
+
+  const discardPlan = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setPlan(null);
+    setRequest({ status: 'idle' });
+  }, []);
+
+  /** Stops the run: what was accepted stays applied, and the summary says
+   *  what remains (spec §Tier 2). */
+  const stopPlan = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    const state = planRef.current;
+    setReview(null);
+    setApplyError(null);
+    setRequest({ status: 'idle' });
+    if (!state) return;
+    setPlan({ ...state, phase: 'stopped', note: planSummary(state, 'Stopped.') });
+  }, []);
+
+  const closePlan = useCallback(() => {
+    setPlan(null);
+    getEditor()?.focus();
+  }, [getEditor]);
+
+  // ─── The rest of the interaction ──────────────────────────────────────────
 
   /** Esc, or Close: abort anything running and restore exactly what was removed. */
   const cancel = useCallback(() => {
@@ -315,8 +651,25 @@ export function useAiCommand(
     }
     setPopup(null);
     setPromptScope(null);
+    setLadder(null);
     setRequest({ status: 'idle' });
   }, [popup]);
+
+  /** Works on the paragraph around the caret instead of the refused target. */
+  const useParagraphRange = useCallback(() => {
+    if (!popup) return;
+    const view = getEditor();
+    const text = documentText();
+    const range = resolveParagraphRange(
+      text,
+      view ? view.state.selection.main.head : null,
+    );
+    if (range === null) return;
+    const scope = resolveAiScope(text, range);
+    setPromptScope(scope);
+    setLadder(decideFor(popup.command, scope));
+    setRequest({ status: 'idle' });
+  }, [decideFor, documentText, getEditor, popup]);
 
   const accept = useCallback(
     (checked: ReadonlySet<number>) => {
@@ -326,6 +679,8 @@ export function useAiCommand(
         setApplyError(applied.reason);
         return;
       }
+      const stepPlan = review.plan;
+      const state = planRef.current;
       if (review.command === 'stylesheet') {
         useDocumentStore.getState().updateActive({
           settings: applyStylesheetProposal(applied.text),
@@ -359,28 +714,42 @@ export function useAiCommand(
       }
       setReview(null);
       setApplyError(null);
+      if (state && stepPlan) advancePlan(state, stepPlan.at, true);
     },
-    [foreignReview, getEditor, review],
+    [advancePlan, foreignReview, getEditor, review],
   );
 
   const reject = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     if (review) decideTurn(review, 'rejected');
+    const stepPlan = review?.plan ?? null;
+    const state = planRef.current;
     setReview(null);
     setApplyError(null);
     setRequest({ status: 'idle' });
     getEditor()?.focus();
-  }, [getEditor, review]);
+    // Rejecting a step skips it and the run moves on: the steps are decided
+    // one at a time, and stopping the run is its own action.
+    if (state && stepPlan) advancePlan(state, stepPlan.at, false);
+  }, [advancePlan, getEditor, review]);
 
-  /** Retry: a fresh AI Action with the same prompt, in place. */
+  /** Retry: a fresh AI Action for the same prompt, in place. A plan step is
+   *  re-resolved against the Document, so a section that moved is followed. */
   const retry = useCallback(() => {
     if (!review) return;
+    const stepPlan = review.plan;
+    const state = planRef.current;
+    if (state && stepPlan) {
+      setReview(null);
+      void runPlanStep(state, stepPlan.at);
+      return;
+    }
     void beginRequest(review.command, review.instruction, {
       removed: review.removed,
       at: review.at,
     });
-  }, [beginRequest, review]);
+  }, [beginRequest, review, runPlanStep]);
 
   /** Edit prompt: back to the popup with the prompt intact. */
   const editPrompt = useCallback(() => {
@@ -396,17 +765,21 @@ export function useAiCommand(
       at: review.at,
       instruction: review.instruction,
     });
-    setPromptScope(computeScope(review.command));
+    const scope = computeScope(review.command);
+    setPromptScope(scope);
+    setLadder(decideFor(review.command, scope));
     setRequest({ status: 'idle' });
-  }, [computeScope, review]);
+  }, [computeScope, decideFor, review]);
 
-  // Staleness for the review dialog: the target text as it stands now. A
-  // foreign review is not checked against the open Document — its reason is
-  // the Document mismatch itself.
+  // Staleness for the review dialog: the text as it stands now. The checker
+  // slices the target's own range out of what it is given, so it gets the
+  // whole Document — passing a pre-sliced range made every target that does
+  // not start at offset 0 read as changed. A foreign review is not checked
+  // against the open Document; its reason is the Document mismatch itself.
   const currentTargetText = review
     ? review.command === 'stylesheet'
       ? settings.customStylesheet
-      : markdown.slice(review.target.from, review.target.to)
+      : markdown
     : '';
   const stale =
     review && !foreignReview
@@ -446,25 +819,34 @@ export function useAiCommand(
       enabled: () => commandsEnabledRef.current,
       onHintChange,
       onCommandFired,
+      onSelectionChange,
     },
     account,
     commandsEnabled,
     hint,
     popup,
     promptScope,
+    ladder,
     gate,
     request,
     review,
+    plan,
     changeSet,
     stale,
     acceptDisabledReason,
     retryBlocked,
     submit,
+    submitPlan,
+    useParagraphRange,
     cancel,
     accept,
     reject,
     retry,
     editPrompt,
+    approvePlan,
+    discardPlan,
+    stopPlan,
+    closePlan,
   };
 }
 

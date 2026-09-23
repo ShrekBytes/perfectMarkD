@@ -7,6 +7,7 @@ import { MAX_ASSET_BYTES } from '../assets/ingest';
 import { useDocumentStore } from '../documents/store';
 import { caretAnchorStyle } from '../ai/anchor';
 import { AiHintPopover } from '../ai/AiHintPopover';
+import { AiPlanDialog } from '../ai/AiPlanDialog';
 import { AiPromptPopover } from '../ai/AiPromptPopover';
 import { AiReviewDialog } from '../ai/AiReviewDialog';
 import { useAiCommand } from '../ai/useAiCommand';
@@ -168,6 +169,7 @@ export function EditorPane({
           ai: {
             enabled: () => aiHandlersRef.current.enabled(),
             onHintChange: (next) => aiHandlersRef.current.onHintChange(next),
+            onSelectionChange: () => aiHandlersRef.current.onSelectionChange(),
             onCommandFired: (context) =>
               aiHandlersRef.current.onCommandFired(context),
             apiRef: ai.editorApiRef,
@@ -306,6 +308,7 @@ export function EditorPane({
           scope={ai.promptScope}
           ai={ai.account}
           gate={ai.gate}
+          ladder={ai.ladder}
           request={ai.request}
           initialInstruction={ai.popup.instruction}
           style={caretAnchorStyle(
@@ -314,8 +317,26 @@ export function EditorPane({
             paneRef.current,
           )}
           onSubmit={ai.submit}
+          onPlan={ai.submitPlan}
+          onUseParagraphRange={ai.useParagraphRange}
           onCancel={ai.cancel}
           onOpenPricing={() => setPricingOpen(true)}
+        />
+      )}
+
+      {/* The AI Plan's surface, and the review dialog's, never share the
+          screen: a step's proposal is the only modal while it is under
+          review, and the plan's progress shows between steps. */}
+      {ai.plan && !ai.review && (
+        <AiPlanDialog
+          key={ai.plan.nonce}
+          plan={ai.plan}
+          remaining={ai.account?.remaining ?? 0}
+          busy={ai.request.status === 'working'}
+          onApprove={ai.approvePlan}
+          onDiscard={ai.discardPlan}
+          onStop={ai.stopPlan}
+          onClose={ai.closePlan}
         />
       )}
 
@@ -362,6 +383,11 @@ export function EditorPane({
           busy={ai.request.status === 'working'}
           retryBlocked={ai.retryBlocked}
           error={ai.request.status === 'error' ? ai.request.message : null}
+          plan={
+            ai.review.plan
+              ? { ...ai.review.plan, onStop: ai.stopPlan }
+              : null
+          }
           onAccept={ai.accept}
           onReject={ai.reject}
           onRetry={ai.retry}

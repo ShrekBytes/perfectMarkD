@@ -103,6 +103,7 @@ export interface EditorHandlers {
     enabled(): boolean;
     onHintChange(hint: AiHint | null): void;
     onCommandFired(context: AiCommandFired): void;
+    onSelectionChange(): void;
     apiRef: { current: AiEditorApi | null };
   };
 }

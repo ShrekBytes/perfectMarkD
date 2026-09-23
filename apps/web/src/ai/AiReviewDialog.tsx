@@ -35,6 +35,11 @@ interface AiReviewDialogProps {
   retryBlocked: boolean;
   /** A Retry failed; shown inline, naming nothing about the provider. */
   error: string | null;
+  /**
+   * Set when this proposal is one step of an approved AI Plan: the step's
+   * place in the run, and the way to stop it (ai-transforms/07).
+   */
+  plan: { at: number; total: number; onStop: () => void } | null;
   onAccept: (checked: ReadonlySet<number>) => void;
   onReject: () => void;
   onRetry: () => void;
@@ -74,6 +79,7 @@ export function AiReviewDialog({
   busy,
   retryBlocked,
   error,
+  plan,
   onAccept,
   onReject,
   onRetry,
@@ -146,6 +152,16 @@ export function AiReviewDialog({
             ? 'Nothing is written to your stylesheet until you accept. The paper is showing this proposal in the meantime.'
             : 'Nothing is written to your Document until you accept, and an accepted proposal is one undo step.'}
         </p>
+
+        {plan !== null && (
+          <p
+            data-testid="ai-review-plan-step"
+            className="mt-1 text-[11px] leading-4 text-ink-faint"
+          >
+            Step {plan.at + 1} of {plan.total} of your plan. Reject skips this
+            step and moves to the next one.
+          </p>
+        )}
 
         <ul className="mt-3 max-h-[55vh] overflow-y-auto pr-1">
           {visible.map((change) => (
@@ -220,14 +236,25 @@ export function AiReviewDialog({
             >
               Retry
             </button>
-            <button
-              type="button"
-              onClick={onEditPrompt}
-              disabled={retryBlocked || busy}
-              className="touch-target inline-flex h-8 items-center rounded-control px-2 text-xs font-medium text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Edit prompt
-            </button>
+            {plan === null && (
+              <button
+                type="button"
+                onClick={onEditPrompt}
+                disabled={retryBlocked || busy}
+                className="touch-target inline-flex h-8 items-center rounded-control px-2 text-xs font-medium text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Edit prompt
+              </button>
+            )}
+            {plan !== null && (
+              <button
+                type="button"
+                onClick={plan.onStop}
+                className="touch-target inline-flex h-8 items-center rounded-control px-2 text-xs font-medium text-ink-soft outline-offset-2 outline-accent transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+              >
+                Stop the plan
+              </button>
+            )}
           </div>
         </div>
       </div>

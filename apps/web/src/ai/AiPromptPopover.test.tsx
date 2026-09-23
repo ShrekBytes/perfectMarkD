@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AiScope } from '@perfectmarkd/core';
+import type { AiLadderDecision, AiScope } from '@perfectmarkd/core';
 import { AiPromptPopover, type AiPromptGate } from './AiPromptPopover';
 import { UNCONFIGURED_AI, type AiAccountState } from './types';
 
@@ -39,12 +39,17 @@ function show(
     request?:
       { status: 'idle' | 'working' } | { status: 'error'; message: string };
     initialInstruction?: string;
+    ladder?: AiLadderDecision | null;
     onSubmit?: (instruction: string) => void;
+    onPlan?: (instruction: string) => void;
+    onUseParagraphRange?: () => void;
     onCancel?: () => void;
     onOpenPricing?: () => void;
   } = {},
 ) {
   const onSubmit = options.onSubmit ?? vi.fn();
+  const onPlan = options.onPlan ?? vi.fn();
+  const onUseParagraphRange = options.onUseParagraphRange ?? vi.fn();
   const onCancel = options.onCancel ?? vi.fn();
   const onOpenPricing = options.onOpenPricing ?? vi.fn();
   render(
@@ -53,15 +58,18 @@ function show(
       scope={scope}
       ai={options.state ?? ai()}
       gate={options.gate ?? 'ready'}
+      ladder={options.ladder ?? null}
       request={options.request ?? { status: 'idle' }}
       initialInstruction={options.initialInstruction}
       style={{}}
       onSubmit={onSubmit}
+      onPlan={onPlan}
+      onUseParagraphRange={onUseParagraphRange}
       onCancel={onCancel}
       onOpenPricing={onOpenPricing}
     />,
   );
-  return { onSubmit, onCancel, onOpenPricing };
+  return { onSubmit, onPlan, onUseParagraphRange, onCancel, onOpenPricing };
 }
 
 describe('the ready state', () => {
@@ -87,9 +95,12 @@ describe('the ready state', () => {
         }}
         ai={ai()}
         gate="ready"
+        ladder={null}
         request={{ status: 'idle' }}
         style={{}}
         onSubmit={vi.fn()}
+        onPlan={vi.fn()}
+        onUseParagraphRange={vi.fn()}
         onCancel={vi.fn()}
         onOpenPricing={vi.fn()}
       />,
@@ -237,5 +248,184 @@ describe('dismissal', () => {
     const { onCancel } = show();
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onCancel).toHaveBeenCalled();
+  });
+});
+
+describe('the size ladder', () => {
+  const selectionScope: AiScope = { ...scope, kind: 'selection' };
+
+  it('says the rest of the document is sent when everything fits', () => {
+    show({
+      ladder: { tier: 0, kind: 'all', characters: 11, context: 'the rest' },
+    });
+    expect(screen.getByTestId('ai-ladder')).toHaveTextContent(
+      'The rest of the document is sent with it',
+    );
+  });
+
+  it('says only part of the document is sent, and how much of it', () => {
+    render(
+      <AiPromptPopover
+        command="markdown"
+        scope={selectionScope}
+        ai={ai()}
+        gate="ready"
+        ladder={{
+          tier: 1,
+          kind: 'partial',
+          digest: '- Two (h2, 40 words): filler',
+          otherSections: 4,
+          characters: 11,
+        }}
+        request={{ status: 'idle' }}
+        style={{}}
+        onSubmit={vi.fn()}
+        onPlan={vi.fn()}
+        onUseParagraphRange={vi.fn()}
+        onCancel={vi.fn()}
+        onOpenPricing={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('ai-ladder')).toHaveTextContent(
+      'this selection in full, plus an outline of the other 4 sections',
+    );
+  });
+
+  it('does not claim an outline when the Document is one section', () => {
+    render(
+      <AiPromptPopover
+        command="markdown"
+        scope={selectionScope}
+        ai={ai()}
+        gate="ready"
+        ladder={{
+          tier: 1,
+          kind: 'partial',
+          digest: '',
+          otherSections: 0,
+          characters: 11,
+        }}
+        request={{ status: 'idle' }}
+        style={{}}
+        onSubmit={vi.fn()}
+        onPlan={vi.fn()}
+        onUseParagraphRange={vi.fn()}
+        onCancel={vi.fn()}
+        onOpenPricing={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('ai-ladder')).toHaveTextContent(
+      'Only this selection is sent',
+    );
+    expect(screen.getByTestId('ai-ladder')).not.toHaveTextContent('outline');
+  });
+
+  it('does not claim an outline when the Document is one section', () => {
+    render(
+      <AiPromptPopover
+        command="markdown"
+        scope={selectionScope}
+        ai={ai()}
+        gate="ready"
+        ladder={{
+          tier: 1,
+          kind: 'partial',
+          digest: '',
+          otherSections: 0,
+          characters: 11,
+        }}
+        request={{ status: 'idle' }}
+        style={{}}
+        onSubmit={vi.fn()}
+        onPlan={vi.fn()}
+        onUseParagraphRange={vi.fn()}
+        onCancel={vi.fn()}
+        onOpenPricing={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('ai-ladder')).toHaveTextContent(
+      'Only this selection is sent',
+    );
+    expect(screen.getByTestId('ai-ladder')).not.toHaveTextContent('outline');
+  });
+
+  it('offers an AI Plan for a document too large for one action', async () => {
+    const user = userEvent.setup();
+    const { onPlan, onSubmit } = show({
+      ladder: { tier: 2, kind: 'plan', digest: '- One (h1, 40 words): x', sections: [], characters: 9_000 },
+    });
+    expect(screen.getByTestId('ai-ladder')).toHaveTextContent(
+      'An AI Plan works through it one section at a time',
+    );
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
+
+    await user.click(screen.getByTestId('ai-prompt-input'));
+    await user.keyboard('  restructure it  ');
+    await user.click(screen.getByRole('button', { name: 'Plan the changes' }));
+    expect(onPlan).toHaveBeenCalledWith('restructure it');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('refuses a target that cannot be worked on, and offers the paragraph', async () => {
+    const user = userEvent.setup();
+    const { onUseParagraphRange, onSubmit } = show({
+      ladder: {
+        tier: 3,
+        kind: 'refused',
+        refusal: {
+          code: 'unsplittable',
+          message:
+            'This document is about 40,000 characters — too large for one AI Action, and it has no headings or Page Breaks to split into sections.',
+        },
+        paragraphRange: { from: 0, to: 40 },
+      },
+    });
+    const refusal = screen.getByTestId('ai-ladder-refusal');
+    expect(refusal).toHaveTextContent('40,000 characters');
+    expect(refusal).toHaveTextContent('no headings or Page Breaks');
+    // Nothing can run, so there is no prompt field and no Send button.
+    expect(screen.queryByTestId('ai-prompt-input')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Work on the paragraph around your cursor',
+      }),
+    );
+    expect(onUseParagraphRange).toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('drops the paragraph offer once the target is that paragraph', () => {
+    render(
+      <AiPromptPopover
+        command="markdown"
+        scope={{ ...scope, kind: 'selection', from: 0, to: 40, text: 'x'.repeat(40) }}
+        ai={ai()}
+        gate="ready"
+        ladder={{
+          tier: 3,
+          kind: 'refused',
+          refusal: {
+            code: 'target_over_write_cap',
+            message: 'That is about 20 tokens, past the 10-token limit.',
+          },
+          paragraphRange: { from: 0, to: 40 },
+        }}
+        request={{ status: 'idle' }}
+        style={{}}
+        onSubmit={vi.fn()}
+        onPlan={vi.fn()}
+        onUseParagraphRange={vi.fn()}
+        onCancel={vi.fn()}
+        onOpenPricing={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('ai-ladder-refusal')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Work on the paragraph around your cursor',
+      }),
+    ).toBeNull();
   });
 });

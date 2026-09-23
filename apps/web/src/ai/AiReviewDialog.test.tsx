@@ -35,6 +35,7 @@ function show(
     busy?: boolean;
     retryBlocked?: boolean;
     error?: string | null;
+    plan?: { at: number; total: number; onStop: () => void } | null;
   } = {},
 ) {
   const onAccept = vi.fn();
@@ -49,6 +50,7 @@ function show(
       busy={options.busy ?? false}
       retryBlocked={options.retryBlocked ?? false}
       error={options.error ?? null}
+      plan={options.plan ?? null}
       onAccept={onAccept}
       onReject={onReject}
       onRetry={onRetry}

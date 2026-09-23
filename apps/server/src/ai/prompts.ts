@@ -14,6 +14,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { AiMessage } from './provider.js';
+import {
+  MAX_AI_PLAN_STEPS,
+  NO_HEADING_LABEL,
+  planBriefText,
+  type AiPlanBrief,
+} from '@perfectmarkd/core';
+
+export type { AiPlanBrief };
 
 export type AiTargetKind = 'document' | 'selection';
 
@@ -75,12 +83,66 @@ Rules:
 - Keep the existing CSS unless the instruction asks to change it.
 - Reply with only the complete updated stylesheet and nothing else — no explanation and no surrounding code fence.`;
 
+/**
+ * The planning prompt (spec §Tier 2): the Document is too large to send, so
+ * the model plans against the outline digest alone. A plan is a list of
+ * sections and what changes in each — never the replacement text, which each
+ * step's own action produces later.
+ */
+export const AI_PLAN_SYSTEM_PROMPT = `You plan edits to a markdown document for PerfectMarkD.
+
+${DIALECT}
+
+The document is too large to send in full, so you are given its outline: one line per section, with the section's heading, its level, its word count, and the first line of its body.
+
+Reply with a plan: one line per section you would change, in document order, in exactly this form:
+- <the section's heading, copied exactly from the outline>: <what changes in that section>
+
+Rules:
+- Copy the heading exactly as the outline gives it. A section with no heading is one the outline names ${NO_HEADING_LABEL}, or (no heading 2), (no heading 3) and so on when the document has several.
+- One line per step, at most ${MAX_AI_PLAN_STEPS} steps. Leave out every section you would not change.
+- Describe each change in one line: what should be different, not the replacement text.
+- Page size, margins, and header/footer bands are engine settings, not content: never plan a change to them.
+- Reply with the plan lines and nothing else — no preamble, no headings, no code fences.`;
+
+export interface PlanPromptInput {
+  instruction: string;
+  /** The outline digest, built locally from the Document's sections. */
+  outline: string;
+}
+
+/**
+ * Assembles the planning messages. The request carries the instruction and the
+ * outline and nothing else: no Document text is sent to build a plan
+ * (spec §Tier 2 — "the plan is produced from the outline alone").
+ */
+export function buildPlanMessages(input: PlanPromptInput): AiMessage[] {
+  return [
+    { role: 'system', content: AI_PLAN_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: [
+        `Instruction: ${input.instruction}`,
+        '',
+        'The outline of the document:',
+        '<outline>',
+        input.outline,
+        '</outline>',
+      ].join('\n'),
+    },
+  ];
+}
+
+
 export interface MarkdownPromptInput {
   instruction: string;
   targetKind: AiTargetKind;
   targetText: string;
-  /** The outline digest sent in place of the rest of a large Document. */
+  /** The rest of the Document: an outline digest, or the whole remainder when
+   *  it fit. Absent when the target is the whole Document. */
   context?: string | null;
+  /** The approved plan, when this request is one step of an AI Plan. */
+  plan?: AiPlanBrief | null;
 }
 
 /**
@@ -164,12 +226,15 @@ export function buildStylesheetMessages(
 
 function userMessage(input: MarkdownPromptInput, anchored: boolean): string {
   const parts = [`Instruction: ${input.instruction}`, ''];
+  if (input.plan) {
+    parts.push(planBriefText(input.plan), '');
+  }
   if (input.context) {
     parts.push(
-      'The rest of the document was too large to send in full. This is an outline digest of it:',
-      '<outline>',
+      'Context — the rest of the document, sent as an outline digest when it was too large to send in full:',
+      '<context>',
       input.context,
-      '</outline>',
+      '</context>',
       '',
     );
   }

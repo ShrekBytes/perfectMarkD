@@ -20,9 +20,15 @@
 import { Hono, type Context } from 'hono';
 import { eq } from 'drizzle-orm';
 import {
+  aiBudgets,
   applyAnchoredEdits,
-  estimateAiSize,
+  checkAiSendSize,
+  parseAiPlan,
   parseAnchoredEdits,
+  planBriefText,
+  MAX_AI_PLAN_STEPS,
+  type AiPlanStep,
+  type AiSizeRefusal,
   type AnchoredEdit,
 } from '@perfectmarkd/core';
 import type { AppEnv } from '../index.js';
@@ -42,8 +48,10 @@ import {
 } from './state.js';
 import {
   buildMarkdownMessages,
+  buildPlanMessages,
   buildStylesheetMessages,
   replayHistory,
+  type AiPlanBrief,
   type StylesheetHistoryTurn,
 } from './prompts.js';
 
@@ -57,13 +65,19 @@ export interface AiRoutesOptions {
 
 /** One AI Proposal as the route returns it. Anchored edits target a whole
  *  Document; `replace` is a selection, an empty-Document generation, or a
- *  whole stylesheet. */
+ *  whole stylesheet; `plan` is the approved work list a large Document is
+ *  broken into before any of it runs (spec §Tier 2). */
 export type AiProposalResult =
   | { kind: 'anchored'; edits: AnchoredEdit[] }
-  | { kind: 'replace'; text: string };
+  | { kind: 'replace'; text: string }
+  | { kind: 'plan'; steps: AiPlanStep[] };
 
 /** How long a user instruction may be; it is advisory text, not data. */
 const MAX_INSTRUCTION_CHARACTERS = 4_000;
+
+/** How many sections a plan request may name; a plan is a work list, not a
+ *  transcription of the Document. */
+const MAX_PLAN_SECTIONS = 500;
 
 const PROVIDER_UNAVAILABLE =
   'The AI is unavailable right now. Try again in a moment.';
@@ -71,6 +85,8 @@ const TRUNCATED_MESSAGE =
   'The reply was cut off before it finished. Try again, or work on a smaller selection.';
 const UNUSABLE_MESSAGE =
   'The AI did not return a usable result. Try again, or work on a smaller selection.';
+const PLAN_UNUSABLE_MESSAGE =
+  'The AI did not return a usable plan. Try again, or work on a smaller range.';
 
 /** Typed codes the client matches on (never the display string). */
 const AI_ERROR_CODES = {
@@ -86,11 +102,29 @@ const AI_ERROR_CODES = {
 } as const;
 
 interface MarkdownRequest {
+  mode: 'edit';
   instruction: string;
   targetKind: 'document' | 'selection';
   targetText: string;
   context: string | null;
+  /** The approved plan, when this is one step of an AI Plan run. */
+  plan: AiPlanBrief | null;
 }
+
+/**
+ * A plan request (spec §Tier 2): the instruction and the outline digest, and
+ * nothing else. The Document is never sent to build a plan; the section labels
+ * ride along so the reply can be refused when it names a section nobody has,
+ * rather than offering a plan with steps that cannot run.
+ */
+interface PlanRequest {
+  mode: 'plan';
+  instruction: string;
+  outline: string;
+  sections: string[];
+}
+
+type MarkdownBody = MarkdownRequest | PlanRequest;
 
 interface StylesheetRequest {
   instruction: string;
@@ -113,37 +147,65 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
     const parsed = parseMarkdownRequest(parseJson(await c.req.text()));
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
 
-    const sized = sizeDecision(
-      parsed.value.targetText,
-      parsed.value.instruction,
-      parsed.value.context,
-      gate.config,
-    );
-    if (!sized.ok) {
-      return c.json(
-        { error: sized.error, code: AI_ERROR_CODES.inputTooLong },
-        413,
-      );
+    const budgets = aiBudgets(gate.config);
+    const request = parsed.value;
+
+    if (request.mode === 'plan') {
+      const sized = checkAiSendSize({
+        instruction: request.instruction,
+        targetText: '',
+        context: request.outline,
+        budgets,
+      });
+      if (!sized.ok) return tooLong(c, sized.refusal);
+
+      if (!acquireBurst(bursts, gate.userId, gate.config.burstPerMinute, now)) {
+        return burstResponse(c);
+      }
+
+      const reply = await callProvider(ai, log, {
+        baseUrl: gate.config.baseUrl,
+        model: gate.config.model,
+        messages: buildPlanMessages({
+          instruction: request.instruction,
+          outline: request.outline,
+        }),
+        maxOutputTokens: gate.config.maxOutputTokens,
+        reasoningEffort: gate.config.reasoningEffort,
+        timeoutMs: gate.config.timeoutSeconds * 1000,
+      });
+      if (!reply.ok) return reply.response;
+
+      const plan = planProposal(reply.value, request.sections);
+      if (!plan.ok) {
+        return c.json({ error: plan.error, code: plan.code }, 502);
+      }
+      return finish(c, gate, plan.value, now);
     }
 
+    const brief = request.plan === null ? null : planBriefText(request.plan);
+    const sized = checkAiSendSize({
+      instruction: request.instruction,
+      targetText: request.targetText,
+      context: request.context,
+      brief,
+      budgets,
+    });
+    if (!sized.ok) return tooLong(c, sized.refusal);
+
     if (!acquireBurst(bursts, gate.userId, gate.config.burstPerMinute, now)) {
-      return c.json(
-        {
-          error: 'Too many at once — try again shortly.',
-          code: AI_ERROR_CODES.burst,
-        },
-        429,
-      );
+      return burstResponse(c);
     }
 
     const reply = await callProvider(ai, log, {
       baseUrl: gate.config.baseUrl,
       model: gate.config.model,
       messages: buildMarkdownMessages({
-        instruction: parsed.value.instruction,
-        targetKind: parsed.value.targetKind,
-        targetText: parsed.value.targetText,
-        context: parsed.value.context,
+        instruction: request.instruction,
+        targetKind: request.targetKind,
+        targetText: request.targetText,
+        context: request.context,
+        plan: request.plan,
       }),
       maxOutputTokens: gate.config.maxOutputTokens,
       reasoningEffort: gate.config.reasoningEffort,
@@ -151,7 +213,7 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
     });
     if (!reply.ok) return reply.response;
 
-    const proposal = markdownProposal(parsed.value, reply.value);
+    const proposal = markdownProposal(request, reply.value);
     if (!proposal.ok) {
       return c.json({ error: proposal.error, code: proposal.code }, 502);
     }
@@ -166,27 +228,16 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
     const parsed = parseStylesheetRequest(parseJson(await c.req.text()));
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
 
-    const sized = sizeDecision(
-      parsed.value.css,
-      parsed.value.instruction,
-      historyText(parsed.value.history),
-      gate.config,
-    );
-    if (!sized.ok) {
-      return c.json(
-        { error: sized.error, code: AI_ERROR_CODES.inputTooLong },
-        413,
-      );
-    }
+    const sized = checkAiSendSize({
+      instruction: parsed.value.instruction,
+      targetText: parsed.value.css,
+      context: historyText(parsed.value.history),
+      budgets: aiBudgets(gate.config),
+    });
+    if (!sized.ok) return tooLong(c, sized.refusal);
 
     if (!acquireBurst(bursts, gate.userId, gate.config.burstPerMinute, now)) {
-      return c.json(
-        {
-          error: 'Too many at once — try again shortly.',
-          code: AI_ERROR_CODES.burst,
-        },
-        429,
-      );
+      return burstResponse(c);
     }
 
     // A stylesheet edit is short, so the Admin may point it at a cheaper model.
@@ -360,12 +411,31 @@ function acquireBurst(
 
 // ─── Request validation ─────────────────────────────────────────────────────
 
-function parseMarkdownRequest(body: unknown): Parsed<MarkdownRequest> {
+function parseMarkdownRequest(body: unknown): Parsed<MarkdownBody> {
   const record = asRecord(body);
   if (!record) return { ok: false, error: 'Send an instruction and a target.' };
   const instruction = instructionOrNull(record.instruction);
   if (instruction === null) {
     return { ok: false, error: 'Describe what you want changed.' };
+  }
+  if (record.mode === 'plan') {
+    if (typeof record.outline !== 'string' || record.outline.trim() === '') {
+      return { ok: false, error: 'The outline is missing.' };
+    }
+    const sections = parseSectionLabels(record.sections);
+    if (!sections.ok) return { ok: false, error: sections.error };
+    return {
+      ok: true,
+      value: {
+        mode: 'plan',
+        instruction,
+        outline: record.outline,
+        sections: sections.value,
+      },
+    };
+  }
+  if (record.mode !== undefined && record.mode !== 'edit') {
+    return { ok: false, error: 'The mode must be an edit or a plan.' };
   }
   const target = asRecord(record.target);
   if (!target) return { ok: false, error: 'Send an instruction and a target.' };
@@ -387,10 +457,73 @@ function parseMarkdownRequest(body: unknown): Parsed<MarkdownRequest> {
   } else {
     return { ok: false, error: 'The context must be text.' };
   }
+  const plan = parsePlanBrief(record.plan);
+  if (!plan.ok) return { ok: false, error: plan.error };
   return {
     ok: true,
-    value: { instruction, targetKind: kind, targetText: target.text, context },
+    value: {
+      mode: 'edit',
+      instruction,
+      targetKind: kind,
+      targetText: target.text,
+      context,
+      plan: plan.value,
+    },
   };
+}
+
+/**
+ * The section labels a plan reply is validated against: the headings the
+ * client's own section list carries, in order. The server never sees the
+ * Document, so the labels are the only thing that can tell it whether a step
+ * names a section that exists.
+ */
+function parseSectionLabels(value: unknown): Parsed<string[]> {
+  if (!Array.isArray(value)) {
+    return { ok: false, error: 'The plan must list the document’s sections.' };
+  }
+  if (value.length === 0 || value.length > MAX_PLAN_SECTIONS) {
+    return { ok: false, error: 'The plan must list the document’s sections.' };
+  }
+  const labels: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string' || entry.length > 500) {
+      return { ok: false, error: 'The section list is malformed.' };
+    }
+    labels.push(entry);
+  }
+  return { ok: true, value: labels };
+}
+
+/**
+ * The approved plan a step request carries. It rides into the prompt as the
+ * shared brief that keeps a long run consistent (spec §Tier 2), so a malformed
+ * one is refused rather than ignored.
+ */
+function parsePlanBrief(value: unknown): Parsed<AiPlanBrief | null> {
+  if (value === undefined || value === null) return { ok: true, value: null };
+  const record = asRecord(value);
+  const malformed = { ok: false as const, error: 'The plan is malformed.' };
+  if (!record || !Number.isInteger(record.index)) return malformed;
+  const index = record.index as number;
+  if (!Array.isArray(record.steps)) return malformed;
+  if (record.steps.length === 0 || record.steps.length > MAX_AI_PLAN_STEPS) {
+    return malformed;
+  }
+  if (index < 0 || index >= record.steps.length) return malformed;
+  const steps: AiPlanBrief['steps'] = [];
+  for (const entry of record.steps) {
+    const step = asRecord(entry);
+    if (!step || typeof step.change !== 'string') return malformed;
+    if (step.heading !== null && typeof step.heading !== 'string') {
+      return malformed;
+    }
+    steps.push({
+      heading: (step.heading as string | null) ?? null,
+      change: step.change,
+    });
+  }
+  return { ok: true, value: { index, steps } };
 }
 
 function parseStylesheetRequest(body: unknown): Parsed<StylesheetRequest> {
@@ -458,48 +591,29 @@ function instructionOrNull(value: unknown): string | null {
   return trimmed;
 }
 
-// ─── The size ladder's first rungs (the full ladder lands in 07) ────────────
-
-type SizeResult = { ok: true } | { ok: false; error: string };
+// ─── The size ladder, re-derived ────────────────────────────────────────────
 
 /**
- * Re-derives the size decision from the shared estimator rather than trusting
- * the client's numbers (spec §The AI route module). Two caps apply: the
- * configured input-character cap, and the write cap — a target may be at most
- * about half the output budget in estimated tokens, so a reply can never be
- * asked for more text than the configured output cap allows.
+ * The refusal a request that does not fit gets: the shared ladder's own
+ * message, stating the size, the cap, and the path forward. The server
+ * re-derives it from the payload it received, so a client that under-reports a
+ * size is refused rather than believed (spec §The AI route module).
  */
-function sizeDecision(
-  targetText: string,
-  instruction: string,
-  context: string | null,
-  config: AiProviderConfig,
-): SizeResult {
-  const size = estimateAiSize(targetText);
-  if (size.characters > config.maxInputCharacters) {
-    return {
-      ok: false,
-      error: `That is about ${size.characters.toLocaleString('en-US')} characters, past the ${config.maxInputCharacters.toLocaleString('en-US')}-character limit for one AI Action. Select a smaller range.`,
-    };
-  }
-  const writeCap = Math.floor(config.maxOutputTokens / 2);
-  if (size.estimatedTokens > writeCap) {
-    return {
-      ok: false,
-      error: `That is about ${size.estimatedTokens.toLocaleString('en-US')} tokens, past the limit one AI Action can rewrite. Select a smaller range.`,
-    };
-  }
-  const sendTokens = estimateAiSize(
-    `${instruction}${targetText}${context ?? ''}`,
-  ).estimatedTokens;
-  if (sendTokens + config.maxOutputTokens > config.contextWindow) {
-    return {
-      ok: false,
-      error:
-        'That passage and its context do not fit the model’s window for one AI Action. Select a smaller range.',
-    };
-  }
-  return { ok: true };
+function tooLong(c: Context<AppEnv>, refusal: AiSizeRefusal): Response {
+  return c.json(
+    { error: refusal.message, code: AI_ERROR_CODES.inputTooLong, refusal: refusal.code },
+    413,
+  );
+}
+
+function burstResponse(c: Context<AppEnv>): Response {
+  return c.json(
+    {
+      error: 'Too many at once — try again shortly.',
+      code: AI_ERROR_CODES.burst,
+    },
+    429,
+  );
 }
 
 // ─── The provider call, truncation, and the output contract ─────────────────
@@ -595,6 +709,34 @@ function markdownProposal(
     };
   }
   return { ok: true, value: { kind: 'anchored', edits: parsed.edits } };
+}
+
+/**
+ * Turns a plan reply into the steps the user approves. The reply is validated
+ * against the section labels the client sent, so a plan that names a section
+ * nobody has is refused whole — a plan with a step that cannot run is not
+ * offered, and a refused reply consumes no allowance.
+ */
+function planProposal(
+  reply: { text: string; finishReason: string },
+  labels: readonly string[],
+): MarkdownProposalResult {
+  if (isTruncatedFinishReason(reply.finishReason)) {
+    return {
+      ok: false,
+      code: AI_ERROR_CODES.truncated,
+      error: TRUNCATED_MESSAGE,
+    };
+  }
+  const parsed = parseAiPlan(reply.text, labels);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      code: AI_ERROR_CODES.invalidResponse,
+      error: PLAN_UNUSABLE_MESSAGE,
+    };
+  }
+  return { ok: true, value: { kind: 'plan', steps: parsed.steps } };
 }
 
 /**

@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { applyAnchoredEdits } from '@perfectmarkd/core';
-import type { AiProposal, AiTarget } from './types';
+import type { AiEditProposal, AiTarget } from './types';
 
 /** Lines of context shown around each change. */
 const CONTEXT_LINES = 3;
@@ -46,7 +46,7 @@ export function stylesheetTarget(css: string): AiTarget {
 /** Builds the change set the review dialog renders. */
 export function buildChangeSet(
   target: AiTarget,
-  proposal: AiProposal,
+  proposal: AiEditProposal,
 ): AiChangeSet {
   if (proposal.kind === 'anchored') {
     return {
@@ -86,7 +86,7 @@ export function buildChangeSet(
  */
 export function applyProposal(
   target: AiTarget,
-  proposal: AiProposal,
+  proposal: AiEditProposal,
   checked: ReadonlySet<number>,
 ): ApplyResult {
   if (proposal.kind === 'replace') {

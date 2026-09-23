@@ -36,6 +36,13 @@ export interface AiTriggerHandlers {
   enabled(): boolean;
   onHintChange(hint: AiHint | null): void;
   onCommandFired(context: AiCommandFired): void;
+  /**
+   * The caret or selection moved. The popup's target is the selection when
+   * there is one, so a selection made while the popup is open has to reach it:
+   * the readout and the size decision follow the editor, and the request sends
+   * what the readout says (ai-transforms/07).
+   */
+  onSelectionChange(): void;
 }
 
 /** The pane-facing API the extension exposes for the React side. */
@@ -147,6 +154,9 @@ export function createAiTriggerExtension(
   };
 
   const hintListener = EditorView.updateListener.of((update) => {
+    if (update.selectionSet && handlers.enabled()) {
+      handlers.onSelectionChange();
+    }
     if (!update.docChanged) return;
     // Typed input only: a paste or a programmatic edit triggers nothing.
     const typed = update.transactions.some((tr) =>

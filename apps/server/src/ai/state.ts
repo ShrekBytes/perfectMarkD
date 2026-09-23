@@ -86,6 +86,10 @@ export interface AiAccountState {
   disclosureSeen: boolean;
   /** The character cap one AI Action may send (spec §scope and size). */
   maxInputCharacters: number;
+  /** The output cap every request carries; the write cap derives from it. */
+  maxOutputTokens: number;
+  /** The model's window, which everything sent plus the reserve must fit. */
+  contextWindow: number;
   /** The AI Allowance this period's plan grants; zero without a plan. */
   allowance: number;
   remaining: number;
@@ -122,6 +126,8 @@ export function aiAccountState({
     access,
     disclosureSeen,
     maxInputCharacters: config.maxInputCharacters,
+    maxOutputTokens: config.maxOutputTokens,
+    contextWindow: config.contextWindow,
     allowance: usage.allowance,
     remaining: usage.remaining,
     period: usage.period,
