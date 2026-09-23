@@ -2,8 +2,10 @@
 # SPA baked into its image at /srv and reverse-proxies the API paths to the
 # api container. One config, imported by two site blocks:
 #
-#   {$SITE_ADDRESS} — the public origin; ":80" locally, a domain in
-#     production gets Caddy's automatic TLS (rollout docs: launch/04).
+#   {$SITE_ADDRESS} — the public origin; ":80" for the shipped deployment,
+#     where a Cloudflare Tunnel terminates TLS in front of Caddy (ADR-0010).
+#     A domain instead gets Caddy's own automatic TLS, which is only right
+#     for a directly-exposed host (rollout docs: launch/04).
 #   http://caddy   — loopback origin on the compose network: the export
 #     worker loads the app's own /export page from here (EXPORT_ORIGIN),
 #     plain HTTP regardless of how the public site is served.

@@ -1,6 +1,6 @@
 # Docs page
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
@@ -63,3 +63,7 @@ footer make it reachable from everywhere.
 - Blocked by: `launch-chrome` (the shared Footer component it adds the Docs link to).
 - The **Docs** term is defined in the project glossary (`CONTEXT.md`), distinct from the onboarding sample Document, which demos the engine inside the editor rather than explaining features.
 - Of the three launch specs (`account-page`, `launch-chrome`, `docs-page`), this one is the only one with a dependency: implement `launch-chrome` first.
+
+## Comments
+
+- **Shipped via `ai-transforms/02`** (commit `49ee531`), not via `launch/02`. That ticket was superseded and marked `wontfix`, with the `/docs` page and the styling reference delivered under the `ai-transforms` workstream instead. `Status` flipped `ready-for-agent` → `resolved` on 2026-09-23, since leaving it `ready-for-agent` advertised work that no longer exists. The `launch-chrome` blocker above is satisfied — that spec shipped in `3ba10b1`.

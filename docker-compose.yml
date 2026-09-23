@@ -6,9 +6,11 @@
 #   cp .env.example .env   # fill in SESSION_SECRET + HISTORY_ENCRYPTION_KEY
 #   docker compose up -d --build
 #
-# Production TLS: set SITE_ADDRESS=<domain> (Cloudflare DNS / VPS rollout is
-# launch/04's ticket). api-data holds the SQLite db and the encrypted
-# export-history files; caddy-data holds TLS certificates.
+# Deployment (launch/04, ADR-0010): the stack runs on the Admin's machine and
+# is published at the domain through a Cloudflare Tunnel, which terminates TLS
+# — so SITE_ADDRESS stays ":80" and caddy-data's ACME certificates go unused.
+# Set SITE_ADDRESS=<domain> only for a directly-exposed host. api-data holds
+# the SQLite db and the encrypted export-history files.
 
 name: perfectmarkd
 

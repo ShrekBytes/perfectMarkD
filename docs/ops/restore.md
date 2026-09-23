@@ -2,7 +2,9 @@
 
 How to bring a PerfectMarkD deployment back from backups onto a clean
 machine, and how the nightly backup that feeds it is set up. Written for the
-Admin's VPS deployment (Hetzner + Compose stack from the README); every
+Admin's own-machine deployment (Compose stack, published through a Cloudflare
+Tunnel — ADR-0010); the same procedure is the migration path onto a VPS when
+that move happens, since it is a clean-machine restore either way. Every
 command has been executed against the Compose stack as part of launch/03.
 
 > **Secrets reminder**: the backup bucket contains `.env` — which contains
@@ -38,7 +40,7 @@ history files when they vanish locally — it moves them into that night's
 `history-prev/` directory. Both the dated db dumps and the `history-prev`
 trees are pruned at 30 days with `rclone delete --min-age 30d`.
 
-## Prerequisites (once per VPS)
+## Prerequisites (once per host)
 
 1. The stack from the README: `git clone` this repo, `cp .env.example .env`,
    fill in `SESSION_SECRET` + `HISTORY_ENCRYPTION_KEY`, `docker compose up -d`.
@@ -75,7 +77,7 @@ The order matters: compose refuses to even parse without
 *inside the backup* — so bootstrap with placeholder secrets, pull the real
 `.env` from the backup, then restore data.
 
-1. **Fresh VPS, repo checked out** (`git clone` at e.g. `/opt/perfectmarkd`),
+1. **Fresh host, repo checked out** (`git clone` at e.g. `/opt/perfectmarkd`),
    `rclone` installed, the same rclone remote configured (`rclone config
    create b2backup b2 account=... key=...` — the credentials live in your
    password manager, not in the backup).
@@ -132,11 +134,11 @@ If step 3 returns 500 on a file that exists, the restored
 `HISTORY_ENCRYPTION_KEY` does not match the one that encrypted the files —
 find the `.env` that did (the backup's, or your password manager).
 
-**Verifying Server Export end-to-end** additionally needs Chromium inside the
-api image (`npx playwright install --with-deps chromium`, launch/04 — not yet
-in the image). After launch/04: enqueue a Server Export from the app (or
-`POST /api/export`), poll `GET /api/export/jobs/<id>` until `done`, download
-the PDF. Until then, a restore is fully verified by the three steps above.
+**Verifying Server Export end-to-end** additionally exercises Chromium, which
+is already baked into the api image (`playwright install --with-deps
+--only-shell chromium`, browsers at `/ms-playwright` — commit 59fd5b3): enqueue
+a Server Export from the app (or `POST /api/export`), poll
+`GET /api/export/jobs/<id>` until `done`, download the PDF.
 
 ## Recovering a purged history file
 
@@ -197,4 +199,4 @@ green when you touch the backup scripts.
   perfectmarkd-backup.service`), and treat a failed night as an alert, not a
   warning.
 - `BACKUP_REMOTE` accepting a local path is what makes the rehearsal above
-  possible — on the VPS it is a real remote, never a local path.
+  possible — on the real deployment it is a real remote, never a local path.

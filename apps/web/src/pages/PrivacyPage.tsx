@@ -8,9 +8,9 @@ const inlineLink =
 /**
  * The /privacy page: one short combined page (launch-chrome spec) — what is
  * stored, what leaves the browser (AI Actions are the one third-party
- * request), what is never done, crypto payments keep card data out, the
- * self-host escape hatch, and a one-line no-warranty caveat standing in for
- * the separate Terms page that doesn't exist.
+ * request), what is never done, crypto payments keep card data
+ * out, the self-host escape hatch, and a one-line no-warranty caveat standing
+ * in for the separate Terms page that doesn't exist.
  */
 export function PrivacyPage() {
   return (
@@ -20,8 +20,8 @@ export function PrivacyPage() {
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         <h1 className="text-2xl font-semibold tracking-tight">Privacy</h1>
         <p className="mt-2 max-w-prose text-sm text-ink-soft">
-          PerfectMarkD holds as little as possible. Here is exactly what
-          happens to your data.
+          PerfectMarkD holds as little as possible. Here is exactly what happens
+          to your data.
         </p>
 
         <section aria-label="What is stored" className="mt-8">
@@ -30,8 +30,8 @@ export function PrivacyPage() {
           </h2>
           <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink-soft">
             <li>
-              Your account email, if you create one — used to sign in and
-              manage your plan.
+              Your account email, if you create one — used to sign in and manage
+              your plan.
             </li>
             <li>
               Nothing else, unless you pay: free users' Documents live entirely
@@ -42,8 +42,8 @@ export function PrivacyPage() {
               Server Export PDFs on Premium: kept 30 days in Export History
               (encrypted at rest, auto-purged) so you can re-download them.
               Every other Server Export payload is processed in memory and
-              deleted immediately after rendering — never written to disk,
-              never logged.
+              deleted immediately after rendering — never written to disk, never
+              logged.
             </li>
             <li>
               Your payment reference: the transaction ID and amount you submit
@@ -53,9 +53,7 @@ export function PrivacyPage() {
         </section>
 
         <section aria-label="AI Actions" className="mt-6">
-          <h2 className="text-base font-semibold tracking-tight">
-            AI Actions
-          </h2>
+          <h2 className="text-base font-semibold tracking-tight">AI Actions</h2>
           <p className="mt-2 max-w-prose text-sm text-ink-soft">
             The <code className="font-mono text-xs">/ai</code> and{' '}
             <code className="font-mono text-xs">/ss</code> commands are the one
@@ -90,10 +88,10 @@ export function PrivacyPage() {
           </h2>
           <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink-soft">
             <li>
-              No third-party analytics, no ad tracking, no fingerprinting. The
-              fonts are self-hosted, so your browser talks to no one else —
-              except when you submit an AI Action, the deliberate exception
-              above.
+              No third-party analytics, no ad tracking, no fingerprinting. Fonts
+              and scripts are self-hosted, so no page here loads anything from
+              another company's server — the one deliberate exception is an AI
+              Action you submit, described above.
             </li>
             <li>
               Your PDF content is never read, used, or shared. Server Export
@@ -129,8 +127,8 @@ export function PrivacyPage() {
         </section>
 
         <p className="mt-10 border-t border-hairline pt-3 text-[11px] leading-relaxed text-ink-faint">
-          PerfectMarkD is provided as-is, with no warranty. There is no
-          separate Terms page.
+          PerfectMarkD is provided as-is, with no warranty. There is no separate
+          Terms page.
         </p>
       </main>
 

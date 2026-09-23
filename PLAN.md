@@ -51,7 +51,7 @@ Manual crypto: **USDT-TRC20, USDT-BEP20, Litecoin**, static wallet addresses. Fl
 
 ### Privacy posture
 
-Server Export payloads are processed in memory and deleted immediately after rendering — never written to disk, never logged. The single exception is Premium Export History: PDFs kept 30 days, encrypted at rest, auto-purged. Client Exports never touch the server. No cookies beyond the login session. Analytics: self-hosted Umami, anonymous event counts only, no personal data. No third-party requests from the editor, the preview, exports, or fonts (self-hosted); AI Actions are the deliberate exception — paid, disclosed at the point of use, switchable off (ADR-0009).
+Server Export payloads are processed in memory and deleted immediately after rendering — never written to disk, never logged. The single exception is Premium Export History: PDFs kept 30 days, encrypted at rest, auto-purged. Client Exports never touch the server. No cookies beyond the login session. Analytics: self-hosted Umami, anonymous event counts only, no personal data. No third-party requests from the editor, the preview, exports, or fonts (self-hosted); AI Actions are the deliberate exception — paid, disclosed at the point of use, switchable off (ADR-0009). Transport is the other exception: the deployment is published through a Cloudflare Tunnel, so requests — and the export payloads among them — traverse Cloudflare's edge, which terminates TLS (ADR-0010). That is infrastructure in the path, not an analytics or tracking service, and the Privacy page states it rather than leaving it implied.
 
 ## 2. Design language
 
@@ -80,7 +80,7 @@ Server Export payloads are processed in memory and deleted immediately after ren
 - **Library swaps from the plugin**: markdown-it replaces Obsidian's renderer; **KaTeX replaces MathJax** (synchronous, print-perfect, kills the MathJax-CSS-extraction code); **Shiki replaces Prism + CODE_THEMES** (VS Code-grade theme catalog — every old theme name has a Shiki equivalent); mermaid stays; RTL detection ports as-is.
 - **Flavor**: GFM (tables, task lists, strikethrough, footnotes), GFM Alerts (`> [!NOTE]`), YAML frontmatter (stripped by default, toggle), `$…$`/`$$…$$` math, images. No Obsidianisms — no `==mark==`, no `[[wikilinks]]`.
 - **Export worker** runs inside the API process (concurrency ~2, SQLite-backed queue table for visibility, Premium jobs jump the queue). Extractable to its own container later if scale demands.
-- **Infra**: one VPS, Docker Compose — `caddy` (TLS, static files, reverse proxy), `api`, `umami`. Nightly SQLite dump + history backup to object storage. Budget: ~€6–10/mo VPS + ~€1/mo storage + domain.
+- **Infra**: the Admin's own machine, Docker Compose — `caddy` (static files, reverse proxy), `api`, `umami` — published at the real domain through a **Cloudflare Tunnel** (outbound only: no port forwarding, no static IP, no inbound rules; TLS terminates at Cloudflare's edge, so Caddy stays on plain HTTP). Nightly SQLite dump + history backup to object storage. Budget: ~€1/mo storage + domain — no server rent until the stack moves to a VPS, which is deferred (ADR-0010).
 - **Persistence**: free users' documents live in IndexedDB (blobs for images) — local-only. Server Export POSTs document + assets (≤ 50 MB payload) ephemerally. No cloud doc sync in v1.
 
 ## 4. Roadmap
@@ -89,7 +89,7 @@ Server Export payloads are processed in memory and deleted immediately after ren
 |---|---|---|
 | **1 — Engine + free app** (~3–4 wks) | Monorepo, `packages/core` port with regression tests, editor app: 3-pane UI, library, Inspector (locks inert), Client Export print flow, sample onboarding, /pricing page | Public free launch — no accounts exist yet |
 | **2 — Paid tier** (~2–3 wks) | Server + auth, Server Export pipeline, quotas, upgrade flow + Order submission, admin panel (payments/users/settings/audit), gated-feature unlocks (custom page size, CSS, fonts, banner/background images), Export History | Payments go live |
-| **3 — Polish & launch ops** (~1–2 wks) | Umami analytics, docs page, backups + restore runbook, perf guards (large-doc warning, lazy Shiki, mermaid caching), deploy hardening, launch checklist | Full launch |
+| **3 — Polish & launch ops** (~1–2 wks) | Umami analytics, docs page, backups + restore runbook, perf guards (large-doc warning, lazy Shiki, mermaid caching), deploy on own machine behind a Cloudflare Tunnel, launch checklist | Full launch |
 
 Workstreams & tickets live in `.scratch/`: [`account-page`](.scratch/account-page/spec.md) · [`ai-transforms`](.scratch/ai-transforms/spec.md) · [`billing`](.scratch/billing/spec.md) · [`docs-page`](.scratch/docs-page/spec.md) · [`launch`](.scratch/launch/spec.md) · [`launch-chrome`](.scratch/launch-chrome/spec.md). **Execution order comes from each ticket's `Blocked by:` line** — work the frontier: any ticket whose blockers are resolved, lowest number first.
 
@@ -112,3 +112,4 @@ Cloud doc sync · public API · mobile-optimized editor · email infrastructure 
 1. Register the domain (`perfectmarkd.com` / `.app` / `.io` — check availability).
 2. Create the three receiving wallets (USDT-TRC20, USDT-BEP20, LTC) and store keys safely; addresses go into admin settings at Phase 2.
 3. Decide the GitHub org/repo name (whole repo is public from Phase 1 — AGPL-3.0).
+4. Set up the Cloudflare Tunnel and DNS for the domain, and point it at the Compose stack on your machine (ADR-0010) — launch/04 assumes this exists.

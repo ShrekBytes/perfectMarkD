@@ -41,7 +41,9 @@ cp .env.example .env    # fill in SESSION_SECRET + HISTORY_ENCRYPTION_KEY
 docker compose up -d --build
 ```
 
-Set `SITE_ADDRESS=<domain>` in `.env` to have Caddy provision TLS automatically. Server Export (paid plans) additionally needs Chromium inside the api image — see [.scratch/launch/issues/04-deploy-production.md](.scratch/launch/issues/04-deploy-production.md).
+The shipped deployment serves the stack behind a Cloudflare Tunnel, which terminates TLS in front of Caddy ([ADR-0010](docs/adr/0010-deploy-on-own-machine-behind-cloudflare-tunnel.md)) — so `SITE_ADDRESS` stays `:80` and no inbound ports are needed. Server Export (paid plans) works out of the box: headless Chromium is baked into the api image. Host-side rollout, monitoring, and backups: [.scratch/launch/issues/04-deploy-production.md](.scratch/launch/issues/04-deploy-production.md).
+
+Exposing a host directly instead? Set `SITE_ADDRESS=<domain>` in `.env` and Caddy provisions TLS automatically.
 
 ## License
 
