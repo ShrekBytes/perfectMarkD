@@ -14,3 +14,13 @@
 - [ ] The whole workspace is green: unit suites, both browser suites, typecheck, and lint, with no skipped or quarantined tests standing in for a fix.
 - [ ] The launch checklist carries the AI prerequisites as items an operator can act on: a key in the environment, a model chosen with the per-Action cost arithmetic in mind, caps sized to that model's window, Test connection run to completion, and the Privacy page confirming what leaves the browser.
 - [ ] The tracker holds no duplicate work: the two superseded tickets are marked as such, and the spec's status reflects what actually shipped.
+
+
+for testing use these:
+open router
+dots-studio/dots-3-note-preview:free
+poolside/laguna-s-2.1:free
+
+The provider's key is `AI_API_KEY` in `.env` (gitignored). It is never written
+to a tracked file, a setting, a log, or an endpoint — see `.env.example` and
+ADR-0008. Rotating it needs a server restart.
