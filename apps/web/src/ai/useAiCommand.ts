@@ -795,6 +795,12 @@ export function useAiCommand(
     ? buildChangeSet(review.target, review.proposal)
     : null;
 
+  /**
+   * Why Accept is unavailable. A spent allowance is deliberately *not* one of
+   * these: the Action was counted when the proposal was offered, so refusing
+   * to apply it would charge the user for text they cannot use. Only Retry is
+   * blocked by exhaustion, because a resubmission is a fresh Action.
+   */
   const acceptDisabledReason = review
     ? (applyError ??
       (foreignReview
@@ -804,9 +810,6 @@ export function useAiCommand(
         ? review.command === 'stylesheet'
           ? 'The stylesheet changed since this was proposed — Retry for a fresh proposal.'
           : 'The text this proposal targets has changed — Retry for a fresh proposal.'
-        : null) ??
-      (account && account.remaining <= 0
-        ? 'No AI Actions left this period.'
         : null) ??
       (request.status === 'error' ? request.message : null))
     : null;

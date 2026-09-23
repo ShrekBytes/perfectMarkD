@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AiReviewDialog } from './AiReviewDialog';
@@ -193,16 +193,18 @@ describe('why Accept is unavailable', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
   });
 
-  it('states an exhausted allowance and blocks Retry too', () => {
-    show({
-      disabledReason: 'No AI Actions left this period.',
-      retryBlocked: true,
-    });
-    expect(screen.getByTestId('ai-accept-reason')).toHaveTextContent(
-      'No AI Actions left this period.',
-    );
+  it('blocks Retry and Edit prompt when the allowance is spent, but not Accept', () => {
+    // The Action was counted when the proposal was offered, so applying it
+    // costs nothing: only the fresh Action a Retry would spend is blocked.
+    const { onAccept } = show({ retryBlocked: true });
+    expect(screen.queryByTestId('ai-accept-reason')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Edit prompt' })).toBeDisabled();
+
+    const accept = screen.getByRole('button', { name: 'Accept (1)' });
+    expect(accept).toBeEnabled();
+    act(() => accept.click());
+    expect(onAccept).toHaveBeenCalled();
   });
 
   it('shows a failed Retry inline and disables the controls while working', () => {

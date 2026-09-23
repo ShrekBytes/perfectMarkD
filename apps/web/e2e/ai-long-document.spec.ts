@@ -72,32 +72,49 @@ const PLAN_STEPS = [
   { sectionIndex: 2, heading: null, change: 'close with a recommendation' },
 ];
 
-async function routeAi(page: Page): Promise<void> {
-  await page.route('**/api/me', (route) =>
-    route.fulfill({
+/**
+ * Routes /api/me and the markdown AI route. `exhaustAfter` moves the account's
+ * remaining AI Actions to zero once the step at that index has been served,
+ * and `exhaustAfterPlan` once the plan itself has, so a run can be watched
+ * running out of allowance between two steps or before the first.
+ */
+async function routeAi(
+  page: Page,
+  options: { exhaustAfter?: number; exhaustAfterPlan?: boolean } = {},
+): Promise<{ exhausted: () => boolean }> {
+  let remaining = 100;
+  let exhausted = false;
+  await page.route('**/api/me', (route) => {
+    if (remaining === 0) exhausted = true;
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(PRO_AI_ME),
-    }),
-  );
+      body: JSON.stringify({
+        ...PRO_AI_ME,
+        ai: { ...PRO_AI_ME.ai, remaining },
+      }),
+    });
+  });
   await page.route('**/api/ai/markdown', async (route) => {
     const body = route.request().postDataJSON() as {
       mode?: string;
       plan?: { index: number };
     };
     if (body.mode === 'plan') {
+      if (options.exhaustAfterPlan) remaining = 0;
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           proposal: { kind: 'plan', steps: PLAN_STEPS },
-          remaining: 99,
+          remaining,
         }),
       });
     }
     // A step of the plan, or a plain action: both come back as the text that
     // would replace the target.
     const step = body.plan?.index;
+    if (step === options.exhaustAfter) remaining = 0;
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -109,10 +126,11 @@ async function routeAi(page: Page): Promise<void> {
               ? 'REWRITTEN PASSAGE'
               : `REWRITTEN SECTION ${step}`,
         },
-        remaining: 98,
+        remaining,
       }),
     });
   });
+  return { exhausted: () => exhausted };
 }
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -288,4 +306,96 @@ test('offers the paragraph around the cursor for a Document that cannot be plann
   await expect(dialog).toBeVisible();
   await page.getByRole('button', { name: /Accept/ }).click();
   await expect(page.locator('.cm-content')).toContainText('REWRITTEN PASSAGE');
+});
+
+test('rejects one step and carries on with the next', async ({ page }) => {
+  await routeAi(page);
+  await openApp(page);
+  await openPopup(page, SECTIONED);
+
+  await page.getByTestId('ai-prompt-input').fill('make it plainer');
+  await page.getByRole('button', { name: 'Plan the changes' }).click();
+  await page.getByRole('button', { name: 'Run 3 steps' }).click();
+
+  // Every step is decided on its own: rejecting one skips it and the next
+  // arrives in its place.
+  const dialog = page.getByTestId('ai-review-dialog');
+  await expect(dialog).toContainText('REWRITTEN SECTION 0');
+  await page.getByRole('button', { name: 'Reject' }).click();
+
+  await expect(dialog).toContainText('REWRITTEN SECTION 1');
+  await expect(page.getByTestId('ai-review-plan-step')).toContainText(
+    'Step 2 of 3 of your plan',
+  );
+  await expect(page.locator('.cm-content')).not.toContainText(
+    'REWRITTEN SECTION 0',
+  );
+  await page.getByRole('button', { name: 'Reject' }).click();
+
+  await expect(dialog).toContainText('REWRITTEN SECTION 2');
+  await page.getByRole('button', { name: /Accept/ }).click();
+
+  // Only the step that was accepted was applied, and the summary says so.
+  await expect(page.getByTestId('ai-plan-summary')).toContainText(
+    'Plan finished. 1 of 3 steps applied.',
+  );
+  const content = page.locator('.cm-content');
+  await expect(content).toContainText('REWRITTEN SECTION 2');
+  await expect(content).not.toContainText('REWRITTEN SECTION 0');
+  await expect(content).not.toContainText('REWRITTEN SECTION 1');
+});
+
+test('keeps the steps already accepted when the allowance runs out', async ({
+  page,
+}) => {
+  const ai = await routeAi(page, { exhaustAfter: 0 });
+  await openApp(page);
+  await openPopup(page, SECTIONED);
+
+  await page.getByTestId('ai-prompt-input').fill('make it plainer');
+  await page.getByRole('button', { name: 'Plan the changes' }).click();
+  await page.getByRole('button', { name: 'Run 3 steps' }).click();
+
+  // Step 1's proposal is the last the allowance covers, and the account is
+  // told so before it is decided: an Action already counted must still be
+  // usable, so Accept is never blocked by a spent allowance.
+  const dialog = page.getByTestId('ai-review-dialog');
+  await expect(dialog).toContainText('REWRITTEN SECTION 0');
+  await expect.poll(ai.exhausted).toBe(true);
+  await page.waitForTimeout(250);
+  await expect(dialog).not.toContainText('No AI Actions left this period');
+  await page.getByRole('button', { name: /Accept/ }).click();
+
+  // The plan stops before the next step, keeping what was accepted.
+  await expect(page.getByTestId('ai-plan-summary')).toContainText(
+    'You have used all your AI Actions this period. 1 of 3 steps applied; 2 steps remain.',
+  );
+  await expect(page.locator('.cm-content')).toContainText(
+    'REWRITTEN SECTION 0',
+  );
+});
+
+test('stops before the first step when the allowance is already gone', async ({
+  page,
+}) => {
+  await routeAi(page, { exhaustAfterPlan: true });
+  await openApp(page);
+  await openPopup(page, SECTIONED);
+
+  await page.getByTestId('ai-prompt-input').fill('make it plainer');
+  await page.getByRole('button', { name: 'Plan the changes' }).click();
+
+  // The plan is approved against an allowance that has nothing left, and says
+  // so before anything runs.
+  await expect(page.getByTestId('ai-plan-cost')).toContainText(
+    '3 steps · 3 AI Actions. You have 0 left',
+  );
+  await page.getByRole('button', { name: 'Run 3 steps' }).click();
+
+  await expect(page.getByTestId('ai-plan-summary')).toContainText(
+    'You have used all your AI Actions this period. 0 of 3 steps applied; 3 steps remain.',
+  );
+  await expect(page.locator('.cm-content')).not.toContainText(
+    'REWRITTEN SECTION',
+  );
 });
