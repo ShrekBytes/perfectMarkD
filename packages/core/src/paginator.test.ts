@@ -318,7 +318,7 @@ describe('splitPreElement', () => {
 
 // ─── paginateEl ───────────────────────────────────────────────────────────────
 
-import { paginateEl } from './paginator';
+import { paginateEl, paginateElChunked } from './paginator';
 
 /** Stands in for real layout: the paginator measures the height of the
  *  measure div, which holds clones of the candidate page content. Mocked
@@ -326,22 +326,42 @@ import { paginateEl } from './paginator';
  *  so tests declare per-block heights instead of depending on a layout
  *  engine. (jsdom cannot produce real heights — golden layout tests run in
  *  real Chromium, engine-port/08.) */
-function withMockedHeights<T>(fn: () => T): T {
+function mockedHeightRect(this: Element): DOMRect {
+  let height = Number(this.getAttribute('data-h') ?? 0);
+  for (const el of this.querySelectorAll('[data-h]')) {
+    height += Number(el.getAttribute('data-h') ?? 0);
+  }
+  return { height } as DOMRect;
+}
+
+/** Installs the mocked measurement and restores it in `finally`. The async
+ *  twin below exists because the mock has to outlive an awaited run. */
+function installMockedHeights(): () => void {
   const proto = Element.prototype as unknown as {
     getBoundingClientRect: () => DOMRect;
   };
   const original = proto.getBoundingClientRect;
-  proto.getBoundingClientRect = function (this: Element) {
-    let height = Number(this.getAttribute('data-h') ?? 0);
-    for (const el of this.querySelectorAll('[data-h]')) {
-      height += Number(el.getAttribute('data-h') ?? 0);
-    }
-    return { height } as DOMRect;
+  proto.getBoundingClientRect = mockedHeightRect;
+  return () => {
+    proto.getBoundingClientRect = original;
   };
+}
+
+function withMockedHeights<T>(fn: () => T): T {
+  const restore = installMockedHeights();
   try {
     return fn();
   } finally {
-    proto.getBoundingClientRect = original;
+    restore();
+  }
+}
+
+async function withMockedHeightsAsync<T>(fn: () => Promise<T>): Promise<T> {
+  const restore = installMockedHeights();
+  try {
+    return await fn();
+  } finally {
+    restore();
   }
 }
 
@@ -425,6 +445,135 @@ describe('paginateEl', () => {
     const bodyChildren = document.body.children.length;
     withMockedHeights(() => paginateEl(source, 600, 150, ''));
     expect(document.body.children.length).toBe(bodyChildren);
+  });
+});
+
+// ─── paginateElChunked ────────────────────────────────────────────────────────
+
+describe('paginateElChunked', () => {
+  const makeSource = (html: string) => {
+    const source = document.createElement('div');
+    source.innerHTML = html;
+    return source;
+  };
+
+  /** A shape that exercises every branch of the loop: whole blocks, a
+   *  force-split list, and an unsplittable oversize element. */
+  const MIXED = [
+    '<p data-h="100">a</p>',
+    '<p data-h="100">b</p>',
+    '<ol><li data-h="60">one</li><li data-h="60">two</li><li data-h="60">three</li></ol>',
+    '<img data-h="500" src="x.png" alt="">',
+    '<p data-h="100">c</p>',
+    '<table><thead><tr><th>H</th></tr></thead><tbody>',
+    '<tr data-h="80">r1</tr><tr data-h="80">r2</tr>',
+    '</tbody></table>',
+  ].join('');
+
+  /** The bucket structure, in a form two runs can be compared by. */
+  const digest = (pages: HTMLElement[][]) =>
+    pages.map((page) =>
+      page.map((node) => `${node.tagName}:${node.textContent ?? ''}`),
+    );
+
+  it('produces exactly the pages paginateEl does', async () => {
+    const sync = withMockedHeights(() =>
+      paginateEl(makeSource(MIXED), 600, 250, ''),
+    );
+    const chunked = await withMockedHeightsAsync(() =>
+      paginateElChunked(makeSource(MIXED), 600, 250, '', { yieldEvery: 1 }),
+    );
+    expect(digest(chunked)).toEqual(digest(sync));
+  });
+
+  it('returns one empty page for an empty source', async () => {
+    const pages = await withMockedHeightsAsync(() =>
+      paginateElChunked(makeSource(''), 600, 1000, ''),
+    );
+    expect(pages).toEqual([[]]);
+  });
+
+  it('does not mutate the source element', async () => {
+    const source = makeSource('<p data-h="100">a</p><p data-h="100">b</p>');
+    const before = source.innerHTML;
+    await withMockedHeightsAsync(() => paginateElChunked(source, 600, 150, ''));
+    expect(source.innerHTML).toBe(before);
+  });
+
+  it('removes the measurement sandbox from the document afterwards', async () => {
+    const bodyChildren = document.body.children.length;
+    await withMockedHeightsAsync(() =>
+      paginateElChunked(makeSource(MIXED), 600, 250, ''),
+    );
+    expect(document.body.children.length).toBe(bodyChildren);
+  });
+
+  it('lets other tasks run while it paginates', async () => {
+    // The point of the chunked variant: the loop must not hold the thread
+    // for its whole duration. A macrotask queued before the run has to get
+    // its turn before the run finishes.
+    const order: string[] = [];
+    await withMockedHeightsAsync(async () => {
+      const running = paginateElChunked(makeSource(MIXED), 600, 250, '', {
+        yieldEvery: 1,
+      });
+      setTimeout(() => order.push('other task'), 0);
+      const pages = await running;
+      order.push('run finished');
+      expect(pages.length).toBeGreaterThan(0);
+    });
+    expect(order).toEqual(['other task', 'run finished']);
+  });
+
+  it('reports a non-decreasing page count that lands on the final total', async () => {
+    const seen: number[] = [];
+    const pages = await withMockedHeightsAsync(() =>
+      paginateElChunked(makeSource(MIXED), 600, 250, '', {
+        yieldEvery: 1,
+        onProgress: (count) => seen.push(count),
+      }),
+    );
+    expect(seen.length).toBeGreaterThan(0);
+    for (let i = 1; i < seen.length; i += 1) {
+      expect(seen[i]!).toBeGreaterThanOrEqual(seen[i - 1]!);
+    }
+    // The last report is the pages completed before the final flush, so it
+    // is the total or one short of it — never more.
+    expect(pages.length - seen.at(-1)!).toBeLessThanOrEqual(1);
+  });
+
+  it('yields once per batch, not once per node', async () => {
+    const source = makeSource(
+      Array.from({ length: 8 }, (_, i) => `<p data-h="100">${i}</p>`).join(''),
+    );
+    const yieldsAt = async (yieldEvery: number): Promise<number> => {
+      const reports: number[] = [];
+      await withMockedHeightsAsync(() =>
+        paginateElChunked(source, 600, 250, '', {
+          yieldEvery,
+          onProgress: () => reports.push(1),
+        }),
+      );
+      return reports.length;
+    };
+
+    // yieldEvery 1 yields after every loop step, so it counts the steps.
+    const perNode = await yieldsAt(1);
+    const perBatch = await yieldsAt(3);
+    expect(perNode).toBeGreaterThan(1);
+    expect(perBatch).toBe(Math.floor(perNode / 3));
+  });
+
+  it('yields nothing when the whole section is one batch', async () => {
+    const reports: number[] = [];
+    const pages = await withMockedHeightsAsync(() =>
+      paginateElChunked(makeSource('<p data-h="10">a</p>'), 600, 250, '', {
+        yieldEvery: 50,
+        onProgress: () => reports.push(1),
+      }),
+    );
+    expect(reports).toHaveLength(0);
+    expect(pages).toHaveLength(1);
   });
 });
 

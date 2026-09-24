@@ -15,7 +15,8 @@ export interface ServerEnv {
   exportConcurrency: number;
   /** Max exports one user may enqueue per rolling minute. */
   exportBurstPerMinute: number;
-  /** Per-render deadline before a job fails as render_timeout. */
+  /** Deadline for one Server Export job, in milliseconds — the whole render,
+   *  print included, before it fails as render_timeout. */
   exportRenderTimeoutMs: number;
   /**
    * Root directory for Export History's encrypted PDFs (server/05) — kept
@@ -41,7 +42,11 @@ const DEFAULT_DB_PATH = './data/perfectmarkd.db';
 const DEFAULT_HISTORY_DIR = './data/history';
 const DEFAULT_EXPORT_CONCURRENCY = 2;
 const DEFAULT_EXPORT_BURST_PER_MINUTE = 10;
-const DEFAULT_EXPORT_RENDER_TIMEOUT_MS = 120_000;
+/** The whole job's deadline (launch/05): handshake, page run, and print. A
+ *  300-page document renders in a few seconds, so a job still going after a
+ *  minute is stuck, not slow — and the queue slot it holds is the reason the
+ *  bound matters more than the exact number. */
+const DEFAULT_EXPORT_RENDER_TIMEOUT_MS = 60_000;
 
 export function loadEnv(
   source: Record<string, string | undefined> = process.env,

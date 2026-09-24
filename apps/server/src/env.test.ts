@@ -11,7 +11,7 @@ describe('loadEnv', () => {
       exportOrigin: 'http://localhost:3000',
       exportConcurrency: 2,
       exportBurstPerMinute: 10,
-      exportRenderTimeoutMs: 120_000,
+      exportRenderTimeoutMs: 60_000,
       historyDir: './data/history',
       historyEncryptionKey: null,
       aiApiKey: null,

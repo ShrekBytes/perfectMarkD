@@ -29,6 +29,7 @@ import {
 } from 'pdf-lib';
 
 import { createDiv, createEl, setCssStyles } from './dom.js';
+import { yieldToBrowser } from './scheduling.js';
 import type { DocumentSettings } from './settings.js';
 
 /** One entry in the PDF outline/bookmark tree, extracted from the heading nodes. */
@@ -463,15 +464,32 @@ function splitElement(
 
 // ── Main pagination loop ─────────────────────────────────────────────────────
 
-/** Distributes a rendered section's block children into page-height buckets,
- *  splitting oversized elements by natural unit (line, row, list item, word,
- *  or character) when they don't fit whole. Returns one HTMLElement[] per page. */
-export function paginateEl(
+/**
+ * The pagination loop as a resumable stepper: one `step()` call advances the
+ * distribution by at most one node, so a caller can interleave the run with
+ * whatever it needs (paginateEl drains it outright; paginateElChunked yields
+ * to the event loop between batches). The loop's state — the sandbox, the
+ * working page, the mutated child list — lives in the closure, so pausing
+ * between steps changes nothing about the result.
+ */
+interface PaginationRun {
+  /** Advances one node; false once every child has been distributed. */
+  step(): boolean;
+  /** Pages completed so far, the in-progress one included. Read-only: safe
+   *  to call mid-run, which is what makes progress reporting possible. */
+  pageCount(): number;
+  /** Flushes the final page and returns the buckets (never empty). */
+  finish(): HTMLElement[][];
+  /** Detaches the measurement sandbox. Always call, success or throw. */
+  dispose(): void;
+}
+
+function beginPagination(
   sourceEl: HTMLElement,
   contentWidthPx: number,
   contentHeightPx: number,
   docCSS: string,
-): HTMLElement[][] {
+): PaginationRun {
   // Hidden shadow-root sandbox: scoped CSS prevents host-document pollution.
   const sandboxHost = createDiv();
   setCssStyles(sandboxHost, {
@@ -514,19 +532,20 @@ export function paginateEl(
   document.body.appendChild(sandboxHost);
 
   const pages: HTMLElement[][] = [];
-  try {
-    let currentPage: HTMLElement[] = [];
-    const children = Array.from(inner.children) as HTMLElement[];
-    let idx = 0;
+  let currentPage: HTMLElement[] = [];
+  const children = Array.from(inner.children) as HTMLElement[];
+  let idx = 0;
 
-    while (idx < children.length) {
+  return {
+    step(): boolean {
+      if (idx >= children.length) return false;
       const child = children[idx]!;
       const fits = makeFitFn(currentPage, measure, contentHeightPx);
 
       if (fits(child)) {
         currentPage.push(child.cloneNode(true) as HTMLElement);
         idx++;
-        continue;
+        return true;
       }
 
       // Element doesn't fit. Try to split it across the page boundary.
@@ -543,7 +562,7 @@ export function paginateEl(
         } else {
           idx++;
         }
-        continue;
+        return true;
       }
 
       // Can't split. If there's content on this page, flush it and retry the
@@ -551,7 +570,7 @@ export function paginateEl(
       if (currentPage.length > 0) {
         pages.push(currentPage);
         currentPage = [];
-        continue;
+        return true;
       }
 
       // Element is alone on an empty page and truly unsplittable (e.g. a giant
@@ -560,13 +579,107 @@ export function paginateEl(
       pages.push(currentPage);
       currentPage = [];
       idx++;
-    }
+      return true;
+    },
 
-    if (currentPage.length > 0) pages.push(currentPage);
+    finish(): HTMLElement[][] {
+      if (currentPage.length > 0) {
+        pages.push(currentPage);
+        currentPage = [];
+      }
+      return pages.length > 0 ? pages : [[]];
+    },
+
+    pageCount(): number {
+      return pages.length + (currentPage.length > 0 ? 1 : 0);
+    },
+
+    dispose(): void {
+      document.body.removeChild(sandboxHost);
+    },
+  };
+}
+
+/** Distributes a rendered section's block children into page-height buckets,
+ *  splitting oversized elements by natural unit (line, row, list item, word,
+ *  or character) when they don't fit whole. Returns one HTMLElement[] per page.
+ *
+ *  Synchronous and uninterrupted. Hosts that render documents big enough to
+ *  freeze the tab use paginateElChunked instead. */
+export function paginateEl(
+  sourceEl: HTMLElement,
+  contentWidthPx: number,
+  contentHeightPx: number,
+  docCSS: string,
+): HTMLElement[][] {
+  const run = beginPagination(
+    sourceEl,
+    contentWidthPx,
+    contentHeightPx,
+    docCSS,
+  );
+  try {
+    while (run.step()) {
+      // Drain: the caller wants the answer, not the ability to breathe.
+    }
+    return run.finish();
   } finally {
-    document.body.removeChild(sandboxHost);
+    run.dispose();
   }
-  return pages.length > 0 ? pages : [[]];
+}
+
+/** Nodes distributed between yields. Layout is flushed once per candidate
+ *  node, so ~50 of them is a few milliseconds of work at most — small enough
+ *  that input latency stays imperceptible, large enough that the yield itself
+ *  is not the run's dominant cost. */
+const YIELD_EVERY_NODES = 50;
+
+export interface PaginateChunkedOptions {
+  /** Nodes per batch; lower yields more often. Defaults to 50. */
+  yieldEvery?: number;
+  /**
+   * Called after each yield with the pages completed so far — a running
+   * count, not a total (the total is not knowable before the run ends).
+   * Omitted: the run yields silently.
+   */
+  onProgress?: (pages: number) => void;
+}
+
+/**
+ * paginateEl, handing the main thread back every `yieldEvery` nodes.
+ *
+ * The output is identical — same buckets, same nodes, same order; only the
+ * scheduling differs. This is the variant the document pipeline uses, because
+ * a 300-page section is thousands of layout flushes in a row and a tab that
+ * cannot paint or answer a keystroke for seconds reads as broken.
+ */
+export async function paginateElChunked(
+  sourceEl: HTMLElement,
+  contentWidthPx: number,
+  contentHeightPx: number,
+  docCSS: string,
+  options: PaginateChunkedOptions = {},
+): Promise<HTMLElement[][]> {
+  const yieldEvery = Math.max(1, options.yieldEvery ?? YIELD_EVERY_NODES);
+  const run = beginPagination(
+    sourceEl,
+    contentWidthPx,
+    contentHeightPx,
+    docCSS,
+  );
+  try {
+    let sinceYield = 0;
+    while (run.step()) {
+      sinceYield += 1;
+      if (sinceYield < yieldEvery) continue;
+      sinceYield = 0;
+      await yieldToBrowser();
+      if (options.onProgress) options.onProgress(run.pageCount());
+    }
+    return run.finish();
+  } finally {
+    run.dispose();
+  }
 }
 
 // ─── Page layout builder ──────────────────────────────────────────────────────

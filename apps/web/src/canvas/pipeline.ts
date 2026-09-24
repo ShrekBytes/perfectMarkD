@@ -15,6 +15,13 @@
 // pagination measured against must be the doc CSS the preview adopts and the
 // export embeds, or content shifts between the three.
 //
+// The run is chunked (launch/05): pagination hands the main thread back every
+// few dozen nodes and the sections are separated by their own yield, so a
+// document big enough to be seconds of work — a few hundred pages is
+// thousands of layout flushes — leaves the tab able to paint and answer
+// keystrokes while it finishes. Callers that want to show that progress pass
+// onProgress; the result is unchanged either way.
+//
 // Runs against the ambient DOM (browser, or jsdom in tests — jsdom's
 // zero-height measurement means each section yields exactly one page, which
 // keeps structural tests deterministic; real page-count behavior is
@@ -25,10 +32,11 @@ import {
   buildDocCSS,
   buildPageLayouts,
   isRTLContent,
-  paginateEl,
+  paginateElChunked,
   renderMarkdown,
   resolvePageGeometry,
   splitMarkdownSections,
+  yieldToBrowser,
   type PageGeometry,
   type PageLayout,
   type DocumentSettings,
@@ -49,12 +57,31 @@ export interface PipelineResult {
   geometry: PageGeometry;
 }
 
+/** How far a run has got. A running tally, not a plan: the page total is not
+ *  knowable until the run ends, so `pages` only ever grows. */
+export interface PipelineProgress {
+  /** Sections fully rendered and paginated. */
+  sectionsDone: number;
+  /** How many sections the document splits into — known before the first
+   *  render, so it is the honest denominator for a progress bar. */
+  sectionsTotal: number;
+  /** Pages laid out so far. */
+  pages: number;
+}
+
 export interface PipelineOptions {
   /** Document title; backs the {{title}} placeholder in page numbers. */
   title: string;
   /** Mermaid fence renderer; omitted (or failing) leaves diagrams as code
    *  blocks. See renderMarkdown's hook contract. */
   renderMermaid?: RenderMermaidHook;
+  /**
+   * Called as the run advances — after each yield, so several times per
+   * section on a long one. The Paper Canvas paints it as a progress
+   * indicator; the export paths ignore it. Omitted: the run reports nothing
+   * and behaves identically.
+   */
+  onProgress?: (progress: PipelineProgress) => void;
 }
 
 /**
@@ -147,7 +174,20 @@ export async function runDocumentPipeline(
   const sections = splitMarkdownSections(prepared);
 
   const allPages: HTMLElement[][] = [];
-  for (const section of sections) {
+  let sectionsDone = 0;
+  // Pages already bucketed plus the pages the section in flight has closed —
+  // pagination reports its own running count, so the readout moves during a
+  // section, not only between them.
+  let pagesLaidOut = 0;
+  const report = (): void => {
+    options.onProgress?.({
+      sectionsDone,
+      sectionsTotal: sections.length,
+      pages: pagesLaidOut,
+    });
+  };
+
+  for (const [index, section] of sections.entries()) {
     const { html } = await renderMarkdown(section, {
       settings: {
         codeTheme: settings.codeTheme,
@@ -157,9 +197,27 @@ export async function runDocumentPipeline(
     });
     const container = document.createElement('div');
     container.innerHTML = html;
-    allPages.push(
-      ...paginateEl(container, geometry.contentW, geometry.contentH, docCSS),
+    const sectionPages = await paginateElChunked(
+      container,
+      geometry.contentW,
+      geometry.contentH,
+      docCSS,
+      {
+        onProgress: (pages) => {
+          pagesLaidOut = allPages.length + pages;
+          report();
+        },
+      },
     );
+    allPages.push(...sectionPages);
+    pagesLaidOut = allPages.length;
+    sectionsDone += 1;
+    report();
+    // A section boundary is where the run can safely pause: everything the
+    // section needed is already measured. Awaiting renderMarkdown alone is
+    // not enough — for a section with no math or fences it never leaves the
+    // current task, so the yields between sections have to be explicit.
+    if (index < sections.length - 1) await yieldToBrowser();
   }
 
   // A blank document paginates to one empty page — the canvas and the export

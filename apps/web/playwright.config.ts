@@ -17,6 +17,24 @@ export default defineConfig({
     baseURL: 'http://localhost:4173',
     trace: 'retain-on-failure',
   },
+  // The performance suite measures how long the main thread is blocked, so it
+  // cannot share the machine with anything else: run alongside the rest of the
+  // suite, CPU contention roughly doubles its numbers (measured: 601ms alone,
+  // 1345ms with the suite in flight), and a measurement whose value depends on
+  // what else is running is not a measurement. Its own project runs it in
+  // isolation — one test, one worker — while the default project covers
+  // everything else.
+  projects: [
+    { name: 'app', testIgnore: '**/performance.spec.ts' },
+    { name: 'performance', testMatch: '**/performance.spec.ts' },
+  ],
+  // Playwright's default snapshot path carries the project name, so splitting
+  // the suite into projects would have silently renamed every committed visual
+  // baseline — the spec would have written fresh `*-app-linux.png` files and
+  // "passed", retiring the regression net without a word. Pinning the template
+  // to the project-less form keeps the existing baselines the ones in force.
+  snapshotPathTemplate:
+    '{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}{-snapshotSuffix}{ext}',
   webServer: {
     // Core's dist must exist (the web bundle imports it); rebuilding both
     // here keeps `pnpm --filter @perfectmarkd/web test:e2e` self-contained.

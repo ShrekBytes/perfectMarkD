@@ -180,6 +180,7 @@ async function fixtureFiles(): Promise<Record<string, File>> {
 let cleanupDb: (() => void) | undefined;
 let fixture: { origin: string; close: () => Promise<void> };
 let blankFixture: { origin: string; close: () => Promise<void> };
+let stuckPageFixture: { origin: string; close: () => Promise<void> };
 let renderer: ReturnType<typeof createPlaywrightRenderer>;
 
 async function makeUser(db: AppDatabase): Promise<number> {
@@ -192,10 +193,20 @@ async function makeUser(db: AppDatabase): Promise<number> {
 
 beforeAll(async () => {
   fixture = await startFixtureServer(await fixtureFiles());
-  // A second origin whose /export never becomes ready — for the timeout path.
+  // A second origin whose /export never becomes ready — for the handshake
+  // timeout (waitForFunction never resolves).
   blankFixture = await startFixtureServer({
     '/export': {
       body: '<!doctype html><html><head><title>stuck</title></head><body></body></html>',
+      type: 'text/html',
+    },
+  });
+  // A third whose /export becomes ready and then never reports back — for the
+  // page's own timeout channel, which the handshake timeout never reaches.
+  stuckPageFixture = await startFixtureServer({
+    '/export': {
+      body: `<!doctype html><html><head><title>stuck page</title></head>
+        <body><script>window.__pmdExportReady = true;</script></body></html>`,
       type: 'text/html',
     },
   });
@@ -209,6 +220,7 @@ afterAll(async () => {
   await renderer.close();
   await fixture.close();
   await blankFixture.close();
+  await stuckPageFixture.close();
   cleanupDb?.();
 });
 
@@ -240,6 +252,40 @@ async function enqueueJob(
 }
 
 describe('Server Export end-to-end (real Chromium)', () => {
+  /** Runs one job against a renderer pointed at `origin` and returns the
+   *  settled job row. The stuck-fixture tests below differ only in which
+   *  fixture they point at. */
+  async function runSingleJob(
+    origin: string,
+    timeoutMs: number,
+    jobId: string,
+  ): Promise<{ job: ExportJob; payloads: PayloadStore }> {
+    const rendererForOrigin = createPlaywrightRenderer({ origin, timeoutMs });
+    try {
+      const { db, dir } = createTestDatabase();
+      cleanupDb?.();
+      cleanupDb = () => removeTestDatabase(dir);
+
+      const payloads = new PayloadStore();
+      const worker = new ExportWorker({
+        db,
+        payloads,
+        results: new ResultStore(),
+        renderPdf: rendererForOrigin.renderPdf,
+      });
+      worker.start();
+
+      await enqueueJob(db, jobId, payloads);
+      worker.notify();
+
+      const job = await pollJob(db, jobId);
+      worker.stop();
+      return { job, payloads };
+    } finally {
+      await rendererForOrigin.close();
+    }
+  }
+
   it('renders through the /export page: queued job → PDF with pages, title, and outline', async () => {
     const { db, dir } = createTestDatabase();
     cleanupDb = () => removeTestDatabase(dir);
@@ -353,36 +399,65 @@ describe('Server Export end-to-end (real Chromium)', () => {
   });
 
   it('fails a job that never renders with the typed render_timeout code', async () => {
-    const stuck = createPlaywrightRenderer({
-      origin: blankFixture.origin,
-      timeoutMs: 500,
+    const { job, payloads } = await runSingleJob(
+      blankFixture.origin,
+      500,
+      'e2e-timeout',
+    );
+    expect(job.status).toBe('failed');
+    expect(job.errorCode).toBe('render_timeout');
+    expect(payloads.size).toBe(0);
+  });
+
+  it('keeps the typed render_timeout when the page goes quiet after ready', async () => {
+    // The page answers the handshake and then never reports back: the failure
+    // arrives through the handshake's own error channel, not as a Playwright
+    // timeout. The code has to survive that trip or the job row — and the
+    // client reading it — loses the distinction between "too slow" and
+    // "broken".
+    const { job, payloads } = await runSingleJob(
+      stuckPageFixture.origin,
+      500,
+      'e2e-page-timeout',
+    );
+    expect(job.status).toBe('failed');
+    expect(job.errorCode).toBe('render_timeout');
+    expect(payloads.size).toBe(0);
+  });
+
+  it('reuses one pooled browser context across sequential jobs', async () => {
+    const { db, dir } = createTestDatabase();
+    cleanupDb?.();
+    cleanupDb = () => removeTestDatabase(dir);
+
+    const payloads = new PayloadStore();
+    const results = new ResultStore();
+    // Concurrency 1: the second job can only be claimed once the first has
+    // returned its context, so the pooled one is what serves it (launch/05).
+    const worker = new ExportWorker({
+      db,
+      payloads,
+      results,
+      renderPdf: renderer.renderPdf,
+      concurrency: 1,
     });
-    try {
-      const { db, dir } = createTestDatabase();
-      cleanupDb?.();
-      cleanupDb = () => removeTestDatabase(dir);
+    worker.start();
 
-      const payloads = new PayloadStore();
-      const results = new ResultStore();
-      const worker = new ExportWorker({
-        db,
-        payloads,
-        results,
-        renderPdf: stuck.renderPdf,
-      });
-      worker.start();
+    await enqueueJob(db, 'e2e-pool-1', payloads);
+    worker.notify();
+    expect((await pollJob(db, 'e2e-pool-1')).status).toBe('done');
+    await worker.waitIdle();
 
-      await enqueueJob(db, 'e2e-timeout', payloads);
-      worker.notify();
-
-      const failed = await pollJob(db, 'e2e-timeout');
-      expect(failed.status).toBe('failed');
-      expect(failed.errorCode).toBe('render_timeout');
-      expect(payloads.size).toBe(0);
-      expect(results.size).toBe(0);
-      worker.stop();
-    } finally {
-      await stuck.close();
-    }
+    await enqueueJob(db, 'e2e-pool-2', payloads);
+    worker.notify();
+    const second = await pollJob(db, 'e2e-pool-2');
+    expect(second.status).toBe('done');
+    // A reused context still prints a whole document, not a torn one: the
+    // page from the previous job is gone and nothing of it bleeds through.
+    expect(second.pages).toBe(2);
+    expect(
+      (await PDFDocument.load(results.get('e2e-pool-2')!)).getPageCount(),
+    ).toBe(2);
+    worker.stop();
   });
 });

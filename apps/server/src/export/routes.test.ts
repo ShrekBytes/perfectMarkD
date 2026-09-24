@@ -260,6 +260,23 @@ describe('POST /api/export', () => {
     );
   });
 
+  it('rejects a body that is not JSON at all', async () => {
+    // The streaming reader answers a non-JSON body with its own 400 rather
+    // than a parse error escaping as a 500 (launch/05).
+    const { app, db } = makeApp();
+    const { cookie } = await grantEntitlement(app, db, { plan: 'pro' });
+
+    const res = await app.request('/api/export', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: 'this is not json',
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe(
+      'Expected a JSON body.',
+    );
+  });
+
   it('enforces the per-minute burst limit', async () => {
     const { app, db } = makeApp({ burstPerMinute: 1 });
     const { cookie } = await grantEntitlement(app, db, { plan: 'pro' });

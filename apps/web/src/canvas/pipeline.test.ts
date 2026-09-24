@@ -10,6 +10,7 @@ import {
   applyAutoBreaks,
   collectAssetRefs,
   runDocumentPipeline,
+  type PipelineProgress,
 } from './pipeline';
 
 describe('applyAutoBreaks', () => {
@@ -232,5 +233,42 @@ describe('runDocumentPipeline', () => {
     expect(hidden.layouts[0]!.pageNodes.map((n) => n.textContent)).toEqual([
       'body',
     ]);
+  });
+
+  it('reports progress against the section count, ending on the total', async () => {
+    const md = 'one\n\n///\n\ntwo\n\n///\n\nthree';
+    const seen: PipelineProgress[] = [];
+    const result = await runDocumentPipeline(md, DEFAULT_SETTINGS, {
+      title: 'Doc',
+      onProgress: (progress) => seen.push({ ...progress }),
+    });
+
+    expect(seen.length).toBeGreaterThan(0);
+    // The denominator is known up front, so a bar has something to fill.
+    expect(seen.every((p) => p.sectionsTotal === 3)).toBe(true);
+    // Both counters only ever move forward.
+    for (let i = 1; i < seen.length; i += 1) {
+      expect(seen[i]!.sectionsDone).toBeGreaterThanOrEqual(
+        seen[i - 1]!.sectionsDone,
+      );
+      expect(seen[i]!.pages).toBeGreaterThanOrEqual(seen[i - 1]!.pages);
+    }
+    // The run ends on its own numbers: every section done, every page counted.
+    expect(seen.at(-1)).toEqual({
+      sectionsDone: 3,
+      sectionsTotal: 3,
+      pages: result.layouts.length,
+    });
+  });
+
+  it('renders without reporting when no onProgress is given', async () => {
+    const result = await runDocumentPipeline(
+      'one\n\n///\n\ntwo',
+      DEFAULT_SETTINGS,
+      {
+        title: 'Doc',
+      },
+    );
+    expect(result.layouts).toHaveLength(2);
   });
 });

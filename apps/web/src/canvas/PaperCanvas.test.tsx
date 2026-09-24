@@ -10,6 +10,8 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaperCanvas, type PaperCanvasApi } from './PaperCanvas';
 import * as pipelineModule from './pipeline';
+import type { PipelineProgress } from './pipeline';
+import { resolvePageGeometry } from '@perfectmarkd/core';
 import {
   resetStylesheetConversationForTests,
   useStylesheetConversation,
@@ -162,6 +164,33 @@ describe('PaperCanvas rendering', () => {
     expect(pageHosts()).toHaveLength(1);
   });
 
+  it('waits 400ms of idle, and a keystroke restarts the window', async () => {
+    const spy = vi.spyOn(pipelineModule, 'runDocumentPipeline');
+    mountCanvas();
+    const scroll = screen.getByTestId('canvas-scroll');
+    setMarkdown('# One');
+
+    // The window has not elapsed: nothing has run yet. aria-busy is the tight
+    // check — the run flips it before its first await, so a debounce that
+    // fired early cannot hide behind a slow async chain.
+    await flushRenderRaw(399);
+    expect(spy).not.toHaveBeenCalled();
+    expect(scroll).toHaveAttribute('aria-busy', 'false');
+
+    // A keystroke inside the window cancels the pending run and restarts the
+    // clock — the render tracks the pause, not the last keypress.
+    setMarkdown('# One two');
+    await flushRenderRaw(399);
+    expect(spy).not.toHaveBeenCalled();
+    expect(scroll).toHaveAttribute('aria-busy', 'false');
+
+    // 400ms of idle is what earns a run, and it renders the latest text.
+    await flushRenderRaw(1);
+    await flushRender();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0]![0]).toBe('# One two');
+  });
+
   it('re-renders when settings change', async () => {
     const spy = vi.spyOn(pipelineModule, 'runDocumentPipeline');
     mountCanvas();
@@ -287,6 +316,98 @@ describe('PaperCanvas rendering', () => {
     await flushRender();
     // The render chain settles within the flush above; aria-busy settles with it.
     expect(scroll.getAttribute('aria-busy')).toBe('false');
+  });
+
+  it('shows the render progress only once the run proves slow', async () => {
+    // A run that never settles: the indicator is the only thing under test.
+    let report: ((progress: PipelineProgress) => void) | undefined;
+    vi.spyOn(pipelineModule, 'runDocumentPipeline').mockImplementation(
+      (_markdown, _settings, options) => {
+        report = options.onProgress;
+        return new Promise(() => {});
+      },
+    );
+
+    mountCanvas();
+    setMarkdown('one\n\n///\n\ntwo\n\n///\n\nthree');
+    await flushRenderRaw(400); // the debounce fires and the run starts
+
+    // Under the reveal threshold nothing appears: a normal edit must never
+    // earn chrome it did not have to wait for.
+    await flushRenderRaw(200);
+    expect(screen.queryByTestId('canvas-progress')).not.toBeInTheDocument();
+
+    // Past it, the desk narrates the run — with the run's own numbers.
+    await flushRenderRaw(100);
+    act(() => {
+      report!({ sectionsDone: 1, sectionsTotal: 3, pages: 2 });
+    });
+    const indicator = screen.getByTestId('canvas-progress');
+    expect(indicator).toHaveTextContent('section 2 of 3');
+    expect(indicator).toHaveTextContent('2 pages');
+
+    // The bar is a progressbar, not a live region: a readout that changes on
+    // every yield would otherwise announce the run dozens of times.
+    const bar = screen.getByRole('progressbar', { name: 'Render progress' });
+    expect(bar).toHaveAttribute('aria-valuemax', '3');
+    expect(bar).toHaveAttribute('aria-valuenow', '1');
+    expect(indicator).not.toHaveAttribute('role', 'status');
+  });
+
+  it('names no section when the document is a single one', async () => {
+    let report: ((progress: PipelineProgress) => void) | undefined;
+    vi.spyOn(pipelineModule, 'runDocumentPipeline').mockImplementation(
+      (_markdown, _settings, options) => {
+        report = options.onProgress;
+        return new Promise(() => {});
+      },
+    );
+
+    mountCanvas();
+    setMarkdown('# One long section');
+    await flushRenderRaw(400);
+    await flushRenderRaw(300);
+    act(() => {
+      report!({ sectionsDone: 0, sectionsTotal: 1, pages: 41 });
+    });
+
+    // No denominator to fill, so no bar — the page count still moves.
+    const indicator = screen.getByTestId('canvas-progress');
+    expect(indicator).toHaveTextContent('Rendering preview · 41 pages');
+    expect(
+      screen.queryByRole('progressbar', { name: 'Render progress' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('clears the progress indicator when the run finishes', async () => {
+    let settle!: () => void;
+    vi.spyOn(pipelineModule, 'runDocumentPipeline').mockImplementation(
+      (_markdown, settings, options) => {
+        options.onProgress?.({ sectionsDone: 1, sectionsTotal: 2, pages: 3 });
+        return new Promise((resolve) => {
+          settle = () =>
+            resolve({
+              layouts: [],
+              docCSS: '',
+              sheetCSS: '',
+              isRTL: false,
+              geometry: resolvePageGeometry(settings),
+            });
+        });
+      },
+    );
+
+    mountCanvas();
+    setMarkdown('# Hello');
+    await flushRenderRaw(400);
+    await flushRenderRaw(300);
+    expect(screen.getByTestId('canvas-progress')).toBeInTheDocument();
+
+    await act(async () => {
+      settle();
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.queryByTestId('canvas-progress')).not.toBeInTheDocument();
   });
 
   it('surfaces a failed render as a persistent notice and Retry recovers', async () => {

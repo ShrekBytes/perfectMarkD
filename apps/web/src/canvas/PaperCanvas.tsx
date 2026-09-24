@@ -28,11 +28,16 @@ import { buildPage, createPageSheets } from './pageBuilder';
 import {
   collectAssetRefs,
   runDocumentPipeline,
+  type PipelineProgress,
   type PipelineResult,
 } from './pipeline';
 
 /** Coalesces typing bursts into one engine run (spec: 400ms auto-render). */
 const RENDER_DEBOUNCE_MS = 400;
+/** A render still running after this long earns the progress indicator. A
+ *  typical edit re-renders in well under it, and the chrome should recede for
+ *  work nobody had to wait for. */
+const PROGRESS_REVEAL_MS = 250;
 const ZOOM_MIN = 0.35;
 const ZOOM_MAX = 1;
 const ZOOM_STEP = 0.05;
@@ -173,12 +178,18 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   const [largeDocCount, setLargeDocCount] = useState<number | null>(null);
   /** The last engine run threw: the preview may be stale until one succeeds. */
   const [renderFailed, setRenderFailed] = useState(false);
+  /** How far the run in flight has got (null between runs). */
+  const [progress, setProgress] = useState<PipelineProgress | null>(null);
+  /** The indicator itself, held back until a run proves it is slow. */
+  const [progressVisible, setProgressVisible] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
   /** Bumped per run: async steps abandon their work when the token moves on. */
   const tokenRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The reveal timer for the progress indicator, cancelled with the run. */
+  const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resolverRef = useRef<{
     docId: string;
     resolver: AssetResolverCache;
@@ -192,6 +203,15 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
   /** The user has taken over the zoom (pill buttons); auto-fit stands down
    *  for the rest of the session once they have. */
   const userZoomedRef = useRef(false);
+
+  /** Disarms the indicator's reveal timer. Two callers — the run's own
+   *  teardown and the document switch — and a forgotten one leaks a timer
+   *  that lights up the indicator for the next document. */
+  const clearProgressTimer = useCallback(() => {
+    if (!progressTimerRef.current) return;
+    clearTimeout(progressTimerRef.current);
+    progressTimerRef.current = null;
+  }, []);
 
   const runRenderRef = useRef<() => Promise<void>>(async () => {});
   runRenderRef.current = async () => {
@@ -215,6 +235,15 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
             customStylesheetEnabled: true,
           };
     setRendering(true);
+    // The indicator waits for the run to prove itself slow. `progress` starts
+    // empty rather than stale: a previous run's numbers would read as this
+    // one's before it has reported anything.
+    setProgress(null);
+    setProgressVisible(false);
+    progressTimerRef.current = setTimeout(() => {
+      progressTimerRef.current = null;
+      setProgressVisible(true);
+    }, PROGRESS_REVEAL_MS);
     try {
       // One resolver per document: its blob URLs die with the doc switch.
       if (resolverRef.current?.docId !== docId) {
@@ -236,6 +265,10 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       const result = await runDocumentPipeline(md, renderSettings, {
         title: name,
         renderMermaid,
+        // A superseded run must not paint over the live one's numbers.
+        onProgress: (next) => {
+          if (token === tokenRef.current) setProgress(next);
+        },
       });
       if (token !== tokenRef.current) return;
 
@@ -282,7 +315,14 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       console.error('Paper Canvas render failed:', error);
       setRenderFailed(true);
     } finally {
-      if (token === tokenRef.current) setRendering(false);
+      // A superseded run tears nothing down: the run that replaced it owns
+      // the indicator now, and clearing it here would blank a live readout.
+      if (token === tokenRef.current) {
+        clearProgressTimer();
+        setProgress(null);
+        setProgressVisible(false);
+        setRendering(false);
+      }
     }
   };
 
@@ -315,10 +355,11 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
     setRenderFailed(false);
     return () => {
       tokenRef.current += 1;
+      clearProgressTimer();
       resolverRef.current?.resolver.dispose();
       resolverRef.current = null;
     };
-  }, [activeId]);
+  }, [activeId, clearProgressTimer]);
 
   // The shell drives manual renders and scroll sync through the ref.
   useImperativeHandle(
@@ -499,6 +540,58 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
           <div className="w-56 max-w-[60%] animate-pulse space-y-2">
             <div className="aspect-[1/1.414] w-full rounded-pane border border-hairline bg-surface-hover" />
             <div className="mx-auto h-2.5 w-20 rounded bg-surface-hover" />
+          </div>
+        </div>
+      )}
+
+      {progressVisible && progress && (
+        <div
+          data-testid="canvas-progress"
+          className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-4"
+        >
+          {/* The reassurance twin of the danger notice below: a long render is
+              not a failure, but a frozen-looking tab is indistinguishable from
+              one, so the desk says what it is doing. It waits 250ms before
+              appearing — a normal edit never earns it.
+
+              Deliberately not a live region. The readout changes on every
+              yield, and a role="status" here would announce the run dozens of
+              times over; the sr-only summary above already tells assistive
+              tech that a render is in flight. The bar carries the numbers as a
+              progressbar, which is queried rather than announced.
+
+              Depth declared once: a floating layer takes a shadow, not a
+              shadow and a hairline both (DESIGN.md Elevation). */}
+          <div className="flex animate-fade-in flex-col gap-1.5 rounded-control bg-surface px-3 py-2 shadow-lg">
+            <p className="text-xs text-ink-soft tabular-nums">
+              Rendering preview
+              {progress.sectionsTotal > 1
+                ? ` — section ${Math.min(progress.sectionsDone + 1, progress.sectionsTotal)} of ${progress.sectionsTotal}`
+                : ''}
+              {progress.pages > 0 ? ` · ${progress.pages} pages` : ''}
+            </p>
+            {progress.sectionsTotal > 1 && (
+              // Determinate on sections, the only total known up front. The
+              // bar's width is a layout property, so it moves in steps rather
+              // than animating (motion is color/opacity only — DESIGN.md).
+              <div
+                role="progressbar"
+                aria-label="Render progress"
+                aria-valuemin={0}
+                aria-valuemax={progress.sectionsTotal}
+                aria-valuenow={progress.sectionsDone}
+                className="h-0.5 w-40 overflow-hidden rounded-control bg-hairline"
+              >
+                <div
+                  className="h-full bg-accent-strong"
+                  style={{
+                    width: `${Math.round(
+                      (progress.sectionsDone / progress.sectionsTotal) * 100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

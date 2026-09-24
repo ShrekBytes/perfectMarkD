@@ -23,7 +23,7 @@ import type { AppDatabase } from '../db/database.js';
 import type { ExportJob, Plan } from '../db/schema.js';
 import { getPlanLimits, pageCapFor } from '../db/settings.js';
 import { findActiveEntitlement, quotaState } from '../quota.js';
-import { parseJson } from '../request-body.js';
+import { readJsonBody } from '../request-body.js';
 import { MAX_EXPORT_BODY_BYTES, parseExportPayload } from './payload.js';
 import {
   PayloadStore,
@@ -134,8 +134,27 @@ export function exportRoutes(options: ExportRoutesOptions) {
     // The burst window only counts requests that will actually enqueue: a
     // malformed or over-cap payload never reaches the queue, so it never
     // consumes one of the user's N-per-minute slots.
+    //
+    // The body is streamed, not buffered (launch/05): this is the one route
+    // whose payload runs to tens of megabytes, and the cap is re-checked
+    // against what actually arrives rather than only the declared length.
+    const body = await readJsonBody(c.req.raw, MAX_EXPORT_BODY_BYTES);
+    if (!body.ok) {
+      if (body.reason === 'too_large') {
+        return c.json(
+          {
+            error:
+              'This document is too large — Server Export accepts up to 50 MB.',
+            code: 'payload_too_large',
+          },
+          413,
+        );
+      }
+      return c.json({ error: 'Expected a JSON body.' }, 400);
+    }
+
     const parsed = parseExportPayload(
-      parseJson(await c.req.text()),
+      body.value,
       pageCapFor(limits, activeEntitlement?.plan ?? 'free'),
     );
     if (!parsed.ok) {

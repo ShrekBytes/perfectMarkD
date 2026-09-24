@@ -107,6 +107,7 @@ describe('postProcessRenderedHTML', () => {
 
 import { DEFAULT_SETTINGS } from './settings';
 import { renderMarkdown } from './render';
+import { getSingletonHighlighter } from 'shiki';
 
 describe('renderMarkdown — GFM basics', () => {
   it('renders headings, tables, strikethrough, and linkified URLs', async () => {
@@ -271,6 +272,49 @@ describe('renderMarkdown — code highlighting', () => {
     const { html } = await renderMarkdown('```notalang\nplain text\n```');
     expect(html).not.toContain('shiki');
     expect(html).toContain('language-notalang');
+  });
+});
+
+// ─── Highlighter reuse and lazy themes (launch/05) ────────────────────────────
+//
+// The preview re-renders on every keystroke, so the highlighting pass has to
+// share one highlighter and pull in a theme only when a render actually asks
+// for it. Both properties come from Shiki's own singleton shorthand
+// (`codeToHtml` from 'shiki'), which is exactly why they need pinning: a
+// refactor to a per-render `createHighlighter`, or to registering the theme
+// catalog up front, would leave the output identical and the cost invisible.
+describe('renderMarkdown — highlighter reuse and lazy themes', () => {
+  it('loads only the theme the render asks for, on the shared highlighter', async () => {
+    const highlighter = await getSingletonHighlighter();
+    const before = highlighter.getLoadedThemes();
+    expect(before).not.toContain('nord');
+
+    await renderMarkdown('```js\nconst answer = 42;\n```', {
+      settings: { ...DEFAULT_SETTINGS, codeTheme: 'nord' },
+    });
+
+    // The same instance served the render — nothing was built per call.
+    const after = await getSingletonHighlighter();
+    expect(after).toBe(highlighter);
+    // Exactly one theme arrived, and it is the one that was asked for: the
+    // catalog was not loaded wholesale.
+    expect(after.getLoadedThemes().filter((t) => !before.includes(t))).toEqual([
+      'nord',
+    ]);
+  });
+
+  it('does not reload a theme it already holds', async () => {
+    await renderMarkdown('```js\nconst a = 1;\n```', {
+      settings: { ...DEFAULT_SETTINGS, codeTheme: 'nord' },
+    });
+    const highlighter = await getSingletonHighlighter();
+    const loaded = highlighter.getLoadedThemes();
+
+    await renderMarkdown('```js\nconst b = 2;\n```', {
+      settings: { ...DEFAULT_SETTINGS, codeTheme: 'nord' },
+    });
+
+    expect(highlighter.getLoadedThemes()).toEqual(loaded);
   });
 });
 
