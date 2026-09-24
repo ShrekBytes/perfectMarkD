@@ -28,13 +28,16 @@ export default defineConfig({
     { name: 'app', testIgnore: '**/performance.spec.ts' },
     { name: 'performance', testMatch: '**/performance.spec.ts' },
   ],
-  // Playwright's default snapshot path carries the project name, so splitting
-  // the suite into projects would have silently renamed every committed visual
-  // baseline — the spec would have written fresh `*-app-linux.png` files and
-  // "passed", retiring the regression net without a word. Pinning the template
-  // to the project-less form keeps the existing baselines the ones in force.
+  // Playwright's default snapshot path carries the project name, so giving the
+  // suite projects moves every committed visual baseline: the four screenshot
+  // tests fail with "A snapshot doesn't exist at ...-app-linux.png" and write
+  // fresh files beside the committed ones. Verified, not assumed — reverting
+  // this template takes the suite from 10 failures to 14. Pinning it to the
+  // project-less form keeps the existing baselines the ones in force, and keeps
+  // the suite's file naming independent of whatever the projects are called.
   snapshotPathTemplate:
     '{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}{-snapshotSuffix}{ext}',
+
   webServer: {
     // Core's dist must exist (the web bundle imports it); rebuilding both
     // here keeps `pnpm --filter @perfectmarkd/web test:e2e` self-contained.

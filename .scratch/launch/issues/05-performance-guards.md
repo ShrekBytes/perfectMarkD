@@ -70,9 +70,13 @@ Client: chunked rendering with yields between sections so 200+ page docs don't f
   The suite runs as its own Playwright project. Sharing the machine with the
   rest of the suite doubled the numbers (601ms alone, 1345ms contended), and a
   measurement that depends on what else is running is not a measurement. That
-  split would have silently renamed every committed visual baseline — Playwright
-  puts the project name in the snapshot path — so `snapshotPathTemplate` is
-  pinned to the project-less form and the existing baselines stay in force.
+  split also moves every committed visual baseline — Playwright puts the project
+  name in the snapshot path, so the four screenshot tests fail with "A snapshot
+  doesn't exist at ...-app-linux.png" and write fresh files beside the committed
+  ones (reverting the template takes the suite from 10 failures to 14; verified,
+  not assumed). `snapshotPathTemplate` is pinned to the project-less form, which
+  keeps the existing baselines in force and the file naming independent of
+  whatever the projects are called.
 
 - **Review findings acted on**: the indicator broke DESIGN.md's "a hairline or a
   shadow, never both" (fixed — shadow only, `shadow-lg` for a floating layer);
