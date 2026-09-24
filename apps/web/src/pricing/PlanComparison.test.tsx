@@ -4,9 +4,17 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlanComparison } from './PlanComparison';
+import { trackEvent } from '../analytics/tracker';
+
+vi.mock('../analytics/tracker', () => ({
+  initAnalytics: vi.fn(),
+  trackPageView: vi.fn(),
+  trackEvent: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
 });
 
 const openEditor = vi.fn();
@@ -74,6 +82,23 @@ describe('calls to action', () => {
     expect(openUpgrade).toHaveBeenLastCalledWith('pro');
     await user.click(upgradeButtons[1]!);
     expect(openUpgrade).toHaveBeenLastCalledWith('premium');
+  });
+
+  it('reports which plan was chosen, and reports nothing for the free CTA', async () => {
+    const user = userEvent.setup();
+    renderComparison();
+
+    const [pro, premium] = screen.getAllByRole('button', { name: 'Upgrade' });
+    await user.click(pro!);
+    expect(trackEvent).toHaveBeenLastCalledWith('plan-select', { plan: 'pro' });
+    await user.click(premium!);
+    expect(trackEvent).toHaveBeenLastCalledWith('plan-select', {
+      plan: 'premium',
+    });
+
+    // Free is not a plan choice — it is the way out of the comparison.
+    await user.click(screen.getByRole('button', { name: 'Open the editor' }));
+    expect(trackEvent).toHaveBeenCalledTimes(2);
   });
 });
 

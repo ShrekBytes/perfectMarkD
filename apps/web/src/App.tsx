@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { AdminPage } from './admin/AdminPage';
 import { AccountPage } from './account/AccountPage';
 import { AuthPage } from './auth/AuthPage';
@@ -9,6 +10,7 @@ import { PrivacyPage } from './pages/PrivacyPage';
 import { PricingPage } from './pricing/PricingPage';
 import { useRoute } from './router';
 import { AppShell } from './shell/AppShell';
+import { initAnalytics, trackPageView } from './analytics/tracker';
 
 /**
  * Route switch for the SPA's surfaces (PLAN.md §3): the `/` editor, the
@@ -18,9 +20,21 @@ import { AppShell } from './shell/AppShell';
  * render surface the server's worker loads (server/03, ADR-0003). Unknown
  * paths get the 404 (launch-chrome spec) instead of falling through to the
  * editor.
+ *
+ * Analytics (launch/01) hooks in here because this is the one place that sees
+ * every route change. The hidden `/export` surface is left out entirely: the
+ * export worker loads it once per Server Export, so tracking it would count
+ * machine renders as visitors.
  */
 export function App() {
   const route = useRoute();
+
+  useEffect(() => {
+    if (route === 'export') return;
+    initAnalytics();
+    trackPageView(window.location.pathname);
+  }, [route]);
+
   switch (route) {
     case 'pricing':
       return <PricingPage />;

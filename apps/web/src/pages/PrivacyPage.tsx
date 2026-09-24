@@ -8,7 +8,8 @@ const inlineLink =
 /**
  * The /privacy page: one short combined page (launch-chrome spec) — what is
  * stored, what leaves the browser (AI Actions are the one third-party
- * request), what is never done, crypto payments keep card data
+ * request), what analytics collects and what it never does (launch/01), what
+ * is never done, crypto payments keep card data
  * out, the self-host escape hatch, and a one-line no-warranty caveat standing
  * in for the separate Terms page that doesn't exist.
  */
@@ -80,6 +81,20 @@ export function PrivacyPage() {
               editor.
             </li>
           </ul>
+        </section>
+
+        <section aria-label="Analytics" className="mt-6">
+          <h2 className="text-base font-semibold tracking-tight">Analytics</h2>
+          <p className="mt-2 max-w-prose text-sm text-ink-soft">
+            We count visits — which pages get used, and how often the export
+            buttons are pressed — with Umami, running on our own server. It is
+            anonymous by design: no cookies beyond your login session, no
+            cross-site tracking, no fingerprinting, nothing shared with anyone
+            else. Your IP address is hashed into a short-lived session id and
+            never stored; the only location ever derived from it is an
+            approximate country. Your documents, their contents, and your
+            account are never part of it.
+          </p>
         </section>
 
         <section aria-label="What is never done" className="mt-6">

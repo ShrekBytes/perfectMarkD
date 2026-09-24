@@ -73,9 +73,10 @@ journalctl -u perfectmarkd-backup.service -n 50
 ## From nothing: a clean-machine restore
 
 The order matters: compose refuses to even parse without
-`SESSION_SECRET`/`HISTORY_ENCRYPTION_KEY` in `.env`, but the real `.env` is
-*inside the backup* — so bootstrap with placeholder secrets, pull the real
-`.env` from the backup, then restore data.
+`SESSION_SECRET`/`HISTORY_ENCRYPTION_KEY` (and, since launch/01, the two
+`UMAMI_*` secrets), but the real `.env` is *inside the backup* — so
+bootstrap with placeholder secrets, pull the real `.env` from the backup,
+then restore data.
 
 1. **Fresh host, repo checked out** (`git clone` at e.g. `/opt/perfectmarkd`),
    `rclone` installed, the same rclone remote configured (`rclone config
@@ -85,7 +86,8 @@ The order matters: compose refuses to even parse without
 
    ```sh
    cp .env.example .env
-   printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\n' \
+   printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\n' \
+     "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
      "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" >> .env
    printf 'BACKUP_REMOTE=b2backup:perfectmarkd-backups\n' >> .env
    ```
@@ -167,7 +169,8 @@ local backend):
 
 ```sh
 export BACKUP_REMOTE=/tmp/pmd-backup-rehearsal   # in .env, not just exported!
-cp .env.example .env && printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nBACKUP_REMOTE=%s\n' \
+cp .env.example .env && printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nBACKUP_REMOTE=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
 
 docker compose up -d --build
@@ -178,7 +181,8 @@ docker compose exec -T api node /seed.mjs
 ops/backup.sh
 docker compose down -v                # the "clean machine"
 rm .env && cp .env.example .env       # …placeholder secrets, real ones restored
-printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nBACKUP_REMOTE=%s\n' \
+printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nBACKUP_REMOTE=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
 ops/restore.sh && docker compose up -d
 # …then §verify with the seed facts the seeder printed (email, password, id)
@@ -193,6 +197,9 @@ green when you touch the backup scripts.
   Self-Hosted Instance backs up its own data its own way (`db/` + `history/`
   + keys are the complete state; `docker compose down -v` loses everything
   not on your own disks).
+- Analytics is deliberately not backed up (launch/01): `umami-db-data` holds
+  anonymous visit counts and nothing else, so a restore starts the statistics
+  empty. Losing them costs numbers, never user data.
 - Backups require the api container to be running (the dump runs inside it);
   a stopped stack fails the job loudly rather than uploading a stale or
   empty backup. Monitor the timer (`journalctl -u

@@ -1,0 +1,80 @@
+# Builds the Umami analytics image (launch/01) and publishes it to GHCR.
+#
+# Why this exists: Umami's BASE_PATH is a build-time variable, so serving it at
+# /analytics on the app's own origin needs a locally compiled image (see
+# ops/umami/Dockerfile). Compiling a Next.js app from source writes 100k+ files
+# and needs a real build environment — and the deployment host is the Admin's
+# own machine (ADR-0010), which should not need either. So the compile happens
+# here and the host only pulls.
+#
+# The image is public, so `docker compose up -d` on any host pulls it with no
+# registry login.
+name: Umami image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ops/umami/Dockerfile'
+      - '.github/workflows/umami-image.yml'
+  # Rebuild monthly so the pinned-from-source image picks up base-image
+  # (node:22-alpine) security updates without waiting for an Umami release.
+  schedule:
+    - cron: '0 4 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner ships ~14 GB of preinstalled SDKs the build doesn't need, and
+      # this build writes a lot: two pnpm installs, a Next.js compile, and the
+      # Prisma runtime. Reclaim the space rather than discover it mid-build.
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
+      - name: Read the pinned Umami version
+        id: version
+        run: |
+          version=$(grep -oP 'ARG UMAMI_VERSION="\K[^"]+' ops/umami/Dockerfile)
+          if [ -z "$version" ]; then
+            echo "Could not read UMAMI_VERSION from ops/umami/Dockerfile" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building Umami $version"
+
+      # ghcr rejects uppercase repository names; the account's login has one.
+      - name: Lowercase the owner
+        id: owner
+        run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ops/umami
+          file: ops/umami/Dockerfile
+          push: true
+          # The version tag is what docker-compose.yml pins; `latest` is a
+          # convenience for anyone reading the package page.
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.name }}/perfectmarkd-umami:${{ steps.version.outputs.version }}
+            ghcr.io/${{ steps.owner.outputs.name }}/perfectmarkd-umami:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

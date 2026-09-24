@@ -14,6 +14,7 @@ import { stubClientRects } from './testing/stub-client-rects';
 import { stubIndexedDB } from './testing/stub-idb';
 import { stubSystemTheme } from './testing/match-media';
 import { jsonResponse } from './testing/json-response';
+import { initAnalytics, trackPageView } from './analytics/tracker';
 
 // The editor surface pulls the real sample document (mermaid fence) — keep the
 // heavy DOM-timing bundle out of component tests, as in AppShell.test.tsx.
@@ -22,7 +23,16 @@ vi.mock('./canvas/mermaid', async () => {
   return stubMermaidModule;
 });
 
+// Analytics is asserted as "the app asked for this", not as "Umami received
+// it" — the wrapper's own suite covers delivery.
+vi.mock('./analytics/tracker', () => ({
+  initAnalytics: vi.fn(),
+  trackPageView: vi.fn(),
+  trackEvent: vi.fn(),
+}));
+
 beforeEach(() => {
+  vi.clearAllMocks();
   localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
   stubSystemTheme('light');
@@ -126,4 +136,34 @@ it('renders the account page at /account', async () => {
   expect(await screen.findByText('Pro')).toBeInTheDocument();
   // The editor must not mount behind the page.
   expect(screen.queryByTestId('export-split')).not.toBeInTheDocument();
+});
+
+it('sends one page view per route change', async () => {
+  const user = userEvent.setup();
+  window.history.pushState({}, '', '/pricing');
+  render(<App />);
+
+  expect(initAnalytics).toHaveBeenCalledTimes(1);
+  expect(trackPageView).toHaveBeenCalledTimes(1);
+  expect(trackPageView).toHaveBeenCalledWith('/pricing');
+
+  // The wordmark is a Link, so the swap is a history push the router sees.
+  await user.click(screen.getByRole('link', { name: 'PerfectMarkD home' }));
+
+  expect(trackPageView).toHaveBeenCalledTimes(2);
+  expect(trackPageView).toHaveBeenLastCalledWith('/');
+
+  // Let the editor's store settle, as the tests above do — an in-flight
+  // IndexedDB transaction would otherwise abort at cleanup.
+  await screen.findByTestId('save-state', {}, { timeout: 5000 });
+});
+
+it('sends nothing from the hidden /export surface the worker renders', () => {
+  window.history.pushState({}, '', '/export');
+  render(<App />);
+
+  // One Server Export = one machine render of /export, so counting it as a
+  // visit would make the page-view numbers meaningless.
+  expect(initAnalytics).not.toHaveBeenCalled();
+  expect(trackPageView).not.toHaveBeenCalled();
 });

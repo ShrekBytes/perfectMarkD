@@ -20,6 +20,15 @@ COPY tsconfig.base.json ./
 COPY packages/core packages/core
 COPY apps/web apps/web
 # Core first: the web bundle resolves @perfectmarkd/core to its built dist/.
+#
+# Analytics (launch/01) is baked in here because the bundle is static: Vite
+# inlines VITE_* at build time, so the website id has to be known now. An
+# empty id produces a bundle with no analytics at all — no tracker request,
+# nothing collected.
+ARG VITE_ANALYTICS_URL="/analytics"
+ARG VITE_ANALYTICS_WEBSITE_ID=""
+ENV VITE_ANALYTICS_URL=$VITE_ANALYTICS_URL
+ENV VITE_ANALYTICS_WEBSITE_ID=$VITE_ANALYTICS_WEBSITE_ID
 RUN pnpm --filter @perfectmarkd/core build \
 	&& pnpm --filter @perfectmarkd/web build
 

@@ -5,6 +5,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { expect, test, type Page } from '@playwright/test';
 
+/** The single origin the suite's own web server serves (playwright.config). */
+const BASE_ORIGIN = 'http://localhost:4173';
+
 /** The shared footer — the only contentinfo on each non-editor surface. */
 function footerOf(page: Page) {
   return page.getByRole('contentinfo');
@@ -51,6 +54,12 @@ test('the Privacy page renders what is stored and what is never done', async ({
   await expect(main.getByText(/kept 30 days/)).toBeVisible();
   await expect(main.getByText(/transaction ID/)).toBeVisible();
 
+  // Analytics (launch/01): self-hosted, and the page says what it collects
+  // and what it does with the address rather than leaving it implied.
+  await expect(main.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+  await expect(main.getByText(/running on our own server/)).toBeVisible();
+  await expect(main.getByText(/never stored/)).toBeVisible();
+
   // What is never done: no third-party analytics or tracking; PDF content
   // never used for anything.
   await expect(main.getByText(/No third-party analytics/)).toBeVisible();
@@ -62,6 +71,31 @@ test('the Privacy page renders what is stored and what is never done', async ({
   // The self-host escape hatch and the no-warranty caveat.
   await expect(main.getByText(/run your own instance/)).toBeVisible();
   await expect(main.getByText(/no warranty/)).toBeVisible();
+});
+
+/**
+ * The posture the Privacy page promises: nothing here loads anything from
+ * another company's server. Analytics is self-hosted and same-origin, so this
+ * audit stays green with it on or off — it exists to catch the next script
+ * tag, font, or image that would quietly break the claim.
+ */
+test('the public surfaces request nothing from another origin', async ({
+  page,
+}) => {
+  const foreign: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.protocol.startsWith('http') && url.origin !== BASE_ORIGIN) {
+      foreign.push(request.url());
+    }
+  });
+
+  for (const path of ['/', '/pricing', '/privacy', '/about', '/docs']) {
+    await page.goto(path);
+  }
+  await page.waitForLoadState('networkidle');
+
+  expect(foreign).toEqual([]);
 });
 
 test('an unknown route renders the 404 with a working link back to the editor', async ({

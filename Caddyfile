@@ -1,6 +1,7 @@
 # PerfectMarkD static serving (server/06): the Caddy container serves the
-# SPA baked into its image at /srv and reverse-proxies the API paths to the
-# api container. One config, imported by two site blocks:
+# SPA baked into its image at /srv, reverse-proxies the API paths to the
+# api container, and reverse-proxies /analytics to the umami container
+# (launch/01). One config, imported by two site blocks:
 #
 #   {$SITE_ADDRESS} — the public origin; ":80" for the shipped deployment,
 #     where a Cloudflare Tunnel terminates TLS in front of Caddy (ADR-0010).
@@ -23,6 +24,16 @@
 	# The hidden /export page is the worker's render surface, not content —
 	# keep it out of search indexes (spec: security posture).
 	header /export* X-Robots-Tag "noindex"
+
+	# Self-hosted analytics (launch/01) sit under /analytics on this origin.
+	# The prefix is passed through untouched: the Umami image bakes that base
+	# path in, so it expects to see it. The tracker endpoints (/script.js,
+	# /api/send) are public by necessity — they are what collects the events —
+	# while the dashboard behind them needs the Admin's own Umami account.
+	@analytics path /analytics /analytics/*
+	handle @analytics {
+		reverse_proxy {$UMAMI_UPSTREAM:umami:3000}
+	}
 
 	# API (auth, billing, admin, export, history) and the health probe go to
 	# the api container; everything else is the SPA.

@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { FEATURE_ROWS, PLANS, formatPrice } from './plans';
 import type { Plan } from './plans';
 import { CheckIcon } from '../shell/icons';
+import { trackEvent } from '../analytics/tracker';
 import './pricing.css';
 
 interface PlanComparisonProps {
@@ -163,7 +164,10 @@ function PlanCta({
   return (
     <button
       type="button"
-      onClick={() => onUpgrade(paidPlanId)}
+      onClick={() => {
+        trackEvent('plan-select', { plan: paidPlanId });
+        onUpgrade(paidPlanId);
+      }}
       className={`${base} border border-accent bg-accent-strong text-accent-ink hover:bg-accent-deep`}
     >
       Upgrade

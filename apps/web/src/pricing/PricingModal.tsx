@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog } from '../shell/Dialog';
 import { PlanComparison } from './PlanComparison';
 import { CLIENT_EXPORT_NOTE, PAID_PLANS_PITCH, planName } from './plans';
 import { UpgradeFlow } from '../billing/UpgradeFlow';
+import { trackEvent } from '../analytics/tracker';
 
 interface PricingModalProps {
   onClose: () => void;
@@ -14,11 +15,18 @@ interface PricingModalProps {
  * as /pricing, compact. A paid plan's Upgrade CTA swaps the flow (billing/01)
  * into this same dialog rather than stacking a second one; Escape and the
  * backdrop close whichever view is showing.
+ *
+ * Every lock, the quota chip, and the Server Export gate open this one modal,
+ * so its mount is the single "the paywall was reached" signal (launch/01).
  */
 export function PricingModal({ onClose }: PricingModalProps) {
   const [upgradePlan, setUpgradePlan] = useState<'pro' | 'premium' | null>(
     null,
   );
+
+  useEffect(() => {
+    trackEvent('upgrade-modal-open');
+  }, []);
 
   return (
     <Dialog

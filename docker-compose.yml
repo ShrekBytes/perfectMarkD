@@ -1,16 +1,20 @@
 # PerfectMarkD deployment stack (server/06): Caddy serves the static web
-# bundle on one origin and reverse-proxies /api to the api container; the
-# export worker inside api loads the app's own /export page by looping back
-# to Caddy over the internal network (ADR-0003).
+# bundle on one origin, reverse-proxies /api to the api container, and
+# reverse-proxies /analytics to the self-hosted Umami instance (launch/01);
+# the export worker inside api loads the app's own /export page by looping
+# back to Caddy over the internal network (ADR-0003).
 #
 #   cp .env.example .env   # fill in SESSION_SECRET + HISTORY_ENCRYPTION_KEY
+#                          # and the two UMAMI_* secrets
 #   docker compose up -d --build
 #
 # Deployment (launch/04, ADR-0010): the stack runs on the Admin's machine and
 # is published at the domain through a Cloudflare Tunnel, which terminates TLS
 # — so SITE_ADDRESS stays ":80" and caddy-data's ACME certificates go unused.
 # Set SITE_ADDRESS=<domain> only for a directly-exposed host. api-data holds
-# the SQLite db and the encrypted export-history files.
+# the SQLite db and the encrypted export-history files; umami-db-data holds
+# the analytics database, which is disposable — losing it costs statistics,
+# never user data, so launch/03's backup deliberately leaves it out.
 
 name: perfectmarkd
 
@@ -19,6 +23,12 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # Analytics (launch/01). Baked in at build time because the SPA is
+        # static: an empty website id produces a bundle with no analytics at
+        # all, which is what a self-hosted instance without Umami gets.
+        VITE_ANALYTICS_URL: ${VITE_ANALYTICS_URL:-/analytics}
+        VITE_ANALYTICS_WEBSITE_ID: ${VITE_ANALYTICS_WEBSITE_ID:-}
     restart: unless-stopped
     depends_on:
       api:
@@ -69,7 +79,63 @@ services:
     volumes:
       - api-data:/data
 
+  # Self-hosted analytics (launch/01). Umami's BASE_PATH is a build-time
+  # variable, so it can't be the upstream prebuilt image — but the deployment
+  # host shouldn't be compiling a Next.js app either, so the image is built by
+  # .github/workflows/umami-image.yml and pulled from GHCR (ADR-0012). The
+  # package is public: no registry login needed. Keep the tag in sync with
+  # UMAMI_VERSION in ops/umami/Dockerfile. To build it locally instead:
+  #   docker build -t ghcr.io/shrekbytes/perfectmarkd-umami:3.4.0 ops/umami
+  #
+  # Deliberately not a dependency of caddy: analytics being down must never
+  # keep the app from serving.
+  umami:
+    image: ghcr.io/shrekbytes/perfectmarkd-umami:${UMAMI_VERSION:-3.4.0}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:3000/api/heartbeat']
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:?UMAMI_DB_PASSWORD is required, see .env.example}@umami-db:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?UMAMI_APP_SECRET is required, see .env.example}
+      # Must match the value baked into the image (ops/umami/Dockerfile):
+      # umami reads it at startup for its own routing and CSP.
+      BASE_PATH: /analytics
+      # The privacy posture (PLAN §1): the instance makes no outbound call of
+      # its own — no telemetry, no update check, no favicon service — and
+      # umami stores a salted hash of a visitor's address, never the address.
+      PRIVATE_MODE: '1'
+      DISABLE_TELEMETRY: '1'
+      DISABLE_UPDATES: '1'
+
+  umami-db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:?UMAMI_DB_PASSWORD is required, see .env.example}
+      # umami's own recommendation: UTC avoids regional-offset drift in the
+      # event timestamps the dashboard reports.
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U umami -d umami']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   api-data:
   caddy-config:
   caddy-data:
+  umami-db-data:

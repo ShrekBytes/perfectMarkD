@@ -4,7 +4,10 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as pipelineModule from '../canvas/pipeline';
-import { useAccountStore } from '../auth/account-store';
+import {
+  resetAccountStoreForTests,
+  useAccountStore,
+} from '../auth/account-store';
 import * as api from '../auth/api';
 import type { MePayload } from '../auth/api';
 import { LOCKED_FLAGS, OPEN_FLAGS } from '../auth/flags';
@@ -24,8 +27,17 @@ import {
 } from './clientExport';
 import { ExportSplitButton } from './ExportSplitButton';
 import { setBrowserNoticeDelayForTests } from './useClientExport';
+import { trackEvent } from '../analytics/tracker';
 
 vi.mock('../library/download', () => ({ downloadBlob: vi.fn() }));
+
+// Analytics is asserted as "the button asked for this", not as "Umami
+// received it" — the wrapper's own suite covers delivery.
+vi.mock('../analytics/tracker', () => ({
+  initAnalytics: vi.fn(),
+  trackPageView: vi.fn(),
+  trackEvent: vi.fn(),
+}));
 
 const FIREFOX_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0';
@@ -46,6 +58,7 @@ beforeEach(async () => {
   setBrowserNoticeDelayForTests(1);
   printStub = stubPrintIframes();
   vi.mocked(downloadBlob).mockClear();
+  vi.mocked(trackEvent).mockClear();
 });
 
 afterEach(() => {
@@ -628,5 +641,84 @@ describe('Server Export (billing/04)', () => {
     ).toBeInTheDocument();
     expect(vi.mocked(downloadBlob)).not.toHaveBeenCalled();
     await waitFor(() => expect(exportButton()).toBeEnabled());
+  });
+});
+
+// ─── Analytics (launch/01) ───────────────────────────────────────────────────
+
+describe('analytics (launch/01)', () => {
+  // This file's other suites leave a signed-in account in the store; the
+  // funnel these tests describe starts from a visitor who has none.
+  beforeEach(() => {
+    resetAccountStoreForTests();
+  });
+
+  it('reports a Client Export click, from the button and from the dropdown item', async () => {
+    markPrintHintShown();
+    render(<ExportSplitButton />);
+    typeMarkdown('# Counted');
+
+    await userEvent.click(exportButton());
+    await waitFor(() => expect(totalPrints()).toBe(1));
+
+    await userEvent.click(chevron());
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: /client export/i }),
+    );
+    await waitFor(() => expect(totalPrints()).toBe(2));
+
+    // Both routes into the same flow are one event name.
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([
+      ['client-export'],
+      ['client-export'],
+    ]);
+  });
+
+  it('reports a Server Export click that the paywall stops', async () => {
+    render(<ExportSplitButton />);
+    typeMarkdown('# Priced out');
+
+    await userEvent.click(chevron());
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: /server export/i }),
+    );
+
+    // The click is the funnel metric — a Free visitor reaching it is the
+    // point — and the modal it opens reports itself.
+    expect(trackEvent).toHaveBeenCalledWith('server-export');
+    await screen.findByRole('dialog', { name: /plans and pricing/i });
+    expect(trackEvent).toHaveBeenCalledWith('upgrade-modal-open');
+    expect(printStub.windows).toHaveLength(0);
+  });
+
+  it('reports a Server Export click that runs', async () => {
+    seedAccount(
+      mePayload({
+        plan: 'pro',
+        expiresAt: '2026-10-01T00:00:00.000Z',
+        quota: { used: 0, limit: 300 },
+        flags: OPEN_FLAGS,
+      }),
+    );
+    vi.spyOn(api, 'me').mockResolvedValue(
+      mePayload({
+        plan: 'pro',
+        expiresAt: '2026-10-01T00:00:00.000Z',
+        quota: { used: 1, limit: 300 },
+        flags: OPEN_FLAGS,
+      }),
+    );
+    stubHappyServerFetch();
+    render(<ExportSplitButton />);
+    typeMarkdown('# Server export');
+
+    await userEvent.click(chevron());
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: /server export/i }),
+    );
+
+    expect(trackEvent).toHaveBeenCalledWith('server-export');
+    // No paywall for an entitled user, so nothing to report there.
+    expect(trackEvent).not.toHaveBeenCalledWith('upgrade-modal-open');
   });
 });

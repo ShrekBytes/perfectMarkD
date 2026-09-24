@@ -4,9 +4,17 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PricingModal } from './PricingModal';
+import { trackEvent } from '../analytics/tracker';
+
+vi.mock('../analytics/tracker', () => ({
+  initAnalytics: vi.fn(),
+  trackPageView: vi.fn(),
+  trackEvent: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
 });
 
 it('renders the compact plan comparison', () => {
@@ -63,4 +71,17 @@ it("the free plan's CTA closes the modal (the editor is already underneath)", as
 
   await user.click(screen.getByRole('button', { name: 'Open the editor' }));
   expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+it('reports the paywall being reached, once per open', () => {
+  // Every lock, the quota chip, and the Server Export gate open this same
+  // modal, so the mount is the one signal (launch/01).
+  const { unmount } = render(<PricingModal onClose={vi.fn()} />);
+
+  expect(trackEvent).toHaveBeenCalledTimes(1);
+  expect(trackEvent).toHaveBeenCalledWith('upgrade-modal-open');
+  unmount();
+
+  render(<PricingModal onClose={vi.fn()} />);
+  expect(trackEvent).toHaveBeenCalledTimes(2);
 });

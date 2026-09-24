@@ -10,6 +10,7 @@ import {
 import { useAccountStore } from '../auth/account-store';
 import { useEscapeLayer, useMenuKeyboard } from '../shell/focus';
 import { PricingModal } from '../pricing/PricingModal';
+import { trackEvent } from '../analytics/tracker';
 import { PrintHintDialog } from './PrintHintDialog';
 import { useClientExport, type ExportToast } from './useClientExport';
 import { useServerExport } from './useServerExport';
@@ -77,6 +78,7 @@ export function ExportSplitButton() {
 
   const startExport = () => {
     setMenuOpen(false);
+    trackEvent('client-export');
     void flow.runExport();
   };
 
@@ -87,6 +89,7 @@ export function ExportSplitButton() {
 
   const startServerExport = () => {
     setMenuOpen(false);
+    trackEvent('server-export');
     void server.runExport().then((outcome) => {
       // The server's typed gate rejection is the upgrade prompt's trigger:
       // over-quota (402) and entitlement-required (403) both land here.
@@ -160,7 +163,7 @@ export function ExportSplitButton() {
                 title={
                   entitlement
                     ? 'Renders on the server — the PDF downloads when ready'
-                    : "Renders on the server — uses your extra exports"
+                    : 'Renders on the server — uses your extra exports'
                 }
                 className="touch-target flex w-full items-start gap-2 px-3 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-hover"
               >
@@ -190,6 +193,10 @@ export function ExportSplitButton() {
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
+                  // The click, not the render: this is the paywall's funnel,
+                  // and a Free visitor reaching it is the whole point of the
+                  // event. The upgrade modal open follows on its own.
+                  trackEvent('server-export');
                   setPricingOpen(true);
                 }}
                 title="Needs a paid plan — see plans"
@@ -197,7 +204,9 @@ export function ExportSplitButton() {
               >
                 <ServerIcon className="text-ink-soft" />
                 Server Export
-                <span className="ml-auto text-xs text-ink-faint">Paid plan</span>
+                <span className="ml-auto text-xs text-ink-faint">
+                  Paid plan
+                </span>
               </button>
             )}
           </div>
