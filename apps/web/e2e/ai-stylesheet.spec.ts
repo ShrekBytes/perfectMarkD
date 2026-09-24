@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // `/ss` and the Stylesheet tab's AI conversation (ai-transforms/06), in a real
-// browser: the box, the proposal card, the provisional paper, Accept and
-// Reject, and the editor's `/ss` writing the same box and the same
-// conversation without moving the Inspector.
+// browser: the box, the proposal card, the box's own diff view, the
+// provisional paper, Accept and Reject, and the editor's `/ss` writing the
+// same box and the same conversation without moving the Inspector.
 //
 // The instance's AI state comes from the intercepted /api/me payload and the
 // proposal from the intercepted stylesheet route — the provider is never
@@ -114,17 +114,25 @@ test('the tab’s conversation: ask, judge the paper, accept', async ({
   await page.getByTestId('stylesheet-ai-input').fill('a warmer accent');
   await page.getByTestId('stylesheet-ai-send').click();
 
-  // The reply is a proposal card: the diff, and nothing written to the box.
+  // The reply is a proposal card, and the CSS is reviewed where the stylesheet
+  // lives: the box has swapped to its before/after diff view.
   const card = page.getByTestId('stylesheet-ai-proposal');
   await expect(card).toBeVisible();
-  await expect(card).toContainText(BASE);
-  await expect(card).toContainText(PROPOSED);
-  await expect(page.getByTestId('stylesheet-box')).toHaveValue(BASE);
+  // The card no longer echoes the rules — the diff moved into the box, and the
+  // card says what came back and what became of it.
+  await expect(card).toContainText('A proposal is in the box above');
+
+  const diff = page.getByTestId('stylesheet-box-diff');
+  await expect(diff).toBeVisible();
+  await expect(diff).toContainText(BASE);
+  await expect(diff).toContainText(PROPOSED);
+  // The box is swapped out while the proposal is pending: nothing was written
+  // to it, and nothing can be typed over the diff. Accept writes it below.
+  await expect(page.getByTestId('stylesheet-box')).toHaveCount(0);
 
   // The paper is drawn with the proposal, so the look can be judged rather
-  // than the CSS — and it is a render only: the box still holds BASE.
+  // than the CSS — and it is a render only, not a write to the box.
   await expect.poll(() => headingColor(page)).toBe(PROPOSED_COLOR);
-  await expect(page.getByTestId('stylesheet-box')).toHaveValue(BASE);
 
   await page.getByTestId('stylesheet-ai-accept').click();
 
@@ -171,7 +179,7 @@ test('/ss in the editor writes the box, joins the conversation, and moves no tab
   await openApp(page);
   await waitForMinPages(page, 1);
 
-  // The Inspector starts on Page, and stays there: `/ss` is an editor
+  // The Inspector starts on Page, and `/ss` leaves it there: it is an editor
   // interaction, not a reason to yank the user to another tab.
   await expect(page.getByTestId('inspector-tab-Page')).toHaveAttribute(
     'aria-selected',
@@ -191,23 +199,31 @@ test('/ss in the editor writes the box, joins the conversation, and moves no tab
   await popup.getByTestId('ai-prompt-input').fill('a warmer accent');
   await page.keyboard.press('Enter');
 
-  const dialog = page.getByTestId('ai-review-dialog');
-  await expect(dialog).toBeVisible();
+  // A stylesheet proposal has no surface in the editor: the diff lives in the
+  // Stylesheet tab's box, and the paper shows the proposal while it is
+  // pending. Neither the review bar nor an inline suggestion appears here.
+  await expect(page.getByTestId('ai-review-bar')).toHaveCount(0);
+  await expect(page.locator('.cm-ai-suggestion')).toHaveCount(0);
   // The proposed look is on the paper before it is accepted.
   await expect.poll(() => headingColor(page)).toBe(PROPOSED_COLOR);
 
-  await page.getByRole('button', { name: 'Accept (1)' }).click();
-  await expect(dialog).toBeHidden();
-
+  // `/ss` moved no tab: the Inspector is still where the user left it.
   await expect(page.getByTestId('inspector-tab-Page')).toHaveAttribute(
     'aria-selected',
     'true',
   );
+
+  // Reviewing the proposal means going to where the stylesheet lives.
+  await openInspectorTab(page, 'Stylesheet');
+  const diff = page.getByTestId('stylesheet-box-diff');
+  await expect(diff).toBeVisible();
+  await expect(diff).toContainText(PROPOSED);
+  await page.getByTestId('stylesheet-ai-accept').click();
+
+  await expect(page.getByTestId('stylesheet-box')).toHaveValue(PROPOSED);
   await expect.poll(() => headingColor(page)).toBe(PROPOSED_COLOR);
 
   // The turn joined this Document's conversation, which the tab shows.
-  await openInspectorTab(page, 'Stylesheet');
-  await expect(page.getByTestId('stylesheet-box')).toHaveValue(PROPOSED);
   await expect(page.getByTestId('stylesheet-ai-log')).toContainText(
     'a warmer accent',
   );

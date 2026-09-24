@@ -156,7 +156,11 @@ async function selectFirstCharacters(
   page: Page,
   characters: number,
 ): Promise<void> {
-  await page.locator('.cm-line').first().click();
+  // Focused without a pointer press: a press inside the editor is an outside
+  // click to the open popup, which dismisses it and restores the trigger — so
+  // a mouse-made selection can never become an open popup's target. The
+  // selection itself is still made by real keystrokes.
+  await page.locator('.cm-content').focus();
   await page.keyboard.press(`${MOD}+Home`);
   await page.keyboard.down('Shift');
   for (let i = 0; i < characters; i += 1) {
@@ -190,9 +194,12 @@ test('sends the target in full with an outline of the rest', async ({
   await page.getByTestId('ai-prompt-input').fill('tighten this passage');
   await page.getByRole('button', { name: 'Send' }).click();
 
-  const dialog = page.getByTestId('ai-review-dialog');
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('REWRITTEN PASSAGE');
+  const bar = page.getByTestId('ai-review-bar');
+  await expect(bar).toBeVisible();
+  // The proposal is drawn where it lands, in the editor's suggestion block.
+  await expect(page.locator('.cm-ai-suggestion')).toContainText(
+    'REWRITTEN PASSAGE',
+  );
   await page.getByRole('button', { name: /Accept/ }).click();
   await expect(page.locator('.cm-content')).toContainText('REWRITTEN PASSAGE');
 });
@@ -223,11 +230,14 @@ test('plans a Document too large for one action, one step at a time', async ({
 
   await page.getByRole('button', { name: 'Run 3 steps' }).click();
 
-  // Each step arrives as its own proposal, carrying its place in the plan.
+  // Each step arrives as its own proposal, carrying its place in the plan and
+  // drawn in the editor at the section it rewrites.
   for (const index of [0, 1, 2]) {
-    const dialog = page.getByTestId('ai-review-dialog');
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText(`REWRITTEN SECTION ${index}`);
+    const bar = page.getByTestId('ai-review-bar');
+    await expect(bar).toBeVisible();
+    await expect(page.locator('.cm-ai-suggestion')).toContainText(
+      `REWRITTEN SECTION ${index}`,
+    );
     await expect(page.getByTestId('ai-review-plan-step')).toContainText(
       `Step ${index + 1} of 3 of your plan`,
     );
@@ -255,12 +265,14 @@ test('stops a plan partway, keeping the steps already accepted', async ({
   await page.getByRole('button', { name: 'Plan the changes' }).click();
   await page.getByRole('button', { name: 'Run 3 steps' }).click();
 
-  const dialog = page.getByTestId('ai-review-dialog');
-  await expect(dialog).toBeVisible();
+  const bar = page.getByTestId('ai-review-bar');
+  await expect(bar).toBeVisible();
   await page.getByRole('button', { name: /Accept/ }).click();
 
   // The second step's proposal is on screen when the user stops the run.
-  await expect(dialog).toContainText('REWRITTEN SECTION 1');
+  await expect(page.locator('.cm-ai-suggestion')).toContainText(
+    'REWRITTEN SECTION 1',
+  );
   await page.getByRole('button', { name: 'Stop the plan' }).click();
 
   await expect(page.getByTestId('ai-plan-summary')).toContainText(
@@ -302,8 +314,8 @@ test('offers the paragraph around the cursor for a Document that cannot be plann
   await page.getByTestId('ai-prompt-input').fill('make this warmer');
   await page.getByRole('button', { name: 'Send' }).click();
 
-  const dialog = page.getByTestId('ai-review-dialog');
-  await expect(dialog).toBeVisible();
+  const bar = page.getByTestId('ai-review-bar');
+  await expect(bar).toBeVisible();
   await page.getByRole('button', { name: /Accept/ }).click();
   await expect(page.locator('.cm-content')).toContainText('REWRITTEN PASSAGE');
 });
@@ -318,12 +330,12 @@ test('rejects one step and carries on with the next', async ({ page }) => {
   await page.getByRole('button', { name: 'Run 3 steps' }).click();
 
   // Every step is decided on its own: rejecting one skips it and the next
-  // arrives in its place.
-  const dialog = page.getByTestId('ai-review-dialog');
-  await expect(dialog).toContainText('REWRITTEN SECTION 0');
+  // arrives in its place, drawn at the section it rewrites.
+  const proposalBlock = page.locator('.cm-ai-suggestion');
+  await expect(proposalBlock).toContainText('REWRITTEN SECTION 0');
   await page.getByRole('button', { name: 'Reject' }).click();
 
-  await expect(dialog).toContainText('REWRITTEN SECTION 1');
+  await expect(proposalBlock).toContainText('REWRITTEN SECTION 1');
   await expect(page.getByTestId('ai-review-plan-step')).toContainText(
     'Step 2 of 3 of your plan',
   );
@@ -332,7 +344,7 @@ test('rejects one step and carries on with the next', async ({ page }) => {
   );
   await page.getByRole('button', { name: 'Reject' }).click();
 
-  await expect(dialog).toContainText('REWRITTEN SECTION 2');
+  await expect(proposalBlock).toContainText('REWRITTEN SECTION 2');
   await page.getByRole('button', { name: /Accept/ }).click();
 
   // Only the step that was accepted was applied, and the summary says so.
@@ -359,11 +371,18 @@ test('keeps the steps already accepted when the allowance runs out', async ({
   // Step 1's proposal is the last the allowance covers, and the account is
   // told so before it is decided: an Action already counted must still be
   // usable, so Accept is never blocked by a spent allowance.
-  const dialog = page.getByTestId('ai-review-dialog');
-  await expect(dialog).toContainText('REWRITTEN SECTION 0');
+  await expect(page.locator('.cm-ai-suggestion')).toContainText(
+    'REWRITTEN SECTION 0',
+  );
   await expect.poll(ai.exhausted).toBe(true);
   await page.waitForTimeout(250);
-  await expect(dialog).not.toContainText('No AI Actions left this period');
+  // The bar's own slot for a blocked Accept states nothing at all — a spent
+  // allowance is not a reason — and Accept stays live, which the click below
+  // proves. Asserting the *absence* of that slot is the only form that can
+  // fail: its copy is written by `acceptDisabledReason`, so a negative on
+  // some particular exhausted wording would pass whatever the app did.
+  await expect(page.getByTestId('ai-accept-reason')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Accept/ })).toBeEnabled();
   await page.getByRole('button', { name: /Accept/ }).click();
 
   // The plan stops before the next step, keeping what was accepted.

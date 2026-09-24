@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The `/ai` command end to end (ai-transforms/05), in a real browser: typing
 // the trigger in the editor, the hint, the popup with the trigger consumed, the
-// review dialog, Accept, and one undo step back.
+// review bar over the inline diff, Accept, and one undo step back.
 //
 // The instance's AI state comes from the intercepted /api/me payload and the
 // proposal from the intercepted route — the provider is never reached, so the
@@ -112,16 +112,18 @@ test('typing /ai, reviewing, and accepting is one undo step', async ({
   await page.getByTestId('ai-prompt-input').fill('make the line shout');
   await page.keyboard.press('Enter');
 
-  // The proposal arrives in the review dialog; nothing has changed yet.
-  const dialog = page.getByTestId('ai-review-dialog');
-  await expect(dialog).toBeVisible();
+  // The proposal arrives in the review bar, and the change is drawn where it
+  // lands: the original struck through, the proposal in a suggestion block
+  // under it. Nothing has changed yet.
+  const bar = page.getByTestId('ai-review-bar');
+  await expect(bar).toBeVisible();
   await expect(page.getByTestId('ai-change-count')).toHaveText('1 change');
-  await expect(dialog).toContainText(SEARCH);
-  await expect(dialog).toContainText(REPLACE);
+  await expect(page.locator('.cm-ai-del')).toContainText(SEARCH);
+  await expect(page.locator('.cm-ai-suggestion')).toContainText(REPLACE);
   await expect(page.locator('.cm-content')).toContainText(SEARCH);
 
   await page.getByRole('button', { name: 'Accept (1)' }).click();
-  await expect(dialog).toBeHidden();
+  await expect(bar).toBeHidden();
 
   // Accepting is the only path into the Document, and it is one edit.
   await expect(page.locator('.cm-content')).toContainText(REPLACE);
@@ -169,10 +171,10 @@ test('rejecting leaves the Document untouched', async ({ page }) => {
   await page.getByTestId('ai-prompt-input').fill('make the line shout');
   await page.keyboard.press('Enter');
 
-  const dialog = page.getByTestId('ai-review-dialog');
-  await expect(dialog).toBeVisible();
+  const bar = page.getByTestId('ai-review-bar');
+  await expect(bar).toBeVisible();
   await page.getByRole('button', { name: 'Reject' }).click();
-  await expect(dialog).toBeHidden();
+  await expect(bar).toBeHidden();
 
   await expect(page.locator('.cm-content')).toContainText(SEARCH);
   await expect(page.locator('.cm-content')).not.toContainText(REPLACE);
@@ -215,11 +217,15 @@ test('a truncated reply is refused, not offered', async ({ page }) => {
   await page.getByTestId('ai-prompt-input').fill('make the line shout');
   await page.keyboard.press('Enter');
 
-  // A plain message with Retry, and no proposal to review.
+  // A plain message with Retry, and no proposal to review. The surfaces that
+  // would have carried one are asserted by count: `toBeHidden()` is satisfied
+  // by an element that does not exist, so it would read as coverage while
+  // checking nothing.
   const popup = page.getByTestId('ai-prompt');
   await expect(popup.getByRole('alert')).toContainText('cut off');
   await expect(popup.getByRole('button', { name: 'Retry' })).toBeVisible();
-  await expect(page.getByTestId('ai-review-dialog')).toBeHidden();
+  await expect(page.getByTestId('ai-review-bar')).toHaveCount(0);
+  await expect(page.locator('.cm-ai-suggestion')).toHaveCount(0);
   await expect(page.locator('.cm-content')).toContainText(SEARCH);
 });
 
