@@ -349,3 +349,16 @@ export function LockIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+/** The editor toolbar's Ask AI button (ai-transforms/05): a four-point spark
+ *  with two companions — the same shape language as the hint popover's label,
+ *  drawn rather than a Unicode glyph. */
+export function SparklesIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+      <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
+      <path d="M5 16l.7 1.6L7.3 18l-1.6.7L5 20.3 4.3 18.7 2.7 18l1.6-.7L5 16z" />
+    </Icon>
+  );
+}

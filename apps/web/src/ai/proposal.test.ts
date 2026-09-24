@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { applyProposal, buildChangeSet, isProposalStale } from './proposal';
+import {
+  applyProposal,
+  isProposalStale,
+  stylesheetTarget,
+} from './proposal';
 import type { AiTarget } from './types';
 
 const target = (text: string): AiTarget => ({
@@ -9,33 +13,10 @@ const target = (text: string): AiTarget => ({
   to: text.length,
 });
 
-describe('buildChangeSet', () => {
-  it('makes one change per anchored edit with surrounding context', () => {
-    const set = buildChangeSet(target('Alpha\nBeta\nGamma'), {
-      kind: 'anchored',
-      edits: [{ search: 'Beta', replace: 'BETA' }],
-    });
-    expect(set.changes).toEqual([
-      {
-        id: 0,
-        before: ['Beta'],
-        after: ['BETA'],
-        contextBefore: ['Alpha'],
-        contextAfter: ['Gamma'],
-      },
-    ]);
-  });
-
-  it('makes a single change from a replacement proposal', () => {
-    const set = buildChangeSet(target('a\nb'), {
-      kind: 'replace',
-      text: 'a\nB',
-    });
-    expect(set.changes).toHaveLength(1);
-    expect(set.changes[0]).toMatchObject({
-      before: ['a', 'b'],
-      after: ['a', 'B'],
-    });
+describe('stylesheetTarget', () => {
+  it('spans the whole box as the staleness baseline', () => {
+    const t = stylesheetTarget('.a {}');
+    expect(t).toEqual({ kind: 'document', text: '.a {}', from: 0, to: 5 });
   });
 });
 

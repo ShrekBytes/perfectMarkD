@@ -262,13 +262,17 @@ the replacement text
 
 ### The review surface
 
-- Every AI Action ends in an AI Proposal in a shared modal dialog — the same primitive the app already uses for destructive and long-form confirmations — never a silent edit.
-- The body is a diff in the app's graphite palette: monospace lines, `+` and `−` gutter marks, soft surface fills for changed lines, three lines of context around each change, a "N changes" summary, and a "show all" control when the diff is long. No red/green highlighter: chrome carries no accent hue, and `--danger` stays reserved for failures.
+_Revised after the first working pass: the modal review dialog was replaced by in-place review — the change is shown where it lands, not in a dialog on top._
+
+- Every AI Action ends in an AI Proposal, never a silent edit. A markdown proposal is drawn **in the editor at its real location**: the original text struck through and faded, the proposed text in an inset suggestion block under it (CodeMirror decorations, never document text). The review bar above the editor carries the change count, the per-change check toggles, and the actions.
+- A stylesheet proposal is reviewed **in the stylesheet box**: while a proposal is pending the box swaps to a read-only before/after diff view of the CSS — the box's own place — with Accept and Reject beneath. The conversation card in the AI block says what came back and what became of it.
+- The diff language is the app's graphite palette: `+`/`−` gutter marks, soft surface fills, struck originals. No red/green highlighter: chrome carries no accent hue, and `--danger` stays reserved for failures. An unchecked change's suggestion is dimmed, so what Accept will apply is exactly what reads solid.
 - Each change is independently checkable and checked by default, so a twenty-change rewrite can be accepted except for the one heading nobody wanted (the pattern Google Docs settled on). Accept applies the checked changes as **one undoable edit**; Reject closes with the Document untouched.
-- The dialog offers Retry (a fresh AI Action, same prompt) and Edit prompt (returns to the popup with the prompt intact; submitting is a new AI Action). Both are refused when the allowance is spent, with the exhausted copy inline.
+- The bar offers Retry (a fresh AI Action, same prompt) and Edit prompt (returns to the popup with the prompt intact; submitting is a new AI Action). Both are refused when the allowance is spent, with the exhausted copy inline.
 - A stylesheet proposal also renders the Paper Canvas with the proposed CSS applied — a provisional render that is never persisted and is reverted on Reject, so the user judges the look rather than the CSS. A markdown proposal shows the diff only; the paper re-paginates on Accept, so a review pass never costs a render of a 500-page Document.
-- Keyboard: Esc rejects and closes, Enter accepts, focus returns to the caret in the editor after accepting. Accept is disabled with a stated reason when the proposal's target text has changed underneath it, when the allowance is exhausted, or when the provider is unavailable.
+- Keyboard: Esc rejects, Enter accepts, focus returns to the caret in the editor after accepting. Accept is disabled with a stated reason when the proposal's target text has changed underneath it, when the proposal belongs to another Document, or when the provider is unavailable.
 - Accepting writes through the existing document-update path, which keeps autosave, cross-tab broadcast, and undo working exactly as for a hand edit. No extra toast: the user just reviewed the change.
+- The editor toolbar gains an **Ask AI** button (the AI Access–gated commands): pressed with a selection it opens the prompt popup scoped to the selection; pressed without, it opens it scoped to the whole Document. The typed `/ai` trigger and the button share the popup and the scope readout; the button never opens `/ss`, which is the stylesheet's own surface. There is no trigger to remove and no anchor to restore, so Esc just closes.
 
 ### The Custom Stylesheet becomes a real engine field
 

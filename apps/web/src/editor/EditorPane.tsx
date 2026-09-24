@@ -9,9 +9,13 @@ import { caretAnchorStyle } from '../ai/anchor';
 import { AiHintPopover } from '../ai/AiHintPopover';
 import { AiPlanDialog } from '../ai/AiPlanDialog';
 import { AiPromptPopover } from '../ai/AiPromptPopover';
-import { AiReviewDialog } from '../ai/AiReviewDialog';
+import { AiReviewBar } from '../ai/AiReviewBar';
 import { useAiCommand } from '../ai/useAiCommand';
 import { PricingModal } from '../pricing/PricingModal';
+import {
+  pushAiReview,
+  aiReviewDecorations,
+} from './ai-review-decorations';
 import {
   BoldIcon,
   HeadingIcon,
@@ -20,6 +24,7 @@ import {
   ListIcon,
   PageBreakIcon,
   RedoIcon,
+  SparklesIcon,
   TableIcon,
   UndoIcon,
 } from '../shell/icons';
@@ -159,7 +164,9 @@ export function EditorPane({
       parent: containerRef.current!,
       state: EditorState.create({
         doc: useDocumentStore.getState().markdown,
-        extensions: createEditorExtensions({
+        extensions: [
+        aiReviewDecorations(),
+        ...createEditorExtensions({
           onDocChanged: (text) => {
             lastSynced.current = text;
             useDocumentStore.getState().updateActive({ markdown: text });
@@ -175,6 +182,7 @@ export function EditorPane({
             apiRef: ai.editorApiRef,
           },
         }),
+        ],
       }),
     });
     viewRef.current = view;
@@ -190,6 +198,21 @@ export function EditorPane({
       viewRef.current = null;
     };
   }, []);
+
+  // The inline review lives outside React: the decorations are editor state,
+  // pushed on every render that changes the review's shape (proposal, checked
+  // set, or clearing it). Null hunks — an anchor that cannot be located — and
+  // a stylesheet review (whose diff lives in the stylesheet box) draw nothing.
+  const reviewInput =
+    ai.review && ai.hunks && !ai.stale
+      ? { hunks: ai.hunks, checked: ai.checked }
+      : null;
+  const reviewInputRef = useRef(reviewInput);
+  reviewInputRef.current = reviewInput;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view) pushAiReview(view, reviewInputRef.current);
+  }, [reviewInput]);
 
   // Markdown changed outside the editor (doc switch, import, remote adoption):
   // replace the document, isolated from undo history across documents.
@@ -272,6 +295,14 @@ export function EditorPane({
           onClick={run(insertPageBreak)}
           icon={PageBreakIcon}
         />
+        {ai.commandsEnabled && (
+          <ToolButton
+            label="Ask AI"
+            hint="Ask AI (with a selection, it targets the selection)"
+            onClick={() => ai.openFromToolbar()}
+            icon={SparklesIcon}
+          />
+        )}
         <div className="ml-auto flex items-center gap-0.5">
           <ToolButton
             label="Undo"
@@ -289,6 +320,30 @@ export function EditorPane({
       </div>
 
       <div ref={containerRef} className="pm-editor min-h-0 flex-1" />
+
+      {ai.review && ai.hunks && ai.review.command === 'markdown' && (
+        // The review bar rides above the editor, under the toolbar: the
+        // changes themselves are drawn in the text below it. Keyed on the
+        // proposal's nonce so a Retry starts a fresh checked set.
+        <AiReviewBar
+          key={ai.review.nonce}
+          command={ai.review.command}
+          hunks={ai.hunks}
+          checked={ai.checked}
+          onToggle={ai.toggleChange}
+          disabledReason={ai.acceptDisabledReason}
+          busy={ai.request.status === 'working'}
+          retryBlocked={ai.retryBlocked}
+          error={ai.request.status === 'error' ? ai.request.message : null}
+          plan={
+            ai.review.plan ? { ...ai.review.plan, onStop: ai.stopPlan } : null
+          }
+          onAccept={ai.accept}
+          onReject={ai.reject}
+          onRetry={ai.retry}
+          onEditPrompt={ai.editPrompt}
+        />
+      )}
 
       {ai.hint && (
         <AiHintPopover
@@ -324,9 +379,8 @@ export function EditorPane({
         />
       )}
 
-      {/* The AI Plan's surface, and the review dialog's, never share the
-          screen: a step's proposal is the only modal while it is under
-          review, and the plan's progress shows between steps. */}
+      {/* The AI Plan's surface: a step's proposal reviews in the bar above
+          the editor, and the plan's progress dialog shows between steps. */}
       {ai.plan && !ai.review && (
         <AiPlanDialog
           key={ai.plan.nonce}
@@ -370,28 +424,6 @@ export function EditorPane({
           handleImageFiles(files);
         }}
       />
-
-      {ai.review && ai.changeSet && (
-        // Keyed on the proposal's nonce: a Retry returns a new one, and the
-        // dialog's own state (which changes are checked, whether the long diff
-        // is expanded) must start fresh rather than carry over.
-        <AiReviewDialog
-          key={ai.review.nonce}
-          command={ai.review.command}
-          changeSet={ai.changeSet}
-          disabledReason={ai.acceptDisabledReason}
-          busy={ai.request.status === 'working'}
-          retryBlocked={ai.retryBlocked}
-          error={ai.request.status === 'error' ? ai.request.message : null}
-          plan={
-            ai.review.plan ? { ...ai.review.plan, onStop: ai.stopPlan } : null
-          }
-          onAccept={ai.accept}
-          onReject={ai.reject}
-          onRetry={ai.retry}
-          onEditPrompt={ai.editPrompt}
-        />
-      )}
 
       {pricingOpen && <PricingModal onClose={() => setPricingOpen(false)} />}
     </div>

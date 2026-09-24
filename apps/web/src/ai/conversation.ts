@@ -103,6 +103,23 @@ export function previewReply(
     : null;
 }
 
+/**
+ * The pending proposal for the stylesheet box (spec §The review surface): the
+ * newest undecided turn's id, what the box held when it was sent, and the
+ * complete proposed replacement — the same shape `previewReply` picks, but
+ * carrying what the box view needs to diff the proposal where it was asked
+ * for. An accepted/rejected turn is not pending, and an older turn never
+ * becomes pending again once a newer one exists.
+ */
+export function pendingProposal(
+  turns: StylesheetTurn[] | undefined,
+): { id: number; against: string; reply: string } | null {
+  const newest = turns?.[turns.length - 1];
+  return newest && newest.status === 'proposal' && newest.decision === null
+    ? { id: newest.id, against: newest.against, reply: newest.reply }
+    : null;
+}
+
 export interface StylesheetConversationStore {
   /** Turns per Document id; a Document's log is created on its first turn. */
   turns: Record<string, StylesheetTurn[]>;

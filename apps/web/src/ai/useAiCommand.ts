@@ -47,12 +47,8 @@ import {
   useStylesheetConversation,
   type StylesheetDecision,
 } from './conversation';
-import {
-  applyProposal,
-  buildChangeSet,
-  isProposalStale,
-  type AiChangeSet,
-} from './proposal';
+import { applyProposal, isProposalStale } from './proposal';
+import { locateProposal, type InlineHunk } from './inline';
 import { planBrief, planSummary, type AiPlanState } from './plan';
 import type { AiEditorApi } from '../editor/ai-trigger';
 import type { AiHint, AiCommandFired } from '../editor/ai-trigger';
@@ -91,8 +87,8 @@ export interface AiReviewState {
   /** Set when this proposal is one step of an approved AI Plan. */
   plan: { at: number; total: number } | null;
   /**
-   * Bumped per proposal so the dialog's own state (which changes are checked,
-   * whether the long diff is expanded) resets when a Retry returns a new one.
+   * Bumped per proposal so the review's own state (which changes are checked)
+   * resets when a Retry returns a new one.
    */
   nonce: number;
 }
@@ -124,8 +120,14 @@ export interface AiCommandController {
   review: AiReviewState | null;
   /** The AI Plan awaiting approval, running, or just finished. */
   plan: AiPlanState | null;
-  /** The review's diff, ready to render; null when nothing is under review. */
-  changeSet: AiChangeSet | null;
+  /**
+   * The review's changes, located in the Document and ready to draw; null
+   * when nothing is under review or the changes cannot be shown where they
+   * land (an anchor that no longer matches exactly once).
+   */
+  hunks: InlineHunk[] | null;
+  /** Which of the hunks Accept will apply (the review bar's checkboxes). */
+  checked: ReadonlySet<number>;
   /** Whether the review's target changed underneath it. */
   stale: boolean;
   /** Why the review's Accept is disabled beyond "nothing is checked". */
@@ -133,13 +135,17 @@ export interface AiCommandController {
   /** Whether a Retry is running, or the allowance is spent so it cannot start. */
   retryBlocked: boolean;
   submit(instruction: string): void;
+  /** Opens the prompt popup from the toolbar button (never from typed input). */
+  openFromToolbar(): void;
   /** Asks for an AI Plan instead of running a whole-Document action. */
   submitPlan(instruction: string): void;
   /** Works on the paragraph around the caret instead of the refused target. */
   useParagraphRange(): void;
   cancel(): void;
-  accept(checked: ReadonlySet<number>): void;
+  accept(): void;
   reject(): void;
+  /** Checks or unchecks one change of the review. */
+  toggleChange(id: number): void;
   retry(): void;
   editPrompt(): void;
   approvePlan(checked: ReadonlySet<number>): void;
@@ -158,6 +164,8 @@ export function useAiCommand(
   const [ladder, setLadder] = useState<AiLadderDecision | null>(null);
   const [request, setRequest] = useState<AiRequestState>({ status: 'idle' });
   const [review, setReview] = useState<AiReviewState | null>(null);
+  /** Which of the review's changes Accept will apply. Reset per proposal. */
+  const [checked, setChecked] = useState<ReadonlySet<number>>(new Set());
   const [plan, setPlan] = useState<AiPlanState | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const editorApiRef = useRef<AiEditorApi | null>(null);
@@ -262,6 +270,24 @@ export function useAiCommand(
   );
 
   /**
+   * The toolbar's AI button: the same popup, opened without typed input. The
+   * target follows the editor exactly as a fired command's does — the
+   * selection when there is one, the whole Document when there is not. There
+   * is no trigger to remove and no anchor to restore, so Esc just closes.
+   */
+  const openFromToolbar = useCallback(() => {
+    if (!commandsEnabled) return;
+    setHint(null);
+    setRequest({ status: 'idle' });
+    setReview(null);
+    setApplyError(null);
+    setPopup({ command: 'markdown', removed: '', at: 0, instruction: '' });
+    const scope = computeScope('markdown');
+    setPromptScope(scope);
+    setLadder(decideFor('markdown', scope));
+  }, [commandsEnabled, computeScope, decideFor]);
+
+  /**
    * The target follows the editor: a selection made while the popup is open
    * becomes the target, and the ladder is re-decided for it, so what the
    * readout says is what the request sends.
@@ -364,6 +390,20 @@ export function useAiCommand(
         }
         abortRef.current = null;
         nonceRef.current += 1;
+        // A stylesheet Action reviews in the stylesheet box (the conversation
+        // turn holds the proposal; the Stylesheet tab swaps the box to its
+        // diff view), so no markdown review is opened for it.
+        if (command === 'stylesheet') {
+          setPopup(null);
+          setRequest({ status: 'idle' });
+          void useAccountStore.getState().refresh();
+          return;
+        }
+        setChecked(
+          proposal.kind === 'anchored'
+            ? new Set(proposal.edits.map((_, index) => index))
+            : new Set([0]),
+        );
         setReview({
           command,
           target,
@@ -490,6 +530,11 @@ export function useAiCommand(
         abortRef.current = null;
         nonceRef.current += 1;
         setPlan({ ...state, phase: 'running', at });
+        setChecked(
+          result.proposal.kind === 'anchored'
+            ? new Set(result.proposal.edits.map((_, index) => index))
+            : new Set([0]),
+        );
         setReview({
           command: 'markdown',
           target: {
@@ -676,53 +721,56 @@ export function useAiCommand(
     setRequest({ status: 'idle' });
   }, [decideFor, documentText, getEditor, popup]);
 
-  const accept = useCallback(
-    (checked: ReadonlySet<number>) => {
-      if (!review || foreignReview) return;
-      const applied = applyProposal(review.target, review.proposal, checked);
-      if (!applied.ok) {
-        setApplyError(applied.reason);
+  const accept = useCallback(() => {
+    if (!review || foreignReview) return;
+    const applied = applyProposal(review.target, review.proposal, checked);
+    if (!applied.ok) {
+      setApplyError(applied.reason);
+      return;
+    }
+    const stepPlan = review.plan;
+    const state = planRef.current;
+    if (review.command === 'stylesheet') {
+      useDocumentStore.getState().updateActive({
+        settings: applyStylesheetProposal(applied.text),
+      });
+      // The turn is decided in the Document's conversation, so the log and
+      // the provisional paper agree with what just happened.
+      decideTurn(review, 'accepted');
+      // The user asked from the editor; put the caret back where it was.
+      getEditor()?.focus();
+    } else {
+      // A final staleness guard: never write into text it no longer matches.
+      const view = getEditor();
+      const current = view
+        ? view.state.doc
+            .toString()
+            .slice(review.target.from, review.target.to)
+        : '';
+      if (current !== review.target.text) {
+        setApplyError(
+          'The text this proposal targets has changed — Retry for a fresh proposal.',
+        );
         return;
       }
-      const stepPlan = review.plan;
-      const state = planRef.current;
-      if (review.command === 'stylesheet') {
-        useDocumentStore.getState().updateActive({
-          settings: applyStylesheetProposal(applied.text),
-        });
-        // The turn is decided in the Document's conversation, so the log and
-        // the provisional paper agree with what just happened.
-        decideTurn(review, 'accepted');
-        // The user asked from the editor; put the caret back where it was.
-        getEditor()?.focus();
-      } else {
-        // A final staleness guard: never write into text it no longer matches.
-        const view = getEditor();
-        const current = view
-          ? view.state.doc
-              .toString()
-              .slice(review.target.from, review.target.to)
-          : '';
-        if (current !== review.target.text) {
-          setApplyError(
-            'The text this proposal targets has changed — Retry for a fresh proposal.',
-          );
-          return;
-        }
-        // One dispatch: autosave, cross-tab broadcast, and undo all behave as
-        // they do for a hand edit, and the whole acceptance is one undo step.
-        editorApiRef.current?.replaceRange(
-          review.target.from,
-          review.target.to,
-          applied.text,
-        );
-      }
-      setReview(null);
-      setApplyError(null);
-      if (state && stepPlan) advancePlan(state, stepPlan.at, true);
-    },
-    [advancePlan, foreignReview, getEditor, review],
-  );
+      // One dispatch: autosave, cross-tab broadcast, and undo all behave as
+      // they do for a hand edit, and the whole acceptance is one undo step.
+      editorApiRef.current?.replaceRange(
+        review.target.from,
+        review.target.to,
+        applied.text,
+      );
+    }
+    setReview(null);
+    setApplyError(null);
+    if (state && stepPlan) advancePlan(state, stepPlan.at, true);
+  }, [
+    advancePlan,
+    checked,
+    foreignReview,
+    getEditor,
+    review,
+  ]);
 
   const reject = useCallback(() => {
     abortRef.current?.abort();
@@ -738,6 +786,16 @@ export function useAiCommand(
     // one at a time, and stopping the run is its own action.
     if (state && stepPlan) advancePlan(state, stepPlan.at, false);
   }, [advancePlan, getEditor, review]);
+
+  /** Checks or unchecks one change; the decoration follows (solid/dimmed). */
+  const toggleChange = useCallback((id: number) => {
+    setChecked((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   /** Retry: a fresh AI Action for the same prompt, in place. A plan step is
    *  re-resolved against the Document, so a section that moved is followed. */
@@ -776,7 +834,7 @@ export function useAiCommand(
     setRequest({ status: 'idle' });
   }, [computeScope, decideFor, review]);
 
-  // Staleness for the review dialog: the text as it stands now. The checker
+  // Staleness for the inline review: the text as it stands now. The checker
   // slices the target's own range out of what it is given, so it gets the
   // whole Document — passing a pre-sliced range made every target that does
   // not start at offset 0 read as changed. A foreign review is not checked
@@ -791,9 +849,14 @@ export function useAiCommand(
       ? isProposalStale(review.target, currentTargetText)
       : false;
 
-  const changeSet = review
-    ? buildChangeSet(review.target, review.proposal)
-    : null;
+  // The review's changes, located for the editor's decorations. Recomputed
+  // from the live store so a Document switch re-derives it; null when the
+  // changes cannot be shown where they land (the bar says so via stale/apply
+  // error, and Accept is blocked by the same guards as before).
+  const hunks =
+    review && review.command === 'markdown' && !foreignReview
+      ? locateProposal(review.target, review.proposal)
+      : null;
 
   /**
    * Why Accept is unavailable. A spent allowance is deliberately *not* one of
@@ -839,16 +902,19 @@ export function useAiCommand(
     request,
     review,
     plan,
-    changeSet,
+    hunks,
+    checked,
     stale,
     acceptDisabledReason,
     retryBlocked,
     submit,
     submitPlan,
+    openFromToolbar,
     useParagraphRange,
     cancel,
     accept,
     reject,
+    toggleChange,
     retry,
     editPrompt,
     approvePlan,

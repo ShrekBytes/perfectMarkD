@@ -219,17 +219,21 @@ describe('the AI block of the Stylesheet tab — its own states', () => {
 });
 
 describe('the AI block — a turn and its proposal card', () => {
-  it('sends the box, shows the diff, and writes the box only on Accept', async () => {
+  it('sends the box, swaps the box to the diff view, and writes the box only on Accept', async () => {
     seed(aiBlock());
     const route = routeStylesheet();
     openTab();
 
     await send('tighter spacing');
 
-    const card = await screen.findByTestId('stylesheet-ai-proposal');
-    // The diff carries both sides: what the box holds, and what is proposed.
-    expect(card).toHaveTextContent(CSS);
-    expect(card).toHaveTextContent(PROPOSED);
+    // The box swapped to the proposed-diff view, which carries both sides:
+    // what the box held, and what is proposed.
+    const diff = await screen.findByTestId('stylesheet-box-diff');
+    expect(diff).toHaveTextContent(CSS);
+    expect(diff).toHaveTextContent(PROPOSED);
+    expect(
+      screen.queryByTestId('stylesheet-box'),
+    ).not.toBeInTheDocument();
     // Nothing is written until Accept.
     expect(activeCSS()).toBe(CSS);
     expect(lastRequest(route)).toMatchObject({
@@ -246,7 +250,9 @@ describe('the AI block — a turn and its proposal card', () => {
     expect(useDocumentStore.getState().settings.customStylesheetEnabled).toBe(
       true,
     );
-    // The turn stays in the log, so the next instruction can refer to it.
+    // The box is back, holding the accepted stylesheet, and the turn stays in
+    // the log so the next instruction can refer to it.
+    expect(screen.getByTestId('stylesheet-box')).toHaveValue(PROPOSED);
     expect(screen.getByTestId('stylesheet-ai-decision')).toHaveTextContent(
       'Accepted',
     );
@@ -258,41 +264,46 @@ describe('the AI block — a turn and its proposal card', () => {
     openTab();
 
     await send('tighter spacing');
-    await screen.findByTestId('stylesheet-ai-proposal');
+    await screen.findByTestId('stylesheet-box-diff');
 
     const user = userEvent.setup();
     await user.click(screen.getByTestId('stylesheet-ai-reject'));
 
+    // The plain box is back, byte-identical, and the decided turn is readable
+    // in the log with no Accept left behind.
     expect(activeCSS()).toBe(CSS);
+    expect(screen.getByTestId('stylesheet-box')).toHaveValue(CSS);
     expect(screen.getByTestId('stylesheet-ai-decision')).toHaveTextContent(
       'Rejected',
-    );
-    // The rejected proposal is still readable, and no Accept is left behind.
-    expect(screen.getByTestId('stylesheet-ai-proposal')).toHaveTextContent(
-      PROPOSED,
     );
     expect(
       screen.queryByTestId('stylesheet-ai-accept'),
     ).not.toBeInTheDocument();
   });
 
-  it('refuses a stale proposal: a hand edit under it disables Accept', async () => {
+  it('refuses a stale proposal: a hand edit under it replaces Accept with the stale reason', async () => {
     seed(aiBlock());
     routeStylesheet();
     openTab();
 
     await send('tighter spacing');
-    await screen.findByTestId('stylesheet-ai-proposal');
+    await screen.findByTestId('stylesheet-box-diff');
 
-    // The box is authoritative — editing it by hand is always safe.
-    fireEvent.change(screen.getByTestId('stylesheet-box'), {
-      target: { value: '.mpdf-doc h2 { color: teal; }' },
+    // The diff view is read-only; the stale path is simulated by editing the
+    // settings underneath (a hand edit to the textarea is impossible while
+    // the diff view holds its place).
+    act(() => {
+      useDocumentStore
+        .getState()
+        .updateActive({ settings: { customStylesheet: '.mpdf-doc h2 { color: teal; }' } });
     });
 
     expect(screen.getByTestId('stylesheet-ai-stale')).toHaveTextContent(
       'changed since this was proposed',
     );
-    expect(screen.getByTestId('stylesheet-ai-accept')).toBeDisabled();
+    expect(
+      screen.queryByTestId('stylesheet-ai-accept'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a plain message with Retry when the request fails, naming nothing', async () => {
@@ -346,13 +357,17 @@ describe('the AI block — a turn and its proposal card', () => {
     expect(last.history[0]?.reply).toBe(PROPOSED);
   });
 
-  it('sends a hand-edited box rather than a stale transcript', async () => {
+  it('sends the box as it stands for a second ask rather than a stale transcript', async () => {
     seed(aiBlock());
     const route = routeStylesheet();
     openTab();
 
     await send('tighter spacing');
-    await screen.findByTestId('stylesheet-ai-proposal');
+    await screen.findByTestId('stylesheet-box-diff');
+    // Decide the pending proposal by hand (Reject), then hand-edit the box.
+    await userEvent
+      .setup()
+      .click(screen.getByTestId('stylesheet-ai-reject'));
     fireEvent.change(screen.getByTestId('stylesheet-box'), {
       target: { value: '.mpdf-doc h3 { color: navy; }' },
     });

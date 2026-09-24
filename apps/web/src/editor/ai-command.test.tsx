@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { EditorView } from '@codemirror/view';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorPane } from './EditorPane';
@@ -367,7 +373,7 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
     expect(panel).not.toHaveTextContent('Whole document');
   });
 
-  it('joins the Document’s conversation: the box is sent, Accept writes it', async () => {
+  it('joins the Document’s conversation: the box is sent, and the proposal reviews in the stylesheet box', async () => {
     seedAi();
     const route = routeStylesheet();
     render(<EditorPane />);
@@ -375,9 +381,8 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
 
     await askForStylesheet(user, 'tighter spacing');
 
-    const dialog = await screen.findByTestId('ai-review-dialog');
-    expect(dialog).toHaveTextContent(CSS);
-    expect(dialog).toHaveTextContent(PROPOSED);
+    // The proposal reviews in the stylesheet box (StylesheetBoxDiff), not in
+    // a dialog: the conversation holds the turn while the box shows the diff.
     expect(route).toEqual([
       { instruction: 'tighter spacing', css: CSS, history: [] },
     ]);
@@ -393,12 +398,9 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
     });
     expect(useDocumentStore.getState().settings.customStylesheet).toBe(CSS);
 
-    await user.click(screen.getByRole('button', { name: 'Accept (1)' }));
-
-    expect(useDocumentStore.getState().settings.customStylesheet).toBe(
-      PROPOSED,
-    );
-    expect(turns()[0]).toMatchObject({ decision: 'accepted' });
+    // The Inspector's Stylesheet tab is where the diff lives; from the editor
+    // pane alone the turn is pending and undecided.
+    expect(turns()[0]!.status).toBe('proposal');
   });
 
   it('Reject decides the turn and leaves the box exactly as it was', async () => {
@@ -408,11 +410,12 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
     const user = userEvent.setup();
 
     await askForStylesheet(user, 'tighter spacing');
-    await screen.findByTestId('ai-review-dialog');
-    await user.click(screen.getByRole('button', { name: 'Reject' }));
-
+    // The popup closes when the reply lands; the turn becomes a pending
+    // proposal in the log for the stylesheet box to review.
+    await waitFor(() =>
+      expect(turns()[0]).toMatchObject({ status: 'proposal', decision: null }),
+    );
     expect(useDocumentStore.getState().settings.customStylesheet).toBe(CSS);
-    expect(turns()[0]).toMatchObject({ decision: 'rejected' });
   });
 
   it('replays the last three exchanges of this Document’s conversation', async () => {
@@ -423,8 +426,15 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
 
     for (const instruction of ['one', 'two', 'three', 'four']) {
       await askForStylesheet(user, instruction);
-      await screen.findByTestId('ai-review-dialog');
-      await user.click(screen.getByRole('button', { name: 'Reject' }));
+      // Each reply lands as a pending turn; the next ask needs no decision —
+      // the conversation replays settled exchanges and the newest pending one
+      // simply waits (the box view decides it, one at a time).
+      await waitFor(() =>
+        expect(turns().at(-1)).toMatchObject({
+          instruction,
+          status: 'proposal',
+        }),
+      );
     }
 
     const last = route.at(-1)!;
@@ -456,43 +466,44 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
     expect(useDocumentStore.getState().settings.customStylesheet).toBe(CSS);
   });
 
-  it('refuses a proposal that belongs to a Document the user has left', async () => {
+  it('leaves the pending turn behind when the user switches Documents', async () => {
     seedAi();
     routeStylesheet();
     render(<EditorPane />);
     const user = userEvent.setup();
 
     await askForStylesheet(user, 'a warmer accent');
-    await screen.findByTestId('ai-review-dialog');
+    await waitFor(() =>
+      expect(turns()).toHaveLength(1),
+    );
+    const firstDocTurns = turns();
+    expect(firstDocTurns).toHaveLength(1);
 
-    // The review survives a Document switch, but it belongs to the Document it
-    // was computed against — writing it into the new one would be silent
-    // cross-Document damage.
+    // The turn belongs to the Document it was asked in; the new Document has
+    // an empty log, and the old turn stays pending there for the user to
+    // decide when they return.
     await act(async () => {
       await useDocumentStore.getState().createDocument();
     });
 
-    expect(screen.getByTestId('ai-accept-reason')).toHaveTextContent(
-      'belongs to another document',
-    );
-    expect(screen.getByRole('button', { name: 'Accept (1)' })).toBeDisabled();
+    expect(turns()).toHaveLength(0);
     expect(useDocumentStore.getState().settings.customStylesheet).toBe('');
   });
 
-  it('returns focus to the caret after accepting', async () => {
+  it('hands the review to the stylesheet conversation, not a modal', async () => {
     seedAi();
     routeStylesheet();
     render(<EditorPane />);
     const user = userEvent.setup();
 
     await askForStylesheet(user, 'a warmer accent');
-    await screen.findByTestId('ai-review-dialog');
-    await user.click(screen.getByRole('button', { name: 'Accept (1)' }));
 
-    expect(
-      editorView().hasFocus ||
-        document.activeElement?.closest('.cm-editor') !== null,
-    ).toBe(true);
+    // No review dialog for /ss: the diff lives in the stylesheet box, the
+    // provisional paper on the canvas, and the turn in the conversation.
+    await waitFor(() => expect(turns()[0]).toMatchObject({ status: 'proposal' }));
+    expect(screen.queryByTestId('ai-review-dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ai-review-bar')).not.toBeInTheDocument();
+    expect(turns()[0]).toMatchObject({ status: 'proposal', decision: null });
   });
 
   it('never touches the Inspector: no tab is switched, no pane moved', async () => {
@@ -504,7 +515,7 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
     // The editor surface has no Inspector at all; the Stylesheet tab's block
     // reads the same conversation. Nothing here can move the Inspector's tab.
     await askForStylesheet(user, 'tighter spacing');
-    await screen.findByTestId('ai-review-dialog');
+    await waitFor(() => expect(turns()).toHaveLength(1));
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(turns()).toHaveLength(1);
   });

@@ -103,3 +103,47 @@
 .pm-editor .cm-md-sep {
   color: var(--ink-faint);
 }
+
+/* ─── Inline AI review (ai-review-decorations.ts) ──────────────────────────── */
+/* The proposed change drawn where it lands: the original struck and faded, the
+   proposed text in an inset block under it. Graphite only — no accent hue, no
+   red/green; an unchecked change's block is dimmed, not colored. */
+
+.pm-editor .cm-ai-del {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: var(--ink-faint);
+  background: var(--accent-soft);
+}
+
+.pm-editor .cm-ai-add {
+  background: var(--accent-soft);
+}
+
+.pm-editor .cm-ai-suggestion {
+  margin: 2px 16px 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pm-editor .cm-ai-suggestion.cm-ai-dimmed {
+  color: var(--ink-faint);
+  border-style: dashed;
+}
+
+.pm-editor .cm-ai-suggestion::before {
+  content: 'AI';
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}

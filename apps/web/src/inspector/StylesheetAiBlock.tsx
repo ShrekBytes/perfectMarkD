@@ -1,10 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The AI block of the Stylesheet tab (ai-transforms/06): a conversation under
-// the CSS box. Each reply is a proposal card — the stylesheet diff, Accept, and
-// Reject — and every turn stays in the log, decided or not, because "not like
-// that — try it with a thinner rule" only means something if the turn it refers
-// to is still there. Accept writes the box; Reject leaves it exactly as it was;
-// the box is what every request sends, so a hand edit is never overwritten by
+// the CSS box. Each reply is a turn — the instruction and what became of it —
+// and every turn stays in the log, decided or not, because "not like that —
+// try it with a thinner rule" only means something if the turn it refers to is
+// still there. A pending reply's diff and its Accept/Reject live in the box
+// above (StylesheetBoxDiff): the review happens where the stylesheet lives.
+// The box is what every request sends, so a hand edit is never overwritten by
 // stale context.
 //
 // The block states its own condition, because the box works whether or not AI
@@ -18,14 +19,8 @@
 import { useState } from 'react';
 import { errorToMessage } from '../api/client';
 import { useAccountStore, useAiState } from '../auth/account-store';
-import { AiDiff } from '../ai/AiDiff';
 import { FirstUseNotice } from '../ai/FirstUseNotice';
 import { periodLabel, resetDate } from '../ai/format';
-import {
-  buildChangeSet,
-  isProposalStale,
-  stylesheetTarget,
-} from '../ai/proposal';
 import { useStylesheetChat } from '../ai/useStylesheetChat';
 import type { StylesheetTurn } from '../ai/conversation';
 
@@ -154,9 +149,7 @@ export function StylesheetAiBlock({
               <Turn
                 key={turn.id}
                 turn={turn}
-                css={css}
                 busy={chat.busy}
-                onDecide={chat.decide}
                 onRetry={chat.retry}
               />
             ))}
@@ -216,14 +209,11 @@ export function StylesheetAiBlock({
 
 interface TurnProps {
   turn: StylesheetTurn;
-  /** The box as it stands, for the staleness check. */
-  css: string;
   busy: boolean;
-  onDecide: (turnId: number, decision: 'accepted' | 'rejected') => void;
   onRetry: (turnId: number) => void;
 }
 
-function Turn({ turn, css, busy, onDecide, onRetry }: TurnProps) {
+function Turn({ turn, busy, onRetry }: TurnProps) {
   return (
     <li
       data-testid="stylesheet-ai-turn"
@@ -255,78 +245,38 @@ function Turn({ turn, css, busy, onDecide, onRetry }: TurnProps) {
         </>
       )}
 
-      {turn.status === 'proposal' && (
-        <ProposalCard turn={turn} css={css} onDecide={onDecide} />
-      )}
+      {turn.status === 'proposal' && <ProposalCard turn={turn} />}
     </li>
   );
 }
 
+/**
+ * A replied turn. The diff and the decision live in the box view while the
+ * proposal is pending; this card says what came back and what became of it.
+ */
 function ProposalCard({
   turn,
-  css,
-  onDecide,
 }: {
   turn: Extract<StylesheetTurn, { status: 'proposal' }>;
-  css: string;
-  onDecide: (turnId: number, decision: 'accepted' | 'rejected') => void;
 }) {
-  // A stylesheet reply is a whole-CSS replacement: one change, whose "before"
-  // is the box as it stood when the request went out.
-  const target = stylesheetTarget(turn.against);
-  const changeSet = buildChangeSet(target, {
-    kind: 'replace',
-    text: turn.reply,
-  });
-  const stale = isProposalStale(target, css);
-
   return (
     <div data-testid="stylesheet-ai-proposal" className="mt-1">
-      {changeSet.changes.map((change) => (
-        <AiDiff key={change.id} change={change} />
-      ))}
-
       {turn.decision ? (
         <p
           data-testid="stylesheet-ai-decision"
-          className="mt-1 text-[11px] leading-4 text-ink-faint"
+          className="text-[11px] leading-4 text-ink-faint"
         >
           {turn.decision === 'accepted'
             ? 'Accepted — written to the box.'
             : 'Rejected — the box is unchanged.'}
         </p>
       ) : (
-        <>
-          {stale && (
-            <p
-              role="status"
-              data-testid="stylesheet-ai-stale"
-              className="mt-1 text-[11px] leading-4 text-danger"
-            >
-              The stylesheet changed since this was proposed — ask again to use
-              it.
-            </p>
-          )}
-          <div className="mt-1 flex items-center gap-1">
-            <button
-              type="button"
-              data-testid="stylesheet-ai-accept"
-              onClick={() => onDecide(turn.id, 'accepted')}
-              disabled={stale}
-              className={`${ACTION_BUTTON} bg-accent-strong text-accent-ink hover:bg-accent-deep`}
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              data-testid="stylesheet-ai-reject"
-              onClick={() => onDecide(turn.id, 'rejected')}
-              className={SECONDARY_BUTTON}
-            >
-              Reject
-            </button>
-          </div>
-        </>
+        <p
+          role="status"
+          className="text-[11px] leading-4 text-ink-faint"
+        >
+          A proposal is in the box above — review it there.
+        </p>
       )}
     </div>
   );
