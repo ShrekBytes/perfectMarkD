@@ -64,6 +64,8 @@ export function AiReviewBar({
 
   // Enter accepts, Esc rejects — the same keyboard contract the dialog had,
   // minus the modal focus trap: the editor keeps its caret and its undo.
+  // Typing surfaces are excluded: Enter inside the editor (contenteditable),
+  // a field, or a button means what it means there, not "accept".
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -75,7 +77,10 @@ export function AiReviewBar({
       const target = event.target as HTMLElement | null;
       if (
         target &&
-        (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON')
+        (target.tagName === 'TEXTAREA' ||
+          target.tagName === 'BUTTON' ||
+          target.tagName === 'INPUT' ||
+          target.isContentEditable)
       ) {
         return;
       }

@@ -19,6 +19,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import type { AiLadderDecision, AiScope } from '@perfectmarkd/core';
 import { useEscapeLayer } from '../shell/focus';
@@ -47,12 +48,17 @@ interface AiPromptPopoverProps {
   initialInstruction?: string;
   /** Anchored position, relative to the editor pane. */
   style: CSSProperties;
+  /** Element the popup was opened from (the toolbar button), if any. A press
+   *  on it is not an outside click: the button toggles the popup itself. */
+  anchorRef?: RefObject<HTMLElement | null>;
   onSubmit: (instruction: string) => void;
   /** Asks for an AI Plan, for a Document too large for one action. */
   onPlan: (instruction: string) => void;
   /** Works on the paragraph around the caret instead of the refused target. */
   onUseParagraphRange: () => void;
   onCancel: () => void;
+  /** An outside press (not on the panel or the anchor) asked to close. */
+  onDismiss?: () => void;
   onOpenPricing: () => void;
 }
 
@@ -183,14 +189,17 @@ export function AiPromptPopover({
   request,
   initialInstruction = '',
   style,
+  anchorRef,
   onSubmit,
   onPlan,
   onUseParagraphRange,
   onCancel,
+  onDismiss = () => {},
   onOpenPricing,
 }: AiPromptPopoverProps) {
   const [instruction, setInstruction] = useState(initialInstruction);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   // Escape cancels; registered as a layer so a review dialog above it wins.
   useEscapeLayer(true, onCancel);
 
@@ -199,6 +208,25 @@ export function AiPromptPopover({
   }, []);
 
   const working = request.status === 'working';
+
+  // An outside press closes the popup — whether it was opened by the toolbar
+  // button or by a typed `/ai`/`/ss`. Presses inside the panel are the popup
+  // working, and a press on the anchor is the button toggling it, so neither
+  // counts. While a request is running the popup is that Action's progress
+  // surface, so only Cancel (or Esc) ends the run; dismissal is inert.
+  useEffect(() => {
+    if (working) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (panelRef.current?.contains(target)) return;
+      if (anchorRef?.current?.contains(target)) return;
+      onDismiss();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [anchorRef, onDismiss, working]);
+
   const info = AI_COMMANDS[command];
   // A refused target has nothing to run: the popup states why and offers the
   // paragraph instead of a Send button that could only fail.
@@ -214,6 +242,7 @@ export function AiPromptPopover({
 
   return (
     <div
+      ref={panelRef}
       data-testid="ai-prompt"
       role="dialog"
       aria-label={`AI · ${info.label}`}

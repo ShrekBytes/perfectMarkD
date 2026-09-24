@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from 'react';
 import { isolateHistory, redo, undo } from '@codemirror/commands';
 import { EditorState, type StateCommand } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -63,14 +70,19 @@ function ToolButton(props: {
   hint?: string;
   onClick?: () => void;
   disabled?: boolean;
+  /** Mirrors the popup state for toggle buttons (the Ask AI button). */
+  ariaExpanded?: boolean;
+  ref?: Ref<HTMLButtonElement>;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
 }) {
   const Icon = props.icon;
   return (
     <button
+      ref={props.ref}
       type="button"
       aria-label={props.label}
       title={props.hint ?? props.label}
+      aria-expanded={props.ariaExpanded}
       onClick={props.onClick}
       disabled={props.disabled}
       className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
@@ -109,6 +121,9 @@ export function EditorPane({
   // The `/ai` and `/ss` surface (ai-transforms/05). The controller reads AI
   // state from the account store; this pane only renders what it reports.
   const ai = useAiCommand(() => viewRef.current);
+  // The toolbar button that can open the popup: the popup exempts it from
+  // outside-click dismissal so the button can toggle the panel closed.
+  const askAiButtonRef = useRef<HTMLButtonElement>(null);
   // The editor is built once, so its extension keeps the first render's
   // handlers. These arrows close over a ref instead, so the extension always
   // reaches the current controller even after the account loads.
@@ -299,7 +314,9 @@ export function EditorPane({
           <ToolButton
             label="Ask AI"
             hint="Ask AI (with a selection, it targets the selection)"
-            onClick={() => ai.openFromToolbar()}
+            onClick={() => ai.toggleFromToolbar()}
+            ariaExpanded={ai.popup !== null}
+            ref={askAiButtonRef}
             icon={SparklesIcon}
           />
         )}
@@ -371,10 +388,12 @@ export function EditorPane({
             ai.popup.at,
             paneRef.current,
           )}
+          anchorRef={askAiButtonRef}
           onSubmit={ai.submit}
           onPlan={ai.submitPlan}
           onUseParagraphRange={ai.useParagraphRange}
           onCancel={ai.cancel}
+          onDismiss={ai.dismiss}
           onOpenPricing={() => setPricingOpen(true)}
         />
       )}

@@ -65,6 +65,18 @@ function seedAi(overrides: Partial<AiAccountState> = {}): void {
   });
 }
 
+/** A markdown route that never answers until its request is aborted. */
+function routeMarkdownPending() {
+  return vi.spyOn(aiApi, 'requestMarkdown').mockImplementation(
+    ((_request, signal) =>
+      new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () =>
+          reject(new DOMException('Aborted', 'AbortError')),
+        );
+      })) as typeof aiApi.requestMarkdown,
+  );
+}
+
 /**
  * Focuses the editor once and types from the keyboard. `user.type` re-clicks
  * its target on every call, which moves the caret and makes multi-step typing
@@ -262,6 +274,104 @@ describe('the popup', () => {
       'used all 100 AI Actions for September 2026',
     );
     expect(panel).toHaveTextContent('2026-10-01');
+  });
+
+  it('the toolbar button is a toggle: pressed again with the popup open, it closes', async () => {
+    seedAi();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+    const button = () => screen.getByRole('button', { name: 'Ask AI' });
+
+    await user.click(button());
+    expect(screen.getByTestId('ai-prompt')).toBeInTheDocument();
+    expect(button()).toHaveAttribute('aria-expanded', 'true');
+
+    // Nothing was removed from the Document, so closing must not disturb it.
+    const before = useDocumentStore.getState().markdown;
+    await user.click(button());
+    expect(screen.queryByTestId('ai-prompt')).not.toBeInTheDocument();
+    expect(button()).toHaveAttribute('aria-expanded', 'false');
+    expect(useDocumentStore.getState().markdown).toBe(before);
+  });
+
+  it('an outside click closes a toolbar popup without changing the Document', async () => {
+    seedAi();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Ask AI' }));
+    expect(screen.getByTestId('ai-prompt')).toBeInTheDocument();
+
+    // A press on the canvas area (outside the panel and the anchor button).
+    await user.click(screen.getByTestId('editor-stats'));
+    expect(screen.queryByTestId('ai-prompt')).not.toBeInTheDocument();
+    // The Document was never touched: no trigger to restore.
+    expect(useDocumentStore.getState().markdown).toBe('');
+  });
+
+  it('an outside click restores a fired trigger without stealing focus', async () => {
+    seedAi();
+    render(
+      <>
+        <EditorPane />
+        <button type="button">Outside target</button>
+      </>,
+    );
+    const user = userEvent.setup();
+
+    await user.type(editorView().contentDOM, 'Hello\n/ai');
+    await user.keyboard(' ');
+    expect(screen.getByTestId('ai-prompt')).toBeInTheDocument();
+
+    const outside = screen.getByRole('button', { name: 'Outside target' });
+    await user.click(outside);
+
+    expect(screen.queryByTestId('ai-prompt')).not.toBeInTheDocument();
+    expect(useDocumentStore.getState().markdown).toBe('Hello\n/ai');
+    expect(outside).toHaveFocus();
+  });
+
+  it('a click outside does not close a working /ai popup, and Esc still restores the trigger', async () => {
+    seedAi();
+    const request = routeMarkdownPending();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+
+    await user.type(editorView().contentDOM, 'Hello\n/ai');
+    await user.keyboard(' ');
+    await user.type(screen.getByTestId('ai-prompt-input'), 'tighten this');
+    await user.keyboard('{Enter}');
+    expect(screen.getByTestId('ai-prompt')).toHaveTextContent('Working…');
+
+    await user.click(screen.getByTestId('editor-stats'));
+    expect(screen.getByTestId('ai-prompt')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId('ai-prompt')).not.toBeInTheDocument();
+    expect(useDocumentStore.getState().markdown).toBe('Hello\n/ai');
+    request.mockRestore();
+  });
+
+  it('keeps a working popup open when its toolbar button is pressed again', async () => {
+    seedAi();
+    const request = routeMarkdownPending();
+    render(<EditorPane />);
+    const user = userEvent.setup();
+    const button = screen.getByRole('button', { name: 'Ask AI' });
+
+    await user.click(button);
+    await user.type(screen.getByTestId('ai-prompt-input'), 'tighten this');
+    await user.keyboard('{Enter}');
+    expect(screen.getByTestId('ai-prompt')).toHaveTextContent('Working…');
+
+    await user.click(button);
+    expect(screen.getByTestId('ai-prompt')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    request.mockRestore();
   });
 });
 

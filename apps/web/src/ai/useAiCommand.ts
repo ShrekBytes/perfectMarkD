@@ -135,8 +135,11 @@ export interface AiCommandController {
   /** Whether a Retry is running, or the allowance is spent so it cannot start. */
   retryBlocked: boolean;
   submit(instruction: string): void;
-  /** Opens the prompt popup from the toolbar button (never from typed input). */
-  openFromToolbar(): void;
+  /**
+   * Opens the prompt popup from the toolbar button (never from typed input);
+   * pressing the button again while the popup is open closes it.
+   */
+  toggleFromToolbar(): void;
   /** Asks for an AI Plan instead of running a whole-Document action. */
   submitPlan(instruction: string): void;
   /** Works on the paragraph around the caret instead of the refused target. */
@@ -146,6 +149,12 @@ export interface AiCommandController {
   reject(): void;
   /** Checks or unchecks one change of the review. */
   toggleChange(id: number): void;
+  /**
+   * Closes the popup from an outside click (or any non-restore dismissal).
+   * No-op while a request is running: the popup is that Action's progress
+   * surface, and Cancel is the way out of a run.
+   */
+  dismiss(): void;
   retry(): void;
   editPrompt(): void;
   approvePlan(checked: ReadonlySet<number>): void;
@@ -270,13 +279,40 @@ export function useAiCommand(
   );
 
   /**
+   * The outside-click dismissal. A fired command removed its trigger from the
+   * Document; dismissal is a cancellation, so the trigger goes back — without
+   * focusing the editor, because the user just clicked somewhere else. A
+   * toolbar-opened popup removed nothing, so nothing is restored.
+   */
+  const dismiss = useCallback(() => {
+    if (!popup || request.status === 'working') return;
+    if (popup.removed !== '' || popup.at !== 0) {
+      editorApiRef.current?.restore(popup.removed, popup.at, false);
+    }
+    setPopup(null);
+    setPromptScope(null);
+    setLadder(null);
+    setHint(null);
+    setRequest({ status: 'idle' });
+  }, [popup, request.status]);
+
+  /**
    * The toolbar's AI button: the same popup, opened without typed input. The
    * target follows the editor exactly as a fired command's does — the
    * selection when there is one, the whole Document when there is not. There
    * is no trigger to remove and no anchor to restore, so Esc just closes.
+   * Pressed again while the popup is open, it closes: the button is a toggle.
    */
-  const openFromToolbar = useCallback(() => {
+  const toggleFromToolbar = useCallback(() => {
     if (!commandsEnabled) return;
+    if (popup) {
+      // While a request is running the popup is the Action's progress surface
+      // (Cancel lives there); closing it would orphan the run, so the button
+      // does nothing. Closing otherwise is a plain dismissal: nothing was
+      // removed, so nothing is restored.
+      dismiss();
+      return;
+    }
     setHint(null);
     setRequest({ status: 'idle' });
     setReview(null);
@@ -285,7 +321,7 @@ export function useAiCommand(
     const scope = computeScope('markdown');
     setPromptScope(scope);
     setLadder(decideFor('markdown', scope));
-  }, [commandsEnabled, computeScope, decideFor]);
+  }, [commandsEnabled, computeScope, decideFor, dismiss, popup]);
 
   /**
    * The target follows the editor: a selection made while the popup is open
@@ -696,7 +732,10 @@ export function useAiCommand(
   const cancel = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
-    if (popup) {
+    // A fired command removed its trigger from the Document; Esc puts it back
+    // byte-for-byte. A toolbar-opened popup removed nothing, so restoring
+    // would only drag the caret to offset 0 — skip it.
+    if (popup && (popup.removed !== '' || popup.at !== 0)) {
       editorApiRef.current?.restore(popup.removed, popup.at);
     }
     setPopup(null);
@@ -909,7 +948,8 @@ export function useAiCommand(
     retryBlocked,
     submit,
     submitPlan,
-    openFromToolbar,
+    toggleFromToolbar,
+    dismiss,
     useParagraphRange,
     cancel,
     accept,

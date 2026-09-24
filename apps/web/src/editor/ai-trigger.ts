@@ -49,8 +49,10 @@ export interface AiTriggerHandlers {
 export interface AiEditorApi {
   /** Fires the command whose hint is showing (a click on the hint). */
   acceptHint(): void;
-  /** Esc: inserts exactly what was removed, leaving the Document as it was. */
-  restore(removed: string, at: number): void;
+  /** Esc or dismissal: inserts exactly what was removed, leaving the Document
+   *  as it was. `focus` is false for an outside-click dismissal — the user
+   *  just clicked elsewhere, so the editor must not steal the caret back. */
+  restore(removed: string, at: number, focus?: boolean): void;
   /** Writes an accepted proposal back as one edit and focuses the caret. */
   replaceRange(from: number, to: number, text: string): void;
 }
@@ -134,14 +136,14 @@ export function createAiTriggerExtension(
     acceptHint: () => {
       if (view) fireFromHint(view);
     },
-    restore: (removed, at) => {
+    restore: (removed, at, focus = true) => {
       if (!view) return;
       const position = Math.min(Math.max(0, at), view.state.doc.length);
       view.dispatch({
         changes: { from: position, insert: removed },
         selection: { anchor: position + removed.length },
       });
-      view.focus();
+      if (focus) view.focus();
     },
     replaceRange: (from, to, text) => {
       if (!view) return;

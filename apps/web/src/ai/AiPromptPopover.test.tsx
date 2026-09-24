@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AiLadderDecision, AiScope } from '@perfectmarkd/core';
 import { AiPromptPopover, type AiPromptGate } from './AiPromptPopover';
@@ -40,10 +41,12 @@ function show(
       { status: 'idle' | 'working' } | { status: 'error'; message: string };
     initialInstruction?: string;
     ladder?: AiLadderDecision | null;
+    anchorRef?: RefObject<HTMLElement | null>;
     onSubmit?: (instruction: string) => void;
     onPlan?: (instruction: string) => void;
     onUseParagraphRange?: () => void;
     onCancel?: () => void;
+    onDismiss?: () => void;
     onOpenPricing?: () => void;
   } = {},
 ) {
@@ -51,6 +54,7 @@ function show(
   const onPlan = options.onPlan ?? vi.fn();
   const onUseParagraphRange = options.onUseParagraphRange ?? vi.fn();
   const onCancel = options.onCancel ?? vi.fn();
+  const onDismiss = options.onDismiss ?? vi.fn();
   const onOpenPricing = options.onOpenPricing ?? vi.fn();
   render(
     <AiPromptPopover
@@ -62,15 +66,74 @@ function show(
       request={options.request ?? { status: 'idle' }}
       initialInstruction={options.initialInstruction}
       style={{}}
+      anchorRef={options.anchorRef}
       onSubmit={onSubmit}
       onPlan={onPlan}
       onUseParagraphRange={onUseParagraphRange}
       onCancel={onCancel}
+      onDismiss={onDismiss}
       onOpenPricing={onOpenPricing}
     />,
   );
-  return { onSubmit, onPlan, onUseParagraphRange, onCancel, onOpenPricing };
+  return {
+    onSubmit,
+    onPlan,
+    onUseParagraphRange,
+    onCancel,
+    onDismiss,
+    onOpenPricing,
+  };
 }
+
+/** Fires a pointerdown on a target outside the rendered panel. */
+function pressOutside(target: HTMLElement): void {
+  target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+}
+
+describe('dismissal', () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup();
+    const { onCancel } = show();
+    await user.keyboard('{Escape}');
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it('closes with the Close control when nothing is running', async () => {
+    const user = userEvent.setup();
+    const { onCancel } = show();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it('dismisses when a press lands outside the panel', () => {
+    const { onDismiss } = show();
+    pressOutside(document.body);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not dismiss a press inside the panel, including the field', () => {
+    const { onDismiss } = show();
+    pressOutside(screen.getByTestId('ai-prompt'));
+    pressOutside(screen.getByTestId('ai-prompt-input'));
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('does not dismiss a press on the anchor (the button toggles)', () => {
+    const anchor = document.createElement('button');
+    document.body.appendChild(anchor);
+    const anchorRef = { current: anchor };
+    const { onDismiss } = show({ anchorRef });
+    pressOutside(anchor);
+    expect(onDismiss).not.toHaveBeenCalled();
+    anchor.remove();
+  });
+
+  it('stays open while a request is running: the popup is the progress surface', () => {
+    const { onDismiss } = show({ request: { status: 'working' } });
+    pressOutside(document.body);
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+});
 
 describe('the ready state', () => {
   it('names the command and states the resolved scope against the cap', () => {
@@ -231,22 +294,6 @@ describe('the working state', () => {
     expect(screen.getByTestId('ai-prompt')).toHaveTextContent('Working…');
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onCancel).toHaveBeenCalled();
-  });
-});
-
-describe('dismissal', () => {
-  it('closes on Escape', async () => {
-    const user = userEvent.setup();
-    const { onCancel } = show();
-    await user.keyboard('{Escape}');
-    expect(onCancel).toHaveBeenCalled();
-  });
-
-  it('closes with the Close control when nothing is running', async () => {
-    const user = userEvent.setup();
-    const { onCancel } = show();
-    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onCancel).toHaveBeenCalled();
   });
 });
