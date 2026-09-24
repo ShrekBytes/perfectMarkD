@@ -7,7 +7,6 @@ import {
   buildFrameOverlayHTML,
   escapeCSSForStyle,
   escapeHTML,
-  frameBorderCSS,
   hexLuminance,
   mmToPx,
   resolveCodeFont,
@@ -17,6 +16,7 @@ import {
   resolvePageGeometry,
   stripPageAtRules,
 } from './css-builder';
+
 import {
   DEFAULT_SETTINGS,
   PAGE_SIZES,
@@ -192,69 +192,52 @@ describe('font resolvers', () => {
 });
 
 describe('frame helpers', () => {
-  it('frameBorderCSS builds the shorthand border value', () => {
-    expect(frameBorderCSS(DEFAULT_SETTINGS)).toBe('4px solid #1c1e21');
-    expect(
-      frameBorderCSS(
-        settings({
-          frameThickness: 2,
-          frameStyle: 'dashed',
-          frameColor: '#f00',
-        }),
-      ),
-    ).toBe('2px dashed #f00');
-  });
-
   it('buildFrameOverlayHTML is empty when the frame is disabled', () => {
     expect(buildFrameOverlayHTML(DEFAULT_SETTINGS)).toBe('');
   });
 
-  it('buildFrameOverlayHTML insets an absolutely-positioned bordered div', () => {
+  it('buildFrameOverlayHTML insets an absolutely-positioned, unstyled-border div', () => {
     const html = buildFrameOverlayHTML(settings({ frameEnabled: true }));
+    expect(html).toContain('mpdf-page-frame');
     expect(html).toContain('position:absolute');
     expect(html).toContain('top:8px');
     expect(html).toContain('left:8px');
     expect(html).toContain('right:8px');
     expect(html).toContain('bottom:8px');
     expect(html).toContain('pointer-events:none');
-    expect(html).toContain('border:4px solid #1c1e21');
+    // The border itself is painted by the .mpdf-page-frame sheet rule —
+    // not inline — so a Custom Stylesheet can restyle it.
+    expect(html).not.toContain('border:');
   });
 });
 
 describe('buildCodeBlockCSS', () => {
-  it('styles pre blocks from the settings code background', () => {
-    const css = buildCodeBlockCSS(settings({ codeBackground: '#eef2ff' }));
+  it('styles pre blocks from the code-background variable', () => {
+    const css = buildCodeBlockCSS(false);
     expect(css).toContain('.mpdf-doc pre {');
-    expect(css).toContain('background: #eef2ff');
+    expect(css).toContain('background: var(--mpdf-code-background)');
     expect(css).toContain('.mpdf-doc pre code {');
     expect(css).toContain('white-space: pre-wrap');
   });
 
-  it('applies the resolved code font and size', () => {
-    const css = buildCodeBlockCSS(DEFAULT_SETTINGS);
-    expect(css).toContain("font-family: 'Courier New', monospace");
-    expect(css).toContain('font-size: 0.85em');
+  it('applies the resolved code font and size through the variables', () => {
+    const css = buildCodeBlockCSS(false);
+    expect(css).toContain('font-family: var(--mpdf-code-font)');
+    expect(css).toContain('font-size: var(--mpdf-code-font-size)');
   });
 
   it('toggles ligatures with the setting', () => {
-    expect(buildCodeBlockCSS(DEFAULT_SETTINGS)).toContain(
-      'font-variant-ligatures: none',
-    );
-    expect(buildCodeBlockCSS(settings({ codeFontLigatures: true }))).toContain(
-      'font-variant-ligatures: normal',
-    );
+    expect(buildCodeBlockCSS(false)).toContain('font-variant-ligatures: none');
+    expect(buildCodeBlockCSS(true)).toContain('font-variant-ligatures: normal');
   });
 
-  it('falls back to the body color for plain code text', () => {
-    const css = buildCodeBlockCSS(settings({ bodyColor: '#123456' }));
-    expect(css).toContain('color: #123456');
+  it('reads the body color for plain code text', () => {
+    const css = buildCodeBlockCSS(false);
+    expect(css).toContain('color: var(--mpdf-body-color)');
   });
 
   it('is theme-agnostic: the code theme never injects colors', () => {
-    const css = buildCodeBlockCSS(
-      settings({ codeTheme: 'dracula', codeBackground: '#f5f5f5' }),
-    );
-    expect(css).toContain('background: #f5f5f5');
+    const css = buildCodeBlockCSS(false);
     expect(css).not.toContain('#bd93f9');
     expect(css).not.toContain('.token');
   });
@@ -269,10 +252,15 @@ describe('buildDocCSS', () => {
   it('styles the document root from the settings', () => {
     const css = buildDocCSS(DEFAULT_SETTINGS);
     expect(css).toContain('.mpdf-doc {');
-    expect(css).toContain('font-family: Georgia, serif');
-    expect(css).toContain('font-size: 13px');
-    expect(css).toContain('line-height: 1.85');
-    expect(css).toContain('color: #1a1a2e');
+    // The root reads the variables it defines — so a Custom Stylesheet can
+    // retarget one and the root follows.
+    expect(css).toContain('--mpdf-font: Georgia, serif;');
+    expect(css).toContain('--mpdf-font-size: 13px;');
+    expect(css).toContain('--mpdf-line-height: 1.85;');
+    expect(css).toContain('--mpdf-body-color: #1a1a2e;');
+    expect(css).toContain('font-family: var(--mpdf-font)');
+    expect(css).toContain('font-size: var(--mpdf-font-size)');
+    expect(css).toContain('color: var(--mpdf-body-color)');
   });
 
   it('scales heading sizes by headingScale', () => {
@@ -287,15 +275,17 @@ describe('buildDocCSS', () => {
     expect(off).not.toContain('text-align: center');
 
     const on = buildDocCSS(settings({ h1BorderBottom: true, centerH1: true }));
-    expect(on).toContain('border-bottom: 2px solid #1c1e21');
+    expect(on).toContain('border-bottom: 2px solid var(--mpdf-accent)');
     expect(on).toContain('text-align: center');
   });
 
-  it('styles inline code from the settings', () => {
+  it('styles inline code from the accent and code-background variables', () => {
     const css = buildDocCSS(DEFAULT_SETTINGS);
     expect(css).toContain('.mpdf-doc code {');
-    expect(css).toContain('background: #f0f1f2');
-    expect(css).toContain('color: #1c1e21');
+    expect(css).toContain('--mpdf-code-background: #f0f1f2;');
+    expect(css).toContain('background: var(--mpdf-code-background)');
+    expect(css).toContain('color: var(--mpdf-accent)');
+    expect(css).toContain('--mpdf-accent: #1c1e21;');
   });
 
   it('uses white text on dark table headers and the heading color on light ones', () => {
@@ -399,12 +389,14 @@ describe('buildDocCSS — Custom Stylesheet layer', () => {
         customStylesheet: customCSS,
         customStylesheetEnabled: true,
       }),
+      false,
+      resolvePageGeometry(DEFAULT_SETTINGS),
     );
     expect(css).toContain('/* Custom Stylesheet */');
     expect(css).toContain(customCSS);
-    // After — not interleaved with — the generated rules.
+    // After — not interleaved with — the generated rules (chrome included).
     expect(css.indexOf(customCSS)).toBeGreaterThan(
-      css.indexOf('.mpdf-doc .mermaid svg'),
+      css.indexOf('/* Page chrome */'),
     );
   });
 
@@ -450,14 +442,88 @@ describe('buildDocCSS — Custom Stylesheet layer', () => {
   });
 
   it('keeps the layer out of the generated rules: off and on differ only in the tail', () => {
-    const off = buildDocCSS(DEFAULT_SETTINGS);
+    const off = buildDocCSS(
+      DEFAULT_SETTINGS,
+      false,
+      resolvePageGeometry(DEFAULT_SETTINGS),
+    );
     const on = buildDocCSS(
       settings({
         customStylesheet: customCSS,
         customStylesheetEnabled: true,
       }),
+      false,
+      resolvePageGeometry(DEFAULT_SETTINGS),
     );
     expect(on.startsWith(off)).toBe(true);
+  });
+
+  describe('page chrome (.mpdf-page)', () => {
+    const geometry = resolvePageGeometry(DEFAULT_SETTINGS);
+
+    it('emits the chrome root, band, and frame rules when geometry is passed', () => {
+      const css = buildDocCSS(
+        settings({ frameEnabled: true }),
+        false,
+        geometry,
+      );
+      expect(css).toContain('.mpdf-page {');
+      expect(css).toContain('--mpdf-page-background: #ffffff;');
+      expect(css).toContain('--mpdf-header-color: #999999;');
+      expect(css).toContain('--mpdf-footer-color: #aaaaaa;');
+      expect(css).toContain('--mpdf-frame-color: #1c1e21;');
+      expect(css).toContain('--mpdf-accent: #1c1e21;');
+      expect(css).toContain('background: var(--mpdf-page-background);');
+      expect(css).toContain('.mpdf-page-header-text {');
+      expect(css).toContain('.mpdf-page-footer-text {');
+      expect(css).toContain('.mpdf-page-frame {');
+      expect(css).toContain('color: var(--mpdf-header-color)');
+      expect(css).toContain('color: var(--mpdf-footer-color)');
+    });
+
+    it('paints the frame border from the frame-color variable, only when enabled', () => {
+      const off = buildDocCSS(DEFAULT_SETTINGS, false, geometry);
+      expect(off).not.toContain('.mpdf-page-frame');
+      const on = buildDocCSS(
+        settings({
+          frameEnabled: true,
+          frameThickness: 2,
+          frameStyle: 'dashed',
+        }),
+        false,
+        geometry,
+      );
+      expect(on).toContain(
+        '.mpdf-page-frame { border: 2px dashed var(--mpdf-frame-color); }',
+      );
+    });
+
+    it('emits no chrome section without geometry (the pagination sheet)', () => {
+      const css = buildDocCSS(DEFAULT_SETTINGS);
+      expect(css).not.toContain('.mpdf-page');
+      expect(css).not.toContain('/* Page chrome */');
+    });
+
+    it('lets a Custom Stylesheet override the chrome by variable or selector', () => {
+      const css = buildDocCSS(
+        settings({
+          customStylesheet:
+            '.mpdf-page { --mpdf-page-background: #101010; } .mpdf-page-header-text { color: #ff0000; }',
+          customStylesheetEnabled: true,
+        }),
+        false,
+        geometry,
+      );
+      // The user's rules land after the chrome section, so they win the
+      // cascade at equal specificity — variable overrides included.
+      expect(css).toContain('/* Custom Stylesheet */');
+      expect(css.indexOf('--mpdf-page-background: #101010;')).toBeGreaterThan(
+        css.indexOf('/* Page chrome */'),
+      );
+      expect(
+        css.indexOf('.mpdf-page-header-text { color: #ff0000; }'),
+      ).toBeGreaterThan(css.indexOf('.mpdf-page-header-text {'));
+    });
   });
 });
 

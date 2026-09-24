@@ -168,6 +168,10 @@ describe('runDocumentPipeline', () => {
     });
     expect(result.isRTL).toBe(true);
     expect(result.docCSS).toBe(buildDocCSS(DEFAULT_SETTINGS, true));
+    // The render sheet is the same content rules plus the page-chrome rules.
+    expect(result.sheetCSS).toBe(
+      buildDocCSS(DEFAULT_SETTINGS, true, result.geometry),
+    );
   });
 
   it('measures against the Custom Stylesheet: one sheet, shared by every consumer (ai-transforms/01)', async () => {
@@ -182,8 +186,13 @@ describe('runDocumentPipeline', () => {
     });
     // The pipeline's sheet is exactly what buildDocCSS emits — the string the
     // pagination sandbox measured against, the Paper Canvas adopts, and both
-    // export paths embed. One stylesheet, four consumers.
+    // export paths embed. One stylesheet, four consumers; the measurement
+    // sheet carries the same content rules and custom layer, minus only the
+    // page-chrome section that cannot affect content flow.
     expect(result.docCSS).toBe(buildDocCSS(settings, false));
+    expect(result.sheetCSS).toBe(buildDocCSS(settings, false, result.geometry));
+    expect(result.sheetCSS).toContain('/* Page chrome */');
+    expect(result.sheetCSS).toContain('letter-spacing: 0.3em');
     expect(result.docCSS).toContain('letter-spacing: 0.3em');
     expect(result.docCSS).not.toContain('@page');
   });

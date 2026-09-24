@@ -17,14 +17,14 @@
         position: relative;
         width: 794px; height: 1123px;
         overflow: hidden;
-        background: #ffffff;
         page-break-after: always; break-after: page;
       }
       .mpdf-export-page:last-child { page-break-after: avoid; break-after: avoid; }
       .mpdf-doc {
-    /* The styling reference's stable contract: the Document's current style
-     * values, mirrored for a Custom Stylesheet to read. Redefining one
-     * changes nothing — the generated rules set their values directly. */
+    /* The Document's current style values. The generated rules below READ
+     * these variables — redefining one (here or on any scoped selector, e.g.
+     * from a Custom Stylesheet) restyles the document everywhere the value is
+     * used. */
     --mpdf-font: Georgia, serif;
     --mpdf-font-size: 13px;
     --mpdf-line-height: 1.85;
@@ -35,17 +35,19 @@
     --mpdf-accent: #1c1e21;
     --mpdf-code-background: #f0f1f2;
     --mpdf-code-font: 'Courier New', monospace;
+    --mpdf-code-font-size: 0.85em;
     --mpdf-blockquote-background: transparent;
+    --mpdf-blockquote-border: #1c1e21;
     --mpdf-table-header-background: #f0f1f2;
-    font-family: Georgia, serif;
-    font-size: 13px;
-    line-height: 1.85;
-    color: #1a1a2e;
+    font-family: var(--mpdf-font);
+    font-size: var(--mpdf-font-size);
+    line-height: var(--mpdf-line-height);
+    color: var(--mpdf-body-color);
     box-sizing: border-box;
     
   }
   .mpdf-doc *, .mpdf-doc *::before, .mpdf-doc *::after { box-sizing: border-box; }
-  .mpdf-doc strong, .mpdf-doc b { font-weight: 700; font-style: normal; color: #1a1a2e; }
+  .mpdf-doc strong, .mpdf-doc b { font-weight: 700; font-style: normal; color: var(--mpdf-bold-color); }
   .mpdf-doc h1 strong, .mpdf-doc h1 b,
   .mpdf-doc h2 strong, .mpdf-doc h2 b,
   .mpdf-doc h3 strong, .mpdf-doc h3 b,
@@ -58,7 +60,7 @@
   .mpdf-doc h1 {
     font-size: 22px;
     font-weight: 700;
-    color: #0d0d1a;
+    color: var(--mpdf-heading-color);
     margin: 0 0 12px;
     line-height: 1.2;
     
@@ -67,54 +69,54 @@
   .mpdf-doc h2 {
     font-size: 17px;
     font-weight: 600;
-    color: #0d0d1a;
+    color: var(--mpdf-heading-color);
     margin: 20px 0 10px;
-    border-bottom: 0.5px solid #1c1e2155; padding-bottom: 5px;
+    border-bottom: 0.5px solid color-mix(in srgb, var(--mpdf-accent) 33%, transparent); padding-bottom: 5px;
   }
   .mpdf-doc h3 {
     font-size: 15px;
     font-weight: 700;
-    color: #0d0d1a;
+    color: var(--mpdf-heading-color);
     margin: 16px 0 8px;
     letter-spacing: 0.01em;
   }
-  .mpdf-doc h4 { font-size: 13px; font-weight: 700; color: #0d0d1a; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .mpdf-doc h5 { font-size: 12px; font-weight: 600; color: #0d0d1a; margin: 10px 0 4px; font-style: italic; }
-  .mpdf-doc h6 { font-size: 11px; font-weight: 600; color: #1a1a2e; margin: 8px 0 4px; font-style: italic; opacity: 0.75; }
-  .mpdf-doc p { margin: 0 0 0.65em; }
-  .mpdf-doc ul, .mpdf-doc ol { padding-inline-start: 1.4em; margin: 0 0 0.65em; }
-  .mpdf-doc li { margin-bottom: 0.2em; line-height: 1.85; }
+  .mpdf-doc h4 { font-size: 13px; font-weight: 700; color: var(--mpdf-heading-color); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .mpdf-doc h5 { font-size: 12px; font-weight: 600; color: var(--mpdf-heading-color); margin: 10px 0 4px; font-style: italic; }
+  .mpdf-doc h6 { font-size: 11px; font-weight: 600; color: var(--mpdf-body-color); margin: 8px 0 4px; font-style: italic; opacity: 0.75; }
+  .mpdf-doc p { margin: 0 0 var(--mpdf-paragraph-spacing); }
+  .mpdf-doc ul, .mpdf-doc ol { padding-inline-start: 1.4em; margin: 0 0 var(--mpdf-paragraph-spacing); }
+  .mpdf-doc li { margin-bottom: 0.2em; line-height: var(--mpdf-line-height); }
   .mpdf-doc blockquote {
-    border-inline-start: 3px solid #1c1e21;
-    background: transparent;
+    border-inline-start: 3px solid var(--mpdf-blockquote-border);
+    background: var(--mpdf-blockquote-background);
     padding-block: 4px;
     padding-inline: 1em 0;
-    margin: 0.65em 0;
+    margin: var(--mpdf-paragraph-spacing) 0;
     font-style: italic;
-    color: #1a1a2ecc;
+    color: color-mix(in srgb, var(--mpdf-body-color) 80%, transparent);
   }
   .mpdf-doc code {
-    font-family: 'Courier New', monospace;
+    font-family: var(--mpdf-code-font);
     font-variant-ligatures: none;
-    font-size: 0.85em;
-    background: #f0f1f2;
+    font-size: var(--mpdf-code-font-size);
+    background: var(--mpdf-code-background);
     padding: 1px 4px;
     border-radius: 3px;
-    color: #1c1e21;
+    color: var(--mpdf-accent);
   }
   
   .mpdf-doc pre {
-    background: #f0f1f2;
+    background: var(--mpdf-code-background);
     border-radius: 4px;
     padding: 10px 12px;
-    margin: 0 0 0.65em;
+    margin: 0 0 var(--mpdf-paragraph-spacing);
     overflow: hidden;
   }
   .mpdf-doc pre code {
-    font-family: 'Courier New', monospace;
+    font-family: var(--mpdf-code-font);
     font-variant-ligatures: none;
-    font-size: 0.85em;
-    color: #1a1a2e;
+    font-size: var(--mpdf-code-font-size);
+    color: var(--mpdf-body-color);
     white-space: pre-wrap;
     overflow-wrap: break-word;
     background: none;
@@ -122,23 +124,23 @@
   }
   .mpdf-doc hr {
     border: none;
-    border-top: 0.5px solid #1c1e2144;
-    margin: 0.9750000000000001em 0;
+    border-top: 0.5px solid color-mix(in srgb, var(--mpdf-accent) 27%, transparent);
+    margin: calc(var(--mpdf-paragraph-spacing) * 1.5) 0;
   }
-  .mpdf-doc img { max-width: 100%; height: auto; display: block; margin: 0.65em auto; }
-  .mpdf-doc a { color: #1c1e21;  }
-  .mpdf-doc table { width: 100%; border-collapse: collapse; margin: 0 0 0.65em; font-size: 0.92em; }
+  .mpdf-doc img { max-width: 100%; height: auto; display: block; margin: var(--mpdf-paragraph-spacing) auto; }
+  .mpdf-doc a { color: var(--mpdf-accent);  }
+  .mpdf-doc table { width: 100%; border-collapse: collapse; margin: 0 0 var(--mpdf-paragraph-spacing); font-size: 0.92em; }
   .mpdf-doc th {
-    background: #f0f1f2;
+    background: var(--mpdf-table-header-background);
     color: #0d0d1a;
     padding: 6px 10px;
     text-align: start;
     font-weight: 600;
-    border: 0.5px solid #1c1e2133;
+    border: 0.5px solid color-mix(in srgb, var(--mpdf-accent) 20%, transparent);
     font-size: 0.9em;
   }
-  .mpdf-doc td { padding: 5px 10px; border: 0.5px solid #1a1a2e22; vertical-align: top; }
-  .mpdf-doc tbody tr:nth-child(even) { background: #f0f1f255; }
+  .mpdf-doc td { padding: 5px 10px; border: 0.5px solid color-mix(in srgb, var(--mpdf-body-color) 13%, transparent); vertical-align: top; }
+  .mpdf-doc tbody tr:nth-child(even) { background: color-mix(in srgb, var(--mpdf-table-header-background) 33%, transparent); }
 
   /* GFM Alerts (GitHub-style > [!NOTE] blocks). One accent-styled design for
    * all five variants; the title band spans the full alert width via negative
@@ -147,16 +149,16 @@
    * custom accents color it with their own hue. (Document content, not
    * chrome — see DESIGN.md.) */
   .mpdf-doc .markdown-alert {
-    border-inline-start: 4px solid #1c1e21;
+    border-inline-start: 4px solid var(--mpdf-accent);
     border-start-start-radius: 0;
     border-start-end-radius: 5px;
     border-end-end-radius: 5px;
     border-end-start-radius: 0;
-    background: #1c1e2112;
-    margin: 0.78em 0;
+    background: color-mix(in srgb, var(--mpdf-accent) 7%, transparent);
+    margin: calc(var(--mpdf-paragraph-spacing) * 1.2) 0;
     padding: 0 14px 9px;
     overflow: hidden;
-    box-shadow: inset 0 0 0 1px #1c1e2122;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mpdf-accent) 13%, transparent);
     font-style: normal;
   }
   .mpdf-doc .markdown-alert-title {
@@ -165,22 +167,22 @@
     gap: 7px;
     margin: 0 -14px;
     padding: 7px 12px;
-    background: #1c1e2128;
-    border-bottom: 1px solid #1c1e2133;
-    font-family: Georgia, serif;
+    background: color-mix(in srgb, var(--mpdf-accent) 16%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--mpdf-accent) 20%, transparent);
+    font-family: var(--mpdf-font);
     font-size: 0.8em;
     font-weight: 800;
     font-style: normal;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #1c1e21;
+    color: var(--mpdf-accent);
     line-height: 1.3;
   }
   .mpdf-doc .markdown-alert-title svg {
     flex-shrink: 0;
     width: 15px;
     height: 15px;
-    stroke: #1c1e21;
+    stroke: var(--mpdf-accent);
     fill: none;
     stroke-width: 2;
   }
@@ -192,7 +194,7 @@
   }
   /* Nested blockquotes inside alerts keep a subtler indent */
   .mpdf-doc .markdown-alert blockquote {
-    border-inline-start-color: #1c1e2166;
+    border-inline-start-color: color-mix(in srgb, var(--mpdf-accent) 40%, transparent);
     background: transparent;
   }
 
@@ -202,20 +204,46 @@
   .mpdf-doc .mermaid {
     display: flex;
     justify-content: center;
-    margin: 0.65em 0;
+    margin: var(--mpdf-paragraph-spacing) 0;
     overflow: hidden;
   }
-  .mpdf-doc .mermaid svg {
-    max-width: 100%;
-    height: auto;
-    display: block;
+  .mpdf-doc .mermaid svg { max-width: 100%; height: auto; display: block; }
+
+/* Page chrome */
+.mpdf-page {
+    /* The page chrome's style values — same contract as the content's. The
+     * accent is mirrored here because the bands are not inside .mpdf-doc. */
+    --mpdf-page-background: #ffffff;
+    --mpdf-header-color: #999999;
+    --mpdf-footer-color: #aaaaaa;
+    --mpdf-frame-color: #1c1e21;
+    --mpdf-accent: #1c1e21;
+    --pm-margin-left: 94.48818897637796px;
+    --pm-margin-right: 94.48818897637796px;
+    --pm-header-h: 20px;
+    --pm-footer-h: 28px;
+    --pm-band-top: 30.236220472440948px;
+    background: var(--mpdf-page-background);
   }
+  .mpdf-page-header-text {
+    font-size: 9px;
+    color: var(--mpdf-header-color);
+    font-family: var(--mpdf-font);
+    border-bottom:0.5px solid color-mix(in srgb, var(--mpdf-accent) 20%, transparent);
+  }
+  .mpdf-page-footer-text {
+    font-size: 9px;
+    color: var(--mpdf-footer-color);
+    font-family: var(--mpdf-font);
+    border-top:0.5px solid color-mix(in srgb, var(--mpdf-accent) 20%, transparent);
+  }
+  .mpdf-page-frame { border: 4px solid var(--mpdf-frame-color); }
     </style>
 </head>
 <body>
-<div class="mpdf-export-page"><div style="position:absolute;inset:0;background-image:url('data:image/png;base64,UEFQRVI=');background-size:cover;background-repeat:no-repeat;background-position:center;opacity:1;pointer-events:none;"></div><div style="position:absolute;top:30.236220472440948px;left:0px;right:0px;height:20px;background-image:url('data:image/png;base64,SEVBREVS');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;"></div><div style="position:absolute;top:30.236220472440948px;left:94.48818897637796px;right:94.48818897637796px;height:20px;display:flex;align-items:center;font-size:9px;color:#999999;font-family:Georgia, serif;white-space:nowrap;border-bottom:0.5px solid #1c1e2133;"><span></span><span style="margin-left:auto;">PerfectMarkD — Quarterly Report</span></div><div class="mpdf-doc" style="position:absolute;top:95.59055118110237px;left:94.48818897637796px;width:605.0236220472441px;"><h1 id="quarterly-report">Quarterly Report</h1>
-<p>First page content.</p></div><div style="position:absolute;bottom:0;left:0px;right:0px;height:28px;background-image:url('data:image/png;base64,Rk9PVEVS');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;"></div><div style="position:absolute;bottom:0;left:0;right:0;height:28px;display:flex;align-items:center;border-top:0.5px solid #1c1e2133;padding:0 94.48818897637796px 0 94.48818897637796px;font-size:9px;color:#aaaaaa;font-family:Georgia, serif;"><span>Acme Corp · Confidential</span><span style="margin-left:auto;">1 / 2</span></div><div style="position:absolute;top:8px;left:8px;right:8px;bottom:8px;pointer-events:none;box-sizing:border-box;border:4px solid #1c1e21;"></div></div>
-<div class="mpdf-export-page"><div style="position:absolute;inset:0;background-image:url('data:image/png;base64,UEFQRVI=');background-size:cover;background-repeat:no-repeat;background-position:center;opacity:1;pointer-events:none;"></div><div style="position:absolute;top:30.236220472440948px;left:0px;right:0px;height:20px;background-image:url('data:image/png;base64,SEVBREVS');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;"></div><div style="position:absolute;top:30.236220472440948px;left:94.48818897637796px;right:94.48818897637796px;height:20px;display:flex;align-items:center;font-size:9px;color:#999999;font-family:Georgia, serif;white-space:nowrap;border-bottom:0.5px solid #1c1e2133;"><span></span><span style="margin-left:auto;">PerfectMarkD — Quarterly Report</span></div><div class="mpdf-doc" style="position:absolute;top:95.59055118110237px;left:94.48818897637796px;width:605.0236220472441px;"><h2 id="details">Details</h2>
-<p>Second page content.</p></div><div style="position:absolute;bottom:0;left:0px;right:0px;height:28px;background-image:url('data:image/png;base64,Rk9PVEVS');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;"></div><div style="position:absolute;bottom:0;left:0;right:0;height:28px;display:flex;align-items:center;border-top:0.5px solid #1c1e2133;padding:0 94.48818897637796px 0 94.48818897637796px;font-size:9px;color:#aaaaaa;font-family:Georgia, serif;"><span>Acme Corp · Confidential</span><span style="margin-left:auto;">2 / 2</span></div><div style="position:absolute;top:8px;left:8px;right:8px;bottom:8px;pointer-events:none;box-sizing:border-box;border:4px solid #1c1e21;"></div></div>
+<div class="mpdf-export-page mpdf-page"><div style="position:absolute;inset:0;background-image:url('data:image/png;base64,UEFQRVI=');background-size:cover;background-repeat:no-repeat;background-position:center;opacity:1;pointer-events:none;"></div><div style="position:absolute;top:30.236220472440948px;left:0px;right:0px;height:20px;background-image:url('data:image/png;base64,SEVBREVS');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;"></div><div class="mpdf-page-header-text" style="position:absolute;top:var(--pm-band-top);left:var(--pm-margin-left);right:var(--pm-margin-right);height:var(--pm-header-h);display:flex;align-items:center;white-space:nowrap;"><span></span><span style="margin-left:auto;">PerfectMarkD — Quarterly Report</span></div><div class="mpdf-doc" style="position:absolute;top:95.59055118110237px;left:94.48818897637796px;width:605.0236220472441px;"><h1 id="quarterly-report">Quarterly Report</h1>
+<p>First page content.</p></div><div style="position:absolute;bottom:0;left:0px;right:0px;height:28px;background-image:url('data:image/png;base64,Rk9PVEVS');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;"></div><div class="mpdf-page-footer-text" style="position:absolute;bottom:0;left:0;right:0;height:var(--pm-footer-h);display:flex;align-items:center;padding:0 var(--pm-margin-right) 0 var(--pm-margin-left);"><span>Acme Corp · Confidential</span><span style="margin-left:auto;">1 / 2</span></div><div class="mpdf-page-frame" style="position:absolute;top:8px;left:8px;right:8px;bottom:8px;pointer-events:none;box-sizing:border-box;"></div></div>
+<div class="mpdf-export-page mpdf-page"><div style="position:absolute;inset:0;background-image:url('data:image/png;base64,UEFQRVI=');background-size:cover;background-repeat:no-repeat;background-position:center;opacity:1;pointer-events:none;"></div><div style="position:absolute;top:30.236220472440948px;left:0px;right:0px;height:20px;background-image:url('data:image/png;base64,SEVBREVS');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;"></div><div class="mpdf-page-header-text" style="position:absolute;top:var(--pm-band-top);left:var(--pm-margin-left);right:var(--pm-margin-right);height:var(--pm-header-h);display:flex;align-items:center;white-space:nowrap;"><span></span><span style="margin-left:auto;">PerfectMarkD — Quarterly Report</span></div><div class="mpdf-doc" style="position:absolute;top:95.59055118110237px;left:94.48818897637796px;width:605.0236220472441px;"><h2 id="details">Details</h2>
+<p>Second page content.</p></div><div style="position:absolute;bottom:0;left:0px;right:0px;height:28px;background-image:url('data:image/png;base64,Rk9PVEVS');background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none;"></div><div class="mpdf-page-footer-text" style="position:absolute;bottom:0;left:0;right:0;height:var(--pm-footer-h);display:flex;align-items:center;padding:0 var(--pm-margin-right) 0 var(--pm-margin-left);"><span>Acme Corp · Confidential</span><span style="margin-left:auto;">2 / 2</span></div><div class="mpdf-page-frame" style="position:absolute;top:8px;left:8px;right:8px;bottom:8px;pointer-events:none;box-sizing:border-box;"></div></div>
 </body>
 </html>

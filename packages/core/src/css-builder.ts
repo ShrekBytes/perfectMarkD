@@ -310,24 +310,24 @@ export function buildFontFaceCSS(faces: readonly FontFaceSource[]): string {
 // the body color, and Shiki's inline colors override these rules when present.
 
 /** Builds the `<pre>`/`<pre><code>` base rules shared by the preview shadow
- *  DOM and the export print HTML. */
-export function buildCodeBlockCSS(s: DocumentSettings): string {
-  const codeFontFamily = resolveCodeFont(s);
-  const ligatures = s.codeFontLigatures ? 'normal' : 'none';
-
+ *  DOM and the export print HTML. The settings-derived values are read from
+ *  the `--mpdf-*` variables the doc root defines, so a Custom Stylesheet that
+ *  redefines one restyles code blocks everywhere too. */
+export function buildCodeBlockCSS(codeFontLigatures: boolean): string {
+  const ligatures = codeFontLigatures ? 'normal' : 'none';
   return `
   .mpdf-doc pre {
-    background: ${s.codeBackground};
+    background: var(--mpdf-code-background);
     border-radius: 4px;
     padding: 10px 12px;
-    margin: 0 0 ${s.paragraphSpacing}em;
+    margin: 0 0 var(--mpdf-paragraph-spacing);
     overflow: hidden;
   }
   .mpdf-doc pre code {
-    font-family: ${codeFontFamily};
+    font-family: var(--mpdf-code-font);
     font-variant-ligatures: ${ligatures};
-    font-size: ${s.codeFontSize}em;
-    color: ${s.bodyColor};
+    font-size: var(--mpdf-code-font-size);
+    color: var(--mpdf-body-color);
     white-space: pre-wrap;
     overflow-wrap: break-word;
     background: none;
@@ -339,19 +339,16 @@ export function buildCodeBlockCSS(s: DocumentSettings): string {
 // Shared by the preview DOM path (apps build the frame element themselves) and
 // the export HTML builder.
 
-/** Shorthand `border` value for the page frame, shared by the preview and export paths. */
-export function frameBorderCSS(s: DocumentSettings): string {
-  return `${s.frameThickness}px ${s.frameStyle} ${s.frameColor}`;
-}
-
 /** Returns the page-edge frame markup for the export HTML — absolutely
  *  positioned inside the page box and inset by frameMargin on all sides so it
  *  sits outside the margin-bound header, footer, and content: the outermost
- *  decoration on the page. Empty string when the frame is disabled. */
+ *  decoration on the page. The border itself is painted by the shared
+ *  `.mpdf-page-frame` sheet rule, so a Custom Stylesheet can restyle it. Empty
+ *  string when the frame is disabled. */
 export function buildFrameOverlayHTML(s: DocumentSettings): string {
   if (!s.frameEnabled) return '';
   const inset = `${s.frameMargin}px`;
-  return `<div style="position:absolute;top:${inset};left:${inset};right:${inset};bottom:${inset};pointer-events:none;box-sizing:border-box;border:${frameBorderCSS(s)};"></div>`;
+  return `<div class="mpdf-page-frame" style="position:absolute;top:${inset};left:${inset};right:${inset};bottom:${inset};pointer-events:none;box-sizing:border-box;"></div>`;
 }
 
 // ─── Page box layers ──────────────────────────────────────────────────────────
@@ -392,20 +389,18 @@ export function bannerStyle(
 }
 
 /** Style for the header text band (the band's inner markup is
- *  buildHFInnerHTML). */
-export function headerBandStyle(s: DocumentSettings, g: PageGeometry): string {
-  const border = s.showHeaderBorder
-    ? `border-bottom:0.5px solid ${s.accentColor}33;`
-    : '';
-  return `position:absolute;top:${g.mTop * 0.4}px;left:${g.mLeft}px;right:${g.mRight}px;height:${g.headerH}px;display:flex;align-items:center;font-size:${s.headerFontSize}px;color:${s.headerFontColor};font-family:${resolveFont(s)};white-space:nowrap;${border}`;
+ *  buildHFInnerHTML). Color is intentionally absent: the header text band is
+ *  painted by the shared `.mpdf-page-header-text` sheet rule, so a Custom
+ *  Stylesheet can restyle it. */
+export function headerBandStyle(): string {
+  return `position:absolute;top:var(--pm-band-top);left:var(--pm-margin-left);right:var(--pm-margin-right);height:var(--pm-header-h);display:flex;align-items:center;white-space:nowrap;`;
 }
 
-/** Style for the footer text band. */
-export function footerBandStyle(s: DocumentSettings, g: PageGeometry): string {
-  const border = s.showFooterBorder
-    ? `border-top:0.5px solid ${s.accentColor}33;`
-    : '';
-  return `position:absolute;bottom:0;left:0;right:0;height:${g.footerH}px;display:flex;align-items:center;${border}padding:0 ${g.mRight}px 0 ${g.mLeft}px;font-size:${s.footerFontSize}px;color:${s.footerFontColor};font-family:${resolveFont(s)};`;
+/** Style for the footer text band. Color is intentionally absent: the footer
+ *  text band is painted by the shared `.mpdf-page-footer-text` sheet rule, so
+ *  a Custom Stylesheet can restyle it. */
+export function footerBandStyle(): string {
+  return `position:absolute;bottom:0;left:0;right:0;height:var(--pm-footer-h);display:flex;align-items:center;padding:0 var(--pm-margin-right) 0 var(--pm-margin-left);`;
 }
 
 /** Inner markup for a header/footer band: a centered span when center text is
@@ -426,14 +421,22 @@ export function buildHFInnerHTML(
 // ─── Doc CSS builder ──────────────────────────────────────────────────────────
 
 /** Builds the full `.mpdf-doc` stylesheet (typography, tables, GFM alerts,
- *  mermaid, code blocks) shared verbatim by the preview shadow DOM and the
- *  export print HTML. When the Custom Stylesheet layer is on, the user's CSS
- *  is appended after the generated rules — the one seam every consumer
- *  (pagination measurement, Paper Canvas, Client Export, Server Export)
- *  inherits, so all four render identically. `@page` at-rules are stripped
- *  (page size and margins are Page-tab settings) and `</style>` sequences
- *  neutralized before the text joins the sheet. */
-export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
+ *  mermaid, code blocks) plus the shared page-chrome rules (`.mpdf-page`:
+ *  paper background, header/footer text bands, page frame), shared verbatim
+ *  by the preview shadow DOM and the export print HTML. The generated rules
+ *  read the `--mpdf-*` variables the two root rules define, so a Custom
+ *  Stylesheet that redefines one restyles the Document or the page chrome
+ *  everywhere at once — and rules appended after the generated ones (the
+ *  Custom Stylesheet layer) win the cascade besides. Pass the page geometry
+ *  to include the chrome section; without it only the content rules build
+ *  (pagination measures content only, and never sees page chrome). `@page`
+ *  at-rules are stripped (page size and margins are Page-tab settings) and
+ *  `</style>` sequences neutralized before the text joins the sheet. */
+export function buildDocCSS(
+  s: DocumentSettings,
+  isRTL = false,
+  geometry?: PageGeometry,
+): string {
   const hs = s.headingScale;
   const fontFamily = resolveFont(s);
   const tableHeaderTextColor =
@@ -441,9 +444,10 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
 
   const generated = `
   .mpdf-doc {
-    /* The styling reference's stable contract: the Document's current style
-     * values, mirrored for a Custom Stylesheet to read. Redefining one
-     * changes nothing — the generated rules set their values directly. */
+    /* The Document's current style values. The generated rules below READ
+     * these variables — redefining one (here or on any scoped selector, e.g.
+     * from a Custom Stylesheet) restyles the document everywhere the value is
+     * used. */
     --mpdf-font: ${fontFamily};
     --mpdf-font-size: ${s.fontSize}px;
     --mpdf-line-height: ${s.lineHeight};
@@ -454,17 +458,19 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
     --mpdf-accent: ${s.accentColor};
     --mpdf-code-background: ${s.codeBackground};
     --mpdf-code-font: ${resolveCodeFont(s)};
+    --mpdf-code-font-size: ${s.codeFontSize}em;
     --mpdf-blockquote-background: ${s.blockquoteBg};
+    --mpdf-blockquote-border: ${s.blockquoteBorderColor};
     --mpdf-table-header-background: ${s.tableHeaderBg};
-    font-family: ${fontFamily};
-    font-size: ${s.fontSize}px;
-    line-height: ${s.lineHeight};
-    color: ${s.bodyColor};
+    font-family: var(--mpdf-font);
+    font-size: var(--mpdf-font-size);
+    line-height: var(--mpdf-line-height);
+    color: var(--mpdf-body-color);
     box-sizing: border-box;
     ${isRTL ? 'direction: rtl;' : ''}
   }
   .mpdf-doc *, .mpdf-doc *::before, .mpdf-doc *::after { box-sizing: border-box; }
-  .mpdf-doc strong, .mpdf-doc b { font-weight: 700; font-style: normal; color: ${s.boldColor}; }
+  .mpdf-doc strong, .mpdf-doc b { font-weight: 700; font-style: normal; color: var(--mpdf-bold-color); }
   .mpdf-doc h1 strong, .mpdf-doc h1 b,
   .mpdf-doc h2 strong, .mpdf-doc h2 b,
   .mpdf-doc h3 strong, .mpdf-doc h3 b,
@@ -477,70 +483,70 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
   .mpdf-doc h1 {
     font-size: ${Math.round(22 * hs)}px;
     font-weight: 700;
-    color: ${s.headingColor};
+    color: var(--mpdf-heading-color);
     margin: 0 0 ${Math.round(12 * hs)}px;
     line-height: 1.2;
-    ${s.h1BorderBottom ? `border-bottom: 2px solid ${s.accentColor}; padding-bottom: 6px;` : ''}
+    ${s.h1BorderBottom ? 'border-bottom: 2px solid var(--mpdf-accent); padding-bottom: 6px;' : ''}
     ${s.centerH1 ? 'text-align: center;' : ''}
   }
   .mpdf-doc h2 {
     font-size: ${Math.round(17 * hs)}px;
     font-weight: 600;
-    color: ${s.headingColor};
+    color: var(--mpdf-heading-color);
     margin: ${Math.round(20 * hs)}px 0 ${Math.round(10 * hs)}px;
-    ${s.h2BorderBottom ? `border-bottom: 0.5px solid ${s.accentColor}55; padding-bottom: 5px;` : ''}
+    ${s.h2BorderBottom ? 'border-bottom: 0.5px solid color-mix(in srgb, var(--mpdf-accent) 33%, transparent); padding-bottom: 5px;' : ''}
   }
   .mpdf-doc h3 {
     font-size: ${Math.round(15 * hs)}px;
     font-weight: 700;
-    color: ${s.headingColor};
+    color: var(--mpdf-heading-color);
     margin: ${Math.round(16 * hs)}px 0 ${Math.round(8 * hs)}px;
     letter-spacing: 0.01em;
   }
-  .mpdf-doc h4 { font-size: ${Math.round(13 * hs)}px; font-weight: 700; color: ${s.headingColor}; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .mpdf-doc h5 { font-size: ${Math.round(12 * hs)}px; font-weight: 600; color: ${s.headingColor}; margin: 10px 0 4px; font-style: italic; }
-  .mpdf-doc h6 { font-size: ${Math.round(11 * hs)}px; font-weight: 600; color: ${s.bodyColor}; margin: 8px 0 4px; font-style: italic; opacity: 0.75; }
-  .mpdf-doc p { margin: 0 0 ${s.paragraphSpacing}em; }
-  .mpdf-doc ul, .mpdf-doc ol { padding-inline-start: 1.4em; margin: 0 0 ${s.paragraphSpacing}em; }
-  .mpdf-doc li { margin-bottom: 0.2em; line-height: ${s.lineHeight}; }
+  .mpdf-doc h4 { font-size: ${Math.round(13 * hs)}px; font-weight: 700; color: var(--mpdf-heading-color); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .mpdf-doc h5 { font-size: ${Math.round(12 * hs)}px; font-weight: 600; color: var(--mpdf-heading-color); margin: 10px 0 4px; font-style: italic; }
+  .mpdf-doc h6 { font-size: ${Math.round(11 * hs)}px; font-weight: 600; color: var(--mpdf-body-color); margin: 8px 0 4px; font-style: italic; opacity: 0.75; }
+  .mpdf-doc p { margin: 0 0 var(--mpdf-paragraph-spacing); }
+  .mpdf-doc ul, .mpdf-doc ol { padding-inline-start: 1.4em; margin: 0 0 var(--mpdf-paragraph-spacing); }
+  .mpdf-doc li { margin-bottom: 0.2em; line-height: var(--mpdf-line-height); }
   .mpdf-doc blockquote {
-    border-inline-start: 3px solid ${s.blockquoteBorderColor};
-    background: ${s.blockquoteBg};
+    border-inline-start: 3px solid var(--mpdf-blockquote-border);
+    background: var(--mpdf-blockquote-background);
     padding-block: 4px;
     padding-inline: 1em 0;
-    margin: ${s.paragraphSpacing}em 0;
+    margin: var(--mpdf-paragraph-spacing) 0;
     font-style: italic;
-    color: ${s.bodyColor}cc;
+    color: color-mix(in srgb, var(--mpdf-body-color) 80%, transparent);
   }
   .mpdf-doc code {
-    font-family: ${resolveCodeFont(s)};
+    font-family: var(--mpdf-code-font);
     font-variant-ligatures: ${s.codeFontLigatures ? 'normal' : 'none'};
-    font-size: ${s.codeFontSize}em;
-    background: ${s.codeBackground};
+    font-size: var(--mpdf-code-font-size);
+    background: var(--mpdf-code-background);
     padding: 1px 4px;
     border-radius: 3px;
-    color: ${s.accentColor};
+    color: var(--mpdf-accent);
   }
-  ${buildCodeBlockCSS(s)}
+  ${buildCodeBlockCSS(s.codeFontLigatures)}
   .mpdf-doc hr {
     border: none;
-    border-top: 0.5px solid ${s.accentColor}44;
-    margin: ${s.paragraphSpacing * 1.5}em 0;
+    border-top: 0.5px solid color-mix(in srgb, var(--mpdf-accent) 27%, transparent);
+    margin: calc(var(--mpdf-paragraph-spacing) * 1.5) 0;
   }
-  .mpdf-doc img { max-width: 100%; height: auto; display: block; margin: ${s.paragraphSpacing}em auto; }
-  .mpdf-doc a { color: ${s.accentColor}; ${s.linkUnderline ? '' : 'text-decoration: none;'} }
-  .mpdf-doc table { width: 100%; border-collapse: collapse; margin: 0 0 ${s.paragraphSpacing}em; font-size: 0.92em; }
+  .mpdf-doc img { max-width: 100%; height: auto; display: block; margin: var(--mpdf-paragraph-spacing) auto; }
+  .mpdf-doc a { color: var(--mpdf-accent); ${s.linkUnderline ? '' : 'text-decoration: none;'} }
+  .mpdf-doc table { width: 100%; border-collapse: collapse; margin: 0 0 var(--mpdf-paragraph-spacing); font-size: 0.92em; }
   .mpdf-doc th {
-    background: ${s.tableHeaderBg};
+    background: var(--mpdf-table-header-background);
     color: ${tableHeaderTextColor};
     padding: 6px 10px;
     text-align: start;
     font-weight: 600;
-    border: 0.5px solid ${s.accentColor}33;
+    border: 0.5px solid color-mix(in srgb, var(--mpdf-accent) 20%, transparent);
     font-size: 0.9em;
   }
-  .mpdf-doc td { padding: 5px 10px; border: 0.5px solid ${s.bodyColor}22; vertical-align: top; }
-  ${s.tableStriped ? `.mpdf-doc tbody tr:nth-child(even) { background: ${s.tableHeaderBg}55; }` : ''}
+  .mpdf-doc td { padding: 5px 10px; border: 0.5px solid color-mix(in srgb, var(--mpdf-body-color) 13%, transparent); vertical-align: top; }
+  ${s.tableStriped ? '.mpdf-doc tbody tr:nth-child(even) { background: color-mix(in srgb, var(--mpdf-table-header-background) 33%, transparent); }' : ''}
 
   /* GFM Alerts (GitHub-style > [!NOTE] blocks). One accent-styled design for
    * all five variants; the title band spans the full alert width via negative
@@ -549,16 +555,16 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
    * custom accents color it with their own hue. (Document content, not
    * chrome — see DESIGN.md.) */
   .mpdf-doc .markdown-alert {
-    border-inline-start: 4px solid ${s.accentColor};
+    border-inline-start: 4px solid var(--mpdf-accent);
     border-start-start-radius: 0;
     border-start-end-radius: 5px;
     border-end-end-radius: 5px;
     border-end-start-radius: 0;
-    background: ${s.accentColor}12;
-    margin: ${s.paragraphSpacing * 1.2}em 0;
+    background: color-mix(in srgb, var(--mpdf-accent) 7%, transparent);
+    margin: calc(var(--mpdf-paragraph-spacing) * 1.2) 0;
     padding: 0 14px 9px;
     overflow: hidden;
-    box-shadow: inset 0 0 0 1px ${s.accentColor}22;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mpdf-accent) 13%, transparent);
     font-style: normal;
   }
   .mpdf-doc .markdown-alert-title {
@@ -567,22 +573,22 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
     gap: 7px;
     margin: 0 -14px;
     padding: 7px 12px;
-    background: ${s.accentColor}28;
-    border-bottom: 1px solid ${s.accentColor}33;
-    font-family: ${fontFamily};
+    background: color-mix(in srgb, var(--mpdf-accent) 16%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--mpdf-accent) 20%, transparent);
+    font-family: var(--mpdf-font);
     font-size: 0.8em;
     font-weight: 800;
     font-style: normal;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: ${s.accentColor};
+    color: var(--mpdf-accent);
     line-height: 1.3;
   }
   .mpdf-doc .markdown-alert-title svg {
     flex-shrink: 0;
     width: 15px;
     height: 15px;
-    stroke: ${s.accentColor};
+    stroke: var(--mpdf-accent);
     fill: none;
     stroke-width: 2;
   }
@@ -594,7 +600,7 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
   }
   /* Nested blockquotes inside alerts keep a subtler indent */
   .mpdf-doc .markdown-alert blockquote {
-    border-inline-start-color: ${s.accentColor}66;
+    border-inline-start-color: color-mix(in srgb, var(--mpdf-accent) 40%, transparent);
     background: transparent;
   }
 
@@ -604,22 +610,64 @@ export function buildDocCSS(s: DocumentSettings, isRTL = false): string {
   .mpdf-doc .mermaid {
     display: flex;
     justify-content: center;
-    margin: ${s.paragraphSpacing}em 0;
+    margin: var(--mpdf-paragraph-spacing) 0;
     overflow: hidden;
   }
-  .mpdf-doc .mermaid svg {
-    max-width: 100%;
-    height: auto;
-    display: block;
-  }
+  .mpdf-doc .mermaid svg { max-width: 100%; height: auto; display: block; }
   `.trim();
 
   // The Custom Stylesheet rides last so its rules win the cascade at equal
-  // specificity against the generated ones. Empty CSS (or the layer off)
-  // appends nothing — the sheet is byte-identical to a document without one.
-  if (!s.customStylesheetEnabled || !s.customStylesheet.trim())
-    return generated;
+  // specificity against the generated ones — in the measurement sheet as much
+  // as in the rendering sheet. Empty CSS (or the layer off) appends nothing.
+  const customTail = () => {
+    if (!s.customStylesheetEnabled || !s.customStylesheet.trim()) return '';
+    const custom = escapeCSSForStyle(
+      stripPageAtRules(s.customStylesheet),
+    ).trim();
+    return `\n\n/* Custom Stylesheet */\n${custom}`;
+  };
 
-  const custom = escapeCSSForStyle(stripPageAtRules(s.customStylesheet)).trim();
-  return `${generated}\n\n/* Custom Stylesheet */\n${custom}`;
+  if (!geometry) return `${generated}${customTail()}`;
+  const g = geometry;
+
+  // The page-chrome rules: painted from the same sheet that carries the Custom
+  // Stylesheet layer, so user CSS reaches the paper, the bands, and the frame —
+  // either per-selector or by redefining a variable. Values ride on the page
+  // box so both the box and its bands read them.
+  const chrome = `
+  .mpdf-page {
+    /* The page chrome's style values — same contract as the content's. The
+     * accent is mirrored here because the bands are not inside .mpdf-doc. */
+    --mpdf-page-background: ${s.pageBackground};
+    --mpdf-header-color: ${s.headerFontColor};
+    --mpdf-footer-color: ${s.footerFontColor};
+    --mpdf-frame-color: ${s.frameColor};
+    --mpdf-accent: ${s.accentColor};
+    --pm-margin-left: ${g.mLeft}px;
+    --pm-margin-right: ${g.mRight}px;
+    --pm-header-h: ${g.headerH}px;
+    --pm-footer-h: ${g.footerH}px;
+    --pm-band-top: ${g.mTop * 0.4}px;
+    background: var(--mpdf-page-background);
+  }
+  .mpdf-page-header-text {
+    font-size: ${s.headerFontSize}px;
+    color: var(--mpdf-header-color);
+    font-family: var(--mpdf-font);
+    ${s.showHeaderBorder ? 'border-bottom:0.5px solid color-mix(in srgb, var(--mpdf-accent) 20%, transparent);' : ''}
+  }
+  .mpdf-page-footer-text {
+    font-size: ${s.footerFontSize}px;
+    color: var(--mpdf-footer-color);
+    font-family: var(--mpdf-font);
+    ${s.showFooterBorder ? 'border-top:0.5px solid color-mix(in srgb, var(--mpdf-accent) 20%, transparent);' : ''}
+  }`.trim();
+
+  // Only an enabled frame contributes a rule; a disabled one must leave no
+  // trace for a stylesheet to fight with.
+  const frameRule = s.frameEnabled
+    ? `\n  .mpdf-page-frame { border: ${s.frameThickness}px ${s.frameStyle} var(--mpdf-frame-color); }`
+    : '';
+
+  return `${generated}\n\n/* Page chrome */\n${chrome}${frameRule}${customTail()}`;
 }

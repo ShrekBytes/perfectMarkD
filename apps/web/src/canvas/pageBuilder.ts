@@ -95,8 +95,8 @@ export function buildPage({
   shadow.adoptedStyleSheets = sheets;
 
   const box = document.createElement('div');
-  box.className = 'pm-page-box';
-  box.style.cssText = `position:relative;width:${g.pw}px;height:${g.ph}px;overflow:hidden;background:${s.pageBackground};`;
+  box.className = 'pm-page-box mpdf-page';
+  box.style.cssText = `position:relative;width:${g.pw}px;height:${g.ph}px;overflow:hidden;`;
   shadow.appendChild(box);
 
   // Page background image (identical on every page; painted first so it's
@@ -121,8 +121,12 @@ export function buildPage({
   }
 
   if (layout.hasHeader) {
-    appendLayer(box, 'header-text', headerBandStyle(s, g));
-    box.lastElementChild!.innerHTML = buildHFInnerHTML(
+    const header = document.createElement('div');
+    header.dataset.pmLayer = 'header-text';
+    header.className = 'mpdf-page-header-text';
+    header.style.cssText = headerBandStyle();
+    box.appendChild(header);
+    header.innerHTML = buildHFInnerHTML(
       layout.headerCenter,
       layout.headerLeft,
       layout.headerRight,
@@ -148,8 +152,12 @@ export function buildPage({
   }
 
   if (layout.hasFooter) {
-    appendLayer(box, 'footer-text', footerBandStyle(s, g));
-    box.lastElementChild!.innerHTML = buildHFInnerHTML(
+    const footer = document.createElement('div');
+    footer.dataset.pmLayer = 'footer-text';
+    footer.className = 'mpdf-page-footer-text';
+    footer.style.cssText = footerBandStyle();
+    box.appendChild(footer);
+    footer.innerHTML = buildHFInnerHTML(
       layout.footerCenter,
       layout.footerLeft,
       layout.footerRight,

@@ -5,8 +5,10 @@ import {
   buildStylingReferenceMarkdown,
   DEFAULT_SETTINGS,
   renderMarkdown,
+  resolvePageGeometry,
   STYLING_REFERENCE_ANCHOR,
   STYLING_REFERENCE_HEADING,
+  STYLING_REFERENCE_PAGE_VARIABLES,
   STYLING_REFERENCE_SELECTORS,
   STYLING_REFERENCE_VARIABLES,
   type DocumentSettings,
@@ -22,6 +24,9 @@ const everyBranch: DocumentSettings = {
   centerH1: true,
   tableStriped: true,
   codeFontLigatures: true,
+  // The page-chrome section's conditional branch: the reference documents
+  // .mpdf-page-frame, which the builder emits only while the frame is on.
+  frameEnabled: true,
   accentColor: '#0af0af',
   bodyColor: '#010203',
   headingColor: '#040506',
@@ -34,21 +39,30 @@ const everyBranch: DocumentSettings = {
 };
 
 describe('styling reference — the drift test (ai-transforms/02)', () => {
-  /** One CSS build with every settings branch on: a name the reference
+  /** One CSS build with every settings branch on, geometry included so the
+   *  page-chrome section is part of the checked output: a name the reference
    *  documents must appear in exactly this output, so the reference can never
    *  describe something the engine stopped emitting. Documenting fewer names
    *  than the engine emits passes — the assertion is one-directional. */
-  const css = buildDocCSS(everyBranch, true);
+  const css = buildDocCSS(everyBranch, true, resolvePageGeometry(everyBranch));
 
   /** The name as a literal regex fragment (the dots in selector names are
    *  literals, not any-char matches). */
   const literal = (name: string): string => name.replace(/\./g, '\\.');
 
-  it('defines every documented variable on .mpdf-doc', () => {
+  it('defines every documented content variable on .mpdf-doc', () => {
     for (const { name } of STYLING_REFERENCE_VARIABLES) {
       // Inside the one root rule — the documented scope — and as a
       // definition, not a var() mention.
       expect(css).toMatch(new RegExp(`\\.mpdf-doc \\{[^}]*${literal(name)}: `));
+    }
+  });
+
+  it('defines every documented page variable on .mpdf-page', () => {
+    for (const { name } of STYLING_REFERENCE_PAGE_VARIABLES) {
+      expect(css).toMatch(
+        new RegExp(`\\.mpdf-page \\{[^}]*${literal(name)}: `),
+      );
     }
   });
 
@@ -85,6 +99,9 @@ describe('buildStylingReferenceMarkdown', () => {
     for (const { name } of STYLING_REFERENCE_VARIABLES) {
       expect(markdown).toContain(name);
     }
+    for (const { name } of STYLING_REFERENCE_PAGE_VARIABLES) {
+      expect(markdown).toContain(name);
+    }
     for (const { name } of STYLING_REFERENCE_SELECTORS) {
       expect(markdown).toContain(name);
     }
@@ -93,7 +110,10 @@ describe('buildStylingReferenceMarkdown', () => {
   it('marks everything else as internal and states the Inspector’s turf', () => {
     // Whitespace-tolerant: the phrase may wrap across source lines.
     expect(markdown).toMatch(/internal and free\s+to\s+change/);
-    expect(markdown).toContain('Inspector settings');
+    // Geometry stays an Inspector setting even though chrome styling is now
+    // CSS; the distinction is the section's whole point.
+    expect(markdown).toMatch(/Inspector\s+setting/);
+    expect(markdown).toMatch(/cannot\s+move\s+them/);
     // @page named as ignored, in its own right.
     expect(markdown).toContain('@page');
   });

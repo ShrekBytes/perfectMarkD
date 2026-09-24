@@ -38,9 +38,13 @@ import {
 /** Everything a page renderer needs to draw the paginated document. */
 export interface PipelineResult {
   layouts: PageLayout[];
-  /** The scoped `.mpdf-doc` stylesheet pagination measured against
-   *  (buildDocCSS with the pipeline's isRTL decision baked in). */
+  /** The scoped `.mpdf-doc` stylesheet pagination measured against —
+   *  content rules only (no page chrome). */
   docCSS: string;
+  /** The full sheet for rendering: the content rules plus the page-chrome
+   *  rules (.mpdf-page) the preview's page boxes and buildExportHTML both
+   *  adopt — one string, so a Custom Stylesheet overrides both identically. */
+  sheetCSS: string;
   isRTL: boolean;
   geometry: PageGeometry;
 }
@@ -131,8 +135,13 @@ export async function runDocumentPipeline(
   options: PipelineOptions,
 ): Promise<PipelineResult> {
   const isRTL = isRTLContent(markdown);
-  const docCSS = buildDocCSS(settings, isRTL);
   const geometry = resolvePageGeometry(settings);
+  // Two builds of one builder: pagination measures against the content rules
+  // only (page chrome cannot affect content flow), while every renderer of the
+  // laid-out pages adopts the full sheet — chrome rules included — so a Custom
+  // Stylesheet overrides preview and both export paths identically.
+  const docCSS = buildDocCSS(settings, isRTL);
+  const sheetCSS = buildDocCSS(settings, isRTL, geometry);
 
   const prepared = applyAutoBreaks(markdown, settings);
   const sections = splitMarkdownSections(prepared);
@@ -158,5 +167,5 @@ export async function runDocumentPipeline(
   if (allPages.length === 0) allPages.push([]);
 
   const layouts = buildPageLayouts(allPages, settings, options.title);
-  return { layouts, docCSS, isRTL, geometry };
+  return { layouts, docCSS, sheetCSS, isRTL, geometry };
 }

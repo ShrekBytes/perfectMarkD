@@ -85,7 +85,10 @@ export function buildExportHTML(
         .flatMap((l) => l.pageNodes.map((n) => n.textContent ?? ''))
         .join(' '),
     );
-  const docCSS = buildDocCSS(s, isRTL);
+  // The geometry rides into the sheet: the page-chrome rules (.mpdf-page) read
+  // their band geometry and paint the paper, so a Custom Stylesheet can
+  // override them — and must see the same sheet the preview adopts.
+  const docCSS = buildDocCSS(s, isRTL, g);
   const frameHTML = buildFrameOverlayHTML(s);
 
   // Resolve asset refs once: the same banner/background layers repeat on
@@ -113,13 +116,13 @@ export function buildExportHTML(
     const contentHTML = layout.pageNodes.map((n) => n.outerHTML).join('\n');
 
     const headerHTML = layout.hasHeader
-      ? `<div style="${headerBandStyle(s, g)}">${buildHFInnerHTML(layout.headerCenter, layout.headerLeft, layout.headerRight)}</div>`
+      ? `<div class="mpdf-page-header-text" style="${headerBandStyle()}">${buildHFInnerHTML(layout.headerCenter, layout.headerLeft, layout.headerRight)}</div>`
       : '';
 
     const contentDivHTML = `<div class="mpdf-doc"${isRTL ? ' dir="rtl"' : ''} style="position:absolute;top:${g.mTop + g.headerH}px;left:${g.mLeft}px;width:${g.contentW}px;">${contentHTML}</div>`;
 
     const footerHTML = layout.hasFooter
-      ? `<div style="${footerBandStyle(s, g)}">${buildHFInnerHTML(layout.footerCenter, layout.footerLeft, layout.footerRight)}</div>`
+      ? `<div class="mpdf-page-footer-text" style="${footerBandStyle()}">${buildHFInnerHTML(layout.footerCenter, layout.footerLeft, layout.footerRight)}</div>`
       : '';
 
     // Banner divs precede their text divs so DOM order puts text on top.
@@ -132,7 +135,7 @@ export function buildExportHTML(
         ? `<div style="${bannerStyle(s, g, footerBannerUrl, 'footer')}"></div>`
         : '';
 
-    return `<div class="mpdf-export-page">${bgImgHTML}${headerBannerHTML}${headerHTML}${contentDivHTML}${footerBannerHTML}${footerHTML}${frameHTML}</div>`;
+    return `<div class="mpdf-export-page mpdf-page">${bgImgHTML}${headerBannerHTML}${headerHTML}${contentDivHTML}${footerBannerHTML}${footerHTML}${frameHTML}</div>`;
   });
 
   const printCSS = `
@@ -149,7 +152,6 @@ export function buildExportHTML(
         position: relative;
         width: ${g.pw}px; height: ${g.ph}px;
         overflow: hidden;
-        background: ${s.pageBackground};
         page-break-after: always; break-after: page;
       }
       .mpdf-export-page:last-child { page-break-after: avoid; break-after: avoid; }

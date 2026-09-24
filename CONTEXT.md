@@ -17,7 +17,7 @@ A named bundle of Document style values (typography, colors, layout) the user ca
 _Avoid_: theme, template, style
 
 **Custom Stylesheet**:
-The user's own CSS for a Document, layered on top of the CSS the engine generates from that Document's style values. A paid capability. It is a layer, not a Preset: it changes no style value, so it can be on alongside any Preset (the preset gallery shows it as a tile, and the Preset's tile stays selected).
+The user's own CSS for a Document, layered on top of the CSS the engine generates from that Document's style values. A paid capability. It is a layer, not a Preset: it changes no style value, so it can be on alongside any Preset (the preset gallery shows it as a tile, and the Preset's tile stays selected). The generated rules read the `--mpdf-*` variables on `.mpdf-doc` (content) and `.mpdf-page` (page chrome: paper, header/footer bands, frame), so a Custom Stylesheet overrides the Preset's typography and colors wholesale by redefining a variable, or per-selector by appending rules. It cannot move or resize the page: geometry (paper size, orientation, margins) stays a Page-tab setting, and `@page` rules are stripped.
 _Avoid_: custom preset, theme, template, skin
 
 **Outline**:
@@ -141,5 +141,5 @@ The single page explaining every feature and how to use the editor. Distinct fro
 _Avoid_: tutorial, guide, help
 
 **Styling reference**:
-The Docs page's section documenting the stable contract a Custom Stylesheet may rely on: the `.mpdf-doc`-scoped CSS variables and content selectors the engine emits. Maintained with the engine — a drift test fails the build if it names something the engine stopped emitting. The Stylesheet tab's footer line links to it.
+The Docs page's section documenting the stable contract a Custom Stylesheet may rely on: the `.mpdf-doc`-scoped variables (the Document's style values, read by the generated rules — redefining one is an override) and the `.mpdf-page`-scoped page-chrome variables and selectors the engine emits. Maintained with the engine — a drift test fails the build if it names something the engine stopped emitting. The Stylesheet tab's footer line links to it.
 _Avoid_: CSS docs, class list, API reference

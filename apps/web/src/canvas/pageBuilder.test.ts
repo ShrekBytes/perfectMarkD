@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import {
   DEFAULT_SETTINGS,
+  buildDocCSS,
   type AssetResolver,
   type DocumentSettings,
   type PageGeometry,
@@ -58,8 +59,10 @@ function build(
   assets: AssetResolver = stubResolver({}),
   isRTL = false,
 ) {
+  // The real sheet for these settings, chrome section included — what the
+  // Paper Canvas adopts in production.
   const sheets = createPageSheets(
-    '.mpdf-doc { color: red; }',
+    buildDocCSS(settings, isRTL, GEOMETRY),
     '.katex { x: y; }',
   );
   return {
@@ -100,15 +103,26 @@ describe('buildPage', () => {
     expect(host.shadowRoot!.adoptedStyleSheets).toEqual([sheets[0], sheets[1]]);
   });
 
-  it('sizes the page box from the geometry and paints the paper background', () => {
+  it('sizes the page box from the geometry and scopes it for the chrome rules', () => {
     const { host } = build(makeLayout());
     const box = boxOf(host);
     expect(box.style.width).toBe('794px');
     expect(box.style.height).toBe('1123px');
     expect(box.style.overflow).toBe('hidden');
-    expect(box.getAttribute('style')).toMatch(
-      /background:\s*(#ffffff|rgb\(255, 255, 255\))/,
-    );
+    // The paper is painted by the shared .mpdf-page sheet rule (the Custom
+    // Stylesheet can override it), not by an inline style.
+    expect(box.className).toContain('mpdf-page');
+    expect(box.getAttribute('style')).not.toContain('background');
+  });
+
+  it('paints the paper background from the sheet, overridable per page', () => {
+    const { sheets } = build(makeLayout());
+    const cssText = sheets
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .map((rule) => rule.cssText)
+      .join('\n');
+    expect(cssText).toContain('.mpdf-page');
+    expect(cssText).toContain('--mpdf-page-background: #ffffff');
   });
 
   it('appends the layout page nodes into the mpdf-doc content root', () => {
@@ -147,7 +161,9 @@ describe('buildPage', () => {
     const header = layer(host, 'header-text')!;
     expect(header.textContent).toBe('Centered');
     expect(header.style.alignItems).toBe('center');
-    expect(header.style.top).toBe(`${GEOMETRY.mTop * 0.4}px`);
+    // Band geometry reads the page-box variables — the numbers ride in the
+    // sheet's .mpdf-page rule, so both stay overridable together.
+    expect(header.style.top).toBe('var(--pm-band-top)');
     expect(header.firstElementChild!.getAttribute('style')).toContain(
       'text-align:center',
     );
@@ -168,27 +184,41 @@ describe('buildPage', () => {
 
   it('adds the header border when showHeaderBorder is on', () => {
     const s = { ...DEFAULT_SETTINGS, showHeaderBorder: true };
-    const { host } = build(makeLayout({ hasHeader: true }), s);
+    const { host, sheets } = build(makeLayout({ hasHeader: true }), s);
     const header = layer(host, 'header-text')!;
-    expect(header.style.borderBottomWidth).toBe('0.5px');
-    // #1c1e2133 = the accent (graphite) at 20% alpha.
-    expect(header.style.borderBottomColor).toBe('rgba(28, 30, 33, 0.2)');
+    // The band's class hooks the shared sheet rule that paints the border.
+    expect(header.className).toBe('mpdf-page-header-text');
+    const cssText = sheets
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .map((rule) => rule.cssText)
+      .join('\n');
+    expect(cssText).toContain('.mpdf-page-header-text');
+    expect(cssText).toContain('border-bottom');
   });
 
   it('renders the footer band pinned to the bottom with page padding', () => {
     const { host } = build(makeLayout({ hasFooter: true, footerLeft: 'foot' }));
     const footer = layer(host, 'footer-text')!;
     expect(footer.style.bottom).toBe('0px');
-    expect(footer.style.paddingLeft).toBe('94.5px');
-    expect(footer.style.paddingRight).toBe('94.5px');
-    expect(footer.style.height).toBe('23px');
+    // Assert the raw cssText: jsdom's CSSOM drops var() inside shorthands,
+    // while real Chromium resolves them from the .mpdf-page rule.
+    const css = footer.getAttribute('style') ?? '';
+    expect(css).toContain(
+      'padding: 0 var(--pm-margin-right) 0 var(--pm-margin-left)',
+    );
+    expect(css).toContain('height: var(--pm-footer-h)');
     expect(footer.textContent).toBe('foot');
   });
 
   it('adds the footer border when showFooterBorder is on', () => {
     const s = { ...DEFAULT_SETTINGS, showFooterBorder: true };
-    const { host } = build(makeLayout({ hasFooter: true }), s);
-    expect(layer(host, 'footer-text')!.style.borderTopWidth).toBe('0.5px');
+    const { host, sheets } = build(makeLayout({ hasFooter: true }), s);
+    expect(layer(host, 'footer-text')!.className).toBe('mpdf-page-footer-text');
+    const cssText = sheets
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .map((rule) => rule.cssText)
+      .join('\n');
+    expect(cssText).toContain('border-top');
   });
 
   it('omits header/footer bands the layout marks off', () => {
@@ -300,11 +330,17 @@ describe('buildPage', () => {
 
   it('appends the frame overlay last, inset by frameMargin', () => {
     const s = { ...DEFAULT_SETTINGS, frameEnabled: true, frameMargin: 8 };
-    const { host } = build(makeLayout(), s);
+    const { host, sheets } = build(makeLayout(), s);
     const frame = boxOf(host).lastElementChild as HTMLElement;
     expect(frame.dataset.pmLayer).toBe('frame');
     expect(frame.style.top).toBe('8px');
-    expect(frame.style.borderTopWidth).toBe('4px');
+    // The border itself comes from the shared .mpdf-page-frame rule.
+    expect(frame.className).toBe('mpdf-page-frame');
+    const cssText = sheets
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .map((rule) => rule.cssText)
+      .join('\n');
+    expect(cssText).toContain('.mpdf-page-frame');
   });
 
   it('omits the frame when disabled', () => {

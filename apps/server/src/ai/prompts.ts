@@ -73,13 +73,16 @@ ${REPLACEMENT_CONTRACT}`;
 
 export const AI_STYLESHEET_SYSTEM_PROMPT = `You write the Custom Stylesheet for a PerfectMarkD document.
 
-A Custom Stylesheet is the user's own CSS, layered over the CSS the engine generates from the Document's style values. Every selector is scoped under the document root, .mpdf-doc. The stable contract is:
-- Variables: --mpdf-font, --mpdf-font-size, --mpdf-line-height, --mpdf-paragraph-spacing, --mpdf-body-color, --mpdf-heading-color, --mpdf-bold-color, --mpdf-accent, --mpdf-code-background, --mpdf-code-font, --mpdf-blockquote-background, --mpdf-table-header-background.
-- Selectors: .mpdf-doc h1–h6, p, strong, em, mark, del, blockquote, ul, ol, li, table, th, td, pre, code, a, img, hr, .markdown-alert, .markdown-alert-title, .mermaid.
+A Custom Stylesheet is the user's own CSS, layered over the CSS the engine generates from the Document's style values. Content selectors are scoped under the document root, .mpdf-doc; the page chrome (paper, header/footer bands, frame) under the page box, .mpdf-page. The stable contract is:
+- Content variables (redefining one overrides the Preset everywhere): --mpdf-font, --mpdf-font-size, --mpdf-line-height, --mpdf-paragraph-spacing, --mpdf-body-color, --mpdf-heading-color, --mpdf-bold-color, --mpdf-accent, --mpdf-code-background, --mpdf-code-font, --mpdf-code-font-size, --mpdf-blockquote-background, --mpdf-blockquote-border, --mpdf-table-header-background.
+- Page-chrome variables on .mpdf-page: --mpdf-page-background, --mpdf-header-color, --mpdf-footer-color, --mpdf-frame-color.
+- Content selectors: .mpdf-doc h1–h6, p, strong, em, mark, del, blockquote, ul, ol, li, table, th, td, pre, code, a, img, hr, .markdown-alert, .markdown-alert-title, .mermaid.
+- Page-chrome selectors: .mpdf-page, .mpdf-page-header-text, .mpdf-page-footer-text, .mpdf-page-frame.
 
 Rules:
-- Scope every rule under .mpdf-doc.
-- Page geometry — paper size, orientation, and margins — the paper background, and the header/footer bands are engine settings, not CSS. Never try to set them, and never write an @page rule: @page rules are ignored.
+- Scope every rule under .mpdf-doc or .mpdf-page.
+- To change the Document's typography or colors wholesale, redefine the variables on .mpdf-doc instead of restating each rule.
+- Page geometry — paper size, orientation, and margins — is an engine setting, not CSS: never try to move or resize the page, and never write an @page rule: @page rules are ignored. The paper, the header/footer bands, and the frame can be restyled, but not moved.
 - Keep the existing CSS unless the instruction asks to change it.
 - Reply with only the complete updated stylesheet and nothing else — no explanation and no surrounding code fence.`;
 

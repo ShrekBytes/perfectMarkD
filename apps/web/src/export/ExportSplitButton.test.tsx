@@ -87,7 +87,7 @@ it('prints straight away when the session hint was already shown', async () => {
   );
   // The print saw the real export document for this document.
   expect(printStub.iframesAtPrint[0]?.getAttribute('srcdoc')).toContain(
-    'class="mpdf-export-page"',
+    'class="mpdf-export-page mpdf-page"',
   );
   expect(printStub.iframesAtPrint[0]?.getAttribute('srcdoc')).toContain(
     '<title>Welcome to PerfectMarkD</title>',
@@ -234,7 +234,9 @@ it('runs the same flow from the dropdown Client Export… item', async () => {
   expect(
     screen.getByRole('menu', { name: /export options/i }),
   ).toBeInTheDocument();
-  await userEvent.click(screen.getByRole('menuitem', { name: 'Client Export…' }));
+  await userEvent.click(
+    screen.getByRole('menuitem', { name: 'Client Export…' }),
+  );
 
   // The menu closed and the flow ran without the hint (already shown).
   expect(screen.queryByRole('menu')).not.toBeInTheDocument();
@@ -248,7 +250,9 @@ it('closes the dropdown with Escape without exporting', async () => {
   render(<ExportSplitButton />);
 
   await userEvent.click(chevron());
-  expect(screen.getByRole('menuitem', { name: 'Client Export…' })).toBeInTheDocument();
+  expect(
+    screen.getByRole('menuitem', { name: 'Client Export…' }),
+  ).toBeInTheDocument();
   await userEvent.keyboard('{Escape}');
 
   expect(screen.queryByRole('menu')).not.toBeInTheDocument();

@@ -86,15 +86,18 @@ export function StylesheetTab({
       />
 
       <div className="shrink-0 pt-2">
-        {/* The guardrail, in the box's own voice: geometry is a Page-tab
-            setting, and an obeyed-in-print-only @page rule would silently
+        {/* The guardrail, in the box's own voice: geometry stays a Page-tab
+            setting (the sheet restyles the paper, bands, and frame, but never
+            moves them), and an obeyed-in-print-only @page rule would silently
             split preview from print — so the engine strips them. The footer
             line also links to the styling reference (ai-transforms/02), the
             Docs page section documenting the stable contract. A router Link,
             so the swap keeps the open Document (it autosaves and survives the
             round trip). */}
         <p className="text-[11px] leading-4 text-ink-faint">
-          Page size and margins are Page-tab settings; @page rules are ignored.{' '}
+          Page size and margins are Page-tab settings; @page rules are ignored.
+          Everything else — colors, typography, paper, header/footer, frame — is
+          overridable here.{' '}
           <Link
             to={`/docs#${STYLING_REFERENCE_ANCHOR}`}
             className="font-medium text-ink underline decoration-hairline underline-offset-2 transition-colors duration-150 outline-offset-2 outline-accent hover:decoration-ink focus-visible:outline-2"

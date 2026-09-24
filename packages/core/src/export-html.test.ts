@@ -65,7 +65,7 @@ describe('buildExportHTML', () => {
     });
     await expect(html).toMatchFileSnapshot('./export-html.golden.html');
     // Structural assertions documenting what the golden file must keep showing.
-    const pages = html.match(/class="mpdf-export-page"/g) ?? [];
+    const pages = html.match(/class="mpdf-export-page mpdf-page"/g) ?? [];
     expect(pages).toHaveLength(2);
     expect(html).toContain('@page { size: 794px 1123px; margin: 0; }');
     expect(html).toContain('-webkit-print-color-adjust: exact;');
@@ -77,7 +77,11 @@ describe('buildExportHTML', () => {
     expect(html).toContain('data:image/png;base64,UEFQRVI='); // background
     expect(html).toContain('data:image/png;base64,SEVBREVS'); // header banner
     expect(html).toContain('data:image/png;base64,Rk9PVEVS'); // footer banner
-    expect(html).toContain('border:4px solid #1c1e21;'); // frame
+    // The frame border is painted by the .mpdf-page-frame sheet rule from the
+    // frame-color variable — restylable by a Custom Stylesheet.
+    expect(html).toContain(
+      '.mpdf-page-frame { border: 4px solid var(--mpdf-frame-color); }',
+    );
     expect(html).toContain('<title>Quarterly Report</title>');
   });
 
@@ -225,6 +229,7 @@ describe('buildExportHTML', () => {
       resolveNothing,
     );
     expect(framed).toContain('top:12px;left:12px;right:12px;bottom:12px;');
+    expect(framed).toContain('class="mpdf-page-frame"');
   });
 
   it('sizes the background layer to the content box in content-only scope', () => {
@@ -242,6 +247,24 @@ describe('buildExportHTML', () => {
       `position:absolute;top:${mTop + 40}px;left:${mLeft}px;width:${794 - 2 * mLeft}px;`,
     );
     expect(html).not.toContain('inset:0;');
+  });
+
+  it('paints the paper, bands, and frame from the sheet so a Custom Stylesheet can restyle them', () => {
+    const s = settings({
+      frameEnabled: true,
+      customStylesheet:
+        '.mpdf-page { --mpdf-page-background: #101018; } .mpdf-page-header-text { color: #8be9fd; }',
+      customStylesheetEnabled: true,
+    });
+    const html = buildExportHTML(twoPageLayouts(s), s, resolveNothing);
+    // The page box carries the chrome scope; the sheet paints it.
+    expect(html).toContain('class="mpdf-export-page mpdf-page"');
+    expect(html).toContain('background: var(--mpdf-page-background);');
+    expect(html).not.toContain('background:#ffffff;');
+    // The user's override lands after the chrome rules in the print CSS.
+    expect(html.indexOf('--mpdf-page-background: #101018;')).toBeGreaterThan(
+      html.indexOf('/* Page chrome */'),
+    );
   });
 
   it('carries the Custom Stylesheet in the print CSS, stripped of @page (ai-transforms/01)', () => {

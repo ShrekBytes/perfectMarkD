@@ -52,7 +52,7 @@ describe('buildExportDocument', () => {
     expect(html).toContain('<title>My essay</title>');
     expect(html).toContain('@page { size: 794px 1123px; margin: 0; }');
     expect(html).toContain('print-color-adjust: exact;');
-    expect(html).toContain('class="mpdf-export-page"');
+    expect(html).toContain('class="mpdf-export-page mpdf-page"');
     expect(html).toContain('<h1 id="hello">Hello</h1>');
     // Header/footer text bands ride the shared layout builder.
     expect(html).toContain('>Hi</span>');

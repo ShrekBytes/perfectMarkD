@@ -55,14 +55,15 @@ test('export builds the print document in a hidden iframe', async ({
   // showed, serialized by the engine's buildExportHTML.
   expect(html).toContain('data-pm-print-ready'); // parse sentinel
   expect(html).toContain('@page'); // page sizing for the print pipeline
-  expect(html).toContain('class="mpdf-export-page"'); // one box per page
+  expect(html).toContain('class="mpdf-export-page mpdf-page"'); // one box per page
   expect(html).toContain('mpdf-doc'); // content root
   expect(html).toContain('.katex'); // math stylesheet inlined
   expect(html).toContain('<title>Welcome to PerfectMarkD</title>');
   expect(html).toContain('Made with PerfectMarkD'); // sample footer text
 
   // Export page count matches what the Paper Canvas paginated.
-  const exportPages = html.split('class="mpdf-export-page"').length - 1;
+  const exportPages =
+    html.split('class="mpdf-export-page mpdf-page"').length - 1;
   expect(exportPages).toBe(canvasPages);
 
   // print() was invoked on the frame's window and the flow completed.

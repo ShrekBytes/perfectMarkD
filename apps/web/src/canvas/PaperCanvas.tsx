@@ -92,7 +92,7 @@ function mountPageSlots(
   zoom: number,
 ): Map<string, number> {
   const headingIndex = new Map<string, number>();
-  const sheets = createPageSheets(result.docCSS, KATEX_LAYOUT_CSS);
+  const sheets = createPageSheets(result.sheetCSS, KATEX_LAYOUT_CSS);
   const fragment = document.createDocumentFragment();
 
   result.layouts.forEach((layout, index) => {

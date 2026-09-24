@@ -1,7 +1,7 @@
 {
   "contentHeights": [
-    922,
-    35,
+    902,
+    56,
   ],
   "outline": [
     {
@@ -32,12 +32,12 @@
         "TABLE[2r+th]",
         "P",
         "P",
-        "P",
       ],
     },
     {
       "headings": [],
       "sigs": [
+        "P",
         "HR",
         "SECTION",
       ],
