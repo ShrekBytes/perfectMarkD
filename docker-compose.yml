@@ -97,7 +97,11 @@ services:
       umami-db:
         condition: service_healthy
     healthcheck:
-      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:3000/api/heartbeat']
+      # The base path is part of the route: umami answers /analytics/api/*,
+      # not /api/* (upstream's own compose has no base path, hence the
+      # difference).
+      test:
+        ['CMD-SHELL', 'curl -fsS http://127.0.0.1:3000/analytics/api/heartbeat']
       interval: 30s
       timeout: 5s
       start_period: 20s
@@ -114,6 +118,11 @@ services:
       PRIVATE_MODE: '1'
       DISABLE_TELEMETRY: '1'
       DISABLE_UPDATES: '1'
+      # Umami filters bots by default, which is what you want in production
+      # and is worth knowing when verifying: headless Chromium sends a UA
+      # containing "HeadlessChrome", so an automated check reports 200 from
+      # /analytics/api/send while storing nothing. Drive it with a real
+      # browser UA (or set DISABLE_BOT_CHECK=1 locally) to see rows appear.
 
   umami-db:
     image: postgres:15-alpine

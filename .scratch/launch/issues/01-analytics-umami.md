@@ -1,6 +1,6 @@
 # 01 — Self-hosted Umami analytics
 
-Status: needs-info
+Status: resolved
 Blocked by: server/06
 
 Add `umami` (+ its DB) to Compose behind Caddy at `/analytics`-subdomain. Anonymous events only: page views, Client Export click, Server Export click, upgrade modal open, plan select. No cookies beyond the app session, no IP storage (Umami configured to hash/anonymize), no personal data — per PLAN §1 posture. Event wiring via a tiny wrapper (no global `data-` sprawl). Admin dashboard access restricted to the Admin.
@@ -75,3 +75,47 @@ Add `umami` (+ its DB) to Compose behind Caddy at `/analytics`-subdomain. Anonym
   **Open**: create the GitHub repository and push, run the workflow, then pull on the host
   and finish the end-to-end proof. The free-space step is still needed for the *pull*
   (a few hundred MB of image layers) even though the compile no longer happens here.
+
+- **Verified end to end in the local Compose stack (2026-09-24).** Freeing disk (KDE's
+  baloo index, ~9 GB) and `btrfs balance -dusage=25` returned 6 GiB of unallocated space —
+  metadata chunks could grow again, and the earlier ENOSPC symptom disappeared with it.
+  The repository is now public at `ShrekBytes/perfectMarkD`; the workflow published
+  `ghcr.io/shrekbytes/perfectmarkd-umami:3.4.0` in 6m48s, and it pulled anonymously, so
+  the package is public as intended.
+
+  The stack (caddy · api · umami · umami-db) came up on the host, and Caddy's `handle`
+  ordering behaved exactly as its documented sorting rule predicted — a named matcher
+  sorts by source position, a bare `handle` sorts last:
+
+  | Route | Result |
+  | --- | --- |
+  | `/` | the SPA (200 text/html) |
+  | `/analytics` | Umami (`<title>Umami</title>`) |
+  | `/analytics/script.js` | the tracker (200, 4773 bytes) |
+  | `/analytics/api/heartbeat` | `{"ok":true}` (umami) |
+  | `/healthz`, `/api/me` | the API (`{"ok":true}`, 401) |
+
+  Driving the real bundle in Chromium fired every event into umami's database — three page
+  views (`/`, `/docs`, `/pricing`), `client-export`, `server-export`, `upgrade-modal-open`,
+  and `plan-select` carrying `plan=pro` in `event_data`, all under one session. A request
+  audit across `/`, `/pricing`, `/privacy`, `/about`, `/docs` with the tracker live saw
+  **zero** foreign origins: the only analytics requests were same-origin
+  `/analytics/script.js` and `/analytics/api/send`.
+
+  Two things the run caught, both fixed or recorded:
+
+  - The umami healthcheck curled `/api/heartbeat`, which is a 404 under a base path — the
+    container sat "starting" forever while the app worked fine. It now curls
+    `/analytics/api/heartbeat`, and the container reports healthy.
+  - Umami filters bots by default, so headless Chromium (UA contains "HeadlessChrome") got
+    a 200 from `/analytics/api/send` while nothing was stored. That is correct production
+    behaviour, not a defect; `docker-compose.yml` records it, and verification used a real
+    browser UA.
+
+  Also found while running the first-ever CI: the engine golden suite **passes locally but
+  fails on the runner**. The preset font stacks are system fonts (`Georgia, serif`,
+  `'Times New Roman', Times, serif`, `Arial, sans-serif`, `'Helvetica Neue', Helvetica`), so
+  the goldens encode the Admin's machine's font substitution and a bare Ubuntu runner
+  substitutes differently — code blocks split at different line counts. Pre-existing and
+  unrelated to this ticket; the snapshots were deliberately **not** regenerated, since
+  baking the runner's fonts in would break local runs and weaken the regression net.
