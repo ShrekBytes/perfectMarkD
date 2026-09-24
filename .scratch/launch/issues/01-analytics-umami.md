@@ -119,3 +119,35 @@ Add `umami` (+ its DB) to Compose behind Caddy at `/analytics`-subdomain. Anonym
   substitutes differently — code blocks split at different line counts. Pre-existing and
   unrelated to this ticket; the snapshots were deliberately **not** regenerated, since
   baking the runner's fonts in would break local runs and weaken the regression net.
+
+- **Two-axis code review, and what it settled (2026-09-24).** Run against `f9885cf..811be88`.
+
+  Fixed from it: the analytics test stub is now shared
+  (`apps/web/src/testing/stub-analytics.ts`, consumed the way `stub-mermaid` already is)
+  instead of the same `vi.mock` factory copied into four suites; the Dockerfile's
+  `SKIP_BUILD_GEO` comment claimed "PerfectMarkD records no visitor location", which
+  contradicted the Privacy page — it now says what is true, that the local geo database is
+  skipped while the proxy's location header may still yield an approximate country; and the
+  `tracker.ts` header no longer implies the event names are *written* centrally when what
+  is central is the union they must come from.
+
+  Two spec findings answered rather than changed, both deliberate:
+
+  - **"Admin dashboard access restricted to the Admin"** rests on Umami's own account, which
+    is the mechanism the user chose over a Caddy basic-auth gate. The residual risk is real
+    and worth stating plainly: the dashboard is publicly reachable at `/analytics` and the
+    account ships as `admin`/`umami`, so **the password change is the whole gate**. README
+    and `.env.example` both say so; there is no second lock by design.
+  - **"no IP storage (Umami configured to hash/anonymize)"** has no knob because Umami has
+    no setting for it — hashing is what it always does. Verified against the schema rather
+    than asserted: `session` has `session_id`, `browser`, `os`, `device`, `screen`,
+    `language`, `country`, `region`, `city` and **no IP column**, and no table in the
+    database has one. The local run stored an empty country, as expected with no proxy
+    header and no geo database.
+
+  Left as-is by judgement: `VITE_ANALYTICS_URL` stays, because the user it serves is a
+  self-hoster not using this repo's Caddyfile (it is documented as such); the duplicated
+  `3.4.0` literal across Dockerfile/compose/.env.example is the drift ADR-0012 already
+  accepts; and `App.tsx` reading `window.location.pathname` beside `useRoute()` is correct
+  but slightly impure — teaching the router to hand the path out would change a core
+  module's API for a cosmetic gain.

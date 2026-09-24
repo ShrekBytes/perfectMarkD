@@ -6,11 +6,10 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { PricingModal } from './PricingModal';
 import { trackEvent } from '../analytics/tracker';
 
-vi.mock('../analytics/tracker', () => ({
-  initAnalytics: vi.fn(),
-  trackPageView: vi.fn(),
-  trackEvent: vi.fn(),
-}));
+vi.mock('../analytics/tracker', async () => {
+  const { stubAnalyticsModule } = await import('../testing/stub-analytics');
+  return stubAnalyticsModule;
+});
 
 afterEach(() => {
   cleanup();

@@ -73,8 +73,11 @@ COPY --from=src /src/docker/proxy.ts ./src
 ENV BASE_PATH=$BASE_PATH
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
-# No MaxMind download: PerfectMarkD records no visitor location, so the
-# geo database would be dead weight in the image and a build-time fetch.
+# Skip the MaxMind download: a local geo database is dead weight here. This is
+# NOT a promise that no location is ever recorded — umami still reads the
+# proxy's location header (Cloudflare's CF-IPCountry), and an approximate
+# country is the only location the deployment ever sees. That is what the
+# Privacy page says, and it is the accurate half of this pair.
 ENV SKIP_BUILD_GEO=1
 
 RUN pnpm build:docker

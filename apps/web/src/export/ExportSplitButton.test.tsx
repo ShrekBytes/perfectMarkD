@@ -33,11 +33,10 @@ vi.mock('../library/download', () => ({ downloadBlob: vi.fn() }));
 
 // Analytics is asserted as "the button asked for this", not as "Umami
 // received it" — the wrapper's own suite covers delivery.
-vi.mock('../analytics/tracker', () => ({
-  initAnalytics: vi.fn(),
-  trackPageView: vi.fn(),
-  trackEvent: vi.fn(),
-}));
+vi.mock('../analytics/tracker', async () => {
+  const { stubAnalyticsModule } = await import('../testing/stub-analytics');
+  return stubAnalyticsModule;
+});
 
 const FIREFOX_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0';

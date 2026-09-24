@@ -12,8 +12,9 @@
  * exactly one page view, with no path-change detection to double-count it
  * (`data-auto-pageview="false"`).
  *
- * Events are named here rather than at the call sites, so the vocabulary stays
- * small and greppable — no `data-` attributes sprinkled over the markup.
+ * The event vocabulary is a union in this module, so a call site can only pass
+ * a name that exists here — the names are greppable from one file, and no
+ * `data-` attributes are sprinkled over the markup to do the same job.
  */
 
 export type AnalyticsEvent =

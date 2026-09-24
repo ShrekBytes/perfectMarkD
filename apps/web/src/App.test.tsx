@@ -25,11 +25,10 @@ vi.mock('./canvas/mermaid', async () => {
 
 // Analytics is asserted as "the app asked for this", not as "Umami received
 // it" — the wrapper's own suite covers delivery.
-vi.mock('./analytics/tracker', () => ({
-  initAnalytics: vi.fn(),
-  trackPageView: vi.fn(),
-  trackEvent: vi.fn(),
-}));
+vi.mock('./analytics/tracker', async () => {
+  const { stubAnalyticsModule } = await import('./testing/stub-analytics');
+  return stubAnalyticsModule;
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
