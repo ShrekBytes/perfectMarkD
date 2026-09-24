@@ -99,8 +99,10 @@ Client: chunked rendering with yields between sections so 200+ page docs don't f
   `main` before this change — `ai-command.spec.ts`, `ai-long-document.spec.ts`,
   and `ai-stylesheet.spec.ts` still drive the AI review surfaces that 035c7d8
   ("review AI proposals in place, not in a modal") replaced. The selectors are
-  stale, not the product; filed as
+  stale, not the product, and they reproduce on a clean tree; filed as
   [ai-transforms/09](../../ai-transforms/issues/09-browser-suite-after-in-place-review.md),
   which also records the one assertion among them that passes vacuously instead
-  of failing. `shell-compact.spec.ts`'s 44px-floor test also flakes under
-  parallel load. Both reproduce on a clean tree.
+  of failing. Separately, `shell-compact.spec.ts`'s 44px-floor sweep failed once
+  in the same run and has not reproduced since — filed as
+  [launch/08](08-shell-compact-touch-floor-flake.md), with the reproduction
+  attempts recorded so they are not repeated.

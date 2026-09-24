@@ -1,6 +1,6 @@
 # AI in the editor and in the Custom Stylesheet
 
-Status: resolved
+Status: resolved — the workstream shipped; one open follow-up, [09](issues/09-browser-suite-after-in-place-review.md) (browser-suite coverage lost to the in-place review refactor).
 
 ## Problem Statement
 
