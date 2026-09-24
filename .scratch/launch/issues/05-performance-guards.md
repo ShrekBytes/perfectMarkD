@@ -97,7 +97,10 @@ Client: chunked rendering with yields between sections so 200+ page docs don't f
 
 - **Found while verifying, not fixed (out of scope)**: 10 web e2e tests fail on
   `main` before this change — `ai-command.spec.ts`, `ai-long-document.spec.ts`,
-  and `ai-stylesheet.spec.ts` still wait for `ai-review-dialog`, which
-  035c7d8 ("review AI proposals in place, not in a modal") removed. The
-  selectors are stale, not the product. `shell-compact.spec.ts`'s 44px-floor
-  test also flakes under parallel load. Both reproduce on a clean tree.
+  and `ai-stylesheet.spec.ts` still drive the AI review surfaces that 035c7d8
+  ("review AI proposals in place, not in a modal") replaced. The selectors are
+  stale, not the product; filed as
+  [ai-transforms/09](../../ai-transforms/issues/09-browser-suite-after-in-place-review.md),
+  which also records the one assertion among them that passes vacuously instead
+  of failing. `shell-compact.spec.ts`'s 44px-floor test also flakes under
+  parallel load. Both reproduce on a clean tree.
