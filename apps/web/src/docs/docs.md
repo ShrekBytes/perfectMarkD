@@ -118,7 +118,7 @@ your own instance with Docker Compose:
 ```bash
 git clone https://github.com/ShrekBytes/perfectMarkD
 cd perfectMarkD
-cp .env.example .env   # fill SESSION_SECRET and HISTORY_ENCRYPTION_KEY
+cp .env.example .env   # then fill in the four secrets it asks for
 docker compose up -d --build
 ```
 

@@ -4,7 +4,7 @@
 # the export worker inside api loads the app's own /export page by looping
 # back to Caddy over the internal network (ADR-0003).
 #
-#   cp .env.example .env   # fill in SESSION_SECRET + HISTORY_ENCRYPTION_KEY
+#   cp .env.example .env   # then fill in the four secrets it asks for
 #                          # and the two UMAMI_* secrets
 #   docker compose up -d --build     # dev checkout: builds the app images
 #
