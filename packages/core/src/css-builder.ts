@@ -552,6 +552,16 @@ export function buildDocCSS(
     border-radius: 3px;
     color: var(--mpdf-accent);
   }
+  /* The rest of the elements the UA stylesheet puts on monospace. A
+   * Document can carry any inline HTML — markdown-it runs with html: true
+   * — so <kbd>, <samp> and <tt> are reachable without any markdown
+   * syntax producing them, and without this rule their metrics came from
+   * whatever monospace the host had while everything around them came from
+   * the Document. Font only: the engine styles code, and whether these
+   * should look like it is a design question, not a determinism one. */
+  .mpdf-doc kbd, .mpdf-doc samp, .mpdf-doc tt {
+    font-family: var(--mpdf-code-font);
+  }
   ${buildCodeBlockCSS(s.codeFontLigatures)}
   .mpdf-doc hr {
     border: none;
