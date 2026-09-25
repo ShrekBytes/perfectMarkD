@@ -5,18 +5,21 @@ Ordered. Each step says who does it and how you'll know it's done. Steps marked
 
 Nothing here is a code change unless it says so. The app is feature-complete:
 all six workstreams are `resolved`, the unit suite is green at 1,592 tests, and
-`typecheck` and `lint` pass. What remains is your machine, a few real-money
-tests, and a decision about AI.
+`typecheck` and `lint` pass. What remains is your machine and a few real-money
+tests.
 
-**Two things to decide before you start**, because they change the shape of
+**One decision to make before you start**, because it changes the shape of
 everything after:
 
-- **Do you want AI Actions live at launch?** If you don't have an `AI_API_KEY`
-  to hand, skip step 5 entirely — the feature is absent by design when no key
-  is configured, no upsell appears, and nothing breaks. Do not let it hold up
-  the launch.
+- **AI Actions are live at this launch.** You have a provider key, so step 5 is
+  a real step with its own checklist, not something to defer. Nothing else in
+  this list substitutes for it.
 - **Do you want backups on?** `BACKUP_ENABLED` defaults to `0`. With it off
   there is no recovery path at all. Turning it on is one variable in step 7.
+
+(If you later want a launch _without_ AI: unset `AI_API_KEY`, and the commands
+simply do not exist for anyone — no upsell, nothing broken. The code supports
+that; this launch doesn't use it.)
 
 ---
 
@@ -33,28 +36,42 @@ cd ~/self-hosted/perfectmarkd
 cp .env.example .env
 ```
 
-Then fill in `.env`. Minimum viable:
+Then fill in `.env`. `.env.example` documents every key — these are the ones
+that need a decision rather than a random string.
 
-| Key                                     | Value                                                             |
-| --------------------------------------- | ----------------------------------------------------------------- |
-| `SESSION_SECRET`                        | anything long and random                                          |
-| `HISTORY_ENCRYPTION_KEY`                | anything long and random — **without it the API refuses to boot** |
-| `ADMIN_EMAIL`                           | your email; the first account registered with it becomes Admin    |
-| `SITE_ADDRESS`                          | `:80` — the tunnel terminates TLS, Caddy stays plain HTTP         |
-| `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` | anything random                                                   |
-| `EXPORT_CONCURRENCY`                    | `1` — see the note below                                          |
-| `CADDY_HTTP_PORT`                       | `8901` — nginx already holds `:80` on this machine                |
-| `BACKUP_ENABLED`                        | `0` for now                                                       |
+**Four are mandatory.** Compose refuses to start without them, each with an
+error naming the key, so a missing one is never silent. Generate all four:
 
-Generate secrets with something like `openssl rand -hex 32`.
+```sh
+for k in SESSION_SECRET HISTORY_ENCRYPTION_KEY UMAMI_APP_SECRET \
+         UMAMI_DB_PASSWORD; do echo "$k=$(openssl rand -hex 32)"; done
+```
+
+| Key                                     | Value                                                          |
+| --------------------------------------- | -------------------------------------------------------------- |
+| `SESSION_SECRET`                        | from the loop above                                            |
+| `HISTORY_ENCRYPTION_KEY`                | from the loop — **without it the API refuses to boot**         |
+| `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` | from the loop                                                  |
+| `ADMIN_EMAIL`                           | your email; the first account registered with it becomes Admin |
+| `AI_API_KEY`                            | your provider key — step 5 needs it                            |
+| `SITE_ADDRESS`                          | `:80` — the tunnel terminates TLS, Caddy stays plain HTTP      |
+| `EXPORT_CONCURRENCY`                    | `1` — see the note below                                       |
+| `CADDY_HTTP_PORT`                       | `8901` — nginx already holds `:80` on this machine             |
+| `BACKUP_ENABLED`                        | `0` for now                                                    |
+
+> **Reusing an old `api-data` volume?** You must reuse that volume's
+> `HISTORY_ENCRYPTION_KEY`, or its Export History stays undecryptable forever
+> (every download fails the GCM tag check). Starting from a clean volume, which
+> is acceptable here, fresh keys are correct.
 
 > **`EXPORT_CONCURRENCY=1`, not the default 2.** Each Server Export is a full
 > headless Chromium process. This machine has 7.5 GB RAM with ~2.3 GB free and
 > swap already at 4.9 GB, so two concurrent renders is how the api gets
 > OOM-killed. Two headless Chromiums on a laptop is the ceiling, not the goal.
 
-**Done when:** `~/self-hosted/perfectmarkd/.env` exists with the five required
-keys filled, and `git -C ~/self-hosted/perfectmarkd status` is clean.
+**Done when:** `~/self-hosted/perfectmarkd/.env` exists with the four mandatory
+keys plus `ADMIN_EMAIL` and `AI_API_KEY` filled, and
+`git -C ~/self-hosted/perfectmarkd status` is clean.
 
 ---
 
@@ -126,33 +143,54 @@ curl -s -o /dev/null -w '%{http_code}\n' https://perfectmarkd.00022000.xyz/
 
 ---
 
-## 5. AI Actions — optional, and skippable
+## 5. AI Actions — configure and verify
 
-**Skip this whole step if you don't have a provider key.** The feature is absent
-until one is configured, which is the designed behaviour, not a broken state.
+Two halves, and the feature stays absent until **both** are in place: the key in
+the environment, the provider config in the database. That split is deliberate
+(ADR-0008) — the key never enters the settings table or a backup, while the
+model can be changed without a redeploy.
 
-If you do want it, six items — the full list with rationale is in
-`.scratch/launch/issues/06-launch-checklist.md`:
+1. `AI_API_KEY` should already be in `.env` from step 1. Confirm it's there and
+   **not** in the settings table, a tracked file, or a log.
+2. Restart the api to pick it up — the key is read at startup:
+   `podman compose up -d api`. Rotating the key is also a restart.
+3. `/admin` → **Settings** → AI provider. Set:
+   - the **base URL** — any OpenAI-compatible endpoint; OpenRouter's API root is
+     the default
+   - the **model id** — pick it with the cost arithmetic in mind, because you
+     pay per call
+   - the **reasoning effort** — `off` / `low` / `medium` / `high`, default
+     `medium`. Temperature is deliberately not configurable.
+   - the **caps**: context window, max output tokens, max input characters.
+     Size them to the model rather than guessing.
+4. Set the **enabled flag** on. Without it, no AI surface exists for anyone and
+   no upsell appears.
+5. Run **Test connection.** Read what it reports: the model's published context
+   length, max completion tokens, and price per million input/output tokens when
+   the provider exposes them. A model the endpoint doesn't know fails here
+   rather than for the first user. A mismatch between the provider's numbers and
+   your caps is a **warning, not a silent correction** — read it.
+6. Check the **worst-case cost of one AI Action** against the plan's monthly AI
+   allowance (Pro 100, Premium 300). A pricey model should be a decision you
+   made, not a surprise. The price shows as unknown if the provider didn't
+   publish one.
+7. Optionally set a **cheaper model for stylesheet edits** — they're short, so
+   a smaller model can serve `/ss` while the main model handles markdown.
+8. Confirm the **per-plan allowances** in the Limits section are what you intend
+   to sell. Zero is legal and disables AI for that plan.
 
-1. Put `AI_API_KEY` in `~/self-hosted/perfectmarkd/.env`. **Never in the
-   settings table, never in a tracked file, never in a log** (ADR-0008).
-2. `podman compose up -d api` to restart and pick up the key. Rotating the key
-   is also a restart.
-3. `/admin` → Settings → AI provider: set the base URL, model id, and reasoning
-   effort. An OpenAI-compatible endpoint is all that's needed; OpenRouter is
-   the default root.
-4. Size the caps to the model's actual window, using Test connection's reported
-   numbers as the reference. A mismatch is a warning, not a silent correction.
-5. Run **Test connection** and read the published context length, output cap,
-   and price it reports.
-6. Decide the kill switch deliberately — on or off — and confirm the panel's
-   worst-case-cost readout against the plan's monthly AI allowance.
+Then verify the copy still matches reality: the Privacy page's AI section and
+its Cloudflare disclosure (landed in `4b2bd64`).
 
-Then confirm the copy still matches: the Privacy page's AI section and the
-Cloudflare disclosure (both landed in `4b2bd64`).
+**Done when:**
 
-**Done when:** `/ai` and `/ss` work in the editor for an entitled account, or
-the commands are correctly absent.
+- [ ] `/ai` in the editor opens the popup for an entitled account; `/ss` opens
+      the same popup for the stylesheet
+- [ ] An accepted proposal edits the Document as one undoable step
+- [ ] The account page shows AI Actions remaining next to the export Quota
+- [ ] `/admin` → Audit log shows the config change
+- [ ] The kill switch behaves: turn it off, confirm the commands disappear
+      entirely, turn it back on
 
 ---
 
