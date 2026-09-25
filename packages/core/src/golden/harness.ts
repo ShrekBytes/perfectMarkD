@@ -541,6 +541,11 @@ export async function runPipeline(
     modules: {
       engine,
       mermaid,
+      // The suite's sans, which is the closest bundled stand-in for the
+      // family mermaid defaults to. The app deliberately keeps mermaid's
+      // default rather than following the Document's typography — that is
+      // its decision and this pin does not touch it; it only stops the
+      // diagram's size from being whatever the host has installed.
       mermaidFont: GOLDEN_BODY_STACK.sans,
     },
     markdown,

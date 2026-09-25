@@ -23,7 +23,10 @@ runs on:
 - **The mermaid renderer.** The engine takes it as a hook, so the harness
   pins the diagram's font family itself (`golden/mermaid.ts`) instead of
   inheriting mermaid's default system stack. Mermaid measures its labels to
-  size its nodes, so a substituted font moves the whole diagram.
+  size its nodes, so a substituted font moves the whole diagram. The app
+  keeps mermaid's default — diagrams are not meant to follow the Document's
+  typography — and that decision is the app's; the pin here only keeps the
+  diagram's *size* from being whatever the host has installed.
 
 The presets' own stacks — `Georgia, serif`, `Arial, sans-serif`, `'Courier
 New', monospace` — are system fonts and stay that way; that is a product

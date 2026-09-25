@@ -166,10 +166,13 @@ and `packages/core/src/golden/README.md` says what the suite depends on.
   than change the product's diagram typography on this ticket's authority, the
   harness now renders mermaid itself with the family pinned
   (`packages/core/src/golden/mermaid.ts`); the app's choice stays the app's.
-  **If the design owner wants diagrams to follow the document's typography
-  instead of mermaid's default, that is a separate, deliberate change** — the
-  engine's `buildDocCSS` already carries `.mpdf-doc .mermaid` rules to hang it
-  on.
+  **Decided (user, 2026-09-26): mermaid's default stays** — diagrams are not to
+  follow the Document's typography, which was the other option and the simpler
+  one to keep. No application change; the harness's pin is a test-only concern,
+  and `apps/web/src/canvas/mermaid.test.ts` keeps the app's own hook covered
+  (render, cache, retry) so the suite moving off it cost nothing. The pin is
+  the suite's sans, the closest bundled stand-in for the family mermaid
+  defaults to.
 
 - **A guard, because this class of bug is silent.** `expectSoundLayout` — which
   every golden test already called for its overflow invariants — now also
