@@ -2,10 +2,12 @@
  * The app's only door to Umami (launch/01).
  *
  * Analytics is self-hosted and same-origin: the tracker script is served from
- * `/analytics` on this origin, so a page load still talks to nobody else. A
- * build has no analytics at all unless `VITE_ANALYTICS_WEBSITE_ID` is set —
- * that is how a self-hosted instance without Umami runs, and it is why every
- * entry point here is a no-op in tests and in development.
+ * `/analytics` on this origin, so a page load still talks to nobody else. An
+ * instance has no analytics at all unless its deployment supplies a website id
+ * — Caddy serves that at `/analytics-config.js` and `index.html` loads it
+ * before the app, so the id is a deployment setting rather than a build input
+ * (launch/11). That is how a self-hosted instance without Umami runs, and it
+ * is why every entry point here is a no-op in tests and in development.
  *
  * Page views come from the router, not from the tracker: this app routes
  * through the History API itself, so one explicit call per route change is
@@ -36,6 +38,12 @@ interface UmamiTracker {
 declare global {
   interface Window {
     umami?: UmamiTracker;
+    /**
+     * This instance's Umami website id, set by `/analytics-config.js` — the
+     * script `index.html` loads before the app (launch/11). Absent on an
+     * instance that runs without analytics.
+     */
+    __ANALYTICS_WEBSITE_ID__?: string;
   }
 }
 
@@ -44,9 +52,20 @@ const TRACKER_BASE = (
   import.meta.env.VITE_ANALYTICS_URL || '/analytics'
 ).replace(/\/+$/, '');
 
-/** The Umami website this build reports to; empty means no analytics at all. */
-const WEBSITE_ID: string | undefined =
-  import.meta.env.VITE_ANALYTICS_WEBSITE_ID || undefined;
+/**
+ * The Umami website this instance reports to, read from the deployment's
+ * config rather than from the bundle — that is what lets one published image
+ * serve every instance. Read when analytics initializes, not when this module
+ * is evaluated, so the config script only has to land before the first track.
+ * Blank means no analytics at all.
+ */
+function websiteIdFromConfig(): string | undefined {
+  // Widened deliberately: the config script is generated from a deployment's
+  // environment, so this global is an input this bundle did not write. Its
+  // declared type is a claim about our own writer, not an enforced one.
+  const raw: unknown = window.__ANALYTICS_WEBSITE_ID__;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
 
 /** Enough to cover the page views before the script lands, and no more. */
 const MAX_QUEUED = 20;
@@ -79,17 +98,19 @@ function flushQueue(): void {
 }
 
 /**
- * Loads the tracker, once, on the first tracked page. A no-op when this build
- * has no website id.
+ * Loads the tracker, once, on the first tracked page. A no-op when this
+ * instance has no website id.
  */
 export function initAnalytics(): void {
-  if (scriptRequested || !WEBSITE_ID) return;
+  if (scriptRequested) return;
+  const websiteId = websiteIdFromConfig();
+  if (!websiteId) return;
   scriptRequested = true;
 
   const script = document.createElement('script');
   script.defer = true;
   script.src = `${TRACKER_BASE}/script.js`;
-  script.dataset.websiteId = WEBSITE_ID;
+  script.dataset.websiteId = websiteId;
   // The router owns page views (see trackPageView), Do Not Track is honoured,
   // and query strings are dropped so nothing a visitor typed can end up in a
   // URL we record.

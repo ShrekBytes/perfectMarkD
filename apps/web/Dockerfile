@@ -21,14 +21,13 @@ COPY packages/core packages/core
 COPY apps/web apps/web
 # Core first: the web bundle resolves @perfectmarkd/core to its built dist/.
 #
-# Analytics (launch/01) is baked in here because the bundle is static: Vite
-# inlines VITE_* at build time, so the website id has to be known now. An
-# empty id produces a bundle with no analytics at all — no tracker request,
-# nothing collected.
+# Where the tracker lives is baked in (launch/01): Vite inlines VITE_* at build
+# time, and every instance serves Umami at the same path on its own origin.
+# The *website id* is deliberately not a build input — one published image
+# serves every instance, so Caddy hands the id to the bundle at runtime
+# (launch/11, and the `handle /analytics-config.js` block in the Caddyfile).
 ARG VITE_ANALYTICS_URL="/analytics"
-ARG VITE_ANALYTICS_WEBSITE_ID=""
 ENV VITE_ANALYTICS_URL=$VITE_ANALYTICS_URL
-ENV VITE_ANALYTICS_WEBSITE_ID=$VITE_ANALYTICS_WEBSITE_ID
 RUN pnpm --filter @perfectmarkd/core build \
 	&& pnpm --filter @perfectmarkd/web build
 

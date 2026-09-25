@@ -22,6 +22,15 @@
         }
       })();
     </script>
+    <!--
+      The instance's analytics website id (launch/11), served by the
+      deployment rather than baked into this bundle, so one published image
+      serves every instance. Deferred, so it does not block first paint; the
+      id is read when analytics initializes, on the app's first render, after
+      this script and the module bundle have both loaded. See
+      src/analytics/tracker.ts.
+    -->
+    <script defer src="/analytics-config.js"></script>
   </head>
   <body>
     <div id="root"></div>

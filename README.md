@@ -50,9 +50,9 @@ Analytics is self-hosted Umami, served at `/analytics` on the same origin ([laun
 
 1. Bring the stack up, open `https://<domain>/analytics`, and sign in with `admin` / `umami` — change the password immediately.
 2. Add a website for your domain and copy its id.
-3. Put it in `.env` as `VITE_ANALYTICS_WEBSITE_ID` and rebuild the web image: `docker compose up -d --build caddy`.
+3. Put it in `.env` as `ANALYTICS_WEBSITE_ID` and restart Caddy: `docker compose up -d caddy`. Caddy serves the id to the app at runtime, so a restart is all it takes — the published image is never rebuilt.
 
-With no id set, the bundle loads no tracker and collects nothing.
+With no id set, the instance loads no tracker and collects nothing.
 
 Umami's image is compiled by [`.github/workflows/umami-image.yml`](.github/workflows/umami-image.yml) and published to GHCR as a public package, so `docker compose up -d` pulls it — the deployment host never needs a build toolchain or room for a 100k-file compile ([ADR-0012](docs/adr/0012-build-the-umami-image-in-ci.md)). `ops/umami/Dockerfile` is the source it builds from; a local build is one command, recorded in `docker-compose.yml`.
 

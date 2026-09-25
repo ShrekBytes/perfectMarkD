@@ -25,6 +25,22 @@
 	# keep it out of search indexes (spec: security posture).
 	header /export* X-Robots-Tag "noindex"
 
+	# This instance's analytics id (launch/11), handed to the app at runtime so
+	# that one published image serves every instance: the id is a deployment
+	# setting, not a build input, and an empty value turns analytics off
+	# entirely. Caddy evaluates the mutually-exclusive `handle` blocks in an
+	# order it derives itself, and a path-matched one sorts ahead of the bare
+	# SPA fallback below — which would otherwise answer this path with
+	# index.html, and a browser handed HTML where it expects JavaScript fails
+	# to parse it on every page load. (Verified with `caddy adapt`: moving this
+	# block after the fallback does not change the resulting order.)
+	handle /analytics-config.js {
+		header Content-Type "application/javascript; charset=utf-8"
+		header Cache-Control "no-store"
+		header X-Robots-Tag "noindex"
+		respond "window.__ANALYTICS_WEBSITE_ID__ = \"{$ANALYTICS_WEBSITE_ID:}\";"
+	}
+
 	# Self-hosted analytics (launch/01) sit under /analytics on this origin.
 	# The prefix is passed through untouched: the Umami image bakes that base
 	# path in, so it expects to see it. The tracker endpoints (/script.js,

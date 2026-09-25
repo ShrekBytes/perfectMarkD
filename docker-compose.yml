@@ -24,11 +24,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        # Analytics (launch/01). Baked in at build time because the SPA is
-        # static: an empty website id produces a bundle with no analytics at
-        # all, which is what a self-hosted instance without Umami gets.
+        # Where the tracker lives (launch/01). Baked in because the SPA is
+        # static and every instance serves Umami at the same path; the
+        # website id is *not* a build input — see ANALYTICS_WEBSITE_ID below.
         VITE_ANALYTICS_URL: ${VITE_ANALYTICS_URL:-/analytics}
-        VITE_ANALYTICS_WEBSITE_ID: ${VITE_ANALYTICS_WEBSITE_ID:-}
     restart: unless-stopped
     depends_on:
       api:
@@ -39,6 +38,11 @@ services:
     environment:
       # ":80" = plain HTTP for local runs; a domain enables automatic TLS.
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      # The Umami website this instance reports to (launch/11). Caddy serves
+      # it to the bundle at runtime on /analytics-config.js, so the same
+      # published image collects for an instance that sets an id here and for
+      # none that leaves it empty. Changing it needs a restart, not a rebuild.
+      ANALYTICS_WEBSITE_ID: ${ANALYTICS_WEBSITE_ID:-}
     volumes:
       - caddy-data:/data
       - caddy-config:/config
