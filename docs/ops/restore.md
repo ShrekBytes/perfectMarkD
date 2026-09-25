@@ -43,7 +43,9 @@ trees are pruned at 30 days with `rclone delete --min-age 30d`.
 ## Prerequisites (once per host)
 
 1. The stack from the README: `git clone` this repo, `cp .env.example .env`,
-   fill in `SESSION_SECRET` + `HISTORY_ENCRYPTION_KEY`, `docker compose up -d`.
+   fill in `SESSION_SECRET` + `HISTORY_ENCRYPTION_KEY`, and bring the stack up
+   — pull the published images on a deployment host, or build from a dev
+   checkout (README's Deployment block).
 2. `rclone` on the host (`apt install rclone` or the single binary).
 3. An object-storage bucket (Backblaze B2 or any rclone-supported backend —
    "~€1/mo" at this project's scale) and an rclone remote configured on the
@@ -106,7 +108,9 @@ then restore data.
    and the restored dump gets any pending migrations applied by the first
    real boot.
 
-4. **Boot the stack**: `docker compose up -d --build`.
+4. **Boot the stack**: `podman compose pull && podman compose up -d --no-build`
+   on a deployment host, or `docker compose up -d --build` from a dev checkout
+   (README's Deployment block).
 
 ## §verify: proving the restore worked
 

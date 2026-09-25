@@ -6,7 +6,15 @@
 #
 #   cp .env.example .env   # fill in SESSION_SECRET + HISTORY_ENCRYPTION_KEY
 #                          # and the two UMAMI_* secrets
-#   docker compose up -d --build
+#   docker compose up -d --build     # dev checkout: builds the app images
+#
+# On a deployment host, build nothing (launch/10): the api and caddy images are
+# published to GHCR by .github/workflows/images.yml, so
+#
+#   podman compose pull && podman compose up -d --no-build
+#
+# brings the stack up from the registry. Pin PERFECTMARKD_IMAGE_TAG to a
+# `sha-…` tag for a reproducible deploy; the default is `latest`.
 #
 # Deployment (launch/04, ADR-0010): the stack runs on the Admin's machine and
 # is published at the domain through a Cloudflare Tunnel, which terminates TLS
@@ -20,6 +28,12 @@ name: perfectmarkd
 
 services:
   caddy:
+    # launch/10: the published image, so a deployment host pulls instead of
+    # building. `build:` stays for a dev checkout — `up -d --build` builds and
+    # tags the result as this ref, while `pull` + `up -d --no-build` uses the
+    # published one. Both work from this one file (verified under podman
+    # compose, which is why there is no second prod compose file).
+    image: ghcr.io/shrekbytes/perfectmarkd-caddy:${PERFECTMARKD_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -48,6 +62,10 @@ services:
       - caddy-config:/config
 
   api:
+    # launch/10: published for the same reason as caddy's — this image carries
+    # headless Chromium and its apt dependencies, which is not something the
+    # deployment host should be assembling.
+    image: ghcr.io/shrekbytes/perfectmarkd-api:${PERFECTMARKD_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/server/Dockerfile

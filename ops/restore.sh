@@ -100,8 +100,12 @@ if [[ "$SKIP_ENV" -eq 0 ]]; then
   echo "restore: .env restored (SESSION_SECRET + HISTORY_ENCRYPTION_KEY must match the backup)"
 fi
 
+# --pull missing: on a deployment host the api image is the published one
+# (launch/10), so fetch it rather than let compose build Chromium here. Where
+# the image is already local — a dev checkout, or the restore rehearsal after
+# its build — this is a no-op.
 echo "restore: populating api-data volume with $DUMP"
-docker compose run --rm --no-deps \
+docker compose run --rm --no-deps --pull missing \
   -v "$STAGE:/restore:ro" \
   --entrypoint sh \
   api -c '
@@ -116,4 +120,4 @@ docker compose run --rm --no-deps \
     ls /data/history | head
   '
 
-echo "restore: done. Next: docker compose up -d, then verify (docs/ops/restore.md §verify)."
+echo "restore: done. Next: docker compose up -d (--no-build on a deployment host, where the images are pulled), then verify (docs/ops/restore.md §verify)."

@@ -1,0 +1,118 @@
+# Builds the two images the app itself runs — the API and the Caddy-fronted web
+# bundle — and publishes them to GHCR (launch/10).
+#
+# Why this exists: the deployment host is the Admin's own machine (ADR-0010),
+# and both images are build-host work — the api image installs headless
+# Chromium with its apt dependencies, the web image runs a workspace-wide pnpm
+# install and a Vite build of the whole app. Compiling either on the host means
+# a toolchain, a pile of build layers, and several GB of scratch space it does
+# not need. This is the same arrangement as the Umami image (ADR-0012,
+# .github/workflows/umami-image.yml): CI compiles, the host pulls.
+#
+# Both packages must be public, so `podman compose pull` on any host needs no
+# registry login. **GHCR creates a package private**, and nothing here can
+# change that: after the first run, set both `perfectmarkd-api` and
+# `perfectmarkd-caddy` to Public in the package's settings (Package settings →
+# Change visibility), the way `perfectmarkd-umami` already is. Until then the
+# deployment host's `pull` fails with a 401.
+#
+# The trigger filters compose the way GitHub documents them: `branches` and
+# `tags` are alternatives — a push matches one or the other — and `paths` is
+# evaluated for branch pushes only. "Path filters are not evaluated for pushes
+# of tags", so a `v*` tag publishes whatever the tagged commit touched.
+name: Images
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      # One union for both images, not one filter per image. Both resolve
+      # @perfectmarkd/core to its built dist/, so a core change has to rebuild
+      # both, and rebuilding both on any app change keeps the pair in lockstep
+      # — a half-updated api/caddy pair is worse than a redundant build.
+      #
+      # The list is the union of what the two Dockerfiles COPY plus what
+      # filters the build context. The two Dockerfiles ride their app's glob;
+      # root package.json is separate because both COPY it for the pnpm
+      # install, and .dockerignore changes the context itself.
+      - 'apps/server/**'
+      - 'apps/web/**'
+      - 'packages/core/**'
+      - 'Caddyfile'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - '.dockerignore'
+      - '.github/workflows/images.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      # The two images are independent: one failing should still report the
+      # other's result rather than cancelling it.
+      fail-fast: false
+      matrix:
+        include:
+          - image: perfectmarkd-api
+            dockerfile: apps/server/Dockerfile
+            build-args: ''
+          - image: perfectmarkd-caddy
+            dockerfile: apps/web/Dockerfile
+            # The tracker's path is a build input (launch/01) because it is
+            # /analytics on every instance. The website id deliberately is not
+            # — Caddy serves that at runtime (launch/11), which is what lets
+            # this one image serve every deployment.
+            build-args: |
+              VITE_ANALYTICS_URL=/analytics
+    steps:
+      - uses: actions/checkout@v4
+
+      # Two jobs in one: ghcr rejects uppercase repository names and the
+      # account's login has one, and the tag list differs between a branch push
+      # and a release tag — which YAML has no clean way to express.
+      - name: Compose the image tags
+        id: tags
+        run: |
+          repo="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/${{ matrix.image }}"
+          {
+            echo "tags<<EOF"
+            # `latest` tracks main and only main. Emitting it on a tag push too
+            # would move it backwards whenever a release is cut on an older
+            # commit, so a release gets its version instead — plus the sha,
+            # which every push gets.
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "$repo:${GITHUB_REF#refs/tags/v}"
+            else
+              echo "$repo:latest"
+            fi
+            echo "$repo:sha-${GITHUB_SHA::7}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build-args }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          # A cache scope per image: two builds sharing one gha entry evict each
+          # other's layers every run, which is most of the point of caching.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

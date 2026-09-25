@@ -39,10 +39,17 @@ Docker Compose runs the whole stack on one origin — Caddy serves the built app
 ```sh
 cp .env.example .env    # fill in SESSION_SECRET + HISTORY_ENCRYPTION_KEY
                         # and UMAMI_APP_SECRET + UMAMI_DB_PASSWORD
+
+# Dev checkout — build the app images locally:
 docker compose up -d --build
+
+# Deployment host — pull the published images and build nothing:
+podman compose pull && podman compose up -d --no-build
 ```
 
-The shipped deployment serves the stack behind a Cloudflare Tunnel, which terminates TLS in front of Caddy ([ADR-0010](docs/adr/0010-deploy-on-own-machine-behind-cloudflare-tunnel.md)) — so `SITE_ADDRESS` stays `:80` and no inbound ports are needed. Server Export (paid plans) works out of the box: headless Chromium is baked into the api image. Host-side rollout, monitoring, and backups: [.scratch/launch/issues/04-deploy-production.md](.scratch/launch/issues/04-deploy-production.md).
+The api and caddy images are compiled by [`.github/workflows/images.yml`](.github/workflows/images.yml) and published to GHCR as public packages, so a deployment host needs no toolchain, no registry login, and no room for a Chromium install — the same arrangement as the Umami image ([ADR-0012](docs/adr/0012-build-the-umami-image-in-ci.md)). Pin `PERFECTMARKD_IMAGE_TAG` to a `sha-…` tag for a reproducible deploy; the default is `latest`.
+
+The shipped deployment serves the stack behind a Cloudflare Tunnel, which terminates TLS in front of Caddy ([ADR-0010](docs/adr/0010-deploy-on-own-machine-behind-cloudflare-tunnel.md)) — so `SITE_ADDRESS` stays `:80` and no inbound ports are needed. Server Export (paid plans) works out of the box: headless Chromium is baked into the api image. Host-side rollout and backups: [.scratch/launch/issues/04-deploy-production.md](.scratch/launch/issues/04-deploy-production.md).
 
 ### Analytics
 
