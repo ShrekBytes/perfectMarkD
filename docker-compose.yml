@@ -98,6 +98,19 @@ services:
       # Both live on the api-data volume: SQLite db + encrypted history.
       DB_PATH: /data/perfectmarkd.db
       HISTORY_DIR: /data/history
+      # The export queue's three knobs (launch/04). apps/server/src/env.ts reads
+      # all of them, but until now compose never forwarded them, so setting any
+      # of them in .env did nothing at all. Left as the same empty-default
+      # passthrough as ADMIN_EMAIL and AI_API_KEY above, so an unset value
+      # reaches the server as empty and it applies its own default — the
+      # numbers live in env.ts and nowhere else.
+      #
+      # EXPORT_CONCURRENCY is the one that matters on a small host: the
+      # default is 2 renders in flight, each a headless Chromium, and a
+      # 300-page document is not a small render.
+      EXPORT_CONCURRENCY: ${EXPORT_CONCURRENCY:-}
+      EXPORT_BURST_PER_MINUTE: ${EXPORT_BURST_PER_MINUTE:-}
+      EXPORT_RENDER_TIMEOUT_MS: ${EXPORT_RENDER_TIMEOUT_MS:-}
     volumes:
       - api-data:/data
 
