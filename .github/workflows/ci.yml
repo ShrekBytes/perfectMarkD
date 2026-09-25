@@ -26,6 +26,14 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @perfectmarkd/core exec playwright install chromium --with-deps
 
+      # First because it is the cheapest check and the one most likely to be
+      # forgotten locally: format:check drifted across 44 files for exactly as
+      # long as it was absent from this file. Prettier's own rules about prose
+      # and generated artifacts live in .prettierignore, so a failure here is a
+      # real one — fix it with `pnpm format` rather than by widening the ignore.
+      - name: Format check
+        run: pnpm format:check
+
       - name: Lint
         run: pnpm lint
 
