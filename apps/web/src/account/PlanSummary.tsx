@@ -135,16 +135,14 @@ export function PlanSummary({
         <p className="mt-3 text-xs text-ink-faint">Loading your plan…</p>
       )}
 
-      {!entitlement &&
-        !last &&
-        (orders !== null || ordersError !== null) && (
-          <div className="mt-3">
-            <p className="text-sm font-semibold text-ink">Free</p>
-            <p className="mt-0.5 text-xs text-ink-soft">
-              No paid plan — upgrades start from the plans.
-            </p>
-          </div>
-        )}
+      {!entitlement && !last && (orders !== null || ordersError !== null) && (
+        <div className="mt-3">
+          <p className="text-sm font-semibold text-ink">Free</p>
+          <p className="mt-0.5 text-xs text-ink-soft">
+            No paid plan — upgrades start from the plans.
+          </p>
+        </div>
+      )}
 
       {quota && (entitlement || quota.limit > 0) && (
         <div className="mt-4">

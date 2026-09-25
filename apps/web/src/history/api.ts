@@ -26,9 +26,15 @@ export async function listHistory(): Promise<HistoryEntry[]> {
   if (!res.ok) throw await errorFrom(res);
   const body: unknown = await res.json().catch(() => null);
   const entries =
-    typeof body === 'object' && body !== null && Array.isArray((body as {
-      entries?: unknown;
-    }).entries)
+    typeof body === 'object' &&
+    body !== null &&
+    Array.isArray(
+      (
+        body as {
+          entries?: unknown;
+        }
+      ).entries,
+    )
       ? (body as { entries: HistoryEntry[] }).entries
       : null;
   if (entries === null) {

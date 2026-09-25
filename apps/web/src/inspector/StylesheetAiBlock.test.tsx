@@ -231,9 +231,7 @@ describe('the AI block — a turn and its proposal card', () => {
     const diff = await screen.findByTestId('stylesheet-box-diff');
     expect(diff).toHaveTextContent(CSS);
     expect(diff).toHaveTextContent(PROPOSED);
-    expect(
-      screen.queryByTestId('stylesheet-box'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stylesheet-box')).not.toBeInTheDocument();
     // Nothing is written until Accept.
     expect(activeCSS()).toBe(CSS);
     expect(lastRequest(route)).toMatchObject({
@@ -293,9 +291,9 @@ describe('the AI block — a turn and its proposal card', () => {
     // settings underneath (a hand edit to the textarea is impossible while
     // the diff view holds its place).
     act(() => {
-      useDocumentStore
-        .getState()
-        .updateActive({ settings: { customStylesheet: '.mpdf-doc h2 { color: teal; }' } });
+      useDocumentStore.getState().updateActive({
+        settings: { customStylesheet: '.mpdf-doc h2 { color: teal; }' },
+      });
     });
 
     expect(screen.getByTestId('stylesheet-ai-stale')).toHaveTextContent(
@@ -365,9 +363,7 @@ describe('the AI block — a turn and its proposal card', () => {
     await send('tighter spacing');
     await screen.findByTestId('stylesheet-box-diff');
     // Decide the pending proposal by hand (Reject), then hand-edit the box.
-    await userEvent
-      .setup()
-      .click(screen.getByTestId('stylesheet-ai-reject'));
+    await userEvent.setup().click(screen.getByTestId('stylesheet-ai-reject'));
     fireEvent.change(screen.getByTestId('stylesheet-box'), {
       target: { value: '.mpdf-doc h3 { color: navy; }' },
     });

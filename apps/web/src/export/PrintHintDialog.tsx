@@ -30,8 +30,8 @@ export function PrintHintDialog({
       onClose={onCancel}
     >
       <p className="text-sm text-ink-soft">
-        This opens your browser's print dialog. Choose 'Save as PDF' —
-        quality is identical to a downloaded PDF.
+        This opens your browser's print dialog. Choose 'Save as PDF' — quality
+        is identical to a downloaded PDF.
       </p>
       {/* Phones: the mobile print experience is a different dance, and this
           dialog is the only moment to teach it — the browser's own UI takes

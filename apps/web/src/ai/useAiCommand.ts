@@ -782,9 +782,7 @@ export function useAiCommand(
       // A final staleness guard: never write into text it no longer matches.
       const view = getEditor();
       const current = view
-        ? view.state.doc
-            .toString()
-            .slice(review.target.from, review.target.to)
+        ? view.state.doc.toString().slice(review.target.from, review.target.to)
         : '';
       if (current !== review.target.text) {
         setApplyError(
@@ -803,13 +801,7 @@ export function useAiCommand(
     setReview(null);
     setApplyError(null);
     if (state && stepPlan) advancePlan(state, stepPlan.at, true);
-  }, [
-    advancePlan,
-    checked,
-    foreignReview,
-    getEditor,
-    review,
-  ]);
+  }, [advancePlan, checked, foreignReview, getEditor, review]);
 
   const reject = useCallback(() => {
     abortRef.current?.abort();

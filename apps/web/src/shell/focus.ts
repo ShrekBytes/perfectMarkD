@@ -140,9 +140,7 @@ export function useMenuKeyboard(
       }
       const items = Array.from(menu.querySelectorAll<HTMLElement>(MENU_ITEM));
       if (items.length === 0) return;
-      const currentIndex = items.indexOf(
-        document.activeElement as HTMLElement,
-      );
+      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
       let next: HTMLElement;
       switch (event.key) {
         case 'ArrowDown':

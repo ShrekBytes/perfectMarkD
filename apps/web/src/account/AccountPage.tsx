@@ -76,8 +76,8 @@ export function AccountPage() {
           <div className="w-full max-w-sm rounded-pane border border-hairline bg-surface p-6">
             <h1 className="text-lg font-semibold tracking-tight">Account</h1>
             <p className="mt-1 text-xs text-ink-soft">
-              You're not signed in. Sign in to see your plan, orders, and
-              export history.
+              You're not signed in. Sign in to see your plan, orders, and export
+              history.
             </p>
             <Link
               to="/login"

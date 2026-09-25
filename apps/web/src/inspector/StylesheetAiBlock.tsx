@@ -271,10 +271,7 @@ function ProposalCard({
             : 'Rejected — the box is unchanged.'}
         </p>
       ) : (
-        <p
-          role="status"
-          className="text-[11px] leading-4 text-ink-faint"
-        >
+        <p role="status" className="text-[11px] leading-4 text-ink-faint">
           A proposal is in the box above — review it there.
         </p>
       )}

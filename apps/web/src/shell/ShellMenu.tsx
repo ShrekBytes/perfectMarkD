@@ -23,7 +23,11 @@ const itemClasses =
  * The primary action, Export, deliberately stays out: it is the product's
  * job and never hides behind a menu.
  */
-export function ShellMenu({ onOpenLibrary, theme, onToggleTheme }: ShellMenuProps) {
+export function ShellMenu({
+  onOpenLibrary,
+  theme,
+  onToggleTheme,
+}: ShellMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);

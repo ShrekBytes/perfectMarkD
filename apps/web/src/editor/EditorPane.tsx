@@ -19,10 +19,7 @@ import { AiPromptPopover } from '../ai/AiPromptPopover';
 import { AiReviewBar } from '../ai/AiReviewBar';
 import { useAiCommand } from '../ai/useAiCommand';
 import { PricingModal } from '../pricing/PricingModal';
-import {
-  pushAiReview,
-  aiReviewDecorations,
-} from './ai-review-decorations';
+import { pushAiReview, aiReviewDecorations } from './ai-review-decorations';
 import {
   BoldIcon,
   HeadingIcon,
@@ -180,23 +177,24 @@ export function EditorPane({
       state: EditorState.create({
         doc: useDocumentStore.getState().markdown,
         extensions: [
-        aiReviewDecorations(),
-        ...createEditorExtensions({
-          onDocChanged: (text) => {
-            lastSynced.current = text;
-            useDocumentStore.getState().updateActive({ markdown: text });
-          },
-          onRequestRender: () => handlers.current.onRequestRender?.(),
-          onImageFiles: handleImageFiles,
-          ai: {
-            enabled: () => aiHandlersRef.current.enabled(),
-            onHintChange: (next) => aiHandlersRef.current.onHintChange(next),
-            onSelectionChange: () => aiHandlersRef.current.onSelectionChange(),
-            onCommandFired: (context) =>
-              aiHandlersRef.current.onCommandFired(context),
-            apiRef: ai.editorApiRef,
-          },
-        }),
+          aiReviewDecorations(),
+          ...createEditorExtensions({
+            onDocChanged: (text) => {
+              lastSynced.current = text;
+              useDocumentStore.getState().updateActive({ markdown: text });
+            },
+            onRequestRender: () => handlers.current.onRequestRender?.(),
+            onImageFiles: handleImageFiles,
+            ai: {
+              enabled: () => aiHandlersRef.current.enabled(),
+              onHintChange: (next) => aiHandlersRef.current.onHintChange(next),
+              onSelectionChange: () =>
+                aiHandlersRef.current.onSelectionChange(),
+              onCommandFired: (context) =>
+                aiHandlersRef.current.onCommandFired(context),
+              apiRef: ai.editorApiRef,
+            },
+          }),
         ],
       }),
     });

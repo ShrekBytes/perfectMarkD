@@ -38,12 +38,16 @@ it('folds Library, theme, and the account entries into one menu', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'More options' }));
   const menu = screen.getByRole('menu', { name: 'More options' });
 
-  expect(within(menu).getByRole('menuitem', { name: /Library/ })).toBeInTheDocument();
+  expect(
+    within(menu).getByRole('menuitem', { name: /Library/ }),
+  ).toBeInTheDocument();
   expect(
     within(menu).getByRole('menuitem', { name: /Switch to dark theme/ }),
   ).toBeInTheDocument();
   expect(menu).toHaveTextContent('reader@example.com');
-  expect(within(menu).getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+  expect(
+    within(menu).getByRole('menuitem', { name: 'Sign out' }),
+  ).toBeInTheDocument();
 });
 
 it('offers sign-in when signed out', async () => {
@@ -51,9 +55,10 @@ it('offers sign-in when signed out', async () => {
   renderMenu();
 
   await userEvent.click(screen.getByRole('button', { name: 'More options' }));
-  expect(
-    screen.getByRole('menuitem', { name: 'Sign in' }),
-  ).toHaveAttribute('href', '/login');
+  expect(screen.getByRole('menuitem', { name: 'Sign in' })).toHaveAttribute(
+    'href',
+    '/login',
+  );
 });
 
 it('runs the shell action the item names, closing first', async () => {

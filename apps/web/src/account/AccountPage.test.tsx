@@ -54,15 +54,15 @@ it('offers the sign-in prompt when signed out', async () => {
   render(<AccountPage />);
 
   expect(screen.getByRole('heading', { name: 'Account' })).toBeInTheDocument();
-  expect(
-    await screen.findByText(/not signed in/),
-  ).toBeInTheDocument();
+  expect(await screen.findByText(/not signed in/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
     'href',
     '/login',
   );
   // No account sections render for a signed-out visitor.
-  expect(screen.queryByRole('heading', { name: 'Plan' })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('heading', { name: 'Plan' }),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByRole('heading', { name: 'Orders' }),
   ).not.toBeInTheDocument();
@@ -111,6 +111,8 @@ it('renders the sections for a signed-in account', async () => {
 it('renders nothing but the header until the session check resolves', () => {
   render(<AccountPage />);
 
-  expect(screen.queryByRole('heading', { name: 'Account' })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('heading', { name: 'Account' }),
+  ).not.toBeInTheDocument();
   expect(screen.queryByText(/not signed in/)).not.toBeInTheDocument();
 });

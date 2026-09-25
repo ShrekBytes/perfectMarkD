@@ -167,7 +167,10 @@ describe('password policy hint (visible before submit)', () => {
     expect(hint).toHaveAttribute('role', 'status');
 
     await user.type(screen.getByLabelText(/password/i), 'abc');
-    expect(screen.getByText(/5 more needed/i)).toHaveAttribute('role', 'status');
+    expect(screen.getByText(/5 more needed/i)).toHaveAttribute(
+      'role',
+      'status',
+    );
   });
 });
 
@@ -330,7 +333,9 @@ describe('mode switch in place', () => {
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
     expect(await screen.findByRole('alert')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /create an account/i }));
+    await user.click(
+      screen.getByRole('button', { name: /create an account/i }),
+    );
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -341,7 +346,9 @@ describe('mode switch in place', () => {
     await user.type(screen.getByLabelText(/email/i), 'a@b.co');
     await user.type(screen.getByLabelText(/password/i), 'correct horse');
 
-    await user.click(screen.getByRole('button', { name: /create an account/i }));
+    await user.click(
+      screen.getByRole('button', { name: /create an account/i }),
+    );
     expect(screen.getByLabelText(/email/i)).toHaveValue('a@b.co');
     expect(screen.getByLabelText(/password/i)).toHaveValue('correct horse');
 

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applyProposal,
-  isProposalStale,
-  stylesheetTarget,
-} from './proposal';
+import { applyProposal, isProposalStale, stylesheetTarget } from './proposal';
 import type { AiTarget } from './types';
 
 const target = (text: string): AiTarget => ({

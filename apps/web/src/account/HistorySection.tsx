@@ -73,9 +73,7 @@ export function HistorySection() {
 
       {premiumGated && (
         <div className="mt-3 py-4 text-center">
-          <p className="text-sm text-ink">
-            Export History is part of Premium.
-          </p>
+          <p className="text-sm text-ink">Export History is part of Premium.</p>
           <p className="mx-auto mt-1 max-w-prose text-xs text-ink-soft">
             Server Exports made on Premium are kept here for 30 days — upgrade
             to keep yours.

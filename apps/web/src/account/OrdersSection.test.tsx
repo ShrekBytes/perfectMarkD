@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { OrdersSection } from './OrdersSection';
@@ -90,7 +96,9 @@ it('shows the awaiting-verification strip once details are submitted', () => {
     /awaiting verification/i,
   );
   // The details are in — the expand becomes "Edit details".
-  expect(screen.getByRole('button', { name: 'Edit details' })).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Edit details' }),
+  ).toBeInTheDocument();
 });
 
 it('shows the strip without a verification claim while details are missing', () => {

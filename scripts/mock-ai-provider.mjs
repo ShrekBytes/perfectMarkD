@@ -49,7 +49,10 @@ function markdownReply(prompt) {
     const lastLine = doc.trimEnd().split('\n').pop() || 'Document';
     return `<<<<<<< SEARCH\n${lastLine}\n=======\n${lastLine}\n\nReviewed by AI.\n>>>>>>> REPLACE`;
   }
-  const replaced = heading.replace(/^(#{1,6}\s)(.*)$/, (_, marks, text) => `${marks}${text.toUpperCase()} — REVIEWED`);
+  const replaced = heading.replace(
+    /^(#{1,6}\s)(.*)$/,
+    (_, marks, text) => `${marks}${text.toUpperCase()} — REVIEWED`,
+  );
   return `<<<<<<< SEARCH\n${heading}\n=======\n${replaced}\n>>>>>>> REPLACE`;
 }
 

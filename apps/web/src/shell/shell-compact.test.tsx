@@ -56,8 +56,7 @@ async function renderCompactShell() {
   return result;
 }
 
-const editor = () =>
-  screen.getByRole('complementary', { name: 'Editor pane' });
+const editor = () => screen.getByRole('complementary', { name: 'Editor pane' });
 const canvas = () => screen.getByRole('main', { name: 'Paper Canvas' });
 const inspector = () =>
   screen.getByRole('complementary', { name: 'Inspector pane' });
@@ -117,7 +116,9 @@ it('keeps the primary Export action in the bar and folds the rest into the menu'
   await renderCompactShell();
 
   expect(screen.getByTestId('export-split')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'More options' })).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'More options' }),
+  ).toBeInTheDocument();
 
   // The desktop-only cluster is gone; Library, theme, and account live in the
   // overflow menu (the Export menu still carries the Server Export quota).

@@ -1,4 +1,8 @@
-import { useRef, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from './icons';
 import { PANE_LIMITS, type PaneId } from './pane-layout';
 

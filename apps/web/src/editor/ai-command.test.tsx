@@ -1,13 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { EditorView } from '@codemirror/view';
-import {
-  act,
-  cleanup,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorPane } from './EditorPane';
@@ -583,9 +577,7 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
     const user = userEvent.setup();
 
     await askForStylesheet(user, 'a warmer accent');
-    await waitFor(() =>
-      expect(turns()).toHaveLength(1),
-    );
+    await waitFor(() => expect(turns()).toHaveLength(1));
     const firstDocTurns = turns();
     expect(firstDocTurns).toHaveLength(1);
 
@@ -610,7 +602,9 @@ describe('/ss — the Custom Stylesheet (ai-transforms/06)', () => {
 
     // No review dialog for /ss: the diff lives in the stylesheet box, the
     // provisional paper on the canvas, and the turn in the conversation.
-    await waitFor(() => expect(turns()[0]).toMatchObject({ status: 'proposal' }));
+    await waitFor(() =>
+      expect(turns()[0]).toMatchObject({ status: 'proposal' }),
+    );
     expect(screen.queryByTestId('ai-review-dialog')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ai-review-bar')).not.toBeInTheDocument();
     expect(turns()[0]).toMatchObject({ status: 'proposal', decision: null });

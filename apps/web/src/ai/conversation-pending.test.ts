@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { pendingProposal, previewReply } from './conversation';
 import type { StylesheetTurn } from './conversation';
 
-const turn = (over: Partial<Extract<StylesheetTurn, { status: 'proposal' }>>):
-  StylesheetTurn => ({
+const turn = (
+  over: Partial<Extract<StylesheetTurn, { status: 'proposal' }>>,
+): StylesheetTurn => ({
   id: 1,
   instruction: 'thinner rules',
   against: '.a {}',
@@ -29,9 +30,7 @@ describe('pendingProposal', () => {
   it('ignores decided and failed turns, and an empty log', () => {
     expect(pendingProposal([])).toBeNull();
     expect(pendingProposal(undefined)).toBeNull();
-    expect(
-      pendingProposal([turn({ decision: 'rejected' })]),
-    ).toBeNull();
+    expect(pendingProposal([turn({ decision: 'rejected' })])).toBeNull();
   });
 
   it('agrees with previewReply about which turn is under review', () => {

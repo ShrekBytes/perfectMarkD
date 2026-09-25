@@ -74,9 +74,7 @@ describe('the review bar', () => {
   it('hides the per-change row for a single-change proposal', () => {
     show({ hunks: [hunks[0]!] });
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-    expect(screen.getByTestId('ai-change-count')).toHaveTextContent(
-      '1 change',
-    );
+    expect(screen.getByTestId('ai-change-count')).toHaveTextContent('1 change');
   });
 
   it('accepts with Enter and rejects with Escape', async () => {
@@ -94,9 +92,7 @@ describe('the review bar', () => {
 
   it('refuses an empty check set and says why', () => {
     show({ checked: new Set<number>() });
-    expect(
-      screen.getByRole('button', { name: 'Accept' }),
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
     expect(screen.getByTestId('ai-accept-reason')).toHaveTextContent(
       'Check at least one change to accept.',
     );
@@ -141,9 +137,7 @@ describe('the review bar', () => {
     expect(
       screen.queryByRole('button', { name: 'Retry' }),
     ).not.toBeInTheDocument();
-    await user.click(
-      screen.getByRole('button', { name: 'Stop the plan' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Stop the plan' }));
     expect(onStop).toHaveBeenCalled();
   });
 });

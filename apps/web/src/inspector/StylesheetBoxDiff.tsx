@@ -31,7 +31,9 @@ function Row({ row }: { row: LineDiffRow }) {
         <span aria-hidden="true" className="mr-2 select-none">
           {' '}
         </span>
-        <span className="whitespace-pre-wrap break-words">{row.text || ' '}</span>
+        <span className="whitespace-pre-wrap break-words">
+          {row.text || ' '}
+        </span>
       </div>
     );
   }

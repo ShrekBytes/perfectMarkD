@@ -138,7 +138,9 @@ it('names an ended plan without a date claim while the window has not lapsed', (
 
   expect(screen.queryByTestId('plan-expired')).not.toBeInTheDocument();
   expect(screen.getByText('Pro')).toBeInTheDocument();
-  expect(screen.getByText('No longer active — nothing auto-renews.')).toBeInTheDocument();
+  expect(
+    screen.getByText('No longer active — nothing auto-renews.'),
+  ).toBeInTheDocument();
 });
 
 it('renders a loading line while the Orders are still loading', () => {

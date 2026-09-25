@@ -64,9 +64,15 @@ export async function listOrders(): Promise<Order[]> {
   if (!res.ok) throw await errorFrom(res);
   const body: unknown = await res.json().catch(() => null);
   const orders =
-    typeof body === 'object' && body !== null && Array.isArray((body as {
-      orders?: unknown;
-    }).orders)
+    typeof body === 'object' &&
+    body !== null &&
+    Array.isArray(
+      (
+        body as {
+          orders?: unknown;
+        }
+      ).orders,
+    )
       ? (body as { orders: Order[] }).orders
       : null;
   if (orders === null) {

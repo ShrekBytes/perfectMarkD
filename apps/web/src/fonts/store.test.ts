@@ -111,7 +111,9 @@ describe('useCustomFontStore', () => {
       error: 'too-large',
     });
     expect(
-      await useCustomFontStore.getState().add(new File([new Uint8Array(1)], 'x.png')),
+      await useCustomFontStore
+        .getState()
+        .add(new File([new Uint8Array(1)], 'x.png')),
     ).toEqual({ ok: false, error: 'unsupported' });
   });
 

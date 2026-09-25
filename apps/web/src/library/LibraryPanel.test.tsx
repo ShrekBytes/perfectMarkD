@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -192,9 +198,7 @@ describe('LibraryPanel', () => {
     );
 
     expect(
-      useDocumentStore
-        .getState()
-        .docs.find((row) => row.name === 'Via menu'),
+      useDocumentStore.getState().docs.find((row) => row.name === 'Via menu'),
     ).toBeDefined();
   });
 

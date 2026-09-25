@@ -113,7 +113,12 @@ export async function testAiConnection({
   // Metadata is best-effort even when the completion failed: a model id the
   // endpoint doesn't know is exactly what the panel should show.
   const info = await provider
-    .modelInfo({ baseUrl: config.baseUrl, apiKey, model: config.model, timeoutMs })
+    .modelInfo({
+      baseUrl: config.baseUrl,
+      apiKey,
+      model: config.model,
+      timeoutMs,
+    })
     .catch(() => null);
   return {
     ok,

@@ -18,10 +18,7 @@ import { useDocumentStore } from '../documents/store';
 import { GateLock, ToggleRow } from './controls';
 import { StylesheetAiBlock } from './StylesheetAiBlock';
 import { StylesheetBoxDiff } from './StylesheetBoxDiff';
-import {
-  pendingProposal,
-  useStylesheetConversation,
-} from '../ai/conversation';
+import { pendingProposal, useStylesheetConversation } from '../ai/conversation';
 import {
   applyStylesheetProposal,
   editStylesheet,

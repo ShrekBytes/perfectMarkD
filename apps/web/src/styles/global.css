@@ -183,7 +183,14 @@
   .pm-reg-marks::before {
     top: -6px;
     left: -6px;
-    clip-path: polygon(0 0, 100% 0, 100% 1.5px, 1.5px 1.5px, 1.5px 100%, 0 100%);
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% 1.5px,
+      1.5px 1.5px,
+      1.5px 100%,
+      0 100%
+    );
   }
 
   /* Bottom-right mark: the L opens left-and-up. */

@@ -64,9 +64,9 @@ export function AboutPage() {
             Free software, AGPL-3.0
           </h2>
           <p className="mt-2 max-w-prose text-sm text-ink-soft">
-            Everything — editor, rendering engine, and server — is free
-            software under AGPL-3.0. You can read the code, audit what it does,
-            or run your own instance. The repo lives on{' '}
+            Everything — editor, rendering engine, and server — is free software
+            under AGPL-3.0. You can read the code, audit what it does, or run
+            your own instance. The repo lives on{' '}
             <a href={GITHUB_URL} className={inlineLink}>
               GitHub
             </a>

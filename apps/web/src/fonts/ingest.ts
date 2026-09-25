@@ -70,8 +70,7 @@ export interface PreparedFont {
 }
 
 export type PreparedFontResult =
-  | { ok: true; font: PreparedFont }
-  | { ok: false; error: FontIngestError };
+  { ok: true; font: PreparedFont } | { ok: false; error: FontIngestError };
 
 /** Validates and normalizes one incoming font file into a storable record.
  *  Size is refused before the bytes are read; the format decision is the
@@ -94,5 +93,8 @@ export async function prepareFont(file: {
   if (!mediaType) return { ok: false, error: 'unsupported' };
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return { ok: true, font: { bytes, mediaType, family: familyForFile(file.name ?? '') } };
+  return {
+    ok: true,
+    font: { bytes, mediaType, family: familyForFile(file.name ?? '') },
+  };
 }
