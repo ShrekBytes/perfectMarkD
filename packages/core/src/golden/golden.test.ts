@@ -17,7 +17,12 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { PRESETS } from '../settings.js';
-import { closeBrowser, measureExport, runPipeline } from './harness.js';
+import {
+  closeBrowser,
+  genericFontElements,
+  measureExport,
+  runPipeline,
+} from './harness.js';
 import {
   CODE_HEAVY,
   FEATURE_MATRIX,
@@ -49,8 +54,11 @@ function digest(result: {
 /** Structural invariants every golden document must satisfy: content never
  *  extends past its page's content box in the pipeline's measurement *and*
  *  in a fresh layout of the export document (the two could diverge if
- *  export positioning drifts from pagination geometry). */
-async function expectNoOverflow(
+ *  export positioning drifts from pagination geometry), and no element in
+ *  the laid-out document resolves its font through a generic keyword —
+ *  which the host answers, so a measurement that depends on it is a
+ *  measurement the machine owns (launch/07). */
+async function expectSoundLayout(
   result: {
     violations: { page: number; tag: string }[];
     exportHTML: string;
@@ -65,6 +73,10 @@ async function expectNoOverflow(
     remeasured.violations,
     `${label}: export document layout overflows its pages`,
   ).toEqual([]);
+  expect(
+    await genericFontElements(result.exportHTML),
+    `${label}: no element falls back to a generic font family`,
+  ).toEqual([]);
 }
 
 afterAll(async () => {
@@ -76,7 +88,7 @@ describe('golden: long prose (inline splitter)', () => {
     const result = await runPipeline(LONG_PROSE, presetSettings('default'), {
       title: 'Long Prose',
     });
-    await expectNoOverflow(result, 'long prose');
+    await expectSoundLayout(result, 'long prose');
     // All 25 headings (1 H1 + 24 H2) land in the outline.
     expect(result.outline).toHaveLength(25);
     expect(result.outline[0]).toMatchObject({
@@ -95,7 +107,7 @@ describe('golden: table-heavy (table splitter)', () => {
     const result = await runPipeline(TABLE_HEAVY, presetSettings('default'), {
       title: 'Tables',
     });
-    await expectNoOverflow(result, 'tables');
+    await expectSoundLayout(result, 'tables');
     // The table must cross at least one boundary: more than one page
     // carries a TABLE node, and every fragment replicates the thead.
     const tablePages = result.pages.filter((p) =>
@@ -120,7 +132,7 @@ describe('golden: list-heavy (list splitter)', () => {
     const result = await runPipeline(LIST_HEAVY, presetSettings('default'), {
       title: 'Lists',
     });
-    await expectNoOverflow(result, 'lists');
+    await expectSoundLayout(result, 'lists');
     expect(result.pageCount).toBeGreaterThan(2);
     await expect(digest(result)).toMatchFileSnapshot(
       './goldens/list-heavy.snapshot.md',
@@ -133,7 +145,7 @@ describe('golden: code-heavy (pre splitter)', () => {
     const result = await runPipeline(CODE_HEAVY, presetSettings('default'), {
       title: 'Code',
     });
-    await expectNoOverflow(result, 'code');
+    await expectSoundLayout(result, 'code');
     expect(result.pageCount).toBeGreaterThan(2);
     await expect(digest(result)).toMatchFileSnapshot(
       './goldens/code-heavy.snapshot.md',
@@ -151,7 +163,7 @@ describe('golden: math + mermaid + GFM feature matrix', () => {
         renderMermaid: true,
       },
     );
-    await expectNoOverflow(result, 'feature matrix');
+    await expectSoundLayout(result, 'feature matrix');
     // Mermaid SVG present in the export document.
     expect(result.exportHTML).toContain('<svg');
     // KaTeX present (span.katex is its wrapper).
@@ -171,7 +183,7 @@ describe('golden: /// page breaks', () => {
         title: 'Sections',
       },
     );
-    await expectNoOverflow(result, 'section breaks');
+    await expectSoundLayout(result, 'section breaks');
     // Three sections, each beginning with its H1 at a page top: the first
     // heading of a page that opens a section is that section's H1.
     const sectionStartPages = result.pages.filter((p) =>
@@ -195,7 +207,7 @@ describe('golden: custom page size + landscape', () => {
     const result = await runPipeline(LONG_PROSE, customSizeSettings(), {
       title: 'Custom Size',
     });
-    await expectNoOverflow(result, 'custom size');
+    await expectSoundLayout(result, 'custom size');
     // Landscape A5-ish: 210mm × 148mm → 794×559px page. More pages than
     // portrait A4 for the same prose.
     expect(result.pageCount).toBeGreaterThan(6);
@@ -210,7 +222,7 @@ describe('golden: RTL document', () => {
     const result = await runPipeline(RTL_DOC, presetSettings('default'), {
       title: 'RTL',
     });
-    await expectNoOverflow(result, 'rtl');
+    await expectSoundLayout(result, 'rtl');
     // The export document carries dir="rtl".
     expect(result.exportHTML).toContain('dir="rtl"');
     expect(result.pageCount).toBeGreaterThan(1);
@@ -236,7 +248,7 @@ describe('golden: all 7 presets over the feature matrix', () => {
         title: `Preset ${preset}`,
         renderMermaid: true,
       });
-      await expectNoOverflow(result, `preset ${preset}`);
+      await expectSoundLayout(result, `preset ${preset}`);
       await expect(digest(result)).toMatchFileSnapshot(
         `./goldens/preset-${preset}.snapshot.md`,
       );
@@ -266,7 +278,7 @@ describe('golden: code-heavy under each Shiki code theme', () => {
         presetSettings('default', { codeTheme: theme }),
         { title: `Theme ${theme}` },
       );
-      await expectNoOverflow(result, `code theme ${theme}`);
+      await expectSoundLayout(result, `code theme ${theme}`);
       expect(result.pageCount).toBeGreaterThan(2);
       await expect(digest(result)).toMatchFileSnapshot(
         `./goldens/code-theme-${theme}.snapshot.md`,

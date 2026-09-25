@@ -1,11 +1,14 @@
 {
   "contentHeights": [
-    922,
-    904,
-    904,
-    904,
-    904,
-    550,
+    878,
+    905,
+    905,
+    905,
+    905,
+    905,
+    905,
+    905,
+    693,
   ],
   "outline": [
     {
@@ -14,7 +17,7 @@
       "title": "Quarterly Regional Report",
     },
   ],
-  "pageCount": 6,
+  "pageCount": 9,
   "pages": [
     {
       "headings": [
@@ -26,37 +29,55 @@
       "sigs": [
         "H1 «Quarterly Regional Report»",
         "P",
-        "TABLE[10r+th]",
-      ],
-    },
-    {
-      "headings": [],
-      "sigs": [
-        "TABLE[11r+th]",
-      ],
-    },
-    {
-      "headings": [],
-      "sigs": [
-        "TABLE[11r+th]",
-      ],
-    },
-    {
-      "headings": [],
-      "sigs": [
-        "TABLE[11r+th]",
-      ],
-    },
-    {
-      "headings": [],
-      "sigs": [
-        "TABLE[11r+th]",
-      ],
-    },
-    {
-      "headings": [],
-      "sigs": [
         "TABLE[6r+th]",
+      ],
+    },
+    {
+      "headings": [],
+      "sigs": [
+        "TABLE[7r+th]",
+      ],
+    },
+    {
+      "headings": [],
+      "sigs": [
+        "TABLE[7r+th]",
+      ],
+    },
+    {
+      "headings": [],
+      "sigs": [
+        "TABLE[7r+th]",
+      ],
+    },
+    {
+      "headings": [],
+      "sigs": [
+        "TABLE[7r+th]",
+      ],
+    },
+    {
+      "headings": [],
+      "sigs": [
+        "TABLE[7r+th]",
+      ],
+    },
+    {
+      "headings": [],
+      "sigs": [
+        "TABLE[7r+th]",
+      ],
+    },
+    {
+      "headings": [],
+      "sigs": [
+        "TABLE[7r+th]",
+      ],
+    },
+    {
+      "headings": [],
+      "sigs": [
+        "TABLE[5r+th]",
         "P",
       ],
     },

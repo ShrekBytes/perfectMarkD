@@ -117,6 +117,22 @@ export function escapeCSSForStyle(css: string): string {
   return css.replace(/<\/style/gi, '<\\/style');
 }
 
+/** The layout half of a KaTeX stylesheet: everything from its first `.katex`
+ *  rule on, dropping the `@font-face` block that precedes it.
+ *
+ *  Both consumers of the math rules need the same slice, for the same reason:
+ *  the faces are the host's to resolve — the web app registers them
+ *  document-wide, and a shadow-level copy would resolve its `url(fonts/…)`
+ *  against the app root — while the layout rules have to travel with the
+ *  scoped sheets, or math is measured unstyled. See the pagination CSS in
+ *  `apps/web/src/canvas/pipeline.ts`.
+ *
+ *  Idempotent: slicing an already-sliced sheet finds the same first rule. */
+export function katexLayoutCSS(css: string): string {
+  const firstRule = css.indexOf('.katex{');
+  return firstRule === -1 ? css : css.slice(firstRule);
+}
+
 // ─── Custom Stylesheet sanitisation (ai-transforms/01) ───────────────────────
 
 /** Index just past the string literal opening at `i` (backslash escapes
@@ -312,12 +328,21 @@ export function buildFontFaceCSS(faces: readonly FontFaceSource[]): string {
 /** Builds the `<pre>`/`<pre><code>` base rules shared by the preview shadow
  *  DOM and the export print HTML. The settings-derived values are read from
  *  the `--mpdf-*` variables the doc root defines, so a Custom Stylesheet that
- *  redefines one restyles code blocks everywhere too. */
+ *  redefines one restyles code blocks everywhere too.
+ *
+ *  `pre` carries the code font as well as `code` does, and it has to: the UA
+ *  stylesheet's `pre { font-family: monospace }` beats inheritance, so
+ *  without this the block's own font — its strut, its line box, anything
+ *  written directly inside it — came from whatever monospace the host
+ *  happened to have, while the text inside it came from the document's. On a
+ *  machine where the two differ the block measured differently for no reason
+ *  the settings could explain. */
 export function buildCodeBlockCSS(codeFontLigatures: boolean): string {
   const ligatures = codeFontLigatures ? 'normal' : 'none';
   return `
   .mpdf-doc pre {
     background: var(--mpdf-code-background);
+    font-family: var(--mpdf-code-font);
     border-radius: 4px;
     padding: 10px 12px;
     margin: 0 0 var(--mpdf-paragraph-spacing);

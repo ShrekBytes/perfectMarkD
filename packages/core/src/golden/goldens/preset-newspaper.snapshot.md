@@ -1,7 +1,7 @@
 {
   "contentHeights": [
-    909,
-    81,
+    950,
+    56,
   ],
   "outline": [
     {
@@ -37,7 +37,6 @@
     {
       "headings": [],
       "sigs": [
-        "P",
         "P",
         "HR",
         "SECTION",

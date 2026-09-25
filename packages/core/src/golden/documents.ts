@@ -25,18 +25,40 @@ import {
   PRESETS,
   type DocumentSettings,
 } from '../settings.js';
+import { GOLDEN_BODY_STACK, GOLDEN_CODE_STACK } from './fonts.js';
 
-/** A settings object with the given preset applied over the defaults. */
+/** Pins a settings object to the faces the suite ships (launch/07).
+ *
+ *  The presets name system fonts, and a golden must not: whichever stand-in
+ *  fontconfig picks on a given machine would become part of the snapshot.
+ *  Which bundled family a preset gets is derived from its own stack rather
+ *  than listed again here — a sans preset renders in the bundled sans, a
+ *  serif preset in the bundled serif, so a new preset follows on its own.
+ *
+ *  Applied after the caller's overrides, not before: the pin is the suite's
+ *  guarantee, not a default a test can accidentally opt out of. */
+export function withBundledFonts(s: DocumentSettings): DocumentSettings {
+  return {
+    ...s,
+    fontFamily: s.fontFamily.includes('sans-serif')
+      ? GOLDEN_BODY_STACK.sans
+      : GOLDEN_BODY_STACK.serif,
+    codeFontFamily: GOLDEN_CODE_STACK,
+  };
+}
+
+/** A settings object with the given preset applied over the defaults, pinned
+ *  to the suite's bundled faces. */
 export function presetSettings(
   preset: string,
   overrides: Partial<DocumentSettings> = {},
 ): DocumentSettings {
-  return {
+  return withBundledFonts({
     ...DEFAULT_SETTINGS,
     ...PRESETS[preset]!,
     preset,
     ...overrides,
-  };
+  });
 }
 
 // ─── Long prose ───────────────────────────────────────────────────────────────
@@ -148,7 +170,14 @@ export const CODE_HEAVY = [
 
 /** The full feature matrix: KaTeX inline + display math, a mermaid diagram,
  *  GFM tables, task lists, footnotes, alerts, strikethrough — one document
- *  every preset must also handle (preset coverage uses this document). */
+ *  every preset must also handle (preset coverage uses this document).
+ *
+ *  The table's status column reads `yes`, not a check-mark emoji. It used to
+ *  carry `✅`, which no bundled face covers: on a machine with an emoji font
+ *  it rendered as a colour emoji and on a machine without one it rendered as
+ *  a notdef box, so the cell's width — and the table's, and the page's —
+ *  depended on the host. A fixture is ours to write, and it should be written
+ *  in glyphs the suite can guarantee (see fonts.ts). */
 export const FEATURE_MATRIX = [
   '# Feature Matrix',
   '',
@@ -179,8 +208,8 @@ export const FEATURE_MATRIX = [
   '',
   '| Feature | Status |',
   '|---------|--------|',
-  '| Math    | ✅     |',
-  '| Mermaid | ✅     |',
+  '| Math    | yes    |',
+  '| Mermaid | yes    |',
   '',
   '...and three paragraphs of plain prose so the page has filler below the blocks. The engine measures all of it. What matters is that math, diagram, and table each stay whole on one page while prose flows around them.',
   '',
@@ -219,13 +248,13 @@ export const SECTION_BREAKS = [
 
 /** A long prose document, paginated against a custom mm page size. */
 export function customSizeSettings(): DocumentSettings {
-  return {
+  return withBundledFonts({
     ...DEFAULT_SETTINGS,
     pageSize: 'Custom',
     customPageWidth: 148, // A5-ish width in mm
     customPageHeight: 210,
     orientation: 'landscape',
-  };
+  });
 }
 
 // ─── RTL ──────────────────────────────────────────────────────────────────────

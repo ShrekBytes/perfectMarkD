@@ -265,6 +265,7 @@ export function PaperCanvas({ ref }: PaperCanvasProps) {
       const result = await runDocumentPipeline(md, renderSettings, {
         title: name,
         renderMermaid,
+        mathCSS: KATEX_LAYOUT_CSS,
         // A superseded run must not paint over the live one's numbers.
         onProgress: (next) => {
           if (token === tokenRef.current) setProgress(next);

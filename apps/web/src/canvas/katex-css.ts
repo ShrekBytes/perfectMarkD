@@ -10,14 +10,12 @@
 //   boundary). Everything before the first `.katex` rule is the @font-face
 //   block; dropping it avoids shadow-level copies resolving `url(fonts/…)`
 //   against the app root and 404-ing.
+import { katexLayoutCSS } from '@perfectmarkd/core';
 import '@perfectmarkd/core/katex.css';
 import katexCss from '@perfectmarkd/core/katex.css?raw';
 import katexFull from '@perfectmarkd/core/katex.css?inline';
 
-const firstLayoutRule = katexCss.indexOf('.katex{');
-
-export const KATEX_LAYOUT_CSS =
-  firstLayoutRule === -1 ? katexCss : katexCss.slice(firstLayoutRule);
+export const KATEX_LAYOUT_CSS = katexLayoutCSS(katexCss);
 
 // The Client Export document inlines the FULL processed stylesheet: the export
 // iframe is its own document, so KaTeX's fonts must register inside it — the

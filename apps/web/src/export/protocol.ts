@@ -115,6 +115,7 @@ export async function renderServerExportDocument(
       {
         title,
         renderMermaid: options.renderMermaid,
+        mathCSS: options.mathCSS,
       },
     );
 

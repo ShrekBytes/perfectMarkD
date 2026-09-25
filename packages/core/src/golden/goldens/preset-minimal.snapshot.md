@@ -1,7 +1,6 @@
 {
   "contentHeights": [
-    902,
-    56,
+    959,
   ],
   "outline": [
     {
@@ -10,7 +9,7 @@
       "title": "Feature Matrix",
     },
   ],
-  "pageCount": 2,
+  "pageCount": 1,
   "pages": [
     {
       "headings": [
@@ -32,11 +31,6 @@
         "TABLE[2r+th]",
         "P",
         "P",
-      ],
-    },
-    {
-      "headings": [],
-      "sigs": [
         "P",
         "HR",
         "SECTION",

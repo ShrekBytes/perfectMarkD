@@ -1,7 +1,7 @@
 {
   "contentHeights": [
-    861,
-    286,
+    926,
+    212,
   ],
   "outline": [
     {
@@ -29,13 +29,13 @@
         "P",
         "UL[2]",
         "P",
-        "TABLE[1r+th]",
+        "TABLE[2r+th]",
+        "P",
       ],
     },
     {
       "headings": [],
       "sigs": [
-        "TABLE[1r+th]",
         "P",
         "P",
         "P",

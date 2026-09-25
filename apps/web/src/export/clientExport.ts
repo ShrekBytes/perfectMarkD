@@ -47,6 +47,7 @@ export async function buildExportDocument(
     const result = await runDocumentPipeline(markdown, settings, {
       title,
       renderMermaid,
+      mathCSS: KATEX_EXPORT_CSS,
     });
 
     // Markdown images keep their asset:// refs through the render (the

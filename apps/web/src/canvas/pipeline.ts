@@ -13,7 +13,9 @@
 // the /export route the server loads (ADR-0003) — so isRTL and docCSS are
 // computed once here and the caller passes them onward: the doc CSS that
 // pagination measured against must be the doc CSS the preview adopts and the
-// export embeds, or content shifts between the three.
+// export embeds, or content shifts between the three. The math layout rules
+// are part of that promise rather than an extra — a document with `$$` math
+// is only measured as it renders when pagination has them too.
 //
 // The run is chunked (launch/05): pagination hands the main thread back every
 // few dozen nodes and the sections are separated by their own yield, so a
@@ -32,6 +34,7 @@ import {
   buildDocCSS,
   buildPageLayouts,
   isRTLContent,
+  katexLayoutCSS,
   paginateElChunked,
   renderMarkdown,
   resolvePageGeometry,
@@ -46,8 +49,10 @@ import {
 /** Everything a page renderer needs to draw the paginated document. */
 export interface PipelineResult {
   layouts: PageLayout[];
-  /** The scoped `.mpdf-doc` stylesheet pagination measured against —
-   *  content rules only (no page chrome). */
+  /** The scoped `.mpdf-doc` content rules (no page chrome). Pagination
+   *  measured against these *plus* the math layout rules of the caller's
+   *  `mathCSS`, and the preview and export both render with the math rules
+   *  adopted ahead of these. */
   docCSS: string;
   /** The full sheet for rendering: the content rules plus the page-chrome
    *  rules (.mpdf-page) the preview's page boxes and buildExportHTML both
@@ -75,6 +80,19 @@ export interface PipelineOptions {
   /** Mermaid fence renderer; omitted (or failing) leaves diagrams as code
    *  blocks. See renderMarkdown's hook contract. */
   renderMermaid?: RenderMermaidHook;
+  /**
+   * The KaTeX stylesheet the caller will render with — `KATEX_EXPORT_CSS` for
+   * an export, `KATEX_LAYOUT_CSS` for the preview. Its layout rules join the
+   * doc CSS in what pagination measures against, so a document with `$$` math
+   * is measured as it will render; without them KaTeX's accessibility MathML
+   * branch is not hidden and its radical SVGs keep the width the stylesheet
+   * overrides. It arrives as an option rather than an import because the
+   * stylesheet is a Vite asset: this module is bundled by esbuild for the
+   * Server Export's end-to-end test and cannot reach for `?raw`. Omitted:
+   * pagination measures without math rules, which is only right for a caller
+   * that renders without them too.
+   */
+  mathCSS?: string;
   /**
    * Called as the run advances — after each yield, so several times per
    * section on a long one. The Paper Canvas paints it as a progress
@@ -169,6 +187,13 @@ export async function runDocumentPipeline(
   // Stylesheet overrides preview and both export paths identically.
   const docCSS = buildDocCSS(settings, isRTL);
   const sheetCSS = buildDocCSS(settings, isRTL, geometry);
+  // What pagination measures against: the math layout rules, then the content
+  // rules — the same order the preview's shadow roots and the export document
+  // put them in. KaTeX's markup needs its own stylesheet to be measured as it
+  // renders: without it the accessibility MathML branch is not hidden and the
+  // radical/brace SVGs keep their 400em attribute width, so a document with
+  // math was paginated against a shape nothing ever draws.
+  const paginateCSS = `${katexLayoutCSS(options.mathCSS ?? '')}\n${docCSS}`;
 
   const prepared = applyAutoBreaks(markdown, settings);
   const sections = splitMarkdownSections(prepared);
@@ -201,7 +226,7 @@ export async function runDocumentPipeline(
       container,
       geometry.contentW,
       geometry.contentH,
-      docCSS,
+      paginateCSS,
       {
         onProgress: (pages) => {
           pagesLaidOut = allPages.length + pages;

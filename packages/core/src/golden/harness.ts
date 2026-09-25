@@ -11,8 +11,12 @@
 //
 // Everything the page needs is served over https://golden.local/ (a
 // fictional origin intercepted before it hits any network): the engine
-// bundle, the mermaid hook bundle, and the KaTeX stylesheet. No dev
-// server, no disk writes, no port races.
+// bundle, the mermaid hook bundle, the KaTeX stylesheet, and every font the
+// golden documents render in. No dev server, no disk writes, no port races.
+//
+// The fonts are the harness's business because a golden records laid-out
+// shape: a face that comes from the host is a measurement that changes
+// machine to machine. See fonts.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFile } from 'node:fs/promises';
@@ -21,6 +25,16 @@ import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { build as esbuildBuild } from 'esbuild';
 
+import {
+  bundledFonts,
+  faceSpecCSS,
+  GOLDEN_BODY_STACK,
+  KATEX_FAMILIES,
+  katexFaces,
+  katexFonts,
+  type FaceSpec,
+} from './fonts.js';
+import { katexLayoutCSS } from '../css-builder.js';
 import type { OutlineEntry } from '../paginator.js';
 import type { DocumentSettings } from '../settings.js';
 
@@ -34,40 +48,143 @@ const ORIGIN = 'https://golden.local';
 // ─── Browser lifecycle ────────────────────────────────────────────────────────
 
 let browser: Browser | undefined;
-let page: Page | undefined;
+/** The one page, behind a promise so concurrent callers share the single
+ *  instance rather than racing to open a second one — the fonts are
+ *  installed on it before it is handed out, and a caller that slipped in
+ *  mid-install would measure against fallbacks. */
+let pagePromise: Promise<Page> | undefined;
 
 /** Node-side registry of served modules: routes read from it, tests (still
  *  Node-side) write to it. Lives in the harness module, not the page. */
-const servedFiles = new Map<string, string>();
+const servedFiles = new Map<string, string | Buffer>();
 
 export async function getPage(): Promise<Page> {
-  if (page) return page;
+  pagePromise ??= openPage();
+  return await pagePromise;
+}
+
+async function openPage(): Promise<Page> {
   browser ??= await chromium.launch();
   const context = await browser.newContext();
   const p = await context.newPage();
 
-  // Serve the in-memory registry at the fictional origin: no filesystem,
-  // no dev server, no port races — Chromium never talks to a real network.
-  await p.route(`${ORIGIN}/**`, (route) => {
+  // Serve the in-memory registry and the bundled fonts at the fictional
+  // origin: no dev server, no port races — Chromium never talks to a real
+  // network. Only the fonts come off disk, and only when asked for.
+  await p.route(`${ORIGIN}/**`, async (route) => {
     const name = new URL(route.request().url()).pathname;
-    const body = servedFiles.get(name);
+    const body = servedFiles.get(name) ?? (await fontBytes(name));
     if (body === undefined) {
       return route.fulfill({ status: 404, body: `no such file ${name}` });
     }
-    return route.fulfill({ contentType: 'application/javascript', body });
+    return route.fulfill({ contentType: contentTypeFor(name), body });
   });
 
   await p.goto(`${ORIGIN}/`);
-  page = p;
+  await installFonts(p);
   return p;
 }
 
 /** Shuts the shared browser down. Call from afterAll. */
 export async function closeBrowser(): Promise<void> {
+  const page = pagePromise
+    ? await pagePromise.catch(() => undefined)
+    : undefined;
+  pagePromise = undefined;
   await page?.close().catch(() => undefined);
-  page = undefined;
   await browser?.close().catch(() => undefined);
   browser = undefined;
+}
+
+// ─── Served files ─────────────────────────────────────────────────────────────
+
+/** Response types for what the route serves. Fonts must not go out labelled
+ *  as JavaScript: same-origin, so CORS is not the issue, but the response
+ *  still has to say what it carries. */
+const CONTENT_TYPES: Record<string, string> = {
+  '.js': 'application/javascript',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+};
+
+function contentTypeFor(name: string): string {
+  const dot = name.lastIndexOf('.');
+  const ext = dot === -1 ? '' : name.slice(dot);
+  return CONTENT_TYPES[ext] ?? 'application/octet-stream';
+}
+
+const bundled = once(() => bundledFonts(ORIGIN));
+const katex = once(() => katexFonts());
+
+/** Served name → absolute path, for everything under /fonts/. */
+let fontIndex: Map<string, string> | undefined;
+/** Bytes already read, so a face used by twenty pages is read once. */
+const fontBytesCache = new Map<string, Buffer>();
+
+/** The bytes of a served font, or undefined when the name is not one the
+ *  suite ships (which the route turns into a 404). */
+async function fontBytes(name: string): Promise<Buffer | undefined> {
+  fontIndex ??= new Map([...(await bundled()).files, ...(await katex())]);
+  const path = fontIndex.get(name.slice(name.lastIndexOf('/') + 1));
+  if (path === undefined) return undefined;
+
+  let bytes = fontBytesCache.get(path);
+  if (bytes === undefined) {
+    bytes = await readFile(path);
+    fontBytesCache.set(path, bytes);
+  }
+  return bytes;
+}
+
+/** Registers every face the golden documents can reach on the page, and
+ *  waits for them. Pagination measures real layout, so a face that swaps in
+ *  after the measurement would be measured as its fallback —
+ *  `document.fonts.ready` alone does not cover this, because a face no
+ *  rendered text has asked for yet is not pending. Each one is loaded
+ *  explicitly first, and a face that yields nothing is a hard failure: it
+ *  means a url or a family name has drifted, and the alternative is a golden
+ *  diff that reads like an engine regression.
+ *
+ *  Both stylesheets go in: the bundled faces, and `katex.css` — which the
+ *  app loads at the document level too. Its faces have to be registered even
+ *  though the pagination sandbox gets no stylesheet, because the golden body
+ *  stacks name them (see fonts.ts). */
+async function installFonts(p: Page): Promise<void> {
+  const [{ css, faces }, mathSheet] = [await bundled(), await mathCSS()];
+  const mathFaces = katexFaces(mathSheet);
+  assertKatexFamilies(mathFaces);
+
+  await p.addStyleTag({ content: css });
+  await p.addStyleTag({ content: mathSheet });
+
+  const specs = [...faces, ...mathFaces].map((face) => faceSpecCSS(face));
+  await p.evaluate(async (specs) => {
+    const loaded = await Promise.all(
+      specs.map((spec) => document.fonts.load(spec)),
+    );
+    const missing = specs.filter((_, i) => loaded[i]!.length === 0);
+    if (missing.length > 0) {
+      throw new Error(`bundled fonts did not load: ${missing.join(', ')}`);
+    }
+    await document.fonts.ready;
+  }, specs);
+}
+
+/** The golden body stacks name KaTeX's families, so that list has to match
+ *  the stylesheet the package ships. A rename or an addition there would
+ *  otherwise leave a family the stack claims and nothing provides — a silent
+ *  host fallback, which is the defect this whole module exists to prevent. */
+function assertKatexFamilies(faces: FaceSpec[]): void {
+  const declared = [...new Set(faces.map((f) => f.family))].sort();
+  const named = [...KATEX_FAMILIES].sort();
+  if (declared.join('\u0000') !== named.join('\u0000')) {
+    throw new Error(
+      'katex.css declares different families than fonts.ts names:\n' +
+        `  declared: ${declared.join(', ')}\n` +
+        `  named:    ${named.join(', ')}`,
+    );
+  }
 }
 
 // ─── Bundles ──────────────────────────────────────────────────────────────────
@@ -85,12 +202,11 @@ const engineBundle = once(async () => {
 
 const mermaidBundle = once(async () => {
   const result = await esbuildBuild({
-    entryPoints: [join(SRC_DIR, '../../../apps/web/src/canvas/mermaid.ts')],
+    entryPoints: [join(SRC_DIR, 'golden/mermaid.ts')],
     bundle: true,
     format: 'esm',
     write: false,
     platform: 'browser',
-    alias: { '@perfectmarkd/core': join(SRC_DIR, 'index.ts') },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   return result.outputFiles[0]!.text;
@@ -123,8 +239,9 @@ export async function engineURL(): Promise<string> {
   return await serveBundle('engine.js', await engineBundle());
 }
 
-/** The web app's mermaid hook URL (its own bundle — mermaid itself is huge
- *  and only the math+mermaid golden document needs it). */
+/** The suite's own mermaid renderer URL (its own bundle — mermaid itself is
+ *  huge and only the math+mermaid golden document needs it). It pins the
+ *  diagram's font family; see golden/mermaid.ts. */
 export async function mermaidURL(): Promise<string> {
   return await serveBundle('mermaid.js', await mermaidBundle());
 }
@@ -132,6 +249,16 @@ export async function mermaidURL(): Promise<string> {
 /** The KaTeX stylesheet text, exactly as core ships it. */
 export async function mathCSS(): Promise<string> {
   return await katexCSS();
+}
+
+/** The layout half of `katex.css`: everything from its first `.katex` rule
+ *  on. That is what the app adopts into its page shadow roots and what its
+ *  pipeline paginates against, and the app takes the same slice through the
+ *  same helper — the block before it is `@font-face`, and a shadow-level copy
+ *  would resolve those `url(fonts/…)` against the host root rather than the
+ *  served origin. */
+export async function mathLayoutCSS(): Promise<string> {
+  return katexLayoutCSS(await katexCSS());
 }
 
 export interface OverflowViolation {
@@ -184,6 +311,77 @@ export async function measureExport(exportHTML: string): Promise<{
   );
 }
 
+/** In-page source: every element in the laid-out export document whose
+ *  primary font family is a generic keyword. */
+const FIND_GENERIC_FONTS = /* js */ `
+  ({ exportHTML }) => {
+    const GENERIC = new Set([
+      'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui',
+      'math', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded',
+    ]);
+    const host = document.createElement('div');
+    host.innerHTML = exportHTML;
+    document.body.appendChild(host);
+
+    // Boxes clipped to nothing are off the page in every sense that matters
+    // here: KaTeX's accessibility MathML branch is a 1px absolute box with
+    // overflow hidden, so its own 'math' family is never rendered. Anything
+    // inside such a box is skipped rather than reported.
+    const clipped = new Set();
+    for (const el of host.querySelectorAll('*')) {
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') {
+        clipped.add(el);
+      } else if (cs.position === 'absolute' || cs.position === 'fixed') {
+        const r = el.getBoundingClientRect();
+        if (r.width <= 4 || r.height <= 4) clipped.add(el);
+      }
+    }
+    const isClipped = (el) => {
+      for (let p = el; p && p !== host; p = p.parentElement) {
+        if (clipped.has(p)) return true;
+      }
+      return false;
+    };
+
+    const found = [];
+    for (const el of host.querySelectorAll('*')) {
+      if (isClipped(el)) continue;
+      const list = getComputedStyle(el).fontFamily;
+      const first = list.split(',')[0].trim().replace(/^["']|["']$/g, '');
+      if (GENERIC.has(first.toLowerCase())) {
+        found.push(el.tagName + ' { font-family: ' + list + ' }');
+      }
+    }
+    host.remove();
+    return found;
+  }
+`;
+
+/** Elements of the laid-out export document whose primary font family is a
+ *  generic keyword, as `TAG { font-family: … }` strings.
+ *
+ *  A generic keyword is answered by the host, not by the document, so an
+ *  element sitting on one measures whatever that machine happens to have —
+ *  which is how this suite came to pass on one machine and fail on another
+ *  twice over: `pre` takes `monospace` from the UA stylesheet unless a rule
+ *  says otherwise, and the pagination sandbox left MathML on `math`. Both
+ *  were real defects, both are fixed, and this is what keeps them fixed.
+ *
+ *  Only the *primary* family is checked. A generic at the end of a list is
+ *  ordinary CSS — `katex.css` writes `KaTeX_Main, "Times New Roman", serif`
+ *  itself, and the leading family is a bundled one. What this does not catch
+ *  is a named family the suite does not ship; the font-independence
+ *  procedure in golden/README.md is the check for that. */
+export async function genericFontElements(
+  exportHTML: string,
+): Promise<string[]> {
+  const p = await getPage();
+  return await p.evaluate(
+    `(${FIND_GENERIC_FONTS})(${JSON.stringify({ exportHTML })})`,
+  );
+}
+
 // ─── The pipeline run ─────────────────────────────────────────────────────────
 
 /** What a golden assertion sees of one laid-out page: node signatures
@@ -224,12 +422,16 @@ const RUN_PIPELINE = /* js */ `
     const core = await import(modules.engine);
 
     const renderMermaid = modules.mermaid
-      ? (await import(modules.mermaid)).renderMermaid
+      ? (await import(modules.mermaid)).createMermaidRenderer(modules.mermaidFont)
       : undefined;
 
     const isRTL = core.isRTLContent(markdown);
     const docCSS = core.buildDocCSS(settings, isRTL);
     const geometry = core.resolvePageGeometry(settings);
+    // Math layout rules first, then the content rules — what the app's
+    // pipeline paginates against, and the order the preview's shadow roots
+    // and the export document both use.
+    const paginateCSS = options.mathLayoutCSS + '\\n' + docCSS;
 
     const allPages = [];
     for (const section of core.splitMarkdownSections(markdown)) {
@@ -244,7 +446,7 @@ const RUN_PIPELINE = /* js */ `
       container.innerHTML = html;
       allPages.push(
         ...core.paginateEl(
-          container, geometry.contentW, geometry.contentH, docCSS,
+          container, geometry.contentW, geometry.contentH, paginateCSS,
         ),
       );
     }
@@ -254,7 +456,15 @@ const RUN_PIPELINE = /* js */ `
     const outline = core.extractOutlineEntries(layouts);
     const exportHTML = core.buildExportHTML(
       layouts, settings, () => undefined,
-      { title: options.title, isRTL, mathCSS: options.mathCSS ?? '' },
+      {
+        title: options.title,
+        isRTL,
+        mathCSS: options.mathCSS ?? '',
+        // The export document carries its own faces, the way the real one
+        // does (billing/05). The page has them too, for the pagination
+        // sandbox — which runs long before this document exists.
+        fontFaceCSS: options.fontFaceCSS ?? '',
+      },
     );
 
     // Structural digest of every page: per-node signatures that make
@@ -319,17 +529,28 @@ export async function runPipeline(
   options: RunOptions = {},
 ): Promise<GoldenResult & { violations: OverflowViolation[] }> {
   const p = await getPage();
-  const [engine, mermaid, math] = [
+  const [engine, mermaid, math, layout, fonts] = [
     await engineURL(),
     options.renderMermaid ? await mermaidURL() : undefined,
     options.includeMathCSS === false ? undefined : await mathCSS(),
+    await mathLayoutCSS(),
+    (await bundled()).css,
   ];
 
   const payload = {
-    modules: { engine, mermaid },
+    modules: {
+      engine,
+      mermaid,
+      mermaidFont: GOLDEN_BODY_STACK.sans,
+    },
     markdown,
     settings,
-    options: { title: options.title ?? 'Golden', mathCSS: math },
+    options: {
+      title: options.title ?? 'Golden',
+      mathCSS: math,
+      mathLayoutCSS: options.includeMathCSS === false ? '' : layout,
+      fontFaceCSS: fonts,
+    },
   };
 
   return (await p.evaluate(

@@ -22,6 +22,7 @@ import type { DocumentSettings, FontFaceSource } from '@perfectmarkd/core';
 import { errorFrom, postJson, ApiError } from '../api/client';
 import { createAssetResolver } from '../assets/resolver';
 import { ensureCustomFontsLoaded, fontFacesForExport } from '../fonts/loader';
+import { KATEX_LAYOUT_CSS } from '../canvas/katex-css';
 import { collectAssetRefs, runDocumentPipeline } from '../canvas/pipeline';
 import { renderMermaid } from '../canvas/mermaid';
 import { openDatabase } from '../documents/db';
@@ -115,6 +116,11 @@ export async function buildServerExportPayload(input: {
     const result = await runDocumentPipeline(input.markdown, input.settings, {
       title: input.title,
       renderMermaid,
+      // The server's /export page renders with the full stylesheet
+      // (KATEX_EXPORT_CSS), and the layout rules are the same ones this
+      // slice carries — so the page count declared here comes from a
+      // measurement that had the same math geometry the server will render.
+      mathCSS: KATEX_LAYOUT_CSS,
     });
 
     // The page swaps refs for these URIs at render time (banner/background
