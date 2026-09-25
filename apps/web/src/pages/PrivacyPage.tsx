@@ -9,7 +9,9 @@ const inlineLink =
  * The /privacy page: one short combined page (launch-chrome spec) — what is
  * stored, what leaves the browser (AI Actions are the one third-party
  * request), what analytics collects and what it never does (launch/01), what
- * is never done, crypto payments keep card data
+ * is never done — including the Cloudflare edge the deployment's tunnel puts in
+ * the request path (ADR-0010), which is infrastructure rather than tracking and
+ * is named rather than left implied — crypto payments keep card data
  * out, the self-host escape hatch, and a one-line no-warranty caveat standing
  * in for the separate Terms page that doesn't exist.
  */
@@ -107,6 +109,15 @@ export function PrivacyPage() {
               and scripts are self-hosted, so no page here loads anything from
               another company's server — the one deliberate exception is an AI
               Action you submit, described above.
+            </li>
+            <li>
+              One piece of infrastructure sits in the way regardless: this site
+              is published through a Cloudflare Tunnel, so Cloudflare's network
+              terminates the connection and relays your request to the server.
+              It is a network provider, not an analytics or tracking service,
+              and we do not use it to measure you — but it does mean your
+              request and, for a Server Export, the Document you submitted pass
+              through Cloudflare's edge on their way to us.
             </li>
             <li>
               Your PDF content is never read, used, or shared. Server Export
