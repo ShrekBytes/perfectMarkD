@@ -51,6 +51,8 @@ The api and caddy images are compiled by [`.github/workflows/images.yml`](.githu
 
 The shipped deployment serves the stack behind a Cloudflare Tunnel, which terminates TLS in front of Caddy ([ADR-0010](docs/adr/0010-deploy-on-own-machine-behind-cloudflare-tunnel.md)) — so `SITE_ADDRESS` stays `:80` and no inbound ports are needed. Server Export (paid plans) works out of the box: headless Chromium is baked into the api image.
 
+Runbooks live in [`docs/ops/`](docs/ops/): [admin.md](docs/ops/admin.md) for verifying payments, resetting passwords and changing wallets · [hosting.md](docs/ops/hosting.md) for what the host does not need · [restore.md](docs/ops/restore.md) for backups and getting back from a bad day.
+
 ### Analytics
 
 Analytics is self-hosted Umami, served at `/analytics` on the same origin ([launch/01](.scratch/launch/issues/01-analytics-umami.md)) — no third-party service, no cookies, no stored addresses. It is off until you point the app at it:

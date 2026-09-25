@@ -23,6 +23,12 @@
 #                                       history files
 #   5. Prune: db dumps and history-prev trees older than 30 days are deleted.
 #
+# What it deliberately does not back up: the umami-db-data volume. There is no
+# pg_dump here, so the analytics Postgres is uncovered. That is a choice — the
+# only thing in it is page-view history, which is regenerable and belongs to
+# nobody — but it is a choice, not an oversight, and "backups cover the stack"
+# is not true of that one volume. See docs/ops/admin.md.
+#
 # Configuration (.env in the repo checkout — compose already requires it):
 #   BACKUP_ENABLED  "1" turns backups on. Anything else, unset included, makes
 #                   this script exit 0 having done nothing — so an installed
