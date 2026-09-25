@@ -13,10 +13,23 @@ command has been executed against the Compose stack as part of launch/03.
 > database's Export History files remain ciphertext forever (each download
 > fails the GCM tag check and returns a 500).
 
+> **Backups are opt-in, and off until switched on** (launch/12).
+> `ops/backup.sh` exits 0 having done nothing unless `BACKUP_ENABLED=1` is in
+> `.env`, so the timer can be installed before you decide. With backups
+> disabled there is **no recovery path** — no dump, no history mirror, nothing
+> to restore from, and this runbook has nothing to work with. That is a
+> deliberate trade rather than an oversight; make it knowingly.
+
 ## What a backup contains
 
 `ops/backup.sh` (nightly, via systemd timer) writes this layout to
-`$BACKUP_REMOTE` (an rclone remote:path, e.g. `b2:perfectmarkd-backups`):
+`$BACKUP_REMOTE` (an rclone remote:path, e.g. `b2:perfectmarkd-backups`) — or,
+with `BACKUP_REMOTE` left unset, to `$BACKUP_STAGE` on this host and nowhere
+else. That is a **local-only backup**: the same dump and the same history
+mirror, no upload, and no `env/.env` copy, because the point of that copy is
+surviving the loss of this machine. Nothing in the table below survives a dead
+host in local-only mode, and a history file deleted from the app is gone from
+staging after the next run (the mirror is rebuilt from scratch each night).
 
 | Path | What | Retention |
 |---|---|---|
@@ -46,31 +59,55 @@ trees are pruned at 30 days with `rclone delete --min-age 30d`.
    fill in `SESSION_SECRET` + `HISTORY_ENCRYPTION_KEY`, and bring the stack up
    — pull the published images on a deployment host, or build from a dev
    checkout (README's Deployment block).
-2. `rclone` on the host (`apt install rclone` or the single binary).
-3. An object-storage bucket (Backblaze B2 or any rclone-supported backend —
+2. In `.env`: `BACKUP_ENABLED=1`. Without it the nightly job is a no-op — and
+   with no backups there is **no recovery path**: no dump, no history mirror,
+   nothing for this runbook to work with. Everything below assumes it is on.
+3. `rclone` on the host (`apt install rclone` or the single binary) — needed
+   only if you are uploading.
+4. An object-storage bucket (Backblaze B2 or any rclone-supported backend —
    "~€1/mo" at this project's scale) and an rclone remote configured on the
    host: `rclone config create b2backup b2 account=... key=...`.
-4. In `.env`: `BACKUP_REMOTE=b2backup:perfectmarkd-backups` (and optionally
-   `BACKUP_STAGE=/var/backups/perfectmarkd`).
+5. In `.env`: `BACKUP_REMOTE=b2backup:perfectmarkd-backups` (and optionally
+   `BACKUP_STAGE=/var/backups/perfectmarkd`). Leaving `BACKUP_REMOTE` unset is
+   supported and gives a local-only backup; steps 3 and 4 are then unnecessary,
+   and so is every restore below that reads from `$BACKUP_REMOTE`.
 
 ## Installing the nightly timer
 
+A **user** unit, not a system one: the deployment host runs rootless podman, so
+the stack belongs to your user, and a root unit cannot see those containers — it
+could not dump the very stack it exists to back up (launch/12). Linger has to be
+on so the timer fires with nobody logged in.
+
 ```sh
-sudo cp ops/perfectmarkd-backup.service ops/perfectmarkd-backup.timer /etc/systemd/system/
-# Edit WorkingDirectory= in the service to your repo checkout (default
-# /opt/perfectmarkd), then:
-sudo systemctl daemon-reload
-sudo systemctl enable --now perfectmarkd-backup.timer
-systemctl list-timers perfectmarkd-backup.timer   # next run at 03:00
+loginctl enable-linger "$USER"
+
+mkdir -p ~/.config/systemd/user
+cp ops/perfectmarkd-backup.{service,timer} ~/.config/systemd/user/
+# Edit WorkingDirectory= and ExecStart= in the service if the checkout is not
+# ~/self-hosted/perfectmarkd, then:
+systemctl --user daemon-reload
+systemctl --user enable --now perfectmarkd-backup.timer
+systemctl --user list-timers perfectmarkd-backup.timer   # next run at 03:00
 ```
+
+The unit sets `DOCKER_HOST` to podman's API socket, which is what makes
+`ops/backup.sh`'s `docker compose` calls reach the containers `podman compose`
+created — the CLI is the docker one, the engine is podman. On a host running
+rootful Docker instead, install the same file as a system unit and drop that
+line.
 
 Run it once by hand and watch it succeed before you trust it:
 
 ```sh
-sudo systemctl start perfectmarkd-backup.service
-journalctl -u perfectmarkd-backup.service -n 50
+systemctl --user start perfectmarkd-backup.service
+journalctl --user -u perfectmarkd-backup.service -n 50
 # or, without systemd: ops/backup.sh
 ```
+
+Before `BACKUP_ENABLED=1` is set, that run reports `backup: disabled` and exits
+0. That is what a correct install looks like at this stage: the timer is live
+and doing nothing, and the switch that changes that lives in `.env`.
 
 ## From nothing: a clean-machine restore
 
@@ -173,7 +210,7 @@ local backend):
 
 ```sh
 export BACKUP_REMOTE=/tmp/pmd-backup-rehearsal   # in .env, not just exported!
-cp .env.example .env && printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nBACKUP_REMOTE=%s\n' \
+cp .env.example .env && printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nBACKUP_ENABLED=1\nBACKUP_REMOTE=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
 
@@ -182,10 +219,10 @@ docker compose up -d --build
 # code paths — login and post-restore decryption are what §verify asserts:
 docker compose cp ops/seed-rehearsal.mjs api:/seed.mjs
 docker compose exec -T api node /seed.mjs
-ops/backup.sh
+ops/backup.sh                         # needs BACKUP_ENABLED=1 in .env (above)
 docker compose down -v                # the "clean machine"
 rm .env && cp .env.example .env       # …placeholder secrets, real ones restored
-printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nBACKUP_REMOTE=%s\n' \
+printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nBACKUP_ENABLED=1\nBACKUP_REMOTE=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
 ops/restore.sh && docker compose up -d
@@ -206,8 +243,14 @@ green when you touch the backup scripts.
   empty. Losing them costs numbers, never user data.
 - Backups require the api container to be running (the dump runs inside it);
   a stopped stack fails the job loudly rather than uploading a stale or
-  empty backup. Monitor the timer (`journalctl -u
-  perfectmarkd-backup.service`), and treat a failed night as an alert, not a
-  warning.
+  empty backup. Monitor the timer (`journalctl --user -u
+  perfectmarkd-backup.service` — it is a user unit, see above), and treat a
+  failed night as an alert, not a warning.
 - `BACKUP_REMOTE` accepting a local path is what makes the rehearsal above
   possible — on the real deployment it is a real remote, never a local path.
+- A **local-only** backup (BACKUP_ENABLED=1, no BACKUP_REMOTE) is the mode the
+  Admin's own deployment runs: it produces the same dump and history mirror in
+  `$BACKUP_STAGE` and uploads nothing. Recovering from one is a manual job —
+  the files are on the host, and `restore.sh` wants a `BACKUP_REMOTE` to read
+  from. Set `BACKUP_REMOTE` to a path if you want the scripted restore against
+  a local target.

@@ -1,20 +1,44 @@
 [Unit]
 Description=PerfectMarkD nightly backup (db VACUUM INTO + history + env → object storage)
-Documentation=file://repo/docs/ops/restore.md
-Wants=network-online.target
-After=network-online.target docker.service
+Documentation=file://%h/self-hosted/perfectmarkd/docs/ops/restore.md
+# podman.socket, not docker.service: the socket is what the docker CLI below
+# talks to, and a user unit cannot order against a system unit anyway.
+Wants=network-online.target podman.socket
+After=network-online.target podman.socket
 
 [Service]
 Type=oneshot
-# Install next to the repo checkout this belongs to, then edit the path:
-#   sudo cp ops/perfectmarkd-backup.{service,timer} /etc/systemd/system/
-#   sudo systemctl daemon-reload && sudo systemctl enable --now perfectmarkd-backup.timer
-WorkingDirectory=/opt/perfectmarkd
-ExecStart=/opt/perfectmarkd/ops/backup.sh
+# This is a *user* unit on purpose (launch/12). The deployment host runs
+# rootless podman, so the stack belongs to this user; a system unit runs as
+# root and cannot see those containers — it could not dump the very stack it
+# exists to back up. Linger must be on so the timer fires with nobody logged
+# in:
+#   loginctl enable-linger "$USER"
+#
+# Install — edit the two paths first if the checkout is not
+# ~/self-hosted/perfectmarkd:
+#   mkdir -p ~/.config/systemd/user
+#   cp ops/perfectmarkd-backup.{service,timer} ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now perfectmarkd-backup.timer
+#   systemctl --user list-timers perfectmarkd-backup.timer
+#
+# %t is this user's runtime directory (/run/user/<uid>). Pointing DOCKER_HOST
+# at podman's API socket is what makes ops/backup.sh's `docker compose` calls
+# reach the containers `podman compose` created: the CLI is the docker one, the
+# engine is podman. On a host running rootful Docker instead, install this as a
+# system unit (absolute paths, no %h) and delete this line — docker.service is
+# not reachable from the user manager.
+Environment=DOCKER_HOST=unix://%t/podman/podman.sock
+WorkingDirectory=%h/self-hosted/perfectmarkd
+ExecStart=%h/self-hosted/perfectmarkd/ops/backup.sh
 # The api container must be up; if it is not, the job fails loudly here and
-# journald records it (monitor the timer — see docs/ops/restore.md).
+# journald records it (monitor the timer — see docs/ops/restore.md). Backups
+# are also opt-in: ops/backup.sh exits 0 without touching anything unless
+# BACKUP_ENABLED=1 is in .env, so this timer can be enabled ahead of that
+# decision.
 Nice=10
 IOSchedulingClass=idle
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
