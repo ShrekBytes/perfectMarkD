@@ -1,6 +1,6 @@
 # 08 — The 44px touch-floor sweep failed once under load and has not reproduced
 
-Status: needs-triage
+Status: resolved
 Blocked by:
 
 `apps/web/e2e/shell-compact.spec.ts:219` — *touch floor › the shell and its overlays keep the 44px floor at 320px* — failed once, in a full-suite run, and has passed in every run since. No failure message was captured, so this ticket is the observation and the reproduction attempts, not a diagnosis.
@@ -54,3 +54,63 @@ A test that fails once without a reproducible cause is re-run rather than invest
 ## Comments
 
 - **Found while verifying [launch/05](05-performance-guards.md)** (2026-09-25), which ran the whole web suite. Recorded here rather than left in a transcript, following [07](07-goldens-on-the-runner.md): it gates a green pipeline before announcement. Filed under `launch` for that reason — move it if the shell workstream is the better home, but note that its spec directory no longer exists.
+
+- **Triage verdict (2026-09-26): not reproduced; the sweep now settles and
+  compares at whole-pixel resolution.** Status flipped `needs-triage` →
+  `resolved`. The evidence and the change are below.
+
+- **The one profile the ticket had not tried was tried, and it did not
+  reproduce either.** The ticket's own suggestion — "a run with the
+  performance project put back alongside the suite" — is the load profile the
+  single failure happened in, and it was still untested: launch/05's split had
+  removed it from every run since. Merging the projects back into one and
+  running the original command (`playwright test --grep-invert ai`) gives
+  **47 passed, 0 failed**, with the contention demonstrably real — the
+  throttled 339-page render took **31.0s** against **15.8s** in isolation, the
+  doubling the config's own comment predicts. That is the fifth profile to
+  fail to reproduce it; the ticket already had the full suite twice,
+  `--workers=8`, and `--repeat-each=8`.
+
+- **What measuring it did add: the assertion has zero margin, on every
+  control.** Reading the boxes directly at each of the five sweep points
+  (initial, overflow menu, export menu, pricing modal, library drawer) shows
+  **18 visible controls, and the smallest dimension of every one is exactly
+  44.00**. That is not a coincidence — the floor is applied as
+  `min-height`/`min-width: 44px`, so a control that satisfies it measures
+  exactly the number the assertion compares against, and the check sits on the
+  boundary it is testing. A control can only be reported by losing its
+  `touch-target` class, or by a box landing a hair under 44.
+
+- **Both of the ticket's candidate causes were checked, and one is ruled
+  out.** Candidate 2 (a transient control from the failed `/api/me` fetch) does
+  not hold as written: all three shell banners — welcome, plan-ended, stale —
+  render through `BannerStrip`, whose action buttons *and* icon dismiss all
+  carry `touch-target`, so a banner appearing cannot introduce a control under
+  the floor. The toasts (`drop-rejected-toast`, `DeleteToast`) appear in no
+  swept state — they need a file drop or a delete. Candidate 1 (caught
+  mid-layout) is the one left standing, and the one the change addresses.
+
+- **The change, in `apps/web/e2e/shell-compact.spec.ts`.** `controls()` now
+  reads until the boxes stop moving (up to five attempts, two animation frames
+  apart) instead of reading once, and `expectFloor` compares at whole-pixel
+  resolution. Both follow from the measurement rather than from the guess: a
+  single read can catch the shell mid-layout, and an assertion whose threshold
+  is the implementation's exact boundary should not turn on a sub-pixel. The
+  floor itself is unchanged at 44.
+
+- **Falsified before it was kept.** Dropping `--touch-target` to `40px` fails
+  the sweep with `"More options 40x40"` named — so the settle cannot hide a
+  control that is genuinely too small, and a control that actually lost its
+  floor measures 28px (`h-7`), caught by a wide margin. The message now reports
+  whole pixels, which is what a person would see.
+
+- **Not changed, deliberately.** The rename-dialog assertion
+  (`box.height >= 44`) covers a different control: that input carries no
+  `touch-target` and takes its height from content, so it is not pinned to a
+  floor and not exposed to this fragility.
+
+- **What this verdict is not.** It is not a reproduction — the control that
+  failed is still unknown, and if the sweep fails again its message will name
+  it. It is a recorded decision of the kind the acceptance allows, taken on the
+  strongest evidence available: five profiles that do not reproduce it, and a
+  measured zero margin that explains why a rare perturbation was enough.

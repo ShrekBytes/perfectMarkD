@@ -129,8 +129,12 @@ test.describe('compact shell', () => {
     await page.setViewportSize({ width: 320, height: 812 });
     await openApp(page);
 
-    await page.getByRole('button', { name: 'More options', exact: true }).click();
-    await expect(page.getByRole('menu', { name: 'More options' })).toBeVisible();
+    await page
+      .getByRole('button', { name: 'More options', exact: true })
+      .click();
+    await expect(
+      page.getByRole('menu', { name: 'More options' }),
+    ).toBeVisible();
 
     // The trap this guards: the menu is 224px wide but the trigger sits ~44px
     // from the bar's right edge, so a trigger-anchored dropdown hung half its
@@ -183,8 +187,11 @@ test.describe('touch floor', () => {
     isMobile: true,
   });
 
-  /** Every visible interactive control, with its box. */
-  async function controls(page: import('@playwright/test').Page) {
+  /** The 44px floor the shell's coarse-pointer rules apply. */
+  const FLOOR = 44;
+
+  /** One synchronous read of every visible interactive control. */
+  async function readControls(page: import('@playwright/test').Page) {
     return page.evaluate(() =>
       [...document.querySelectorAll('button, a[href], input, select')]
         .map((el) => {
@@ -207,12 +214,56 @@ test.describe('touch floor', () => {
     );
   }
 
+  /**
+   * Every visible interactive control, with its box — read until the boxes
+   * stop moving.
+   *
+   * A single read can catch the shell mid-layout, and then the sweep reports
+   * the machine rather than the shell. That is not a hypothetical here: this
+   * test failed exactly once, in the one run where the CPU-throttled
+   * performance suite was in flight alongside it (launch/08), and no
+   * reproduction has managed it since. Settling costs two animation frames
+   * per attempt and cannot hide a control that is genuinely too small — the
+   * boxes have stopped moving by the time the reading is kept.
+   */
+  async function controls(page: import('@playwright/test').Page) {
+    let previous: string | undefined;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const snapshot = await readControls(page);
+      const serialized = JSON.stringify(snapshot);
+      if (serialized === previous) return snapshot;
+      previous = serialized;
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+    }
+    return await readControls(page);
+  }
+
+  /**
+   * Asserts the floor holds for every visible control.
+   *
+   * The floor is applied as `min-height`/`min-width: 44px`, so a control that
+   * satisfies it measures *exactly* 44 — the assertion's threshold is the
+   * implementation's boundary, with no slack, on every control in the shell.
+   * The comparison therefore runs at whole-pixel resolution: a box that
+   * rounds to 44 is 44 for every purpose the floor exists for, and a control
+   * that actually lost its floor measures 28px (`h-7`), which this still
+   * catches by a wide margin.
+   */
   async function expectFloor(page: import('@playwright/test').Page) {
     const small = (await controls(page)).filter(
-      ({ box }) => box.width < 44 || box.height < 44,
+      ({ box }) =>
+        Math.round(box.width) < FLOOR || Math.round(box.height) < FLOOR,
     );
     expect(
-      small.map(({ name, box }) => `${name} ${box.width}x${box.height}`),
+      small.map(
+        ({ name, box }) =>
+          `${name} ${Math.round(box.width)}x${Math.round(box.height)}`,
+      ),
     ).toEqual([]);
   }
 
@@ -226,20 +277,26 @@ test.describe('touch floor', () => {
     await expectFloor(page);
 
     // The compact overflow menu.
-    await page.getByRole('button', { name: 'More options', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'More options', exact: true })
+      .click();
     await expectFloor(page);
     await page.keyboard.press('Escape');
 
     // The Export dropdown — the one menu that stays in the bar.
     await page.getByRole('button', { name: 'More export options' }).click();
     await expectFloor(page);
-    await page.getByRole('menuitem', { name: 'Server Export Paid plan' }).click();
+    await page
+      .getByRole('menuitem', { name: 'Server Export Paid plan' })
+      .click();
     await expect(page.getByTestId('pricing-modal')).toBeVisible();
     await expectFloor(page);
     await page.keyboard.press('Escape');
 
     // The Library drawer.
-    await page.getByRole('button', { name: 'More options', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'More options', exact: true })
+      .click();
     await page.getByRole('menuitem', { name: 'Library' }).click();
     await expect(page.getByRole('dialog', { name: 'Library' })).toBeVisible();
     await expectFloor(page);
