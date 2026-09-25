@@ -47,7 +47,7 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DB_PATH=/data/perfectmarkd.db \
     HISTORY_DIR=/data/history
-# Server Export's renderer (launch/04, pulled forward): the worker lazily
+# Server Export's renderer: the worker lazily
 # imports Playwright, and every deployment — the Admin's VPS, a local test
 # stack, a self-hoster's copy — runs the same image, so local testing is
 # production parity for the whole feature (the AGPL pitch is "self-host a

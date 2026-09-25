@@ -112,4 +112,4 @@ Cloud doc sync · public API · mobile-optimized editor · email infrastructure 
 1. Register the domain (`perfectmarkd.com` / `.app` / `.io` — check availability).
 2. Create the three receiving wallets (USDT-TRC20, USDT-BEP20, LTC) and store keys safely; addresses go into admin settings at Phase 2.
 3. Decide the GitHub org/repo name (whole repo is public from Phase 1 — AGPL-3.0).
-4. Set up the Cloudflare Tunnel and DNS for the domain, and point it at the Compose stack on your machine (ADR-0010) — launch/04 assumes this exists.
+4. Set up the Cloudflare Tunnel and DNS for the domain, and point it at the Compose stack on your machine (ADR-0010).

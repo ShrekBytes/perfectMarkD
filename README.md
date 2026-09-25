@@ -49,7 +49,7 @@ podman compose pull && podman compose up -d --no-build
 
 The api and caddy images are compiled by [`.github/workflows/images.yml`](.github/workflows/images.yml) and published to GHCR as public packages, so a deployment host needs no toolchain, no registry login, and no room for a Chromium install — the same arrangement as the Umami image ([ADR-0012](docs/adr/0012-build-the-umami-image-in-ci.md)). Pin `PERFECTMARKD_IMAGE_TAG` to a `sha-…` tag for a reproducible deploy; the default is `latest`.
 
-The shipped deployment serves the stack behind a Cloudflare Tunnel, which terminates TLS in front of Caddy ([ADR-0010](docs/adr/0010-deploy-on-own-machine-behind-cloudflare-tunnel.md)) — so `SITE_ADDRESS` stays `:80` and no inbound ports are needed. Server Export (paid plans) works out of the box: headless Chromium is baked into the api image. Host-side rollout and backups: [.scratch/launch/issues/04-deploy-production.md](.scratch/launch/issues/04-deploy-production.md).
+The shipped deployment serves the stack behind a Cloudflare Tunnel, which terminates TLS in front of Caddy ([ADR-0010](docs/adr/0010-deploy-on-own-machine-behind-cloudflare-tunnel.md)) — so `SITE_ADDRESS` stays `:80` and no inbound ports are needed. Server Export (paid plans) works out of the box: headless Chromium is baked into the api image.
 
 ### Analytics
 

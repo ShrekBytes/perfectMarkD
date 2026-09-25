@@ -6,7 +6,7 @@
 #   {$SITE_ADDRESS} — the public origin; ":80" for the shipped deployment,
 #     where a Cloudflare Tunnel terminates TLS in front of Caddy (ADR-0010).
 #     A domain instead gets Caddy's own automatic TLS, which is only right
-#     for a directly-exposed host (rollout docs: launch/04).
+#     for a directly-exposed host (deployment: README).
 #   http://caddy   — loopback origin on the compose network: the export
 #     worker loads the app's own /export page from here (EXPORT_ORIGIN),
 #     plain HTTP regardless of how the public site is served.
