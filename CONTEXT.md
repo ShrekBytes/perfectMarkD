@@ -118,6 +118,24 @@ _Avoid_: batch, job, queue, run
 The Admin's configuration of the AI service: which compatible endpoint, which model, and how much reasoning. The API key belongs to the deployment, not to a setting.
 _Avoid_: AI settings, model config
 
+## Accounts & sign-in
+
+**Email Verification**:
+Proving a login email is reachable by having its owner follow a one-time link. Sign-in is blocked until it succeeds, and Google Sign-In counts as Email Verification. Distinct from Verification, which is the Admin's on-chain check of an Order.
+_Avoid_: verification alone (that means the on-chain check), activation, confirmation
+
+**Verified Email**:
+The state of a login email after Email Verification has succeeded for it. An account whose login email is not verified cannot sign in.
+_Avoid_: active account, confirmed email, approved
+
+**Password Reset**:
+Setting a new password by following a one-time emailed link, without signing in. Also how an account signed in with Google gains a password, or recovers when it can't tell which sign-in method it used. Distinct from changing the password while signed in.
+_Avoid_: forgot password, recovery, password change
+
+**Google Sign-In**:
+Registering or signing in with a Google account. On a matching email it signs in to the existing account; it counts as Email Verification. A password is optional afterwards.
+_Avoid_: Google login, social login, SSO, OAuth (an implementation detail)
+
 ## Product UI
 
 **Paper Canvas**:
