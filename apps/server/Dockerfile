@@ -59,6 +59,16 @@ ENV NODE_ENV=production \
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN corepack enable \
 	&& npx --yes playwright install --with-deps --only-shell chromium
+# Build identity, stamped in by CI from the repo-root package.json and reported
+# by /healthz. Unstamped — a hand-built image — reads as dev/local.
+#
+# Below the Chromium install deliberately: a layer's cache key covers every
+# instruction above it, so an ENV placed higher would make each version bump
+# re-download the browser. Nothing between here and CMD needs it earlier.
+ARG APP_VERSION="dev"
+ARG APP_COMMIT="local"
+ENV APP_VERSION=$APP_VERSION \
+    APP_COMMIT=$APP_COMMIT
 # Database (SQLite WAL) and Export History's encrypted files (server/05) live
 # on a volume so they survive container upgrades.
 RUN mkdir -p /data && chown node:node /data

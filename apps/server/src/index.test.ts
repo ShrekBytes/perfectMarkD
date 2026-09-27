@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HTTPException } from 'hono/http-exception';
 import { createApp, type AppType } from './index.js';
 import type { LogSink } from './request-logger.js';
@@ -9,6 +9,7 @@ let cleanup: (() => void) | undefined;
 afterEach(() => {
   cleanup?.();
   cleanup = undefined;
+  vi.unstubAllEnvs();
 });
 
 function makeApp() {
@@ -23,11 +24,31 @@ function makeApp() {
 }
 
 describe('health check', () => {
-  it('responds 200 ok', async () => {
+  it('responds 200 ok, with the build identity alongside', async () => {
+    // The stamp is read from the environment per request, so a developer with
+    // APP_VERSION exported would otherwise see a different body than CI does.
+    vi.stubEnv('APP_VERSION', '0.1.0');
+    vi.stubEnv('APP_COMMIT', 'abc1234');
     const { app } = makeApp();
     const res = await app.request('/healthz');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toEqual({
+      ok: true,
+      version: '0.1.0',
+      commit: 'abc1234',
+    });
+  });
+
+  it('reports dev/local for a build with nothing stamped in', async () => {
+    vi.stubEnv('APP_VERSION', '');
+    vi.stubEnv('APP_COMMIT', '');
+    const { app } = makeApp();
+    const res = await app.request('/healthz');
+    expect(await res.json()).toEqual({
+      ok: true,
+      version: 'dev',
+      commit: 'local',
+    });
   });
 });
 

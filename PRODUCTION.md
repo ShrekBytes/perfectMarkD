@@ -93,7 +93,15 @@ Check it:
 ```sh
 podman compose ps                    # all four healthy
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8901/healthz   # 200
+curl -s http://localhost:8901/healthz     # {"ok":true,"version":"0.1.0","commit":"abc1234"}
 ```
+
+That second call names the build that is actually up. It tracks `latest`, which
+follows every push to main, so the number alone pins nothing — to deploy a fixed
+point, cut a release (`git tag v0.1.0 && git push --tags`, with `package.json`'s
+`version` already at `0.1.0`) and set `PERFECTMARKD_IMAGE_TAG=0.1.0` in `.env`
+before the `podman compose pull` above. README § Versions and releases has the
+whole ritual.
 
 **Done when:** `api`, `caddy`, `umami`, `umami-db` are all up, and `/healthz`,
 `/`, and `/pricing` each answer `200` on port 8901.

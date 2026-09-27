@@ -1,4 +1,5 @@
 import { Link } from '../router';
+import { buildInfo } from '../version';
 import { GITHUB_URL, LICENSE_URL, PLUGIN_URL } from './site-links';
 
 const plainLink =
@@ -11,8 +12,13 @@ const plainLink =
  * links to the static surfaces, so any of them can reach the others. The
  * editor and the auth pages render no footer: the drop-in experience stays
  * uncluttered.
+ *
+ * The build identity sits at the end, quietest thing in the row. Every other
+ * surface here is marketing; this is the one fact a visitor or a bug report
+ * needs, and it has to be readable from a screenshot of the page.
  */
 export function Footer() {
+  const { version, commit } = buildInfo();
   return (
     <footer className="flex flex-wrap items-center gap-3 border-t border-hairline bg-surface px-4 py-4 text-xs text-ink-soft">
       <a
@@ -39,6 +45,9 @@ export function Footer() {
       <a href={PLUGIN_URL} className={`${plainLink} ml-auto`}>
         Successor to the Advanced PDF Export plugin
       </a>
+      <span className="font-mono">
+        {version} ({commit})
+      </span>
     </footer>
   );
 }

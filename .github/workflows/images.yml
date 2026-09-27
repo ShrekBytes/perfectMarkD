@@ -75,6 +75,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve the build identity
+        id: version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          # A release tag and package.json must agree: otherwise a `v0.2.0` tag
+          # publishes an image that reports 0.1.0, which is the exact "which
+          # build is this?" ambiguity the version exists to remove.
+          if [[ "$GITHUB_REF" == refs/tags/v* && "${GITHUB_REF#refs/tags/v}" != "$version" ]]; then
+            echo "::error::Tag ${GITHUB_REF#refs/tags/v} does not match the package.json version $version. Bump the version in the same commit as the tag."
+            exit 1
+          fi
+          {
+            echo "version=$version"
+            # Same 7 characters as the sha- image tag, so the two agree.
+            echo "commit=${GITHUB_SHA::7}"
+          } >> "$GITHUB_OUTPUT"
+
       # Two jobs in one: ghcr rejects uppercase repository names and the
       # account's login has one, and the tag list differs between a branch push
       # and a release tag — which YAML has no clean way to express.
@@ -87,7 +104,9 @@ jobs:
             # `latest` tracks main and only main. Emitting it on a tag push too
             # would move it backwards whenever a release is cut on an older
             # commit, so a release gets its version instead — plus the sha,
-            # which every push gets.
+            # which every push gets. The number itself comes from package.json
+            # (the step above), not from the tag: the tag is what marks a
+            # release, package.json is what the app reports.
             if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
               echo "$repo:${GITHUB_REF#refs/tags/v}"
             else
@@ -109,7 +128,13 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          build-args: ${{ matrix.build-args }}
+          # The matrix's own build args (the tracker path for caddy) plus the
+          # build identity, which both images need and neither can work out
+          # for itself — only CI knows the commit.
+          build-args: |
+            ${{ matrix.build-args }}
+            APP_VERSION=${{ steps.version.outputs.version }}
+            APP_COMMIT=${{ steps.version.outputs.commit }}
           push: true
           tags: ${{ steps.tags.outputs.tags }}
           # A cache scope per image: two builds sharing one gha entry evict each

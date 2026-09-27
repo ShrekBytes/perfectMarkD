@@ -3,6 +3,7 @@ import { getSignedCookie } from 'hono/cookie';
 import type { AppDatabase } from './db/database.js';
 import type { User } from './db/schema.js';
 import { requestLogger, type LogSink } from './request-logger.js';
+import { buildInfo } from './version.js';
 import { authRoutes, type AuthOptions } from './auth/routes.js';
 import { orderRoutes } from './orders/routes.js';
 import { adminRoutes } from './admin/routes.js';
@@ -179,7 +180,11 @@ export function createApp({
       }
       return next();
     })
-    .get('/healthz', (c) => c.json({ ok: true }))
+    // The build identity rides along on the health probe: when a bug report
+    // says "the export came out wrong", the first question is which build, and
+    // `ok` alone cannot answer it. Compose's healthcheck only reads `ok`, so
+    // this stays compatible with it.
+    .get('/healthz', (c) => c.json({ ok: true, ...buildInfo() }))
     .route('/api/me', meRoutes({ now: clock, ai }))
     .route(
       '/api/auth',

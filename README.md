@@ -55,6 +55,26 @@ The shipped deployment serves the stack behind a Cloudflare Tunnel, which termin
 
 Runbooks live in [`docs/ops/`](docs/ops/): [admin.md](docs/ops/admin.md) for verifying payments, resetting passwords and changing wallets · [hosting.md](docs/ops/hosting.md) for what the host does not need · [restore.md](docs/ops/restore.md) for backups and getting back from a bad day.
 
+### Versions and releases
+
+The app's version is the `version` field in the root [`package.json`](package.json) — currently **0.1.0**. It is the only place a release number is _set_: the workspace packages stay at `0.0.0` because they are private and never published, and nothing derives a version from anywhere else.
+
+CI reads that field and stamps it into both images as `APP_VERSION`, alongside the short commit sha as `APP_COMMIT`. Both halves of the running stack then report what they are without anyone looking it up:
+
+- the app, in the footer of every public page — `0.1.0 (abc1234)`
+- the API, on the health probe — `curl -s localhost:3000/healthz` → `{"ok":true,"version":"0.1.0","commit":"abc1234"}`
+
+A build with nothing stamped in — `pnpm dev`, or a hand-built image from a dev checkout — reports `dev (local)` rather than guessing at a version.
+
+Cutting a release is three commands, and the tag and the number are checked against each other so they cannot drift:
+
+```sh
+# bump "version" in package.json, commit, then:
+git tag v0.1.0 && git push --tags
+```
+
+The tag publishes `perfectmarkd-api` and `perfectmarkd-caddy` under that version as well as `sha-…`; `PERFECTMARKD_IMAGE_TAG=0.1.0` then pins the deployment to it. A tag that disagrees with `package.json` fails the workflow rather than publishing an image that reports a different number than the tag it was published under.
+
 ### Analytics
 
 Analytics is self-hosted Umami, served at `/analytics` on the same origin ([launch/01](.scratch/launch/issues/01-analytics-umami.md)) — no third-party service, no cookies, no stored addresses. It is off until you point the app at it:

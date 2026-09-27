@@ -28,6 +28,13 @@ COPY apps/web apps/web
 # (launch/11, and the `handle /analytics-config.js` block in the Caddyfile).
 ARG VITE_ANALYTICS_URL="/analytics"
 ENV VITE_ANALYTICS_URL=$VITE_ANALYTICS_URL
+# Build identity, stamped in by CI from the repo-root package.json. Vite
+# inlines both into the bundle, so the caddy stage below needs neither.
+# Unstamped — a hand-built image — reads as dev/local.
+ARG APP_VERSION="dev"
+ARG APP_COMMIT="local"
+ENV VITE_APP_VERSION=$APP_VERSION \
+    VITE_APP_COMMIT=$APP_COMMIT
 RUN pnpm --filter @perfectmarkd/core build \
 	&& pnpm --filter @perfectmarkd/web build
 
