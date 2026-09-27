@@ -24,7 +24,9 @@ it('offers a plain link to the start endpoint when the server advertises the fea
   const button = await screen.findByRole('link', {
     name: /continue with google/i,
   });
-  expect(button).toHaveAttribute('href', '/api/auth/google/start');
+  // The root path, not /api: the callback URI is registered with Google, so the
+  // server mounts the flow at /auth/google and both proxies pass it through.
+  expect(button).toHaveAttribute('href', '/auth/google/start');
   expect(providers).toHaveBeenCalled();
 });
 

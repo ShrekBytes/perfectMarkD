@@ -346,7 +346,7 @@ describe('Google Sign-In', () => {
     const { unmount } = render(<AuthPage mode="login" />);
     expect(
       await screen.findByRole('link', { name: /continue with google/i }),
-    ).toHaveAttribute('href', '/api/auth/google/start');
+    ).toHaveAttribute('href', '/auth/google/start');
     unmount();
 
     render(<AuthPage mode="register" />);

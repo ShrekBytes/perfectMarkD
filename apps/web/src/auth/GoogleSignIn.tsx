@@ -16,8 +16,12 @@ import { useEffect, useState } from 'react';
 import { signInProviders } from './api';
 
 /** Where the flow starts. Relative, so it is the same origin in development
- *  (Vite proxies it) and production (Caddy does). */
-const START_PATH = '/api/auth/google/start';
+ *  (Vite proxies it) and production (Caddy does). At the app's root, not under
+ *  /api: the server mounts the whole Google flow at /auth/google, because the
+ *  registered redirect URI is the address a person comes back to and has to be
+ *  a path the SPA's deep-link fallback cannot swallow. Both proxies pass this
+ *  path through (apps/web/vite.config.ts, Caddyfile). */
+const START_PATH = '/auth/google/start';
 
 /**
  * How the callback's outcome reached this page. The server answers every
