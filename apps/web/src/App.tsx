@@ -3,6 +3,7 @@ import { AdminPage } from './admin/AdminPage';
 import { AccountPage } from './account/AccountPage';
 import { AuthPage } from './auth/AuthPage';
 import { CheckInboxPage } from './auth/CheckInboxPage';
+import { ConfirmEmailChangePage } from './auth/ConfirmEmailChangePage';
 import { ResetPasswordPage } from './auth/ResetPasswordPage';
 import { SetPasswordPage } from './auth/SetPasswordPage';
 import { VerifyEmailPage } from './auth/VerifyEmailPage';
@@ -22,10 +23,11 @@ import { initAnalytics, trackPageView } from './analytics/tracker';
  * (`/account`), the two auth forms (`/login`, `/register`) the upgrade flow
  * uses, the two Email Verification pages (`/check-inbox`, `/verify-email`,
  * email/02), the two Password Reset pages (`/reset-password`, `/set-password`,
- * email/03), the Admin's panel (`/admin`, billing/02), and the hidden
- * `/export` render surface the server's worker loads (server/03, ADR-0003).
- * Unknown paths get the 404 (launch-chrome spec) instead of falling through to
- * the editor.
+ * email/03), the Email Change page its link resolves to
+ * (`/confirm-email-change`, email/04), the Admin's panel (`/admin`, billing/02),
+ * and the hidden `/export` render surface the server's worker loads (server/03,
+ * ADR-0003). Unknown paths get the 404 (launch-chrome spec) instead of falling
+ * through to the editor.
  *
  * Analytics (launch/01) hooks in here because this is the one place that sees
  * every route change. The hidden `/export` surface is left out entirely: the
@@ -64,6 +66,8 @@ export function App() {
       return <ResetPasswordPage />;
     case 'set-password':
       return <SetPasswordPage />;
+    case 'confirm-email-change':
+      return <ConfirmEmailChangePage />;
     case 'admin':
       return <AdminPage />;
     case 'export':

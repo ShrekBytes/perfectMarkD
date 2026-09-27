@@ -11,7 +11,7 @@
 import type { Mailer } from './mailer.js';
 
 export type RecordedSendKind =
-  'verification' | 'password_reset' | 'email_changed_notice';
+  'verification' | 'password_reset' | 'email_change' | 'email_changed_notice';
 
 export interface RecordedSend {
   kind: RecordedSendKind;
@@ -39,6 +39,9 @@ export function createRecordingMailer(): RecordingMailer {
     },
     async sendPasswordReset({ to, url }) {
       sends.push({ kind: 'password_reset', to, url });
+    },
+    async sendEmailChange({ to, url }) {
+      sends.push({ kind: 'email_change', to, url });
     },
     async sendEmailChangedNotice({ to }) {
       sends.push({ kind: 'email_changed_notice', to });

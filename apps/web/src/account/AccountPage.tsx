@@ -11,16 +11,16 @@ import { AiSection } from './AiSection';
 import { OrdersSection } from './OrdersSection';
 import { HistorySection } from './HistorySection';
 import { ChangePasswordForm } from './ChangePasswordForm';
+import { ChangeEmailSection } from './ChangeEmailSection';
 
 /**
  * The Account page: everything the account owns in one calm, single-column
- * page — plan and Quota, Orders, Export History, and the inline
- * change-password form. The page composes existing endpoints only; no server
- * or schema changes. Chrome matches the auth pages' minimal header pattern
- * (wordmark linking back to the editor, theme toggle); no footer — the
- * Account page is an app surface, not a marketing surface. Signed out, it
- * offers the sign-in prompt; the data sections render for a signed-in
- * account only.
+ * page — login email, plan and Quota, Orders, Export History, and the inline
+ * change-password form. The page composes existing endpoints only. Chrome
+ * matches the auth pages' minimal header pattern (wordmark linking back to the
+ * editor, theme toggle); no footer — the Account page is an app surface, not a
+ * marketing surface. Signed out, it offers the sign-in prompt; the data sections
+ * render for a signed-in account only.
  */
 export function AccountPage() {
   const { theme, toggle } = useTheme();
@@ -90,11 +90,15 @@ export function AccountPage() {
       ) : (
         <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
           <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
-          <p className="mt-1 text-xs text-ink-soft">{user.email}</p>
 
           <div className="mt-6 space-y-4">
             {/* Each section is contained: a render error inside one is that
-                section's inline failure, not a blank page. */}
+                section's inline failure, not a blank page. Login email leads,
+                because it is the account's identity and the only thing here that
+                says who the page belongs to. */}
+            <ErrorBoundary label="The email section">
+              <ChangeEmailSection />
+            </ErrorBoundary>
             <ErrorBoundary label="The Plan section">
               <PlanSummary
                 entitlement={entitlement}

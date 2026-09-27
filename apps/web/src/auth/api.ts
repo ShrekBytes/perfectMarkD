@@ -143,6 +143,42 @@ export async function changePassword(
 }
 
 /**
+ * The email-changed code: the new address belongs to another account. Only the
+ * swap can know it — the request never refuses an address that is registered,
+ * so the Account page cannot be used to discover whose addresses those are.
+ */
+export const EMAIL_TAKEN_CODE = 'email_taken';
+
+/**
+ * Asks for an email-change link. The current password is the gate: the server
+ * checks it before it mails anything, so a stolen session cannot redirect the
+ * account. Nothing changes until the link is opened, and the address comes back
+ * as the server stored it (normalized), so the form can name the right inbox.
+ */
+export async function requestEmailChange(
+  email: string,
+  currentPassword: string,
+): Promise<string> {
+  const res = await postJson('/api/auth/change-email', {
+    email,
+    currentPassword,
+  });
+  if (!res.ok) throw await errorFrom(res);
+  return ((await res.json()) as { email: string }).email;
+}
+
+/**
+ * Spends the emailed link: the account's login address is swapped onto the one
+ * the link was mailed to, and that address is verified by the opening. The
+ * user comes back with the identity the swap produced.
+ */
+export async function confirmEmailChange(token: string): Promise<AuthUser> {
+  return readUserOrThrow(
+    await postJson('/api/auth/confirm-email-change', { token }),
+  );
+}
+
+/**
  * Sets the caller's AI Access switch (spec §AI Access) and returns the fresh
  * `ai` block. The switch is server-side, so it follows the account.
  */

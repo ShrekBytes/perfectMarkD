@@ -22,6 +22,9 @@ export function createConsoleMailer(log: LogSink = consoleSink): Mailer {
     async sendPasswordReset({ to, url }) {
       log(`console mail: password reset link for ${to} → ${url}`);
     },
+    async sendEmailChange({ to, url }) {
+      log(`console mail: email-change link for ${to} → ${url}`);
+    },
     async sendEmailChangedNotice({ to }) {
       log(`console mail: email-changed notice for ${to}`);
     },

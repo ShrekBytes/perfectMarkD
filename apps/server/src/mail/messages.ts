@@ -48,6 +48,22 @@ export function passwordResetMessage(to: string, url: string): OutboundEmail {
   };
 }
 
+/** Email change — the link that swaps the account's login address onto `to`. */
+export function emailChangeMessage(to: string, url: string): OutboundEmail {
+  return {
+    subject: 'Confirm your new PerfectMarkD login email',
+    text: [
+      'Confirm your new login email',
+      '',
+      `Your PerfectMarkD login email was changed to ${to}. Open this link to make it your login email — nothing changes until you do, and your password stays the same.`,
+      '',
+      url,
+      '',
+      'This link works once. If you did not ask to change your login email, ignore this message — nothing has changed until you open it.',
+    ].join('\n'),
+  };
+}
+
 /** The courtesy notice the old address gets after an Email change. */
 export function emailChangedNoticeMessage(to: string): OutboundEmail {
   return {

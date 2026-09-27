@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { ApiError, errorToMessage, FALLBACK_CODE } from '../api/client';
+import { errorToFormFailure, type FormFailure } from '../api/client';
 import { changePassword } from '../auth/api';
 
 /** The policy the server enforces on new passwords (server/02). */
@@ -11,27 +11,6 @@ const ERROR_ID = 'account-password-error';
 
 const INPUT_CLASS =
   'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
-
-/** Name the problem and the recovery (DESIGN.md → Do's). The server's own
- *  message wins when it carries one; the generic strings are ours. A 5xx or
- *  the fallback marker (a body the client couldn't read) is never about the
- *  input, so no field is flagged; everything else falls to the shared mapper
- *  (the offline case included). */
-function messageFor(cause: unknown): { message: string; fieldError: boolean } {
-  if (cause instanceof ApiError) {
-    if (cause.status >= 500 || cause.code === FALLBACK_CODE) {
-      return {
-        message: "The server couldn't complete that. Try again in a moment.",
-        fieldError: false,
-      };
-    }
-    return {
-      message: cause.message,
-      fieldError: cause.status === 400 || cause.status === 401,
-    };
-  }
-  return { message: errorToMessage(cause), fieldError: false };
-}
 
 /**
  * The Account page's inline change-password section: three fields — current,
@@ -45,10 +24,7 @@ export function ChangePasswordForm() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [failure, setFailure] = useState<{
-    message: string;
-    fieldError: boolean;
-  } | null>(null);
+  const [failure, setFailure] = useState<FormFailure | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -82,7 +58,8 @@ export function ChangePasswordForm() {
       setNext('');
       setConfirm('');
     } catch (cause) {
-      setFailure(messageFor(cause));
+      // A 400 is the policy, a 401 the current password: both are the input.
+      setFailure(errorToFormFailure(cause, [400, 401]));
     } finally {
       setSubmitting(false);
     }

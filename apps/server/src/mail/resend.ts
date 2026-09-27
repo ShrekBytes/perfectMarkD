@@ -14,6 +14,7 @@
 
 import { MailerError, type Mailer } from './mailer.js';
 import {
+  emailChangeMessage,
   emailChangedNoticeMessage,
   passwordResetMessage,
   verificationMessage,
@@ -105,6 +106,9 @@ export function createResendMailer({
     },
     async sendPasswordReset({ to, url }) {
       await send(to, passwordResetMessage(to, url));
+    },
+    async sendEmailChange({ to, url }) {
+      await send(to, emailChangeMessage(to, url));
     },
     async sendEmailChangedNotice({ to }) {
       await send(to, emailChangedNoticeMessage(to));

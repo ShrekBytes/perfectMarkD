@@ -132,6 +132,10 @@ _Avoid_: active account, confirmed email, approved
 Setting a new password by following a one-time emailed link, without signing in. Also how an account signed in with Google gains a password, or recovers when it can't tell which sign-in method it used. Distinct from changing the password while signed in.
 _Avoid_: forgot password, recovery, password change
 
+**Email Change**:
+Moving an account's login email to a new address, from the Account page. It asks for the current password, and it happens only when the owner of the new address follows the emailed link — which is what makes the new address a Verified Email — after which the old address is told. The password and every session survive it. Distinct from Password Reset, which replaces the password and signs every device out.
+_Avoid_: address change, re-registration, email verification (that proves one inbox)
+
 **Google Sign-In**:
 Registering or signing in with a Google account. On a matching email it signs in to the existing account; it counts as Email Verification. A password is optional afterwards.
 _Avoid_: Google login, social login, SSO, OAuth (an implementation detail)
@@ -151,7 +155,7 @@ The panel listing the user's local Documents (rename, duplicate, delete, import,
 _Avoid_: file manager, recents
 
 **Account**:
-The signed-in user's space for plan and Quota status, Orders, Export History, and password management. Distinct from the account-less Free Tier and from the local Library.
+The signed-in user's space for plan and Quota status, Orders, Export History, login email, and password management. Distinct from the account-less Free Tier and from the local Library.
 _Avoid_: profile, dashboard, workspace
 
 **Docs**:

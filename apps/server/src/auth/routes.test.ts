@@ -7,11 +7,15 @@ import {
   testMailComposition,
 } from './testing.js';
 import type { RecordingMailer } from '../mail/testing.js';
+import { createRecordingMailer } from '../mail/testing.js';
+import { MailerError } from '../mail/mailer.js';
 import { users } from '../db/schema.js';
 import {
+  EMAIL_CHANGE_TOKEN_TTL_MS,
   PASSWORD_RESET_TOKEN_TTL_MS,
   VERIFICATION_TOKEN_TTL_MS,
 } from './tokens.js';
+import { EMAIL_TAKEN_CODE, LINK_INVALID_CODE } from './routes.js';
 
 const SESSION_SECRET = 'test-session-secret';
 
@@ -799,6 +803,302 @@ describe('POST /api/auth/change-password', () => {
       newPassword: 'a brand new password',
     });
     expect(res.status).toBe(401);
+  });
+});
+
+/** Asks for an email-change link the way the Account page does. */
+function requestEmailChange(
+  app: AppType,
+  cookie: string,
+  email: string,
+  currentPassword = PASSWORD,
+) {
+  return postJson(
+    app,
+    '/api/auth/change-email',
+    { email, currentPassword },
+    { cookie },
+  );
+}
+
+/** Follows the emailed link, the way its page does. */
+function confirmEmailChange(app: AppType, token: string) {
+  return postJson(app, '/api/auth/confirm-email-change', { token });
+}
+
+/** The account's own row: the address, and when it was last proven. */
+function accountRow(db: AppDatabase) {
+  return db
+    .select({ email: users.email, verifiedAt: users.verifiedAt })
+    .from(users)
+    .get();
+}
+
+describe('POST /api/auth/change-email', () => {
+  it('mails a link to the new address and changes nothing yet', async () => {
+    // Story 17: the change lands only when the new address's owner follows the
+    // link, so a typo can never lock anyone out of their own account.
+    const { app, mailer, db } = makeApp();
+    const cookie = await signedIn(app, mailer);
+    mailer.sends.length = 0;
+
+    const res = await requestEmailChange(app, cookie, 'moved@example.com');
+
+    expect(res.status).toBe(200);
+    // The address the user is leaving, and a link built from PUBLIC_ORIGIN.
+    expect(mailer.sends).toEqual([
+      {
+        kind: 'email_change',
+        to: 'moved@example.com',
+        url: expect.stringMatching(
+          new RegExp(
+            `^${PUBLIC_ORIGIN}/confirm-email-change\\?token=[A-Za-z0-9_-]+$`,
+          ),
+        ) as unknown as string,
+      },
+    ]);
+    // The account is untouched until that link is followed.
+    expect(accountRow(db)?.email).toBe('reader@example.com');
+  });
+
+  it('refuses a wrong current password without mailing anything', async () => {
+    // Story 16: the password is what a stolen session cannot produce, so a
+    // session on its own must not be able to redirect the account.
+    const { app, mailer, db } = makeApp();
+    const cookie = await signedIn(app, mailer);
+    mailer.sends.length = 0;
+
+    const res = await requestEmailChange(
+      app,
+      cookie,
+      'attacker@example.com',
+      'not the password',
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ error: expect.any(String) });
+    expect(mailer.sends).toEqual([]);
+    expect(accountRow(db)?.email).toBe('reader@example.com');
+  });
+
+  it('requires a session', async () => {
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
+    mailer.sends.length = 0;
+
+    const res = await postJson(app, '/api/auth/change-email', {
+      email: 'moved@example.com',
+      currentPassword: PASSWORD,
+    });
+
+    expect(res.status).toBe(401);
+    expect(mailer.sends).toEqual([]);
+  });
+
+  it('rejects a malformed address, and the address already in use', async () => {
+    const { app, mailer } = makeApp();
+    const cookie = await signedIn(app, mailer);
+    mailer.sends.length = 0;
+
+    const malformed = await requestEmailChange(app, cookie, 'not-an-email');
+    expect(malformed.status).toBe(400);
+
+    // The one address it can refuse without telling a stranger anything: the
+    // caller's own. A different address's account is refused at swap time, not
+    // here, so this endpoint can't be used to discover who has an account.
+    const same = await requestEmailChange(app, cookie, 'reader@example.com');
+    expect(same.status).toBe(400);
+
+    expect(mailer.sends).toEqual([]);
+  });
+
+  it('spends the shared send budget, on the new address', async () => {
+    const { app, mailer } = makeApp({
+      authRateLimit: {
+        emailSend: {
+          perAddress: { limit: 1, windowMs: 60_000 },
+          perIp: { limit: 10, windowMs: 60_000 },
+        },
+      },
+    });
+    const cookie = await signedIn(app, mailer);
+
+    expect(
+      (await requestEmailChange(app, cookie, 'moved@example.com')).status,
+    ).toBe(200);
+    const second = await requestEmailChange(app, cookie, 'moved@example.com');
+
+    expect(second.status).toBe(429);
+    expect(second.headers.get('retry-after')).toBeTruthy();
+  });
+
+  it('does not spend that budget on a wrong password', async () => {
+    // The send budget is one counter for every message this instance sends, so a
+    // request that was never going to send must not draw on it: a session that
+    // cannot produce the password must not be able to silence the product's mail
+    // for an hour.
+    const { app, mailer } = makeApp({
+      authRateLimit: {
+        emailSend: {
+          perAddress: { limit: 1, windowMs: 60_000 },
+          perIp: { limit: 10, windowMs: 60_000 },
+        },
+      },
+    });
+    const cookie = await signedIn(app, mailer);
+
+    expect(
+      (
+        await requestEmailChange(
+          app,
+          cookie,
+          'moved@example.com',
+          'not the password',
+        )
+      ).status,
+    ).toBe(401);
+
+    // The wrong attempt spent the guess budget, not the send budget, so the
+    // right password still gets its link.
+    expect(
+      (await requestEmailChange(app, cookie, 'moved@example.com')).status,
+    ).toBe(200);
+  });
+});
+
+describe('POST /api/auth/confirm-email-change', () => {
+  it('swaps the address, verifies it, and tells the old one', async () => {
+    // Stories 17 and 18: the swap lands here, and the address it left is
+    // never cut off without a word.
+    const { app, mailer, db } = makeApp({ now: () => current });
+    const cookie = await signedIn(app, mailer);
+    await requestEmailChange(app, cookie, 'moved@example.com');
+    const token = mailer.tokenTo('moved@example.com');
+    mailer.sends.length = 0;
+    current = new Date(current.getTime() + 60_000);
+
+    const res = await confirmEmailChange(app, token);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      user: { email: 'moved@example.com', isAdmin: false },
+    });
+    // The new address is verified by the act of following the link, so the
+    // account records when this one was proven — not when the old one was.
+    expect(accountRow(db)).toEqual({
+      email: 'moved@example.com',
+      verifiedAt: current,
+    });
+    expect(mailer.sends).toEqual([
+      { kind: 'email_changed_notice', to: 'reader@example.com' },
+    ]);
+    // The password never changed, and the session survives: the swap is keyed
+    // to the account, not to an address.
+    expect(
+      await postJson(app, '/api/auth/login', {
+        email: 'moved@example.com',
+        password: PASSWORD,
+      }),
+    ).toMatchObject({ status: 200 });
+    expect(
+      await app.request('/api/auth/me', { headers: { cookie } }),
+    ).toMatchObject({ status: 200 });
+  });
+
+  it('refuses the link a second time', async () => {
+    const { app, mailer } = makeApp();
+    const cookie = await signedIn(app, mailer);
+    await requestEmailChange(app, cookie, 'moved@example.com');
+    const token = mailer.tokenTo('moved@example.com');
+
+    expect((await confirmEmailChange(app, token)).status).toBe(200);
+    const again = await confirmEmailChange(app, token);
+
+    expect(again.status).toBe(400);
+    expect(await again.json()).toMatchObject({
+      code: LINK_INVALID_CODE,
+    });
+  });
+
+  it('refuses a link past its 24 hours, leaving the address alone', async () => {
+    const { app, mailer, db } = makeApp({ now: () => current });
+    const cookie = await signedIn(app, mailer);
+    await requestEmailChange(app, cookie, 'moved@example.com');
+    const token = mailer.tokenTo('moved@example.com');
+    current = new Date(current.getTime() + EMAIL_CHANGE_TOKEN_TTL_MS + 1);
+
+    const res = await confirmEmailChange(app, token);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: LINK_INVALID_CODE });
+    expect(accountRow(db)?.email).toBe('reader@example.com');
+  });
+
+  it('refuses an unknown or missing token', async () => {
+    const { app } = makeApp();
+
+    expect((await confirmEmailChange(app, 'not-a-token')).status).toBe(400);
+    expect(
+      (await postJson(app, '/api/auth/confirm-email-change', { token: '' }))
+        .status,
+    ).toBe(400);
+  });
+
+  it('refuses a new address another account took in the meantime', async () => {
+    // The check is at swap time, not at request time: refusing here would turn
+    // the Account page into a way to discover which addresses are registered.
+    const { app, mailer, db } = makeApp();
+    const cookie = await signedIn(app, mailer);
+    await signedIn(app, mailer, 'taken@example.com');
+    await requestEmailChange(app, cookie, 'taken@example.com');
+    const token = mailer.tokenTo('taken@example.com');
+    mailer.sends.length = 0;
+
+    const res = await confirmEmailChange(app, token);
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: EMAIL_TAKEN_CODE });
+    // The link is spent by the refusal, so the recovery is a fresh request.
+    expect((await confirmEmailChange(app, token)).status).toBe(400);
+    // Nothing moved, and the address that was left hears nothing: the change
+    // did not happen, so there is nothing to tell it about.
+    expect(db.select({ email: users.email }).from(users).all()).toEqual([
+      { email: 'reader@example.com' },
+      { email: 'taken@example.com' },
+    ]);
+    expect(mailer.sends).toEqual([]);
+  });
+
+  it('keeps the swap when the courtesy notice cannot be sent', async () => {
+    // The change is already durable when the notice goes out, so a provider
+    // hiccup must not answer the link with a failure and leave the user
+    // believing nothing happened.
+    const lines: string[] = [];
+    const recorder = createRecordingMailer();
+    const { app, db } = makeApp({
+      log: (line) => lines.push(line),
+      mail: {
+        ...recorder,
+        async sendEmailChangedNotice() {
+          throw new MailerError('http', 'The mail provider refused it.', 502);
+        },
+      },
+    });
+    const cookie = await signedIn(app, recorder);
+    await requestEmailChange(app, cookie, 'moved@example.com');
+
+    const res = await confirmEmailChange(
+      app,
+      recorder.tokenTo('moved@example.com'),
+    );
+
+    expect(res.status).toBe(200);
+    expect(accountRow(db)?.email).toBe('moved@example.com');
+    // Logged, never swallowed: the line names the failure and the account, not
+    // the address.
+    expect(lines.join('\n')).toMatch(
+      /courtesy notice failed for user \d+: http/,
+    );
   });
 });
 

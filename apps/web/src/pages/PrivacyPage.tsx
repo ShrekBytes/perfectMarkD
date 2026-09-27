@@ -67,19 +67,21 @@ export function PrivacyPage() {
         <section aria-label="Email" className="mt-6">
           <h2 className="text-base font-semibold tracking-tight">Email</h2>
           <p className="mt-2 max-w-prose text-sm text-ink-soft">
-            Verifying an address and recovering a password both work by email,
-            so the server sends it. A message carries your address, a one-time
-            link, and a sentence or two of our own words — never any part of a
-            Document, and nothing you have written. The address and the link go
-            to Resend, the mail provider this instance is configured with; how
-            long Resend keeps what it receives is Resend's policy, not ours.
+            Verifying an address, recovering a password, and changing the login
+            email on an account all work by email, so the server sends it. A
+            message carries your address, a one-time link, and a sentence or two
+            of our own words — never any part of a Document, and nothing you
+            have written. The address and the link go to Resend, the mail
+            provider this instance is configured with; how long Resend keeps
+            what it receives is Resend's policy, not ours.
           </p>
           <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink-soft">
             <li>
               Sent when you register (a verification link), when you ask to
-              reset a password (a reset link), and when the login email on an
-              account changes (a notice to the old address, so a hijacker cannot
-              cut you off silently).
+              reset a password (a reset link), when you ask to change the login
+              email on an account (a confirmation link, to the new address), and
+              when that change happens (a notice to the old address, so a
+              hijacker cannot cut you off silently).
             </li>
             <li>
               What we keep is the address and a hash of each link — never the

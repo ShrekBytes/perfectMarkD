@@ -18,6 +18,10 @@ describe('the console mailer', () => {
       to: 'ada@example.com',
       url: 'https://perfectmarkd.00022000.xyz/reset?token=01HY',
     });
+    await createConsoleMailer((line) => lines.push(line)).sendEmailChange({
+      to: 'new@example.com',
+      url: 'https://perfectmarkd.00022000.xyz/confirm-email-change?token=01HZ',
+    });
     await createConsoleMailer((line) =>
       lines.push(line),
     ).sendEmailChangedNotice({
@@ -27,6 +31,7 @@ describe('the console mailer', () => {
     expect(lines).toEqual([
       'console mail: verification link for ada@example.com → https://perfectmarkd.00022000.xyz/verify?token=01HX',
       'console mail: password reset link for ada@example.com → https://perfectmarkd.00022000.xyz/reset?token=01HY',
+      'console mail: email-change link for new@example.com → https://perfectmarkd.00022000.xyz/confirm-email-change?token=01HZ',
       'console mail: email-changed notice for old@example.com',
     ]);
   });

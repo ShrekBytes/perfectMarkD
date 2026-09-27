@@ -3,6 +3,7 @@ import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { emailTokens, users } from '../db/schema.js';
 import {
+  EMAIL_CHANGE_TOKEN_TTL_MS,
   PASSWORD_RESET_TOKEN_TTL_MS,
   VERIFICATION_TOKEN_TTL_MS,
   issueToken,
@@ -64,6 +65,19 @@ describe('issueToken', () => {
 
     expect(db.select().from(emailTokens).get()?.expiresAt).toEqual(
       new Date(NOW.getTime() + PASSWORD_RESET_TOKEN_TTL_MS),
+    );
+  });
+
+  it('expires 24 hours out for an email-change link', () => {
+    // A day, not reset's half hour: the requester already proved the password,
+    // so this link is a convenience (find the new inbox, open the mail), not the
+    // way back into an account — and a day is the most exposure that buys.
+    const { db, userId } = makeDb();
+
+    issueToken(db, { purpose: 'email_change', userId }, NOW);
+
+    expect(db.select().from(emailTokens).get()?.expiresAt).toEqual(
+      new Date(NOW.getTime() + EMAIL_CHANGE_TOKEN_TTL_MS),
     );
   });
 });

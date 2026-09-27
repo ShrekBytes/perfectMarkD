@@ -17,6 +17,8 @@ import {
 } from './sessions.js';
 import type { Clock } from './sessions.js';
 import { clearSessionCookie, clientIp, setSessionCookie } from './http.js';
+import { MailerError } from '../mail/mailer.js';
+import type { LogSink } from '../request-logger.js';
 import {
   DEFAULT_AUTH_RATE_LIMITS,
   FixedWindowRateLimiter,
@@ -39,9 +41,17 @@ export interface AuthOptions {
   authRateLimit?: AuthRateLimitConfig;
   /** Injectable clock (tests control session expiry). */
   now?: Clock;
+  /** Diagnostics sink; a mail failure the flow cannot fail on is logged here. */
+  log?: LogSink;
 }
 
 const MIN_PASSWORD_LENGTH = 8;
+
+/** The two answers to a wrong or missing current password, shared by the routes
+ *  that ask for one (change-password, change-email) so the words a user reads
+ *  for the same failure cannot drift apart. */
+const ENTER_CURRENT_PASSWORD = 'Enter your current password.';
+const CURRENT_PASSWORD_WRONG = 'Current password is incorrect.';
 // Deliberately permissive: an address with a local part, an @, and a domain
 // with a dot. Anything stricter rejects valid addresses; verification is a
 // link the owner follows, which is what proves the address.
@@ -56,6 +66,10 @@ const VERIFY_PATH = '/verify-email';
  *  fetched the page would burn it before the user typed anything. */
 const SET_PASSWORD_PATH = '/set-password';
 
+/** The SPA page an email-change link resolves to; it spends the token over the
+ *  API, the way the verification and reset links do. */
+const CONFIRM_EMAIL_CHANGE_PATH = '/confirm-email-change';
+
 /**
  * Codes the client branches on, never the message beside them: the sign-in gate
  * offers a resend, and a spent link offers a fresh one.
@@ -63,12 +77,17 @@ const SET_PASSWORD_PATH = '/set-password';
 export const EMAIL_UNVERIFIED_CODE = 'email_unverified';
 export const LINK_INVALID_CODE = 'link_invalid';
 
+/** The new address is spoken for — by another account, or by one registered
+ *  while the link was in flight. The recovery is a fresh request. */
+export const EMAIL_TAKEN_CODE = 'email_taken';
+
 /**
  * One answer for every way a link fails to redeem — unknown, expired, already
  * spent, or issued for another flow. Distinguishing them would tell a stranger
  * holding a dead link something about the account behind it, and the recovery is
  * the same either way: ask for a fresh link. The wording names no flow, because
- * the same answer serves a verification link and a reset link.
+ * the same answer serves every link that can be asked for — a verification, a
+ * reset, and an email change.
  */
 function invalidLink(c: Context<AppEnv>) {
   return c.json(
@@ -150,7 +169,10 @@ export function authRoutes(options: AuthOptions) {
   const limiters = {
     login: new FixedWindowRateLimiter(limits.login),
     register: new FixedWindowRateLimiter(limits.register),
-    changePassword: new FixedWindowRateLimiter(limits.changePassword),
+    // One budget for both routes that ask for the current password, because
+    // they are the same attack — guessing a password through a stolen session —
+    // and two budgets would only mean twice the guesses.
+    passwordConfirm: new FixedWindowRateLimiter(limits.changePassword),
     // Registration and the resend send the same kind of message, so they share
     // one send budget on both keys: the per-IP rule above bounds account
     // creation at ten a minute and says nothing about mail, and a per-IP rule
@@ -470,7 +492,7 @@ export function authRoutes(options: AuthOptions) {
   });
 
   app.post('/change-password', async (c) => {
-    const limited = rejectRateLimited(c, limiters.changePassword);
+    const limited = rejectRateLimited(c, limiters.passwordConfirm);
     if (limited) return limited;
 
     const user = c.var.user;
@@ -480,7 +502,7 @@ export function authRoutes(options: AuthOptions) {
     const currentPassword = body?.currentPassword;
     const newPassword = body?.newPassword;
     if (typeof currentPassword !== 'string') {
-      return c.json({ error: 'Enter your current password.' }, 400);
+      return c.json({ error: ENTER_CURRENT_PASSWORD }, 400);
     }
     if (
       typeof newPassword !== 'string' ||
@@ -496,7 +518,7 @@ export function authRoutes(options: AuthOptions) {
 
     const matches = await verifyPassword(user.passwordHash, currentPassword);
     if (!matches) {
-      return c.json({ error: 'Current password is incorrect.' }, 401);
+      return c.json({ error: CURRENT_PASSWORD_WRONG }, 401);
     }
 
     c.var.db
@@ -518,6 +540,145 @@ export function authRoutes(options: AuthOptions) {
     return user
       ? c.json({ user: publicUser(user) })
       : c.json({ error: 'Not signed in.' }, 401);
+  });
+
+  /**
+   * Email change, requested from the Account page (stories 15–17).
+   *
+   * The current password is the gate. A session on its own — a stolen cookie, a
+   * borrowed laptop — must not be able to redirect where an account's mail
+   * goes, so the check stands in front of the token and the mail.
+   *
+   * Nothing is swapped here: the link goes to the new address and the swap waits
+   * for the owner of that address to open it, so a typo cannot lock anyone out
+   * of their own account. Nor is uniqueness checked here — refusing an address
+   * someone else has registered would turn this form into a way to learn whose
+   * accounts exist, and the address may be claimed while the link is in flight
+   * anyway. Swap time is where that is decided.
+   */
+  app.post('/change-email', async (c) => {
+    const limited = rejectRateLimited(c, limiters.passwordConfirm);
+    if (limited) return limited;
+
+    const user = c.var.user;
+    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+
+    const body = asRecord(parseJson(await c.req.text()));
+    const currentPassword = body?.currentPassword;
+    const newEmail = normalizeEmail(body?.email);
+    if (typeof currentPassword !== 'string' || currentPassword === '') {
+      return c.json({ error: ENTER_CURRENT_PASSWORD }, 400);
+    }
+    if (newEmail === null) {
+      return c.json({ error: 'Enter a valid email address.' }, 400);
+    }
+    // The one address this can refuse without telling a stranger anything: the
+    // caller's own, which a link back to the same inbox would only confuse.
+    if (newEmail === user.email) {
+      return c.json({ error: 'That is already your login email.' }, 400);
+    }
+
+    // The password check comes before the send budget, not after it: the budget
+    // is shared with every other mail this instance sends, so spending it on a
+    // request that was never going to send anything would let a session that
+    // cannot produce the password silence the product's mail for an hour. The
+    // guesses themselves stay bounded by the limiter above, which is what exists
+    // to bound them.
+    const matches = await verifyPassword(user.passwordHash, currentPassword);
+    if (!matches) {
+      return c.json({ error: CURRENT_PASSWORD_WRONG }, 401);
+    }
+
+    // Now the send budget, on the new address: the message this endpoint exists
+    // to produce is a flood an attacker would aim at an inbox, not at this key.
+    const overBudget = rejectOverSendBudget(c, newEmail);
+    if (overBudget) return overBudget;
+
+    // The new address rides along as the link's payload, so the swap needs
+    // nothing but the token to know where the account is going.
+    const token = issueToken(
+      c.var.db,
+      { purpose: 'email_change', userId: user.id, payload: newEmail },
+      now(),
+    );
+    await c.var.mailer.sendEmailChange({
+      to: newEmail,
+      url: oneTimeLink(options.publicOrigin, CONFIRM_EMAIL_CHANGE_PATH, token),
+    });
+    return c.json({ email: newEmail });
+  });
+
+  /**
+   * The Email change itself: the link the new address received, opened.
+   *
+   * Following it is the proof that the new address is reachable, so the swap and
+   * the verification happen in one statement and the account is verified at the
+   * moment this address — not the one it replaces — was proven.
+   */
+  app.post('/confirm-email-change', async (c) => {
+    const token = asRecord(parseJson(await c.req.text()))?.token;
+    if (typeof token !== 'string' || token === '') {
+      return invalidLink(c);
+    }
+
+    const at = now();
+    const redeemed = redeemToken(c.var.db, 'email_change', token, at);
+    if (!redeemed) return invalidLink(c);
+
+    const user = c.var.db
+      .select()
+      .from(users)
+      .where(eq(users.id, redeemed.userId))
+      .get();
+    const newEmail = redeemed.payload ? normalizeEmail(redeemed.payload) : null;
+    // A real link always carries its new address; one that does not is as dead
+    // as one that cannot be found, and says so the same way.
+    if (!user || newEmail === null) return invalidLink(c);
+
+    // Uniqueness, decided here rather than at request time. An account that
+    // registered the new address while the link was in flight keeps it: the
+    // swap is refused, the token is spent, and the way forward is a fresh
+    // request with another address.
+    //
+    // The check and the update below share one synchronous block — nothing awaits
+    // between them — so a second confirmation for the same address cannot slip
+    // past the check and reach the UNIQUE index. That is the whole reason this
+    // needs no isUniqueViolation catch (the way registration does, where an
+    // argon2 hash awaits between its check and its insert). Anything that
+    // introduces an await in that window has to bring the catch with it.
+    const spokenFor = accountFor(c, newEmail);
+    if (spokenFor && spokenFor.id !== user.id) {
+      return c.json(
+        {
+          error:
+            'That address is already used by another account. Ask for a new link from the Account page with a different address.',
+          code: EMAIL_TAKEN_CODE,
+        },
+        409,
+      );
+    }
+
+    const swapped = c.var.db
+      .update(users)
+      .set({ email: newEmail, verifiedAt: at })
+      .where(eq(users.id, user.id))
+      .returning({ email: users.email, isAdmin: users.isAdmin })
+      .get();
+
+    // The courtesy notice goes after the swap, never before: telling the old
+    // address about a change that might not happen would be its own lie. And a
+    // provider that cannot deliver it must not undo — or deny — a change that
+    // is already durable, so the failure is logged and the swap stands.
+    try {
+      await c.var.mailer.sendEmailChangedNotice({ to: user.email });
+    } catch (cause) {
+      options.log?.(
+        `email-changed courtesy notice failed for user ${user.id}: ${
+          cause instanceof MailerError ? cause.code : 'unknown'
+        }`,
+      );
+    }
+    return c.json({ user: publicUser(swapped) });
   });
 
   return app;

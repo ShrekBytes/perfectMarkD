@@ -21,6 +21,7 @@ export type Route =
   | 'verify-email'
   | 'reset-password'
   | 'set-password'
+  | 'confirm-email-change'
   | 'admin'
   | 'export'
   | 'about'
@@ -40,13 +41,15 @@ export function routeForPath(pathname: string): Route {
   if (pathname === '/register') return 'register';
   // The two Email Verification pages (email/02): where a new registration
   // lands, and the page a verification link resolves to. The two Password Reset
-  // pages (email/03): the request, and the page a reset link resolves to. A
-  // link's token travels in the query string — the page spends it over the API,
-  // so a link scanner that follows the URL in an inbox cannot.
+  // pages (email/03): the request, and the page a reset link resolves to. The
+  // Email Change page (email/04): the one its link resolves to. A link's token
+  // travels in the query string — the page spends it over the API, so a link
+  // scanner that follows the URL in an inbox cannot.
   if (pathname === '/check-inbox') return 'check-inbox';
   if (pathname === '/verify-email') return 'verify-email';
   if (pathname === '/reset-password') return 'reset-password';
   if (pathname === '/set-password') return 'set-password';
+  if (pathname === '/confirm-email-change') return 'confirm-email-change';
   if (pathname === '/admin') return 'admin';
   if (pathname === '/about') return 'about';
   if (pathname === '/privacy') return 'privacy';

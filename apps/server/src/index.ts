@@ -203,6 +203,7 @@ export function createApp({
         publicOrigin,
         authRateLimit,
         now: clock,
+        log,
       }),
     )
     .route('/api/orders', orderRoutes())

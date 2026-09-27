@@ -41,6 +41,15 @@ export interface PasswordResetEmail extends MailRecipient {
 }
 
 /**
+ * Email change: a one-time link mailed to the *new* address, which the owner
+ * follows to swap the account's login address onto it. The Admin's change (when
+ * email/05 lands) is the same email.
+ */
+export interface EmailChangeEmail extends MailRecipient {
+  url: string;
+}
+
+/**
  * The notice the old address gets after an Email change, so a hijacker cannot
  * cut the owner off silently. It carries no link.
  */
@@ -49,6 +58,7 @@ export type EmailChangedNotice = MailRecipient;
 export interface Mailer {
   sendVerification(email: VerificationEmail): Promise<void>;
   sendPasswordReset(email: PasswordResetEmail): Promise<void>;
+  sendEmailChange(email: EmailChangeEmail): Promise<void>;
   sendEmailChangedNotice(email: EmailChangedNotice): Promise<void>;
 }
 

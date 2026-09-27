@@ -34,6 +34,15 @@ export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 export const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 /**
+ * Email Change links live 24 hours. The requester already proved the current
+ * password, so this link carries no authority it does not already hold — it
+ * moves the account's mail, it does not open the account (the password is
+ * untouched) — which makes it a convenience rather than a recovery, and a day is
+ * the most exposure that convenience is worth.
+ */
+export const EMAIL_CHANGE_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
  * How long each kind of link stays live. Keyed by purpose so a new flow brings
  * its own length with it and cannot inherit someone else's — a reset link
  * quietly living for 24 hours would be a quiet hole in this feature.
@@ -41,6 +50,7 @@ export const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 const TOKEN_TTL_MS = {
   verification: VERIFICATION_TOKEN_TTL_MS,
   password_reset: PASSWORD_RESET_TOKEN_TTL_MS,
+  email_change: EMAIL_CHANGE_TOKEN_TTL_MS,
 } satisfies Record<TokenPurpose, number>;
 
 /** What a redeemed link carries back to the flow that spends it. */

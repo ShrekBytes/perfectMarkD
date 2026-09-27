@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AccountPage } from './AccountPage';
 import {
@@ -92,6 +92,16 @@ it('renders the sections for a signed-in account', async () => {
 
   expect(screen.getByRole('heading', { name: 'Account' })).toBeInTheDocument();
   expect(screen.getByText('reader@example.com')).toBeInTheDocument();
+  // Login email leads the page: the address in use, and the form that moves it.
+  // A named region, so the two "Current password" fields on this page are each
+  // announced with the section they belong to.
+  const emailSection = screen.getByRole('region', { name: 'Login email' });
+  expect(
+    within(emailSection).getByLabelText('New email address'),
+  ).toBeInTheDocument();
+  expect(
+    within(emailSection).getByLabelText('Current password'),
+  ).toBeInTheDocument();
   // Plan summary: the store's entitlement and quota, not a second fetch.
   expect(await screen.findByText('Premium')).toBeInTheDocument();
   expect(screen.getByText('Expires 2026-10-15')).toBeInTheDocument();

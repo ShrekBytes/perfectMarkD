@@ -86,18 +86,47 @@ export function errorToMessage(cause: unknown): string {
 }
 
 /**
- * The same, with the house rule for a failure that is ours rather than the
- * user's (DESIGN.md → Do's, from AuthForm): a 5xx or a body the client could
- * not read is never about what was typed, so it gets one honest sentence about
- * the server instead of a raw status line. Anything the server owns a message
- * for — including the offline case — passes through `errorToMessage`.
+ * Whether a failure is ours rather than the user's (DESIGN.md → Do's, from
+ * AuthForm): a 5xx, or a body the client could not read. Both get one honest
+ * sentence about the server instead of a raw status line, and neither is ever
+ * a verdict on what was typed.
  */
-export function errorToUserMessage(cause: unknown): string {
-  if (
+function isServerFailure(cause: unknown): boolean {
+  return (
     cause instanceof ApiError &&
     (cause.status >= 500 || cause.code === FALLBACK_CODE)
-  ) {
-    return "The server couldn't complete that. Try again in a moment.";
-  }
-  return errorToMessage(cause);
+  );
+}
+
+/**
+ * The same, with that rule applied: a failure that is ours gets one honest
+ * sentence about the server. Anything the server owns a message for — including
+ * the offline case — passes through `errorToMessage`.
+ */
+export function errorToUserMessage(cause: unknown): string {
+  return isServerFailure(cause)
+    ? "The server couldn't complete that. Try again in a moment."
+    : errorToMessage(cause);
+}
+
+/** What a form shows when a request failed: the message, and whether the
+ *  server's answer was about what was typed — the statuses in `fieldStatuses`
+ *  are the ones this form is willing to flag a field for. A failure that is
+ *  ours never flags one. */
+export interface FormFailure {
+  message: string;
+  fieldError: boolean;
+}
+
+export function errorToFormFailure(
+  cause: unknown,
+  fieldStatuses: number[],
+): FormFailure {
+  return {
+    message: errorToUserMessage(cause),
+    fieldError:
+      !isServerFailure(cause) &&
+      cause instanceof ApiError &&
+      fieldStatuses.includes(cause.status),
+  };
 }

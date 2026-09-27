@@ -28,6 +28,7 @@ describe('routeForPath', () => {
     expect(routeForPath('/verify-email')).toBe('verify-email');
     expect(routeForPath('/reset-password')).toBe('reset-password');
     expect(routeForPath('/set-password')).toBe('set-password');
+    expect(routeForPath('/confirm-email-change')).toBe('confirm-email-change');
     expect(routeForPath('/admin')).toBe('admin');
     expect(routeForPath('/about')).toBe('about');
     expect(routeForPath('/privacy')).toBe('privacy');
