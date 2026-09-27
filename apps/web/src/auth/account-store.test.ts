@@ -17,6 +17,7 @@ function mePayload(overrides: Partial<MePayload> = {}): MePayload {
     plan: null,
     expiresAt: null,
     quota: { used: 0, limit: 0 },
+    signIn: { password: true, google: false },
     flags: LOCKED_FLAGS,
     ai: UNCONFIGURED_AI,
     ...overrides,
@@ -256,6 +257,7 @@ describe('account store', () => {
       user: { email: 'a@b.co', isAdmin: false },
       entitlement: { plan: 'pro', expiresAt: '2026-10-01T00:00:00.000Z' },
       quota: { used: 1, limit: 300 },
+      signIn: { password: true, google: true },
       flags: OPEN_FLAGS,
       planEndedNotice: true,
       status: 'ready',
@@ -270,5 +272,77 @@ describe('account store', () => {
     // Logged-out users never gain gates (billing/04).
     expect(useAccountStore.getState().flags).toEqual(LOCKED_FLAGS);
     expect(useAccountStore.getState().planEndedNotice).toBe(false);
+    // A signed-out store knows nothing about sign-in methods (google-signin/01b).
+    expect(useAccountStore.getState().signIn).toBeNull();
+  });
+
+  describe('sign-in methods', () => {
+    it('mirrors the signIn block /api/me reports', async () => {
+      vi.spyOn(api, 'me').mockResolvedValue(
+        mePayload({ signIn: { password: false, google: true } }),
+      );
+
+      await useAccountStore.getState().load();
+
+      expect(useAccountStore.getState().signIn).toEqual({
+        password: false,
+        google: true,
+      });
+    });
+
+    it('is null until the server has said — not "neither method"', async () => {
+      expect(useAccountStore.getState().signIn).toBeNull();
+
+      // A payload that leaves the block out is not a claim about the account.
+      const withoutSignIn = { ...mePayload() } as Partial<MePayload>;
+      delete withoutSignIn.signIn;
+      vi.spyOn(api, 'me').mockResolvedValue(withoutSignIn as MePayload);
+
+      await useAccountStore.getState().load();
+
+      expect(useAccountStore.getState().signIn).toBeNull();
+    });
+
+    it('setting a first password records the password and keeps the Google identity', async () => {
+      // google-signin/01b: Set Password adds a sign-in method, and gaining one
+      // never takes the other away.
+      vi.spyOn(api, 'me').mockResolvedValue(
+        mePayload({ signIn: { password: false, google: true } }),
+      );
+      const setPassword = vi
+        .spyOn(api, 'setPassword')
+        .mockResolvedValue(undefined);
+      await useAccountStore.getState().load();
+
+      await useAccountStore.getState().setPassword('a brand new password');
+
+      expect(setPassword).toHaveBeenCalledWith('a brand new password');
+      expect(useAccountStore.getState().signIn).toEqual({
+        password: true,
+        google: true,
+      });
+    });
+
+    it('leaves the reported methods alone when the write is refused', async () => {
+      vi.spyOn(api, 'me').mockResolvedValue(
+        mePayload({ signIn: { password: false, google: true } }),
+      );
+      vi.spyOn(api, 'setPassword').mockRejectedValue(
+        new api.AuthError(
+          'This account already has a password. Change it instead.',
+          409,
+        ),
+      );
+      await useAccountStore.getState().load();
+
+      await expect(
+        useAccountStore.getState().setPassword('a brand new password'),
+      ).rejects.toThrow('This account already has a password.');
+
+      expect(useAccountStore.getState().signIn).toEqual({
+        password: false,
+        google: true,
+      });
+    });
   });
 });

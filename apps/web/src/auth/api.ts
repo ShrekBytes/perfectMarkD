@@ -74,8 +74,19 @@ export async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
 }
 
+/**
+ * How the account signs in (google-signin/01b): a password of its own, a Google
+ * identity, or both. The Account page renders the form this reports and never
+ * guesses which of the two an account has.
+ */
+export interface SignInMethods {
+  password: boolean;
+  google: boolean;
+}
+
 /** The GET /api/me payload (server/04 + billing/04): identity, entitlement
- *  gates, and the feature flags the Inspector's gated controls read. */
+ *  gates, the sign-in methods (google-signin/01b), and the feature flags the
+ *  Inspector's gated controls read. */
 export interface MePayload {
   email: string;
   isAdmin: boolean;
@@ -85,6 +96,8 @@ export interface MePayload {
   expiresAt: string | null;
   /** Monthly Server Export stance: used vs the plan quota plus comps. */
   quota: { used: number; limit: number };
+  /** This account's sign-in methods, as the server reports them. */
+  signIn: SignInMethods;
   /** The gated Inspector controls (billing/04): which gates are open. */
   flags: FeatureFlags;
   /** The instance's and the caller's AI state (ai-transforms/05). */
@@ -140,6 +153,33 @@ export async function changePassword(
     newPassword,
   });
   if (!res.ok) throw await errorFrom(res);
+}
+
+/**
+ * Sets the *first* password on an account that has none (google-signin/01b) —
+ * Set Password, from the Account page while signed in. The session is the whole
+ * check, so there is no current password to send; a 409 is an account that
+ * already has one, which belongs in Change Password.
+ */
+export async function setPassword(newPassword: string): Promise<void> {
+  const res = await postJson('/api/auth/set-password', { newPassword });
+  if (!res.ok) throw await errorFrom(res);
+}
+
+/**
+ * What sign-in methods this instance offers (google-signin/01). `google` is
+ * false on a deployment with no OAuth client, which is how the button on the
+ * sign-in page stays absent rather than broken. Public: the page nobody is
+ * signed in to yet is the one that asks.
+ */
+export interface SignInProviders {
+  google: boolean;
+}
+
+export async function signInProviders(): Promise<SignInProviders> {
+  const res = await fetch('/api/auth/providers', { credentials: 'include' });
+  if (!res.ok) throw await errorFrom(res);
+  return (await res.json()) as SignInProviders;
 }
 
 /**

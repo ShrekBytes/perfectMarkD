@@ -126,3 +126,54 @@ it('renders nothing but the header until the session check resolves', () => {
   ).not.toBeInTheDocument();
   expect(screen.queryByText(/not signed in/)).not.toBeInTheDocument();
 });
+
+it('a Google-registered account gets Set Password, not Change Password', async () => {
+  // google-signin/01b: the form the page shows is the one /api/me's sign-in
+  // methods report, and a passwordless account is exactly what Google
+  // registration leaves behind.
+  useAccountStore.setState({
+    user: { email: 'ada@example.com', isAdmin: false },
+    status: 'ready',
+    signIn: { password: false, google: true },
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string | URL | Request) => {
+      if (String(url) === '/api/orders') {
+        return Promise.resolve(jsonResponse(200, { orders: [] }));
+      }
+      if (String(url) === '/api/history') {
+        return Promise.resolve(jsonResponse(200, { entries: [] }));
+      }
+      return Promise.reject(new Error('unexpected fetch'));
+    }),
+  );
+
+  render(<AccountPage />);
+
+  expect(screen.getByTestId('account-signin-methods')).toHaveTextContent(
+    /Google — this account has no password of its own yet\./,
+  );
+  expect(
+    screen.getByRole('heading', { name: 'Set password' }),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId('change-password-form')).not.toBeInTheDocument();
+});
+
+it('an account with a password gets Change Password and no Set Password section', () => {
+  useAccountStore.setState({
+    user: { email: 'ada@example.com', isAdmin: false },
+    status: 'ready',
+    signIn: { password: true, google: true },
+  });
+
+  render(<AccountPage />);
+
+  expect(screen.getByTestId('account-signin-methods')).toHaveTextContent(
+    /Password and Google/,
+  );
+  expect(
+    screen.getByRole('heading', { name: 'Change password' }),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId('set-password-form')).not.toBeInTheDocument();
+});

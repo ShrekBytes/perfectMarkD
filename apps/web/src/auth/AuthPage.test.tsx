@@ -339,6 +339,66 @@ describe('forgot password', () => {
   });
 });
 
+describe('Google Sign-In', () => {
+  it('offers the button on both auth pages when the server advertises it', async () => {
+    vi.spyOn(api, 'signInProviders').mockResolvedValue({ google: true });
+
+    const { unmount } = render(<AuthPage mode="login" />);
+    expect(
+      await screen.findByRole('link', { name: /continue with google/i }),
+    ).toHaveAttribute('href', '/api/auth/google/start');
+    unmount();
+
+    render(<AuthPage mode="register" />);
+    expect(
+      await screen.findByRole('link', { name: /continue with google/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('leaves the page untouched on a deployment without it', async () => {
+    // Story 8: no option that leads nowhere — the page is exactly what it was.
+    vi.spyOn(api, 'signInProviders').mockResolvedValue({ google: false });
+
+    render(<AuthPage mode="login" />);
+
+    await waitFor(() => expect(api.signInProviders).toHaveBeenCalled());
+    expect(
+      screen.queryByRole('link', { name: /continue with google/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('auth-form')).toBeInTheDocument();
+  });
+
+  it('answers a failed Google leg inline, with the password form intact', async () => {
+    // Story 9: the callback redirected back with its code (google-signin/01), and
+    // a user whose Google leg failed keeps their place.
+    window.history.pushState({}, '', '/login?google=declined');
+    vi.spyOn(api, 'signInProviders').mockResolvedValue({ google: true });
+
+    render(<AuthPage mode="login" />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /closed the consent screen/i,
+    );
+    // The way in that always works is still right there, typed into or not.
+    expect(screen.getByTestId('auth-form')).toBeInTheDocument();
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+  });
+
+  it('says nothing about Google when the page did not come from a callback', async () => {
+    vi.spyOn(api, 'signInProviders').mockResolvedValue({ google: true });
+
+    render(<AuthPage mode="login" />);
+
+    // Wait for the block to arrive first: an assertion made before the check
+    // settles would pass whether or not the notice ever rendered.
+    await screen.findByRole('link', { name: /continue with google/i });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('google-sign-in-failure'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('mode switch in place', () => {
   function Switching() {
     const [mode, setMode] = useState<AuthMode>('login');

@@ -7,22 +7,25 @@ const inlineLink =
 
 /**
  * The /privacy page: one short combined page (launch-chrome spec) — what is
- * stored, what leaves the browser (transactional email and AI Actions are the
- * two third parties, each described in its own section), what analytics collects
- * and what it never does (launch/01), what is never done — including the
- * Cloudflare edge the deployment's tunnel puts in the request path (ADR-0010),
- * which is infrastructure rather than tracking and is named rather than left
- * implied — crypto payments keep card data out, the self-host escape hatch, and
- * a one-line no-warranty caveat standing in for the separate Terms page that
- * doesn't exist.
+ * stored, what leaves the browser (transactional email, Google Sign-In, and AI
+ * Actions are the third parties, each described in its own section), what
+ * analytics collects and what it never does (launch/01), what is never done —
+ * including the Cloudflare edge the deployment's tunnel puts in the request path
+ * (ADR-0010), which is infrastructure rather than tracking and is named rather
+ * than left implied — crypto payments keep card data out, the self-host escape
+ * hatch, and a one-line no-warranty caveat standing in for the separate Terms
+ * page that doesn't exist.
  *
  * email/01 owns the Email section and the structure later email tickets append
- * to. Two constraints from ADR-0010 hold here: the page names no hosting
- * topology or transport, and the no-third-party-loads claim keeps its precise
- * scope. That claim is about what a page loads, so transactional email is not
- * one of its exceptions — the server-to-server handoff is disclosed in the
- * Email section instead, and the claim says so rather than listing mail beside
- * a page load it never was.
+ * to; google-signin/02 appends Google Sign-In after it, the same way and without
+ * touching a section. Two constraints from ADR-0010 hold here: the page names no
+ * hosting topology or transport, and the no-third-party-loads claim keeps its
+ * precise scope. That claim is about what a page loads, so transactional email
+ * is not one of its exceptions — the server-to-server handoff is disclosed in
+ * the Email section instead, and the claim says so rather than listing mail
+ * beside a page load it never was. A Google Sign-In round trip is a navigation
+ * the user starts, not a page load either, and the Google Sign-In section says
+ * exactly that rather than leaving it to be argued about.
  */
 export function PrivacyPage() {
   return (
@@ -93,6 +96,38 @@ export function PrivacyPage() {
               There is no switch to turn this off: an address is verified before
               the first sign-in, so an account that cannot be verified is an
               account that cannot be used.
+            </li>
+          </ul>
+        </section>
+
+        <section aria-label="Google Sign-In" className="mt-6">
+          <h2 className="text-base font-semibold tracking-tight">
+            Google Sign-In
+          </h2>
+          <p className="mt-2 max-w-prose text-sm text-ink-soft">
+            If this instance is set up for it, the sign-in page offers a Google
+            button. Choosing it takes you to a page of Google’s to confirm who
+            you are — a page you asked to go to, not this site loading anything
+            from Google. The consent screen asks for your name, email address,
+            and basic profile, and nothing else. Of what Google sends back we
+            keep two things: the address, as your login email (already verified,
+            since Google proved it), and your Google account id, so the next
+            Google sign-in finds the same account here. Your name, your
+            contacts, your files, and your profile picture are not kept.
+          </p>
+          <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink-soft">
+            <li>
+              It is optional. The password form is on the same page, and you can
+              set a password on your Account page afterwards, so signing in
+              without Google always stays possible.
+            </li>
+            <li>
+              Google is never the only way in: the password reset on the sign-in
+              page works whatever you signed in with.
+            </li>
+            <li>
+              An instance that has not set Google Sign-In up never shows the
+              button at all.
             </li>
           </ul>
         </section>

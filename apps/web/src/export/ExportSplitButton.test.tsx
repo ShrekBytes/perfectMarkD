@@ -318,6 +318,7 @@ function mePayload(overrides: Partial<MePayload> = {}): MePayload {
     plan: null,
     expiresAt: null,
     quota: { used: 0, limit: 0 },
+    signIn: { password: true, google: false },
     flags: LOCKED_FLAGS,
     ai: UNCONFIGURED_AI,
     ...overrides,

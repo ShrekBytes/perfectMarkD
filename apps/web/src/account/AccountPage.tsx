@@ -10,13 +10,14 @@ import { PlanSummary } from './PlanSummary';
 import { AiSection } from './AiSection';
 import { OrdersSection } from './OrdersSection';
 import { HistorySection } from './HistorySection';
-import { ChangePasswordForm } from './ChangePasswordForm';
 import { ChangeEmailSection } from './ChangeEmailSection';
+import { PasswordSection } from './PasswordSection';
 
 /**
  * The Account page: everything the account owns in one calm, single-column
- * page — login email, plan and Quota, Orders, Export History, and the inline
- * change-password form. The page composes existing endpoints only. Chrome
+ * page — login email, plan and Quota, Orders, Export History, and the password
+ * section (Change Password, or Set Password for an account that has none).
+ * The page composes existing endpoints only. Chrome
  * matches the auth pages' minimal header pattern (wordmark linking back to the
  * editor, theme toggle); no footer — the Account page is an app surface, not a
  * marketing surface. Signed out, it offers the sign-in prompt; the data sections
@@ -121,7 +122,7 @@ export function AccountPage() {
               <HistorySection />
             </ErrorBoundary>
             <ErrorBoundary label="The password form">
-              <ChangePasswordForm />
+              <PasswordSection />
             </ErrorBoundary>
           </div>
         </main>

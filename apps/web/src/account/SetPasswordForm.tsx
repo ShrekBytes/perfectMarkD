@@ -1,51 +1,54 @@
 import { useState, type FormEvent } from 'react';
 import { errorToFormFailure, type FormFailure } from '../api/client';
-import { changePassword } from '../auth/api';
+import { useAccountStore } from '../auth/account-store';
 
 /** The policy the server enforces on new passwords (server/02). */
 const PASSWORD_MIN = 8;
 
 /** The form is rendered once per page, so the IDs are stable and unique. */
-const HINT_ID = 'account-password-hint';
-const ERROR_ID = 'account-password-error';
+const HINT_ID = 'account-set-password-hint';
+const ERROR_ID = 'account-set-password-error';
 
 const INPUT_CLASS =
   'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
 
-export interface ChangePasswordFormProps {
+export interface SetPasswordFormProps {
   /**
-   * Called after a successful change. The page that composes this uses it to
-   * stand down any confirmation of its own (google-signin/01b's Set Password
-   * hands over to this form, and both report the same outcome).
+   * Called once the password is set. The form goes away with it — the account
+   * now has a password, so the page swaps in Change Password — and the caller
+   * is what confirms the change.
    */
-  onChanged?: () => void;
+  onSet: () => void;
 }
 
 /**
- * The Account page's inline change-password section: three fields — current,
- * new, confirm — calling the existing change-password client function. The
- * 8-character minimum matches the register policy and is checked before the
- * request, so a too-short password gets inline feedback instead of a round
- * trip. Success and failure render inline; the current session stays valid
- * after a change (the server signs out other devices only).
+ * The Account page's Set Password section (google-signin/01b): two fields — new,
+ * confirm — for an account that has no password of its own. Change Password
+ * asks for the current password, which an account that registered with Google
+ * cannot answer, so this is the only way one gets a password while signed in.
+ *
+ * Deliberately the shape of ChangePasswordForm with the current-password field
+ * and its client-side check left out — the same policy, the same minimum, the
+ * same inline failure, read here as the one question a passwordless account
+ * cannot answer. The wording names no sign-in method: this section is for every
+ * account without a password, whatever it signed in with.
+ *
+ * The session is the whole check, so nothing about the existing sign-in method
+ * is sent.
  */
-export function ChangePasswordForm({
-  onChanged,
-}: ChangePasswordFormProps = {}) {
-  const [current, setCurrent] = useState('');
+export function SetPasswordForm({ onSet }: SetPasswordFormProps) {
+  const setPassword = useAccountStore((state) => state.setPassword);
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [failure, setFailure] = useState<FormFailure | null>(null);
-  const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setFailure(null);
-    setSuccess(false);
 
-    // Client-side first: a too-short or mismatched new password is the
-    // user's input — correct it before a round trip.
+    // Client-side first: a too-short or mismatched password is the user's
+    // input — correct it before a round trip.
     if (next.length < PASSWORD_MIN) {
       setFailure({
         message: `New password must be at least ${PASSWORD_MIN} characters.`,
@@ -54,24 +57,19 @@ export function ChangePasswordForm({
       return;
     }
     if (confirm !== next) {
-      setFailure({
-        message: 'The new passwords don’t match.',
-        fieldError: true,
-      });
+      setFailure({ message: 'The passwords don’t match.', fieldError: true });
       return;
     }
 
     setSubmitting(true);
     try {
-      await changePassword(current, next);
-      setSuccess(true);
-      setCurrent('');
-      setNext('');
-      setConfirm('');
-      onChanged?.();
+      await setPassword(next);
+      onSet();
     } catch (cause) {
-      // A 400 is the policy, a 401 the current password: both are the input.
-      setFailure(errorToFormFailure(cause, [400, 401]));
+      // A 400 is the policy; a 409 is an account that already has a password,
+      // which is a Change Password after all — the page swaps in on the next
+      // /api/me, so the message names that rather than the server's.
+      setFailure(errorToFormFailure(cause, [400, 409]));
     } finally {
       setSubmitting(false);
     }
@@ -82,8 +80,7 @@ export function ChangePasswordForm({
       ? `At least ${PASSWORD_MIN} characters — ${PASSWORD_MIN - next.length} more needed.`
       : `At least ${PASSWORD_MIN} characters.`;
 
-  const fieldInvalid =
-    failure !== null && failure.fieldError ? true : undefined;
+  const fieldInvalid = failure?.fieldError ? true : undefined;
   const nextDescribedBy =
     [hint ? HINT_ID : null, failure ? ERROR_ID : null]
       .filter(Boolean)
@@ -91,40 +88,31 @@ export function ChangePasswordForm({
 
   return (
     <section
-      aria-labelledby="account-password-heading"
+      aria-labelledby="account-set-password-heading"
       className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
     >
       <h2
-        id="account-password-heading"
+        id="account-set-password-heading"
         className="text-base font-semibold tracking-tight text-ink"
       >
-        Change password
+        Set password
       </h2>
+      <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink-soft">
+        Optional. This account has no password of its own — set one and you can
+        sign in with a password as well as the way you signed in here. If you
+        ever lose that one, the password reset on the sign-in page is the way
+        back.
+      </p>
 
       <form
         onSubmit={(event) => void onSubmit(event)}
         // With JS broken this would otherwise GET, putting the password in the
         // URL and any request log. A failed POST is the safer failure.
         method="post"
-        data-testid="change-password-form"
+        data-testid="set-password-form"
         className="mt-3 w-full"
       >
         <label className="block text-xs font-medium text-ink-soft">
-          Current password
-          <input
-            type="password"
-            name="currentPassword"
-            autoComplete="current-password"
-            required
-            aria-invalid={fieldInvalid}
-            aria-describedby={failure ? ERROR_ID : undefined}
-            value={current}
-            onChange={(event) => setCurrent(event.target.value)}
-            className={INPUT_CLASS}
-          />
-        </label>
-
-        <label className="mt-3 block text-xs font-medium text-ink-soft">
           New password
           <input
             type="password"
@@ -167,23 +155,12 @@ export function ChangePasswordForm({
           </p>
         )}
 
-        {success && (
-          <p
-            role="status"
-            data-testid="change-password-success"
-            className="mt-3 text-xs text-ink"
-          >
-            Your password has been changed. Other signed-in devices were signed
-            out.
-          </p>
-        )}
-
         <button
           type="submit"
           disabled={submitting}
           className="touch-target mt-4 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
         >
-          {submitting ? 'Changing…' : 'Change password'}
+          {submitting ? 'Setting…' : 'Set password'}
         </button>
       </form>
     </section>

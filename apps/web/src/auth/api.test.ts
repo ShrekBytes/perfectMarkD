@@ -9,6 +9,8 @@ import {
   requestPasswordReset,
   resendVerification,
   resetPassword,
+  setPassword,
+  signInProviders,
   verifyEmail,
 } from './api';
 
@@ -232,6 +234,7 @@ describe('me', () => {
         plan: 'pro',
         expiresAt: '2026-10-01T00:00:00.000Z',
         quota: { used: 3, limit: 300 },
+        signIn: { password: false, google: true },
         flags: {
           customPageSize: true,
           customStylesheet: true,
@@ -251,6 +254,9 @@ describe('me', () => {
       plan: 'pro',
       expiresAt: '2026-10-01T00:00:00.000Z',
       quota: { used: 3, limit: 300 },
+      // google-signin/01b: a Google-registered account, so no password of its
+      // own — the Account page renders the form this reports.
+      signIn: { password: false, google: true },
       flags: {
         customPageSize: true,
         customStylesheet: true,
@@ -304,5 +310,69 @@ describe('changePassword', () => {
     await expect(changePassword('bad', 'new password')).rejects.toThrow(
       'Current password is incorrect.',
     );
+  });
+});
+
+describe('setPassword', () => {
+  it('POSTs the new password alone and resolves on 204', async () => {
+    // Set Password (google-signin/01b): the session is the whole check, so
+    // there is no current password to send.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await setPassword('a brand new password');
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/set-password');
+    expect(init).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ newPassword: 'a brand new password' }),
+    });
+  });
+
+  it('surfaces the refusal for an account that already has a password', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: 'This account already has a password. Change it instead.',
+          },
+          409,
+        ),
+      ),
+    );
+
+    await expect(setPassword('a brand new password')).rejects.toThrow(
+      new AuthError(
+        'This account already has a password. Change it instead.',
+        409,
+      ),
+    );
+  });
+});
+
+describe('signInProviders', () => {
+  it('GETs the advertisement the sign-in page renders the button from', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ google: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await signInProviders()).toEqual({ google: false });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/providers');
+    expect(init).toMatchObject({ credentials: 'include' });
+  });
+
+  it('reports the feature on a deployment that has it configured', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse({ google: true })),
+    );
+
+    expect(await signInProviders()).toEqual({ google: true });
   });
 });

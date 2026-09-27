@@ -76,4 +76,56 @@ describe('PrivacyPage', () => {
     expect(email).toHaveTextContent(/a hash of each link/i);
     expect(email).toHaveTextContent(/links work once, they expire/i);
   });
+
+  it('discloses what Google Sign-In sends and what is kept', () => {
+    render(<PrivacyPage />);
+
+    const google = screen.getByRole('region', { name: 'Google Sign-In' });
+    // What the consent screen asks for (story 14), what is stored, and what
+    // arrives and is dropped: the identity is the only import (spec §Out of
+    // Scope), and the server keeps exactly the two fields the paragraph names.
+    expect(google).toHaveTextContent(/name, email address, and basic profile/i);
+    expect(google).toHaveTextContent(
+      /we keep two things: the address[\s\S]*your Google account id/i,
+    );
+    expect(google).toHaveTextContent(
+      /Your name, your contacts, your files, and your profile picture are not kept/i,
+    );
+  });
+
+  it('scopes the Google round trip as a navigation the user starts, not a page load', () => {
+    // ADR-0010: the no-third-party-loads claim is about what a page loads, and
+    // the sign-in redirect is not one of its exceptions — the disclosure has to
+    // say so itself rather than leave the reader to reconcile the two.
+    render(<PrivacyPage />);
+
+    const google = screen.getByRole('region', { name: 'Google Sign-In' });
+    expect(google).toHaveTextContent(
+      /a page you asked to go to, not this site loading anything from Google/i,
+    );
+    // The claim itself is unchanged: an AI Action is still its one exception.
+    const claim = screen.getByText(/no page here loads anything from/i);
+    expect(claim).toHaveTextContent(/AI Action/i);
+  });
+
+  it('says Google is optional, and never the only way in', () => {
+    // Stories 5–7: a password can be set later, and Password Reset is the
+    // recovery whatever the account signed in with.
+    render(<PrivacyPage />);
+
+    const google = screen.getByRole('region', { name: 'Google Sign-In' });
+    expect(google).toHaveTextContent(/It is optional/i);
+    expect(google).toHaveTextContent(/set a password on your Account page/i);
+    expect(google).toHaveTextContent(/Google is never the only way in/i);
+    expect(google).toHaveTextContent(/password reset on the sign-in page/i);
+  });
+
+  it('covers an instance that has not set Google Sign-In up', () => {
+    // Self-Hosted Instances are never forced into Google Cloud setup (story 12).
+    render(<PrivacyPage />);
+
+    expect(
+      screen.getByRole('region', { name: 'Google Sign-In' }),
+    ).toHaveTextContent(/never shows the button at all/i);
+  });
 });

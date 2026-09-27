@@ -70,6 +70,7 @@ function mePayload(ai: AiAccountState): MePayload {
     plan: 'pro',
     expiresAt: '2030-01-01T00:00:00.000Z',
     quota: { used: 0, limit: 300 },
+    signIn: { password: true, google: false },
     flags: OPEN_FLAGS,
     ai,
   };

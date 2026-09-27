@@ -5,11 +5,20 @@
 // this store only mirrors what GET /api/me reports (server/04 + billing/04):
 // the identity, the active Entitlement, the Server Export quota (top-level —
 // comps grant allowance without a plan, so quota is account state, not
-// entitlement state), and the feature flags the gated Inspector controls read.
+// entitlement state), the sign-in methods the Account page's password section
+// renders off (google-signin/01b), and the feature flags the gated Inspector
+// controls read.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { logout, me, setAiAccess, type MePayload } from './api';
+import {
+  logout,
+  me,
+  setAiAccess,
+  setPassword as setFirstPassword,
+  type MePayload,
+  type SignInMethods,
+} from './api';
 import type { AuthUser } from './api';
 import { LOCKED_FLAGS, type FeatureFlags } from './flags';
 import type { AiAccountState } from '../ai/types';
@@ -34,6 +43,15 @@ export function useAiState(): AiAccountState | null {
   return useAccountStore((state) => state.ai);
 }
 
+/**
+ * The account store's selector for the sign-in methods (google-signin/01b).
+ * Null is not "neither" — it is "the server has not said yet", and the Account
+ * page renders Change Password rather than guessing an account has no password.
+ */
+export function useSignInMethods(): SignInMethods | null {
+  return useAccountStore((state) => state.signIn);
+}
+
 interface AccountState {
   user: AuthUser | null;
   entitlement: EntitlementState | null;
@@ -43,6 +61,11 @@ interface AccountState {
    * plan (billing/03) has allowance while entitlement is null.
    */
   quota: { used: number; limit: number } | null;
+  /**
+   * How the account signs in (google-signin/01b), or null until /api/me says.
+   * The Account page's password section renders the form this reports.
+   */
+  signIn: SignInMethods | null;
   /** The gated Inspector controls; locked until /api/me says otherwise. */
   flags: FeatureFlags;
   /** The instance's and the caller's AI state; null signed out. */
@@ -73,6 +96,13 @@ interface AccountState {
    * Account page can show it.
    */
   setAiAccess: (access: boolean) => Promise<void>;
+  /**
+   * Sets the account's first password (google-signin/01b) and records the one
+   * fact that changed: it now has a password of its own. No refresh — the
+   * write is the answer, and a Google identity is untouched by it. Rejects with
+   * the server's message, so the form can show a refusal.
+   */
+  setPassword: (newPassword: string) => Promise<void>;
   /** Clears the plan-ended notice once the user has seen it. */
   dismissPlanEndedNotice: () => void;
 }
@@ -83,6 +113,7 @@ function splitMe(payload: MePayload | null): {
   user: AuthUser | null;
   entitlement: EntitlementState | null;
   quota: { used: number; limit: number } | null;
+  signIn: SignInMethods | null;
   flags: FeatureFlags;
   ai: AiAccountState | null;
 } {
@@ -98,6 +129,7 @@ function splitMe(payload: MePayload | null): {
     user: payload ? { email: payload.email, isAdmin: payload.isAdmin } : null,
     entitlement,
     quota: payload?.quota ?? null,
+    signIn: payload?.signIn ?? null,
     flags: payload?.flags ?? LOCKED_FLAGS,
     ai: payload?.ai ?? null,
   };
@@ -134,6 +166,7 @@ export const useAccountStore = create<AccountState>()((set) => {
     user: null,
     entitlement: null,
     quota: null,
+    signIn: null,
     flags: LOCKED_FLAGS,
     ai: null,
     planEndedNotice: false,
@@ -159,6 +192,7 @@ export const useAccountStore = create<AccountState>()((set) => {
         user: null,
         entitlement: null,
         quota: null,
+        signIn: null,
         flags: LOCKED_FLAGS,
         ai: null,
         planEndedNotice: false,
@@ -166,6 +200,15 @@ export const useAccountStore = create<AccountState>()((set) => {
     },
     setAiAccess: async (access) => {
       set({ ai: await setAiAccess(access) });
+    },
+    setPassword: async (newPassword) => {
+      await setFirstPassword(newPassword);
+      // A Google identity survives a first password (CONTEXT.md: gaining one
+      // sign-in method never takes the other away), so only the password
+      // changes — no refresh to re-read what did not move.
+      set((state) => ({
+        signIn: { password: true, google: state.signIn?.google ?? false },
+      }));
     },
     dismissPlanEndedNotice: () => set({ planEndedNotice: false }),
   };
@@ -177,6 +220,7 @@ export function resetAccountStoreForTests(): void {
     user: null,
     entitlement: null,
     quota: null,
+    signIn: null,
     flags: LOCKED_FLAGS,
     ai: null,
     planEndedNotice: false,
