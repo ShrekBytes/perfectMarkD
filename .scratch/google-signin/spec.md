@@ -80,9 +80,26 @@ never forced into Google Cloud setup.
 - **SPA surface.** The Google button on the sign-in/registration pages (only
   when the server advertises the feature), a "Set password" section on the
   Account page for passwordless accounts, and the sign-in-method line on the
-  Account page.
+  Account page. Both Account-page states read one API addition — a
+  sign-in-methods block on `/api/me` saying whether the account has a password
+  and whether it has a Google identity — so the page renders what the server
+  reports and never guesses: an account with a password gets the Change Password
+  form, one without gets the section that sets its first password.
+- **The first password is set by the session, or not at all.** Change Password
+  asks for the current password, which a passwordless account cannot answer. A
+  separate write sets the *first* password on an account that has none: the
+  session is the whole check, the same minimum policy applies, the caller's own
+  session survives and every other session the account has is signed out (the
+  rule Change Password and Password Reset already follow). An account that
+  already has a password is refused — this is not a second way to overwrite a
+  password without the current one, and Password Reset remains the recovery
+  path. It is deliberately not rate limited: the limiter the password routes
+  share exists to bound password guessing, and this write asks for no secret.
+  **Sign-in method** is the glossary term for what `/api/me` reports; an account
+  may have both, and gaining one never removes the other.
 - **The mailer is untouched.** Google Sign-In sends no email; Password Reset
-  from the email spec is its recovery path. The Admin temp-password
+  from the email spec is its recovery path, and setting a first password mails
+  nothing because the address is already verified. The Admin temp-password
   replacement and the admin email change live in the email spec.
 - **First-account bootstrap** (the admin email rule) is method-agnostic:
   registration by Google callback counts exactly like registration by
@@ -105,6 +122,10 @@ never forced into Google Cloud setup.
 - SPA changes are covered by component tests with mocked clients (prior art:
   the Account page tests): button presence given the server's advertisement,
   error fallback, the Account page's set-password and sign-in-method states.
+- The Account page's server support is tested through the same HTTP seam as
+  everything else auth: the sign-in-methods block in each of its states, the
+  first password being set (other sessions revoked, the caller's kept), and the
+  refusal for an account that already has a password.
 - The Google client (token exchange, identity fetch) gets narrow
   stubbed-fetch tests for error mapping only — an implementation detail
   behind the injected seam.
@@ -130,8 +151,18 @@ never forced into Google Cloud setup.
 - ADR-0013 covers the mailer this feature deliberately does not use; Google
   Sign-In adds no third-party data flow beyond the sign-in redirect itself.
 - Glossary terms live in `CONTEXT.md`: Google Sign-In (auto-link, counts as
-  Email Verification, password optional), Verified Email.
+  Email Verification, password optional), Sign-in method (what `/api/me`
+  reports: password and/or Google), Verified Email.
+- The work is three tickets, in this order: `01` the OAuth flow and the identity
+  link, `01b` the Account page's server support (the sign-in-methods block and
+  the first-password write), `02` the SPA surface. 01b exists because both
+  Account-page states are *server* facts, and both are verifiable on their own —
+  a full spec check should not read the Account page as needing anything the
+  flow's ticket did not build. None of the three needs real Google credentials
+  to implement or to test: the button is a link to the start endpoint, its
+  visibility reads the server's advertisement, and only the round trip through
+  Google's consent screen does not.
 - Ordered after the email spec's mailer ticket only in the sense that its
   composition-root change should land on top of the Mailer's; both specs'
   tickets carry explicit `Blocked by` lines where they exist. Commit scope:
-  `google-signin/NN`.
+  `google-signin/01b` for the middle ticket, `google-signin/02` for the last.

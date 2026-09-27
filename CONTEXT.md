@@ -140,6 +140,10 @@ _Avoid_: address change, re-registration, email verification (that proves one in
 Registering or signing in with a Google account. On a matching email it signs in to the existing account; it counts as Email Verification. A password is optional afterwards.
 _Avoid_: Google login, social login, SSO, OAuth (an implementation detail)
 
+**Sign-in method**:
+One of the ways into an account: a password, a Google identity, or both. The Account page lists them, and Google Sign-In does not take one away by adding the other.
+_Avoid_: login method, auth method, credentials
+
 ## Product UI
 
 **Paper Canvas**:
