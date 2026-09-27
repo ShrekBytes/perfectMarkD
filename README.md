@@ -37,8 +37,10 @@ Pull requests run lint, typecheck, build, and tests via [.github/workflows/ci.ym
 Docker Compose runs the whole stack on one origin — Caddy serves the built app, reverse-proxies `/api` to the api container, and reverse-proxies `/analytics` to a self-hosted Umami instance:
 
 ```sh
-cp .env.example .env    # then fill in the four secrets it asks for
-                        # and UMAMI_APP_SECRET + UMAMI_DB_PASSWORD
+cp .env.example .env    # then fill in the four secrets it asks for,
+                        # UMAMI_APP_SECRET + UMAMI_DB_PASSWORD, and the
+                        # RESEND_API_KEY + MAIL_FROM the api refuses to
+                        # start without
 
 # Dev checkout — build the app images locally:
 docker compose up -d --build

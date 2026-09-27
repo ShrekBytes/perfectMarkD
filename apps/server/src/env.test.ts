@@ -15,6 +15,9 @@ describe('loadEnv', () => {
       historyDir: './data/history',
       historyEncryptionKey: null,
       aiApiKey: null,
+      resendApiKey: null,
+      mailFrom: null,
+      mailMode: null,
     });
   });
 
@@ -32,6 +35,9 @@ describe('loadEnv', () => {
         HISTORY_DIR: '/var/lib/pmd/history',
         HISTORY_ENCRYPTION_KEY: 'a'.repeat(64),
         AI_API_KEY: 'sk-provider-key',
+        RESEND_API_KEY: 're_provider-key',
+        MAIL_FROM: 'PerfectMarkD <hello@perfectmarkd.00022000.xyz>',
+        MAIL_MODE: 'console',
       }),
     ).toEqual({
       port: 8080,
@@ -45,7 +51,18 @@ describe('loadEnv', () => {
       historyDir: '/var/lib/pmd/history',
       historyEncryptionKey: 'a'.repeat(64),
       aiApiKey: 'sk-provider-key',
+      resendApiKey: 're_provider-key',
+      mailFrom: 'PerfectMarkD <hello@perfectmarkd.00022000.xyz>',
+      mailMode: 'console',
     });
+  });
+
+  it('reads only the console mail mode, so no other value opens the gate', () => {
+    expect(loadEnv({ MAIL_MODE: 'console' }).mailMode).toBe('console');
+    // Anything else — a typo, or an attempt at a kill switch — is not a mode.
+    for (const raw of ['off', 'none', 'disabled', 'smtp', 'CONSOLE', '', ' ']) {
+      expect(loadEnv({ MAIL_MODE: raw }).mailMode, raw).toBeNull();
+    }
   });
 
   it('treats blank values as unset', () => {
@@ -59,6 +76,8 @@ describe('loadEnv', () => {
       null,
     );
     expect(loadEnv({ AI_API_KEY: ' ' }).aiApiKey).toBeNull();
+    expect(loadEnv({ RESEND_API_KEY: '  ' }).resendApiKey).toBeNull();
+    expect(loadEnv({ MAIL_FROM: '' }).mailFrom).toBeNull();
   });
 
   it('rejects a PORT that is not an integer in range', () => {

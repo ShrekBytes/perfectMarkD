@@ -43,6 +43,10 @@ describe('PrivacyPage', () => {
     const claim = screen.getByText(/no page here loads anything from/i);
     // The exception stays the one it was: an AI Action the user submits.
     expect(claim).toHaveTextContent(/AI Action/i);
+    // Email is a server-side handoff, not a page load, so it must not be listed
+    // as an exception to this claim — the page separates the two instead.
+    expect(claim).not.toHaveTextContent(/two deliberate exceptions/i);
+    expect(claim).toHaveTextContent(/never a page loading anything/i);
   });
 
   it('still tells the user AI Actions are the one place text leaves the browser', () => {
@@ -51,5 +55,25 @@ describe('PrivacyPage', () => {
     expect(
       screen.getByText(/the one place where your text leaves your browser/i),
     ).toBeInTheDocument();
+  });
+
+  it('says exactly what an email carries: the address, the link, nothing else', () => {
+    render(<PrivacyPage />);
+
+    const email = screen.getByRole('region', { name: 'Email' });
+    expect(email).toHaveTextContent(/your address, a one-time link/i);
+    // ADR-0013's load-bearing promise, stated where email is described.
+    expect(email).toHaveTextContent(/never any part of a Document/i);
+    // And the provider is named, with its retention called the provider's.
+    expect(email).toHaveTextContent(/Resend/);
+    expect(email).toHaveTextContent(/is Resend's policy, not ours/i);
+  });
+
+  it('tells the user a link cannot be replayed from a copy of the database', () => {
+    render(<PrivacyPage />);
+
+    const email = screen.getByRole('region', { name: 'Email' });
+    expect(email).toHaveTextContent(/a hash of each link/i);
+    expect(email).toHaveTextContent(/links work once, they expire/i);
   });
 });

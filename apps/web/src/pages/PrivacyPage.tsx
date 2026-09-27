@@ -7,13 +7,22 @@ const inlineLink =
 
 /**
  * The /privacy page: one short combined page (launch-chrome spec) — what is
- * stored, what leaves the browser (AI Actions are the one third-party
- * request), what analytics collects and what it never does (launch/01), what
- * is never done — including the Cloudflare edge the deployment's tunnel puts in
- * the request path (ADR-0010), which is infrastructure rather than tracking and
- * is named rather than left implied — crypto payments keep card data
- * out, the self-host escape hatch, and a one-line no-warranty caveat standing
- * in for the separate Terms page that doesn't exist.
+ * stored, what leaves the browser (transactional email and AI Actions are the
+ * two third parties, each described in its own section), what analytics collects
+ * and what it never does (launch/01), what is never done — including the
+ * Cloudflare edge the deployment's tunnel puts in the request path (ADR-0010),
+ * which is infrastructure rather than tracking and is named rather than left
+ * implied — crypto payments keep card data out, the self-host escape hatch, and
+ * a one-line no-warranty caveat standing in for the separate Terms page that
+ * doesn't exist.
+ *
+ * email/01 owns the Email section and the structure later email tickets append
+ * to. Two constraints from ADR-0010 hold here: the page names no hosting
+ * topology or transport, and the no-third-party-loads claim keeps its precise
+ * scope. That claim is about what a page loads, so transactional email is not
+ * one of its exceptions — the server-to-server handoff is disclosed in the
+ * Email section instead, and the claim says so rather than listing mail beside
+ * a page load it never was.
  */
 export function PrivacyPage() {
   return (
@@ -34,7 +43,7 @@ export function PrivacyPage() {
           <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink-soft">
             <li>
               Your account email, if you create one — used to sign in and manage
-              your plan.
+              your plan, and verified once before the first sign-in.
             </li>
             <li>
               Nothing else, unless you pay: free users' Documents live entirely
@@ -51,6 +60,37 @@ export function PrivacyPage() {
             <li>
               Your payment reference: the transaction ID and amount you submit
               with an Order, kept so your Manual Payment can be verified.
+            </li>
+          </ul>
+        </section>
+
+        <section aria-label="Email" className="mt-6">
+          <h2 className="text-base font-semibold tracking-tight">Email</h2>
+          <p className="mt-2 max-w-prose text-sm text-ink-soft">
+            Verifying an address and recovering a password both work by email,
+            so the server sends it. A message carries your address, a one-time
+            link, and a sentence or two of our own words — never any part of a
+            Document, and nothing you have written. The address and the link go
+            to Resend, the mail provider this instance is configured with; how
+            long Resend keeps what it receives is Resend's policy, not ours.
+          </p>
+          <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink-soft">
+            <li>
+              Sent when you register (a verification link), when you ask to
+              reset a password (a reset link), and when the login email on an
+              account changes (a notice to the old address, so a hijacker cannot
+              cut you off silently).
+            </li>
+            <li>
+              What we keep is the address and a hash of each link — never the
+              link itself, so a copy of our database cannot be used to sign in
+              as you. Links work once, they expire, and asking for a new one is
+              always possible.
+            </li>
+            <li>
+              There is no switch to turn this off: an address is verified before
+              the first sign-in, so an account that cannot be verified is an
+              account that cannot be used.
             </li>
           </ul>
         </section>
@@ -108,7 +148,9 @@ export function PrivacyPage() {
               No third-party analytics, no ad tracking, no fingerprinting. Fonts
               and scripts are self-hosted, so no page here loads anything from
               another company's server — the one deliberate exception is an AI
-              Action you submit, described above.
+              Action you submit, described above. Email is the other third
+              party, but it is the server handing over an address and a one-time
+              link, never a page loading anything.
             </li>
             <li>
               One piece of infrastructure sits in the way regardless: this site

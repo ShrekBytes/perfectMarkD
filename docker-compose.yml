@@ -91,6 +91,14 @@ services:
       # AI Actions (ADR-0008): deployment-level provider key; unset means the
       # instance reports AI as unavailable (no key is ever stored in the db).
       AI_API_KEY: ${AI_API_KEY:-}
+      # Transactional email (ADR-0013). The API itself refuses to boot without
+      # the key and the from-address, so compose cannot mark them required the
+      # way it does the two secrets above — MAIL_MODE=console is the local
+      # escape that deliberately boots without either. Same empty-default
+      # passthrough as ADMIN_EMAIL and AI_API_KEY.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_MODE: ${MAIL_MODE:-}
       # The worker's Chromium loads the SPA's /export page from Caddy over
       # the internal network — the loopback origin (http://caddy) exists so
       # the worker has one regardless of how the public site is served.

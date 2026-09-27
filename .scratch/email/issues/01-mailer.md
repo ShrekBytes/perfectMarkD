@@ -1,6 +1,6 @@
 # 01 — Mailer: Resend client, env config, boot gate
 
-Status: ready-for-agent
+Status: ready-for-human
 
 The foundation ticket: the server gains the ability to send transactional
 email, and nothing user-visible changes yet. A Mailer with one send operation
@@ -27,3 +27,71 @@ stubbed fetch (implementation detail behind the seam — nothing else tests it);
 typecheck and lint green; boot-gate test proves refusal without configuration.
 
 ## Comments
+
+Implemented (uncommitted at the time of writing). `pnpm lint`, `pnpm typecheck`,
+`pnpm format:check` and `pnpm test` (1,611 tests, +19) are green, and the boot
+gate was checked by running the API four ways: no mail configuration refuses
+with the `RESEND_API_KEY` message, a key without `MAIL_FROM` refuses naming
+`MAIL_FROM`, `MAIL_MODE=off` refuses the same way (no kill switch), and
+`MAIL_MODE=console` boots and listens. The Privacy page was verified in a real
+browser (Chromium, Vite dev server): the new Email section renders in the Light
+Table like its neighbours, no console errors.
+
+What landed:
+
+- **The seam** (`apps/server/src/mail/mailer.ts`): one send operation per
+  transactional email — `sendVerification`, `sendPasswordReset`,
+  `sendEmailChangedNotice` — each taking an address and, where the message
+  carries one, an absolute one-time link. There is no operation that takes free
+  text, so no route can mail Document content whatever it means to (ADR-0013).
+  `MailerError` is the one failure shape (`transport` / `timeout` / `http` /
+  `invalid_response`), and no message in it names the provider.
+- **The Resend client** (`mail/resend.ts`): one POST per email, key in the
+  header only, four-field plain-text body, 10s deadline. `messages.ts` owns the
+  copy (subject + plain-text body per email, no HTML part) so both clients share
+  it and the "a link and a sentence or two" promise lives in one file.
+- **The console mailer** (`mail/console.ts`) and the resolver + boot gate
+  (`mail/config.ts`): `resolveMail` throws when the provider configuration is
+  absent unless `MAIL_MODE=console` is set by name; any other value is not a
+  mode, so the gate stays shut. `main.ts` calls it beside the other two gates
+  and hands the Mailer to `createApp`, which puts it on `c.var.mailer`.
+- **Env** (`env.ts`): `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_MODE`. Compose
+  forwards all three with empty defaults — it cannot mark the first two required
+  the way it marks the secrets, because the console escape boots without them.
+- **Privacy page**: a new Email section (what a message carries, when it is sent,
+  the hashed one-time link, and that there is no switch), and the no-third-party
+  claim back to its one page-load exception. Tests pin both, including that the
+  claim does *not* list email as a page-load exception.
+
+Deliberate decisions and deferrals:
+
+- **`c.var.mailer` has no reader yet.** Nothing in this ticket sends a message;
+  the AppEnv variable is the mechanism email/02's routes read, and it is how
+  `c.var.db` already works. If it turns out email/02 wants the Mailer passed
+  into a route factory instead (as the AI seam does), that ticket moves it.
+- **The Resend wire is deliberately unpinned.** The spec asks for "narrow
+  stubbed-fetch tests for error mapping only", so `resend.test.ts` covers only
+  the failure mapping (plus one accepted send). The privacy guarantee that a
+  message carries an address and a link is enforced by the seam's types rather
+  than by a test that would fail on a legitimate refactor.
+- **The transport boilerplate duplicates `ai/provider.ts` on purpose.** The two
+  clients are independent seams with different error vocabularies and different
+  response readers; the shared shape would need five knobs and would couple the
+  mail feature to the AI one. Left as two ~50-line bodies.
+- **Copy speaks in verification, not confirmation** (`CONTEXT.md` lists
+  "confirmation" and "confirmed email" as avoid words).
+- **Docs the boot gate invalidated were updated too**: `.env.example`,
+  `docker-compose.yml`, `PRODUCTION.md`, `README.md`, `AGENTS.md`, and the
+  restore runbook (its placeholder bootstrap now sets `MAIL_MODE=console`, since
+  compose starting is not enough any more — the api refuses to boot).
+- `MAIL_FROM` ships blank in `.env.example`, like every other operator-supplied
+  value: a pre-filled domain of ours would let a Self-Hosted Instance boot
+  happily and then fail every send at the provider.
+
+**What is left is the human step** (hence the label): create the Resend account,
+add the sending domain `perfectmarkd.00022000.xyz` with its DKIM/SPF records at
+the DNS host, create an API key, and paste `RESEND_API_KEY` + `MAIL_FROM` into
+`.env`. Resend only delivers to your own address until the domain is verified,
+so that is also what gates a real end-to-end email check — the code path is
+verified here with `MAIL_MODE=console` and the stubbed-fetch tests. Use the
+`wizard` skill for the dashboard steps.

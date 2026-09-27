@@ -21,6 +21,7 @@ import type { HistoryStore } from './history/store.js';
 import { meRoutes } from './me.js';
 import { resolveAiContext, type AiAppOptions } from './ai/context.js';
 import { aiRoutes } from './ai/routes.js';
+import type { Mailer } from './mail/mailer.js';
 
 export interface AppEnv {
   Variables: {
@@ -28,6 +29,12 @@ export interface AppEnv {
     user: User | null;
     /** Raw session token from a verified cookie; null when absent. */
     sessionToken: string | null;
+    /**
+     * The Mailer (ADR-0013), resolved once at the composition root. Null only
+     * in a composition that wires none — every real one must, since the mail
+     * boot gate refuses to start an API that cannot send.
+     */
+    mailer: Mailer | null;
   };
 }
 
@@ -85,6 +92,13 @@ export interface CreateAppOptions {
    * provider so nothing here touches a live API.
    */
   ai?: AiAppOptions;
+  /**
+   * The Mailer (ADR-0013), injected at the composition root beside the session
+   * secret and the clock: production passes the provider client, tests a fake
+   * that records sends. Omitted only by tests that touch no email flow —
+   * main.ts's boot gate is what stops a real composition without one.
+   */
+  mail?: Mailer;
 }
 
 /**
@@ -102,6 +116,7 @@ export function createApp({
   history,
   export: exportOptions,
   ai: aiOptions,
+  mail,
 }: CreateAppOptions) {
   const clock: Clock = now ?? (() => new Date());
   // The AI context is resolved once: the environment key plus the provider
@@ -148,6 +163,7 @@ export function createApp({
     .use('*', requestLogger(log))
     .use('*', async (c, next) => {
       c.set('db', db);
+      c.set('mailer', mail ?? null);
       // Resolve the session once per request; `me` and future gated routes
       // read the result rather than re-querying. The cookie is signed, so an
       // invalid signature (false) counts as no session.

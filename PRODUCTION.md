@@ -54,6 +54,8 @@ for k in SESSION_SECRET HISTORY_ENCRYPTION_KEY UMAMI_APP_SECRET \
 | `UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET` | from the loop                                                  |
 | `ADMIN_EMAIL`                           | your email; the first account registered with it becomes Admin |
 | `AI_API_KEY`                            | your provider key — step 5 needs it                            |
+| `RESEND_API_KEY`                        | your mail provider's key — **without it the API refuses to boot** |
+| `MAIL_FROM`                             | `PerfectMarkD <hello@perfectmarkd.00022000.xyz>`, on the domain you verified with the provider |
 | `SITE_ADDRESS`                          | `:80` — the tunnel terminates TLS, Caddy stays plain HTTP      |
 | `EXPORT_CONCURRENCY`                    | `1` — see the note below                                       |
 | `CADDY_HTTP_PORT`                       | `8901` — nginx already holds `:80` on this machine             |
@@ -103,7 +105,11 @@ podman compose logs api --tail 50
 ```
 
 A refusal mentioning a missing key means `.env` is incomplete. The API will not
-boot without `HISTORY_ENCRYPTION_KEY`; that is deliberate.
+boot without `HISTORY_ENCRYPTION_KEY` or without the mail configuration
+(`RESEND_API_KEY` + `MAIL_FROM`); both are deliberate — sign-in is blocked until
+an address is confirmed, so an instance that cannot send mail is an instance
+nobody can get into. `MAIL_MODE=console` prints messages to the log instead and
+boots without either, but it belongs to a local machine, not to this one.
 
 ---
 

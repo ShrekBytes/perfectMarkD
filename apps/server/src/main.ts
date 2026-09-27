@@ -4,6 +4,7 @@ import { loadEnv } from './env.js';
 import { createApp } from './index.js';
 import { createHistoryStore } from './history/store.js';
 import { startHistoryPurge } from './history/purge.js';
+import { resolveMail } from './mail/config.js';
 
 const env = loadEnv(process.env);
 if (!env.sessionSecret) {
@@ -16,6 +17,15 @@ if (!env.historyEncryptionKey) {
     'HISTORY_ENCRYPTION_KEY is required — Server Exports by Premium users must land in Export History. Generate one with: openssl rand -hex 32',
   );
 }
+// Transactional email (email/01, ADR-0013): the third boot gate, and the one
+// that fails first when a deployment has never sent a message. Sign-in is
+// blocked until an address is verified, so an instance that cannot send email
+// is an instance nobody can get into. MAIL_MODE=console is the local escape.
+const mail = resolveMail({
+  apiKey: env.resendApiKey,
+  from: env.mailFrom,
+  mode: env.mailMode,
+});
 const db = createDatabase(env.dbPath);
 // Export History storage (server/05): finished Premium exports, encrypted at
 // rest, live here. parseMasterKey rejects malformed key material — a bad key
@@ -44,6 +54,7 @@ const app = createApp({
     renderTimeoutMs: env.exportRenderTimeoutMs,
   },
   history,
+  mail,
 });
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {

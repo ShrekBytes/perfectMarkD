@@ -1,3 +1,5 @@
+import type { MailMode } from './mail/config.js';
+
 export interface ServerEnv {
   port: number;
   dbPath: string;
@@ -36,6 +38,22 @@ export interface ServerEnv {
    * its operator supplies one. Rotating it needs a restart.
    */
   aiApiKey: string | null;
+  /**
+   * Transactional email (ADR-0013): the mail provider's API key. Belongs to
+   * the deployment, never to a setting, and never leaves it. The composition
+   * root (main.ts) requires it — sign-in is blocked until an address is
+   * verified, so a deployment that cannot send mail is not a usable one.
+   */
+  resendApiKey: string | null;
+  /** The from-address, as the provider takes it: `Name <local@domain>`. */
+  mailFrom: string | null;
+  /**
+   * `console` prints transactional email to the server log instead of sending
+   * it, so a local API needs no provider account. It is the only way past the
+   * mail boot gate and has to be asked for by name; any other value is not a
+   * mode, so the gate stays shut.
+   */
+  mailMode: MailMode | null;
 }
 
 const DEFAULT_DB_PATH = './data/perfectmarkd.db';
@@ -76,6 +94,13 @@ export function loadEnv(
     historyDir: nonEmpty(source.HISTORY_DIR) ?? DEFAULT_HISTORY_DIR,
     historyEncryptionKey: nonEmpty(source.HISTORY_ENCRYPTION_KEY),
     aiApiKey: nonEmpty(source.AI_API_KEY),
+    resendApiKey: nonEmpty(source.RESEND_API_KEY),
+    mailFrom: nonEmpty(source.MAIL_FROM),
+    // Only the one documented mode counts. A value that is not `console`
+    // selects nothing, so a typo (or an attempt at a kill switch) leaves the
+    // boot gate shut rather than quietly starting an instance that sends
+    // nothing.
+    mailMode: nonEmpty(source.MAIL_MODE) === 'console' ? 'console' : null,
   };
 }
 
