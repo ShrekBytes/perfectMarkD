@@ -60,6 +60,13 @@ export interface AuthRateLimitConfig {
   register?: RateLimitRule;
   changePassword?: RateLimitRule;
   /**
+   * The Google Sign-In flow (google-signin/01). One rule for the two legs, two
+   * budgets drawn on it — a sign-in spends a start and a callback, and sharing
+   * one window would halve the limit for everyone behind a single address,
+   * which behind a Cloudflare Tunnel (ADR-0010) is every visitor.
+   */
+  googleSignIn?: RateLimitRule;
+  /**
    * The budget for one email this instance sends, on both of its keys. Every
    * route that can mail a user shares it — registration, the resends, the reset
    * requests, the email changes, and the admin panel's two (email/02, email/05).
@@ -109,6 +116,10 @@ export const DEFAULT_AUTH_RATE_LIMITS: Required<AuthRateLimitConfig> = {
   login: DEFAULT_RULE,
   register: DEFAULT_RULE,
   changePassword: DEFAULT_RULE,
+  // The sign-in redirect is a full-page trip to a provider, so ten a minute is
+  // far above how often a person starts one and far below a loop that would
+  // spend Google's own rate limits for us. Per leg, not per flow (see above).
+  googleSignIn: DEFAULT_RULE,
   // Sized against the mail provider's free tier (Resend: 100 messages a day,
   // 3,000 a month), which is a cap on the whole account, not on one key — so
   // what these buy is that a single key cannot drain it in an afternoon.

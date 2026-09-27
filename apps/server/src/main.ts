@@ -5,6 +5,7 @@ import { createApp } from './index.js';
 import { createHistoryStore } from './history/store.js';
 import { startHistoryPurge } from './history/purge.js';
 import { resolveMail, requirePublicOrigin } from './mail/config.js';
+import { resolveGoogleSignIn } from './google/exchange.js';
 
 const env = loadEnv(process.env);
 if (!env.sessionSecret) {
@@ -31,6 +32,15 @@ const mail = resolveMail({
 // a user's browser reaches the instance on. A missing value cannot reach a
 // user — it would put a dead link in a real inbox — so it stops the boot.
 const publicOrigin = requirePublicOrigin(env.publicOrigin);
+// Google Sign-In (google-signin/01): resolved beside the Mailer, from the
+// deployment's own OAuth client. There is no boot gate here — a deployment
+// without it is complete, not degraded — so this is null and the routes are
+// simply not mounted.
+const google = resolveGoogleSignIn({
+  clientId: env.googleClientId,
+  clientSecret: env.googleClientSecret,
+  redirectUri: env.googleRedirectUri,
+});
 const db = createDatabase(env.dbPath);
 // Export History storage (server/05): finished Premium exports, encrypted at
 // rest, live here. parseMasterKey rejects malformed key material — a bad key
@@ -60,6 +70,7 @@ const app = createApp({
   },
   history,
   mail,
+  google,
   // The one-time links in transactional email are absolute (email/02): the
   // verification email a new account waits on, and the resend that replaces a
   // lost one.

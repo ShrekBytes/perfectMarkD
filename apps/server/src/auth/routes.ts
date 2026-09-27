@@ -51,6 +51,13 @@ export interface AuthOptions {
   sendLimiter?: SendLimiter;
   /** Injectable clock (tests control session expiry). */
   now?: Clock;
+  /**
+   * Whether this deployment has Google Sign-In configured (google-signin/01).
+   * Only the /providers advertisement reads it — the flow's own routes are not
+   * mounted at all without a client, so an unconfigured instance answers 404
+   * there and the SPA renders no button.
+   */
+  googleSignIn?: boolean;
   /** Diagnostics sink; a mail failure the flow cannot fail on is logged here. */
   log?: LogSink;
 }
@@ -543,6 +550,16 @@ export function authRoutes(options: AuthOptions) {
       ? c.json({ user: publicUser(user) })
       : c.json({ error: 'Not signed in.' }, 401);
   });
+
+  /**
+   * What sign-in methods this instance has (google-signin/01), for a sign-in
+   * page nobody is signed in to yet. Always mounted; `google` is false on a
+   * deployment with no OAuth client, which is how the button stays absent
+   * rather than broken (spec §SPA surface).
+   */
+  app.get('/providers', (c) =>
+    c.json({ google: options.googleSignIn === true }),
+  );
 
   /**
    * Email change, requested from the Account page (stories 15–17).

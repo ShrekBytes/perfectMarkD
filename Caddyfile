@@ -52,8 +52,11 @@
 	}
 
 	# API (auth, billing, admin, export, history) and the health probe go to
-	# the api container; everything else is the SPA.
-	@backend path /api /api/* /healthz
+	# the api container; everything else is the SPA. /auth/google is the Google
+	# Sign-In callback (google-signin/01): it is a browser navigation back from
+	# Google's consent screen, at the address the OAuth client registered, so it
+	# cannot live under /api where the SPA's deep links would swallow it.
+	@backend path /api /api/* /healthz /auth/google /auth/google/*
 	handle @backend {
 		reverse_proxy {$API_UPSTREAM:api:3000}
 	}

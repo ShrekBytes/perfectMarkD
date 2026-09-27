@@ -544,8 +544,8 @@ describe('POST /api/auth/reset-password', () => {
     const { app, mailer, db } = makeApp();
     await signedIn(app, mailer);
     // What a Google-registered account looks like to this table: no password of
-    // its own. (The column is NOT NULL today, so the empty string stands in for
-    // the null google-signin introduces.) This database holds one account.
+    // its own. (The column is NOT NULL, so an empty hash is how google-signin/01
+    // writes a passwordless account.) This database holds one account.
     db.update(users).set({ passwordHash: '' }).run();
     await requestReset(app, 'reader@example.com');
 

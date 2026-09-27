@@ -19,6 +19,10 @@ describe('loadEnv', () => {
       resendApiKey: null,
       mailFrom: null,
       mailMode: null,
+      googleClientId: null,
+      googleClientSecret: null,
+      googleRedirectUri:
+        'https://perfectmarkd.00022000.xyz/auth/google/callback',
     });
   });
 
@@ -40,6 +44,8 @@ describe('loadEnv', () => {
         RESEND_API_KEY: 're_provider-key',
         MAIL_FROM: 'PerfectMarkD <hello@perfectmarkd.00022000.xyz>',
         MAIL_MODE: 'console',
+        GOOGLE_CLIENT_ID: 'client-id.apps.googleusercontent.com',
+        GOOGLE_CLIENT_SECRET: 'GOCSPX-secret',
       }),
     ).toEqual({
       port: 8080,
@@ -57,6 +63,10 @@ describe('loadEnv', () => {
       resendApiKey: 're_provider-key',
       mailFrom: 'PerfectMarkD <hello@perfectmarkd.00022000.xyz>',
       mailMode: 'console',
+      googleClientId: 'client-id.apps.googleusercontent.com',
+      googleClientSecret: 'GOCSPX-secret',
+      googleRedirectUri:
+        'https://perfectmarkd.00022000.xyz/auth/google/callback',
     });
   });
 
@@ -82,6 +92,19 @@ describe('loadEnv', () => {
     expect(loadEnv({ RESEND_API_KEY: '  ' }).resendApiKey).toBeNull();
     expect(loadEnv({ MAIL_FROM: '' }).mailFrom).toBeNull();
     expect(loadEnv({ PUBLIC_ORIGIN: '  ' }).publicOrigin).toBeNull();
+    expect(loadEnv({ GOOGLE_CLIENT_ID: ' ' }).googleClientId).toBeNull();
+  });
+
+  it('points Google Sign-In at the deployment that registered the callback', () => {
+    expect(loadEnv({}).googleRedirectUri).toBe(
+      'https://perfectmarkd.00022000.xyz/auth/google/callback',
+    );
+    // Development has its own API, so it registers its own entry.
+    expect(
+      loadEnv({
+        GOOGLE_REDIRECT_URI: 'http://localhost:3000/auth/google/callback',
+      }).googleRedirectUri,
+    ).toBe('http://localhost:3000/auth/google/callback');
   });
 
   it('accepts a public origin and strips its trailing slash', () => {

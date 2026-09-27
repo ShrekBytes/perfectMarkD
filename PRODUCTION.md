@@ -60,6 +60,7 @@ for k in SESSION_SECRET HISTORY_ENCRYPTION_KEY UMAMI_APP_SECRET \
 | `EXPORT_CONCURRENCY`                    | `1` — see the note below                                       |
 | `CADDY_HTTP_PORT`                       | `8901` — nginx already holds `:80` on this machine             |
 | `BACKUP_ENABLED`                        | `0` for now                                                    |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | from your Google Cloud OAuth client — leave both empty to keep Google Sign-In switched off |
 
 > **Reusing an old `api-data` volume?** You must reuse that volume's
 > `HISTORY_ENCRYPTION_KEY`, or its Export History stays undecryptable forever

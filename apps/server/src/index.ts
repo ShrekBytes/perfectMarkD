@@ -24,6 +24,8 @@ import { meRoutes } from './me.js';
 import { resolveAiContext, type AiAppOptions } from './ai/context.js';
 import { aiRoutes } from './ai/routes.js';
 import type { Mailer } from './mail/mailer.js';
+import { googleRoutes } from './google/routes.js';
+import type { GoogleSignIn } from './google/exchange.js';
 
 export interface AppEnv {
   Variables: {
@@ -109,6 +111,13 @@ export interface CreateAppOptions {
    * carries our DKIM signature.
    */
   publicOrigin: string;
+  /**
+   * Google Sign-In (google-signin/01): the deployment's OAuth client. Absent
+   * (either half of the pair) means the feature is absent — the routes are not
+   * mounted and the SPA renders no button. Unlike the mailer, this is not a boot
+   * gate: a deployment without Google Sign-In is complete, not degraded.
+   */
+  google?: GoogleSignIn | null;
 }
 
 /**
@@ -128,6 +137,7 @@ export function createApp({
   ai: aiOptions,
   mail,
   publicOrigin,
+  google,
 }: CreateAppOptions) {
   const clock: Clock = now ?? (() => new Date());
   // One send budget for the whole instance, built here and handed to every route
@@ -211,6 +221,7 @@ export function createApp({
         publicOrigin,
         authRateLimit,
         sendLimiter,
+        googleSignIn: Boolean(google),
         now: clock,
         log,
       }),
@@ -231,12 +242,40 @@ export function createApp({
     // commands themselves are hidden client-side when unconfigured.
     .route('/api/ai', aiRoutes({ ai, now: clock, log }));
 
+  // Google Sign-In (google-signin/01): mounted only when the deployment
+  // configured an OAuth client. Unconfigured, the routes do not exist at all —
+  // an absent feature, not a broken one — and /api/auth/providers reports it
+  // off, which is what keeps the SPA's button off the page.
+  //
+  // The flow is mounted at the app's root rather than under /api because the
+  // redirect URI is registered with the OAuth client, and the operator
+  // registers the address a person actually comes back to. Same origin either
+  // way in production (Caddy serves the SPA and the API from one hostname);
+  // the proxy passes /auth/google through to the API.
+  const withGoogle = google
+    ? app.route(
+        '/auth/google',
+        googleRoutes({
+          google,
+          publicOrigin,
+          sessionSecret,
+          adminEmail,
+          authRateLimit,
+          now: clock,
+          log,
+        }),
+      )
+    : app;
+
   // Export History (server/05) mounts whenever storage is configured; the
   // Server Export API additionally needs its worker options. A composition
   // without history (some tests) simply has no /api/history routes.
   const withHistory = history
-    ? app.route('/api/history', historyRoutes({ store: history, now: clock }))
-    : app;
+    ? withGoogle.route(
+        '/api/history',
+        historyRoutes({ store: history, now: clock }),
+      )
+    : withGoogle;
 
   return exportApp ? withHistory.route('/api/export', exportApp) : withHistory;
 }

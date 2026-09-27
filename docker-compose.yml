@@ -91,6 +91,14 @@ services:
       # AI Actions (ADR-0008): deployment-level provider key; unset means the
       # instance reports AI as unavailable (no key is ever stored in the db).
       AI_API_KEY: ${AI_API_KEY:-}
+      # Google Sign-In (google-signin/01). Optional like AI_API_KEY: an unset
+      # client id or secret means the feature does not exist, so the api mounts
+      # no routes and the sign-in page shows no button. The redirect URI
+      # defaults in the server to the production callback; development
+      # overrides it.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       # Transactional email (ADR-0013). The API itself refuses to boot without
       # the key and the from-address, so compose cannot mark them required the
       # way it does the two secrets above — MAIL_MODE=console is the local

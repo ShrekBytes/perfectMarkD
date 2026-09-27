@@ -63,12 +63,29 @@ export interface ServerEnv {
    * mode, so the gate stays shut.
    */
   mailMode: MailMode | null;
+  /**
+   * Google Sign-In (google-signin/01): the OAuth client's id and secret, from
+   * the deployment's own Google project. Absent (either half) means the feature
+   * is absent — not a boot gate, just a feature this instance does not have.
+   */
+  googleClientId: string | null;
+  googleClientSecret: string | null;
+  /**
+   * The redirect URI registered with that client, and the one the flow sends
+   * Google's consent screen back to. Defaults to the shipped deployment's
+   * callback; development points it at its own API.
+   */
+  googleRedirectUri: string;
 }
 
 const DEFAULT_DB_PATH = './data/perfectmarkd.db';
 const DEFAULT_HISTORY_DIR = './data/history';
 const DEFAULT_EXPORT_CONCURRENCY = 2;
 const DEFAULT_EXPORT_BURST_PER_MINUTE = 10;
+/** The callback the shipped deployment registers with its OAuth client (the
+ *  same host Caddy serves the SPA and the API on). */
+const DEFAULT_GOOGLE_REDIRECT_URI =
+  'https://perfectmarkd.00022000.xyz/auth/google/callback';
 /** The whole job's deadline (launch/05): handshake, page run, and print. A
  *  300-page document renders in a few seconds, so a job still going after a
  *  minute is stuck, not slow — and the queue slot it holds is the reason the
@@ -111,6 +128,10 @@ export function loadEnv(
     // boot gate shut rather than quietly starting an instance that sends
     // nothing.
     mailMode: nonEmpty(source.MAIL_MODE) === 'console' ? 'console' : null,
+    googleClientId: nonEmpty(source.GOOGLE_CLIENT_ID),
+    googleClientSecret: nonEmpty(source.GOOGLE_CLIENT_SECRET),
+    googleRedirectUri:
+      nonEmpty(source.GOOGLE_REDIRECT_URI) ?? DEFAULT_GOOGLE_REDIRECT_URI,
   };
 }
 

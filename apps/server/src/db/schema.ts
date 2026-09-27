@@ -212,6 +212,35 @@ export const emailTokens = sqliteTable('email_tokens', {
 });
 
 /**
+ * A third-party identity linked to an account (google-signin/01): Google's
+ * stable account id plus the address Google had proven at the moment it was
+ * linked. The provider is part of the key, so one identity belongs to one
+ * account (sign in by subject alone) and a second provider is additive — new
+ * rows under a new provider value, no migration.
+ *
+ * The address is a record of what was proven, not a login name: matching an
+ * account on it is the auto-link rule's *second* step, after the subject, and
+ * the account's own email is what the app shows.
+ */
+export const identities = sqliteTable(
+  'identities',
+  {
+    provider: text('provider').notNull(), // 'google' today
+    /** Google's `sub`: stable for the life of the Google account. */
+    subject: text('subject').notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The provider-verified address at link time. */
+    email: text('email').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.subject] })],
+);
+
+/**
  * A user's submitted request to verify a Manual Payment (ADR-0005). Pending
  * until the Admin verifies or rejects it. Amounts are decimal strings, not
  * floats — they must round-trip exactly what was shown to the user and what
