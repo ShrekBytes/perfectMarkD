@@ -197,9 +197,14 @@ describe('LibraryPanel', () => {
       'Via menu{Enter}',
     );
 
-    expect(
-      useDocumentStore.getState().docs.find((row) => row.name === 'Via menu'),
-    ).toBeDefined();
+    // 'Second' is not the open document, so the rename takes the store's async
+    // path: it reads the record, writes, broadcasts, and only then updates the
+    // list. Asserting straight after {Enter} raced that write.
+    await waitFor(() => {
+      expect(
+        useDocumentStore.getState().docs.find((row) => row.name === 'Via menu'),
+      ).toBeDefined();
+    });
   });
 
   it('closes the kebab menu on Escape and returns focus to its trigger', async () => {

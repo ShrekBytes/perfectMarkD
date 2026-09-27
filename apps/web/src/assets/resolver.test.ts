@@ -100,6 +100,33 @@ it('resolves lazily outside warmup, via the same cache', async () => {
   expect(urls.create).toHaveBeenCalledTimes(1);
 });
 
+it('contains a lost lazy read instead of leaving an unhandled rejection', async () => {
+  const rejections: unknown[] = [];
+  const record = (reason: unknown) => {
+    rejections.push(reason);
+  };
+  process.on('unhandledRejection', record);
+  try {
+    const resolve = createAssetResolver(db, 'blob-url');
+    // The connection goes away under the lazy read — a closing tab, or
+    // another tab upgrading the schema. A synchronous resolve() has already
+    // answered by then, so nothing is left to observe the read failing, and
+    // `idb` attaches no handler of its own: the rejection has to be contained
+    // here or it reaches the process.
+    expect(resolve(assetRef('a1'))).toBeUndefined();
+    db.close();
+    // Long enough for Node to report an unhandled rejection: the microtask
+    // queue drains, then the check runs on the next macrotask turn.
+    await new Promise((resolve_) => setTimeout(resolve_, 0));
+    await new Promise((resolve_) => setImmediate(resolve_));
+    await new Promise((resolve_) => setTimeout(resolve_, 0));
+  } finally {
+    process.off('unhandledRejection', record);
+  }
+
+  expect(rejections).toEqual([]);
+});
+
 it('revokes blob URLs on dispose and leaves other URLs alone', async () => {
   const resolve = createAssetResolver(db, 'blob-url');
   await resolve.warmup([assetRef('a1'), 'https://example.com/x.png']);

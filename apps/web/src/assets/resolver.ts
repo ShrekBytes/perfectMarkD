@@ -82,7 +82,15 @@ export function createAssetResolver(
     if (parseAssetRef(ref) === null) return ref; // passthrough needs no IO
     const cached = cache.get(ref);
     if (cached !== undefined) return cached;
-    void resolveAsync(ref);
+    // This call is synchronous, so its caller has already moved on and there
+    // is nobody left to tell that the read failed. Nothing awaits the promise
+    // — `void` on a rejected one is an unhandled rejection, which is how a
+    // lost read (a connection closing under it, a transaction aborted by
+    // another tab's schema upgrade) turned an otherwise green test run red.
+    // The `.finally` above already drops it from `inflight`, so a lost read
+    // stays a cache miss the next call retries, and undefined is already this
+    // path's answer.
+    void resolveAsync(ref).catch(() => undefined);
     return undefined;
   }) as AssetResolverCache;
 
