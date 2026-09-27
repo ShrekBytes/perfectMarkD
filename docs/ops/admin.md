@@ -74,6 +74,17 @@ until they do.
    one of their devices is signed out. Say so, or they will be surprised by the
    logouts.
 
+Both mail actions draw on the **same send budget** as everything else the
+instance emails — registrations, resends, and customers asking for their own
+reset link. That is deliberate: the panel's messages drain the mail provider's
+daily cap exactly as a customer's own would, and one shared budget is what bounds
+it once. The practical consequence is that you get a few links an hour per
+address and ten per hour from your own connection. Over that, the panel says so
+and sends nothing; a user who has just been mailed a link is in the same share,
+so a burst of panel clicks can leave a customer who emails you at the same moment
+waiting an hour. If you ever need to mail a batch of users, that is the moment to
+raise the limit rather than to look for a way around it.
+
 If the account has never verified its email, the confirmation says a
 **verification link** went instead. That is deliberate: sign-in stays locked
 until the address is proven, so a reset link would have been a dead end. The

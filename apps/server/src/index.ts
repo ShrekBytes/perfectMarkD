@@ -8,6 +8,7 @@ import { authRoutes, type AuthOptions } from './auth/routes.js';
 import { orderRoutes } from './orders/routes.js';
 import { adminRoutes } from './admin/routes.js';
 import { setSessionCookie } from './auth/http.js';
+import { createSendLimiter } from './auth/rate-limit.js';
 import {
   SESSION_COOKIE,
   userForSessionToken,
@@ -129,6 +130,13 @@ export function createApp({
   publicOrigin,
 }: CreateAppOptions) {
   const clock: Clock = now ?? (() => new Date());
+  // One send budget for the whole instance, built here and handed to every route
+  // that can mail a user. It lives at the composition root rather than inside
+  // one router because "one budget for all of them" (spec §Rate limits) is a
+  // fact about the wiring: registration, the resends, the reset requests, the
+  // email changes, and the admin panel's two all draw on these counters, so a
+  // flood started from any of them is bounded once.
+  const sendLimiter = createSendLimiter(authRateLimit);
   // The AI context is resolved once: the environment key plus the provider
   // seam. With no key the context is inert — AI reports as unconfigured and
   // no surface can reach a provider.
@@ -202,6 +210,7 @@ export function createApp({
         adminEmail,
         publicOrigin,
         authRateLimit,
+        sendLimiter,
         now: clock,
         log,
       }),
@@ -209,7 +218,13 @@ export function createApp({
     .route('/api/orders', orderRoutes())
     .route(
       '/api/admin',
-      adminRoutes({ now: clock, publicOrigin, removeStoredFile, ai }),
+      adminRoutes({
+        now: clock,
+        publicOrigin,
+        sendLimiter,
+        removeStoredFile,
+        ai,
+      }),
     )
     // AI Actions (ai-transforms/05): always mounted so the AI Access switch
     // and typed gate refusals work even on an instance with no key. The

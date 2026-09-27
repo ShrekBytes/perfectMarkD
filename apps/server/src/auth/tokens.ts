@@ -7,9 +7,10 @@
 // every flow's spent rows.
 //
 // The raw token leaves the server exactly once — inside the absolute link the
-// Mailer sends. `oneTimeLink` here knows the link's shape and the route knows
-// the public origin, so the two meet in the route: the Mailer's own contract is
-// that it never sees anything but an address and a URL (ADR-0013).
+// Mailer sends. `oneTimeLink` here knows the link's shape and the sender needs
+// the public origin, so `createLinkSender` binds the two and hands the routes one
+// operation per purpose: the Mailer's own contract is that it never sees
+// anything but an address and a URL (ADR-0013).
 //
 // Spent and expired rows are swept opportunistically by the flow that issues a
 // link, not by a timer: the table only grows when a message goes out, so the
@@ -19,6 +20,7 @@
 import { and, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { AppDatabase } from '../db/database.js';
 import { emailTokens, type TokenPurpose } from '../db/schema.js';
+import type { Mailer } from '../mail/mailer.js';
 import { hashOpaqueToken, newOpaqueToken } from './opaque-token.js';
 
 export type { TokenPurpose };
@@ -140,4 +142,67 @@ export function oneTimeLink(
   token: string,
 ): string {
   return `${origin}${path}?token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * The SPA page each kind of link points at. A link's page and its authority are
+ * one decision, so they live in one table: a reset link that opened the
+ * verification page would be a reset link whose token is the wrong purpose.
+ *
+ * The web router names the same pages (`apps/web/src/router.tsx`); these strings
+ * and those routes have to agree, which is why both are written out rather than
+ * derived.
+ */
+const LINK_PATH = {
+  verification: '/verify-email',
+  password_reset: '/set-password',
+  email_change: '/confirm-email-change',
+} satisfies Record<TokenPurpose, string>;
+
+/** The Mailer operation each kind of link travels in. */
+const MAIL_FOR_PURPOSE = {
+  verification: (mailer, email) => mailer.sendVerification(email),
+  password_reset: (mailer, email) => mailer.sendPasswordReset(email),
+  email_change: (mailer, email) => mailer.sendEmailChange(email),
+} satisfies Record<
+  TokenPurpose,
+  (mailer: Mailer, email: { to: string; url: string }) => Promise<void>
+>;
+
+/** The link a sender is asked for: what it is for, and who it goes to. */
+export interface LinkRequest {
+  purpose: TokenPurpose;
+  userId: number;
+  /** The one address the message is allowed to mention (ADR-0013). */
+  to: string;
+  /** The flow's own data, when the link carries any (email/04's new address). */
+  payload?: string | null;
+}
+
+/**
+ * Issues a link and mails it, for every route that can send one.
+ *
+ * One function because the purpose decides four things that must not be able to
+ * disagree: the page the link opens, the window it lives in, the Mailer
+ * operation it travels in, and the token's purpose in the database. A route that
+ * assembled those itself had four chances to send a reset link with a
+ * verification token, or a link to a page that cannot spend it.
+ */
+export function createLinkSender({
+  origin,
+  now = () => new Date(),
+}: {
+  /** PUBLIC_ORIGIN: the address users reach this instance on. */
+  origin: string;
+  now?: () => Date;
+}) {
+  return async function sendLink(
+    mailer: Mailer,
+    db: AppDatabase,
+    { purpose, userId, to, payload = null }: LinkRequest,
+  ): Promise<void> {
+    const token = issueToken(db, { purpose, userId, payload }, now());
+    const url = oneTimeLink(origin, LINK_PATH[purpose], token);
+    await MAIL_FOR_PURPOSE[purpose](mailer, { to, url });
+  };
 }

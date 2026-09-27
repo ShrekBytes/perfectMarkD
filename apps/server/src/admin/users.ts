@@ -1,23 +1,19 @@
 import { unlinkSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
 import { orderView, type OrderView } from '../orders/routes.js';
 import { methodForCoinNetwork } from '../orders/payment.js';
 import { getPlanLimits, getWallets } from '../db/settings.js';
+import { normalizeEmail } from '../auth/routes.js';
 import {
-  normalizeEmail,
-  CONFIRM_EMAIL_CHANGE_PATH,
-  SET_PASSWORD_PATH,
-  VERIFY_PATH,
-} from '../auth/routes.js';
-import {
-  issueToken,
-  oneTimeLink,
+  createLinkSender,
   PASSWORD_RESET_TOKEN_TTL_MS,
   VERIFICATION_TOKEN_TTL_MS,
 } from '../auth/tokens.js';
+import { clientIp } from '../auth/http.js';
+import { createSendLimiter, type SendLimiter } from '../auth/rate-limit.js';
 import {
   auditLogs,
   entitlements,
@@ -63,6 +59,14 @@ export interface UsersRoutesOptions {
    * this panel mails are built from it and from nothing else.
    */
   publicOrigin: string;
+  /**
+   * The instance-wide send budget, the same object the auth routes spend
+   * (spec §Rate limits): the panel's mail is as capable of draining the
+   * provider's daily cap as a customer's own reset request, so it draws on the
+   * same counters rather than getting a pool of its own. Omitted, this router
+   * builds a private one.
+   */
+  sendLimiter?: SendLimiter;
   /**
    * Removes an Export History file after account deletion. Defaults to
    * best-effort unlinking of absolute paths; server/03 owns the storage
@@ -269,20 +273,6 @@ function parseUserId(raw: string): number | null {
 }
 
 /**
- * The SPA page a link of each kind points at. The same map the sign-in page's
- * reset request follows, so the panel's link and the user's own land on the same
- * form — a link's authority and the page that spends it are one decision.
- */
-const LINK_PATH = {
-  verification: VERIFY_PATH,
-  password_reset: SET_PASSWORD_PATH,
-} as const;
-
-function pathFor(kind: keyof typeof LINK_PATH): string {
-  return LINK_PATH[kind];
-}
-
-/**
  * The audit entry for a link this panel mailed.
  *
  * `after` says a link went out and stops there: the account does not move until
@@ -319,9 +309,45 @@ function emailPattern(query: string): string {
 export function usersRoutes({
   now = () => new Date(),
   publicOrigin,
+  sendLimiter = createSendLimiter(),
   removeStoredFile = removeStoredFileDefault,
 }: UsersRoutesOptions) {
   const app = new Hono<AppEnv>();
+  const sendLink = createLinkSender({ origin: publicOrigin, now });
+
+  /**
+   * The one send budget this instance shares with every other route that can
+   * mail a user, on the same two keys. The panel's messages drain the provider's
+   * daily cap exactly as a customer's own would, so a separate meter would only
+   * mean a second way to drain it that nobody is watching.
+   *
+   * Keyed on the *target's* address, so the sharp per-address rule protects the
+   * inbox itself: one address cannot be mailed three times an hour by anyone,
+   * the Admin included. What actually bounds the Admin is the per-IP key, since
+   * every click comes from their one machine.
+   *
+   * The refusal says what happened. The sign-in page's "too many attempts" would
+   * send an operator hunting for a mistake they did not make — they clicked
+   * twice.
+   */
+  const rejectOverSendBudget = (c: Context<AppEnv>, address: string) => {
+    for (const [limiter, key] of [
+      [sendLimiter.perIp, clientIp(c)],
+      [sendLimiter.perAddress, address],
+    ] as const) {
+      const decision = limiter.check(key);
+      if (decision.allowed) continue;
+      c.header('retry-after', String(decision.retryAfterSeconds));
+      return c.json(
+        {
+          error:
+            'This instance has already mailed its share of links this hour. Try again shortly.',
+        },
+        429,
+      );
+    }
+    return null;
+  };
 
   app.get('/', (c) => {
     const db = c.var.db;
@@ -597,14 +623,18 @@ export function usersRoutes({
     const user = db.select().from(users).where(eq(users.id, id)).get();
     if (!user) return c.json({ error: 'User not found.' }, 404);
 
+    const overBudget = rejectOverSendBudget(c, user.email);
+    if (overBudget) return overBudget;
+
+    // email/03's repair rule, applied to the same question: the purpose decides
+    // the page, the window, and the message, so there is no way to send a reset
+    // link carrying a verification token.
     const kind = user.verifiedAt ? 'password_reset' : 'verification';
-    const token = issueToken(db, { purpose: kind, userId: user.id }, now());
-    const url = oneTimeLink(publicOrigin, pathFor(kind), token);
-    if (kind === 'verification') {
-      await c.var.mailer.sendVerification({ to: user.email, url });
-    } else {
-      await c.var.mailer.sendPasswordReset({ to: user.email, url });
-    }
+    await sendLink(c.var.mailer, db, {
+      purpose: kind,
+      userId: user.id,
+      to: user.email,
+    });
     recordMailedLink(db, admin, user.id, 'user.reset_link');
     // The window in minutes, so the panel states the server's own rather than a
     // copy of it that can fall behind.
@@ -656,16 +686,19 @@ export function usersRoutes({
       return c.json({ error: 'That is already the user’s login email.' }, 400);
     }
 
+    // The budget comes after the refusals above, not before: it is a shared
+    // counter, so a request that was never going to send must not draw on it and
+    // leave a user who is actually locked out with no way back.
+    const overBudget = rejectOverSendBudget(c, newEmail);
+    if (overBudget) return overBudget;
+
     // The new address rides along as the link's payload, so the swap needs
     // nothing but the token to know where the account is going.
-    const token = issueToken(
-      db,
-      { purpose: 'email_change', userId: user.id, payload: newEmail },
-      now(),
-    );
-    await c.var.mailer.sendEmailChange({
+    await sendLink(c.var.mailer, db, {
+      purpose: 'email_change',
+      userId: user.id,
       to: newEmail,
-      url: oneTimeLink(publicOrigin, CONFIRM_EMAIL_CHANGE_PATH, token),
+      payload: newEmail,
     });
     recordMailedLink(db, admin, user.id, 'user.email_change');
     return c.json({ email: newEmail });

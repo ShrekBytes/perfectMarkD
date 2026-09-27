@@ -1156,6 +1156,154 @@ describe('POST /api/admin/users/:id/email', () => {
 });
 
 describe('the links the panel issues', () => {
+  it('spends the same send budget the sign-in page spends', async () => {
+    // Spec §Rate limits and story 24: one budget for every message this instance
+    // sends, whatever route it came out of. The panel's link is as capable of
+    // draining the provider's cap as a registration is, so a private meter here
+    // would be a second, unwatched way to drain it. This is the test that fails
+    // if the two routers stop sharing.
+    //
+    // Two per address: one goes to registering the account, one to the panel's
+    // link. A third has nothing left, which is the whole point.
+    const { app, db } = makeApp({
+      adminEmail: 'owner@example.com',
+      authRateLimit: {
+        emailSend: {
+          perAddress: { limit: 2, windowMs: 60_000 },
+          perIp: { limit: 20, windowMs: 60_000 },
+        },
+      },
+    });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+
+    expect(
+      (
+        await postJson(
+          app,
+          `/api/admin/users/${userIdFor(db, 'reader@example.com')}/password`,
+          {},
+          admin,
+        )
+      ).status,
+    ).toBe(200);
+
+    // That inbox's own share is gone, so the customer asking for it is refused —
+    // the panel's click spent the budget the sign-in page draws on.
+    const forReader = await postJson(app, '/api/auth/request-password-reset', {
+      email: 'reader@example.com',
+    });
+
+    expect(forReader.status).toBe(429);
+    expect(forReader.headers.get('retry-after')).toBeTruthy();
+    // …and only that inbox's: an untouched address still has its full share, so
+    // the refusal above is a shared counter and not the router refusing outright.
+    expect(
+      (
+        await postJson(app, '/api/auth/request-password-reset', {
+          email: 'stranger@example.com',
+        })
+      ).status,
+    ).toBe(200);
+  });
+
+  it('refuses the panel over the per-IP key, in the Admin’s own words', async () => {
+    // What bounds the Admin is their own IP — every click comes from one machine —
+    // and the refusal cannot be the sign-in page's "too many attempts", which
+    // would send an operator hunting for a mistake they did not make.
+    //
+    // Four per IP: two go to registering the two accounts, leaving exactly two
+    // sends before the third is refused.
+    const { app, db } = makeApp({
+      adminEmail: 'owner@example.com',
+      authRateLimit: {
+        emailSend: {
+          perAddress: { limit: 20, windowMs: 60_000 },
+          perIp: { limit: 4, windowMs: 60_000 },
+        },
+      },
+    });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+    const send = () =>
+      postJson(
+        app,
+        `/api/admin/users/${userIdFor(db, 'reader@example.com')}/password`,
+        {},
+        admin,
+      );
+
+    expect((await send()).status).toBe(200);
+    expect((await send()).status).toBe(200);
+    const refused = await send();
+
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get('retry-after')).toBeTruthy();
+    expect(await refused.json()).toMatchObject({
+      error: expect.stringContaining('already mailed its share of links'),
+    });
+    // Nothing was sent and nothing was logged, so a refused request leaves no
+    // token row and no audit entry claiming a link went out. (The account's own
+    // registration link is in the same fake, so this counts the panel's.)
+    expect(
+      mailer.sends.filter(
+        (s) => s.to === 'reader@example.com' && s.kind === 'password_reset',
+      ),
+    ).toHaveLength(2);
+    const entries = (await auditEntries(app, admin)) as Array<{
+      action: string;
+    }>;
+    expect(
+      entries.filter((row) => row.action === 'user.reset_link'),
+    ).toHaveLength(2);
+  });
+
+  it('does not spend the budget on a request that sends nothing', async () => {
+    // The same ordering email/04's review pinned on /change-email: a refusal that
+    // is going to happen anyway must not draw down a counter a user who is
+    // genuinely locked out still needs. Two per address: one goes to registering
+    // the account, so the send below is only possible if the two refusals left
+    // theirs alone.
+    const { app, db } = makeApp({
+      adminEmail: 'owner@example.com',
+      authRateLimit: {
+        emailSend: {
+          perAddress: { limit: 2, windowMs: 60_000 },
+          perIp: { limit: 20, windowMs: 60_000 },
+        },
+      },
+    });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+    const id = userIdFor(db, 'reader@example.com');
+
+    expect(
+      (
+        await postJson(
+          app,
+          `/api/admin/users/${id}/email`,
+          { email: 'not-an-address' },
+          admin,
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await postJson(
+          app,
+          `/api/admin/users/${id}/email`,
+          { email: 'reader@example.com' },
+          admin,
+        )
+      ).status,
+    ).toBe(400);
+    // The budget the two refusals did not touch is still the user's to spend.
+    expect(
+      (await postJson(app, `/api/admin/users/${id}/password`, {}, admin))
+        .status,
+    ).toBe(200);
+  });
+
   it('leaves an earlier link spendable when a second one is issued', async () => {
     // A second attempt is where the panel comes from (a mistyped address, a link
     // the user lost), so a fresh link has to work — and it must not quietly

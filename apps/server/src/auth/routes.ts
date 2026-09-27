@@ -22,9 +22,11 @@ import type { LogSink } from '../request-logger.js';
 import {
   DEFAULT_AUTH_RATE_LIMITS,
   FixedWindowRateLimiter,
+  createSendLimiter,
   type AuthRateLimitConfig,
+  type SendLimiter,
 } from './rate-limit.js';
-import { issueToken, oneTimeLink, redeemToken } from './tokens.js';
+import { createLinkSender, redeemToken } from './tokens.js';
 
 export interface AuthOptions {
   /** Signs session cookies; resolved from env by createApp. */
@@ -39,6 +41,14 @@ export interface AuthOptions {
   publicOrigin: string;
   /** Per-route overrides for the auth rate limits (tests tighten these). */
   authRateLimit?: AuthRateLimitConfig;
+  /**
+   * The instance-wide send budget, built at the composition root and shared with
+   * every route that can mail a user — the admin panel's two included, so a flood
+   * started from one of them is bounded by the same counters as a flood started
+   * from the sign-up form. Omitted, this router builds a private one, which is
+   * what a suite testing auth alone wants.
+   */
+  sendLimiter?: SendLimiter;
   /** Injectable clock (tests control session expiry). */
   now?: Clock;
   /** Diagnostics sink; a mail failure the flow cannot fail on is logged here. */
@@ -56,21 +66,6 @@ const CURRENT_PASSWORD_WRONG = 'Current password is incorrect.';
 // with a dot. Anything stricter rejects valid addresses; verification is a
 // link the owner follows, which is what proves the address. See normalizeEmail.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** The SPA page a verification link resolves to; it spends the token over the
- *  API, so a link scanner that follows the URL in an inbox cannot spend it. */
-export const VERIFY_PATH = '/verify-email';
-
-/** The SPA page a reset link resolves to. It holds the new-password form and
- *  spends the token when one is chosen — not on load, or a link preview that
- *  fetched the page would burn it before the user typed anything. Also the page
- *  the Admin panel's reset link points at, so the two cannot drift. */
-export const SET_PASSWORD_PATH = '/set-password';
-
-/** The SPA page an email-change link resolves to; it spends the token over the
- *  API, the way the verification and reset links do. Also the page the Admin
- *  panel's email change points at — the swap is the same operation. */
-export const CONFIRM_EMAIL_CHANGE_PATH = '/confirm-email-change';
 
 /**
  * Codes the client branches on, never the message beside them: the sign-in gate
@@ -183,13 +178,13 @@ export function authRoutes(options: AuthOptions) {
     // they are the same attack — guessing a password through a stolen session —
     // and two budgets would only mean twice the guesses.
     passwordConfirm: new FixedWindowRateLimiter(limits.changePassword),
-    // Registration and the resend send the same kind of message, so they share
-    // one send budget on both keys: the per-IP rule above bounds account
-    // creation at ten a minute and says nothing about mail, and a per-IP rule
-    // alone cannot see a flood aimed at one inbox from many hosts.
-    sendAddress: new FixedWindowRateLimiter(limits.emailSend.perAddress),
-    sendIp: new FixedWindowRateLimiter(limits.emailSend.perIp),
   };
+  // The send budget is not here: it belongs to the instance, not to this router,
+  // because the admin panel can send the same messages and has to spend the same
+  // counters. A composition that shares it (createApp) passes it in.
+  const sendLimiter =
+    options.sendLimiter ?? createSendLimiter(options.authRateLimit);
+  const sendLink = createLinkSender({ origin: options.publicOrigin, now });
 
   /** Returns a 429 response when the key is over budget, else null. */
   const rejectRateLimited = (
@@ -204,12 +199,12 @@ export function authRoutes(options: AuthOptions) {
   };
 
   /** The send budget every "mail me a link" endpoint spends, on both its keys.
-   *  One budget for all of them: a reset request is as capable of draining the
-   *  provider's daily cap as a registration is, so it draws on the same
-   *  counters rather than getting its own. */
+   *  One budget for all of them — a reset request is as capable of draining the
+   *  provider's daily cap as a registration is, and so is the admin panel's
+   *  reset link, so none of them draws on counters of its own. */
   const rejectOverSendBudget = (c: Context<AppEnv>, address: string) =>
-    rejectRateLimited(c, limiters.sendIp) ??
-    rejectRateLimited(c, limiters.sendAddress, address);
+    rejectRateLimited(c, sendLimiter.perIp) ??
+    rejectRateLimited(c, sendLimiter.perAddress, address);
 
   /** The account an address belongs to, or null. Every flow that answers about
    *  an address without revealing whether it is registered reads it here. */
@@ -220,40 +215,6 @@ export function authRoutes(options: AuthOptions) {
       .where(eq(users.email, email))
       .get();
 
-  /** Issues a fresh verification link and mails it. */
-  const sendVerification = async (
-    c: Context<AppEnv>,
-    userId: number,
-    email: string,
-  ) => {
-    const token = issueToken(
-      c.var.db,
-      { purpose: 'verification', userId },
-      now(),
-    );
-    await c.var.mailer.sendVerification({
-      to: email,
-      url: oneTimeLink(options.publicOrigin, VERIFY_PATH, token),
-    });
-  };
-
-  /** Issues a reset link and mails it — the same email the Admin panel sends. */
-  const sendPasswordReset = async (
-    c: Context<AppEnv>,
-    userId: number,
-    email: string,
-  ) => {
-    const token = issueToken(
-      c.var.db,
-      { purpose: 'password_reset', userId },
-      now(),
-    );
-    await c.var.mailer.sendPasswordReset({
-      to: email,
-      url: oneTimeLink(options.publicOrigin, SET_PASSWORD_PATH, token),
-    });
-  };
-
   /**
    * The branch a reset request and the Admin panel's reset link share: a verified
    * account gets a reset link, an unverified one gets a verification link
@@ -261,21 +222,21 @@ export function authRoutes(options: AuthOptions) {
    * password it sets buys nothing while sign-in stays locked on Email
    * Verification — so the two flows repair each other instead.
    *
-   * The branch has two sides that must not drift (the token's purpose and the
-   * link's page), which is what made it worth one name rather than a `kind`
-   * variable compared twice at each call site.
+   * The branch has two sides that must not drift, which is why the *purpose* is
+   * what's chosen here and `sendLink` turns it into a page, a window, and a
+   * message: there is no way to pick the verification link and get a reset
+   * token.
    */
   const mailResetLink = async (
     c: Context<AppEnv>,
     userId: number,
     email: string,
   ): Promise<'password_reset' | 'verification'> => {
-    if (!accountFor(c, email)?.verifiedAt) {
-      await sendVerification(c, userId, email);
-      return 'verification';
-    }
-    await sendPasswordReset(c, userId, email);
-    return 'password_reset';
+    const purpose = accountFor(c, email)?.verifiedAt
+      ? 'password_reset'
+      : 'verification';
+    await sendLink(c.var.mailer, c.var.db, { purpose, userId, to: email });
+    return purpose;
   };
 
   /**
@@ -327,8 +288,8 @@ export function authRoutes(options: AuthOptions) {
     // check before the argon2 hash and the mail.
     const limited =
       rejectRateLimited(c, limiters.register) ??
-      rejectRateLimited(c, limiters.sendIp) ??
-      rejectRateLimited(c, limiters.sendAddress, parsed.email);
+      rejectRateLimited(c, sendLimiter.perIp) ??
+      rejectRateLimited(c, sendLimiter.perAddress, parsed.email);
     if (limited) return limited;
 
     const userId = await unverifiedAccountId(c, parsed.email, parsed.password);
@@ -338,7 +299,11 @@ export function authRoutes(options: AuthOptions) {
 
     // No session: the account cannot be used until the link is followed, so
     // there is nothing to sign in to yet.
-    await sendVerification(c, userId, parsed.email);
+    await sendLink(c.var.mailer, c.var.db, {
+      purpose: 'verification',
+      userId,
+      to: parsed.email,
+    });
     return c.json({ email: parsed.email }, 201);
   });
 
@@ -360,7 +325,13 @@ export function authRoutes(options: AuthOptions) {
     // registered one would turn this into an account-enumeration oracle. The
     // only account that gets a message is one that still needs verifying.
     const user = accountFor(c, parsed);
-    if (user && !user.verifiedAt) await sendVerification(c, user.id, parsed);
+    if (user && !user.verifiedAt) {
+      await sendLink(c.var.mailer, c.var.db, {
+        purpose: 'verification',
+        userId: user.id,
+        to: parsed,
+      });
+    }
     return c.json({ sent: true });
   });
 
@@ -627,14 +598,11 @@ export function authRoutes(options: AuthOptions) {
 
     // The new address rides along as the link's payload, so the swap needs
     // nothing but the token to know where the account is going.
-    const token = issueToken(
-      c.var.db,
-      { purpose: 'email_change', userId: user.id, payload: newEmail },
-      now(),
-    );
-    await c.var.mailer.sendEmailChange({
+    await sendLink(c.var.mailer, c.var.db, {
+      purpose: 'email_change',
+      userId: user.id,
       to: newEmail,
-      url: oneTimeLink(options.publicOrigin, CONFIRM_EMAIL_CHANGE_PATH, token),
+      payload: newEmail,
     });
     return c.json({ email: newEmail });
   });

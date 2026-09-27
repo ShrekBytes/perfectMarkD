@@ -31,19 +31,20 @@ errors.
 
 **What landed**
 
-- **One route changed meaning, one route added.** `POST
-  /api/admin/users/:id/password` no longer returns a temporary password: it
-  issues a `password_reset` token and mails it, and nothing about the account
-  changes until the user follows it. `POST /api/admin/users/:id/email` issues an
-  `email_change` token whose payload is the new address and mails that — the
-  same token, the same link page, and the same `/api/auth/confirm-email-change`
-  the Account page's link uses, so one implementation of the swap serves both
-  seats.
+- **Two API routes.** `POST /api/admin/users/:id/password` is no longer a
+  temporary password; it mails a link and returns which kind plus the window. New:
+  `POST /api/admin/users/:id/email` mails an `email_change` link to a new
+  address. Both spend the instance-wide send budget (see the second pass below).
 - **`PUBLIC_ORIGIN` reaches the admin router** (`adminRoutes` → `usersRoutes`,
   required on both). The panel's links are built from configuration like every
   other one, never from a request's Host header. That is also what deleted the
   argon2 hash from the admin path entirely: the most expensive handler in the
   admin tree is now a token insert and an HTTP POST to the mail provider.
+- **A link is one function.** `createLinkSender` (`auth/tokens.ts`) takes a
+  purpose and produces the token, the page, the window, and the message. Every
+  route that can mail a user — six endpoints across two routers — calls it, so
+  there is no place left to assemble a reset link carrying a verification token,
+  or one pointing at a page that cannot spend it.
 - **Two audit actions, `user.reset_link` and `user.email_change`**, both
   `after: { linkSent: true }` and neither recording an address — the reason
   `user.delete` does not either. `user.password_reset` is gone: nothing resets a
@@ -74,16 +75,11 @@ errors.
 - **The 30 minutes is the server's number, not the panel's.** The reply carries
   `expiresInMinutes` and the panel formats it, so the copy cannot fall behind the
   TTL the way a hard-coded 30 would.
-- **`normalizeEmail` and the three link paths are exported from
-  `auth/routes.ts`.** Two spellings of one address, or two pages for one link,
-  are both the kind of drift email/02-04 have been closing; the alternative — a
-  shared mail-link module — is the same logic in a third place. The import list
-  now shows the coupling honestly instead of hiding it.
-- **The reset branch has one name, not a `kind` compared twice.** The first
-  version computed `kind`, then used it for the token purpose, the link page, and
-  the mailer call — three ways for the two halves to disagree. The sign-in page's
-  branch is now `mailResetLink`, and the panel's link pages come from one map,
-  so the unverified branch cannot disagree with itself in two files.
+- **`normalizeEmail` is exported from `auth/routes.ts`.** Two spellings of one
+  address are the kind of drift email/02-04 have been closing, and the import now
+  shows that coupling honestly instead of hiding it behind a second normalizer.
+  (The three link *paths* are no longer exported at all: `createLinkSender` owns
+  them, so there is nothing left to export.)
 - **Uniqueness is still decided at swap time**, exactly as email/04 does it: an
   address can be claimed while the link is in flight, so an early refusal would
   refuse a state the user may never land in. The panel refuses only the one
@@ -119,28 +115,67 @@ and `spec.md`). What it changed:
 **Four findings were considered and declined, with the reasoning kept here rather
 than buried:**
 
-- **A rate limiter on the two admin send endpoints** (story 24 names *every
-  endpoint that triggers an email*). The spec's own design places the limiter in
-  `authRoutes`, and wiring an auth-shaped budget into the admin router is an
-  architectural decision this ticket has no need for: the panel's mail is one
-  deliberate click per user, behind the Admin session, and the threat it would
-  bound is a compromised admin session — which can already delete accounts and
-  grant entitlements, so the marginal loss is a drained mail quota. **Worth a
-  maintainer's call**, and the honest gap in this ticket.
-- **Extracting the "issue a token, build the link, mail it" shape** that
-  `auth/routes.ts` and `admin/users.ts` now both contain. The two send *with a
-  payload* and the two send *to the account's current address* are different
-  enough that a shared helper would need the whole mailer interface as parameters
-  — a helper that mails anything, which is the thing `ADR-0013`'s seam exists to
-  prevent. The drift that actually bit was the *unverified branch*, and that is
-  now one name.
+- **Extracting the "issue a token, build the link, mail it" shape.** The two
+  send *with a payload* and the two send *to the account's current address* are
+  different enough that a shared helper would need the whole mailer interface as
+  parameters — a helper that mails anything, which is the thing `ADR-0013`'s
+  seam exists to prevent. **Superseded:** the one helper that was worth having
+  turned out to be exactly the thing whose shape the purpose decides, so
+  `createLinkSender` in `auth/tokens.ts` is that helper and both routers call it.
+  A link's page, window, Mailer operation, and token purpose are now one table
+  that the compiler checks against `TOKEN_PURPOSES`, so a fourth purpose cannot
+  arrive without a page, a message, and a window.
 - **Sharing one field-class constant** between the new dialog and the existing
   ones. Byte-identical in three files now, but there is no shared styles module
   to put it in and inventing one is an architectural decision, not this
   ticket's — the same finding email/04 recorded and left.
-- **Admin routes still have no rate limiting of any kind**, and the panel's
-  `POST /api/admin/users/:id/email` is a cheap unauthenticated-adjacent POST
-  behind the session gate. Pre-existing, and the same reasoning as above.
+- **Admin routes still have no rate limiting of any other kind**, and the panel's
+  `POST /api/admin/users/:id/email` is a cheap POST behind the session gate.
+  Pre-existing, and the send budget is now the part that mattered.
+- **`ADMIN_EMAIL` and a self-serve email change** — see below; deliberately left
+  to whoever owns the Admin story.
+
+**A second pass, after the first review, closed the one gap it left open: the
+send budget.** Story 24 names *every endpoint that triggers an email*, and the
+first version of this ticket read the spec's "both send endpoints" as the two
+user-facing ones. The panel's two routes were outside the pool — not drawing on
+it, and not bounded by it. Fixed here, and the fix is smaller than the
+alternatives were:
+
+- **The budget is now the instance's, not the auth router's.** `createApp` builds
+  one and hands the same object to `authRoutes` and `adminRoutes`, so "one
+  budget for all of them" is a fact about the wiring rather than a convention
+  each router has to remember. Both routers fall back to a private one when not
+  given it, which is what a suite testing one of them in isolation wants — so no
+  existing test had to change.
+- **The panel's draw is keyed on the *target's* address**, so the sharp
+  per-address rule protects the inbox itself: one address cannot be mailed three
+  times an hour by anyone, the Admin included. What actually bounds the Admin is
+  the per-IP key, since every click comes from one machine — and the per-address
+  key means a user who has just been mailed a link is in the same share, so a
+  burst of panel clicks can leave a customer who emails at that moment waiting.
+  That is the honest cost of sharing, and the runbook now says it out loud rather
+  than leaving an operator to discover it.
+- **The budget is spent after the refusals, not before**, on both routes — the
+  same ordering email/04's review pinned on `/change-email`. A request that was
+  never going to send must not draw down a counter a locked-out user still needs.
+  Tested with a budget tight enough that the ordering is the only thing that
+  makes it pass.
+- **The refusal says what happened.** The sign-in page's *"Too many attempts"*
+  would send an operator hunting for a mistake they did not make — they clicked
+  twice. The panel gets *"This instance has already mailed its share of links
+  this hour."*
+- **Three tests, one of which is the acceptance criterion**: a panel send spends
+  the budget a customer's own request then cannot draw on (and an untouched
+  address still can, so it is a shared counter and not a blanket refusal); the
+  per-IP refusal, its message, and that a refused request leaves no token row and
+  no audit entry; and the ordering above.
+
+The ceiling is still `DEFAULT_AUTH_RATE_LIMITS` in `auth/rate-limit.ts` — a code
+constant, not an env var, because nothing wires `authRateLimit` to the
+environment. So if the shared budget is ever too tight, raising it is a one-line
+change and not a refactor, which is what makes sharing the safe default here
+rather than a trade-off.
 
 **Not touched, deliberately**
 

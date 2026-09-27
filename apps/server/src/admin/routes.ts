@@ -14,6 +14,7 @@ import {
 } from './users.js';
 import { settingsRoutes } from './settings-routes.js';
 import type { AiContext } from '../ai/context.js';
+import type { SendLimiter } from '../auth/rate-limit.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin panel API (billing/02): the Verification queue and audit trail behind
@@ -34,6 +35,12 @@ export interface AdminRoutesOptions {
    * one-time links are built from it, and from nothing else.
    */
   publicOrigin: string;
+  /**
+   * The instance-wide send budget, shared with the auth routes so the panel's
+   * mail is bounded by the same counters as a customer's own (spec §Rate
+   * limits).
+   */
+  sendLimiter?: SendLimiter;
   /** Removes an Export History file on account deletion (see usersRoutes). */
   removeStoredFile?: (storedPath: string) => void;
   /** The AI context for the settings panel's Test connection (03). */
@@ -67,6 +74,7 @@ function parseReason(body: unknown): string | { error: string } {
 export function adminRoutes({
   now = () => new Date(),
   publicOrigin,
+  sendLimiter,
   removeStoredFile,
   ai,
 }: AdminRoutesOptions) {
@@ -297,7 +305,10 @@ export function adminRoutes({
     });
   });
 
-  app.route('/users', usersRoutes({ now, publicOrigin, removeStoredFile }));
+  app.route(
+    '/users',
+    usersRoutes({ now, publicOrigin, sendLimiter, removeStoredFile }),
+  );
   app.route('/settings', settingsRoutes({ now, ai }));
 
   return app;

@@ -60,9 +60,12 @@ export interface AuthRateLimitConfig {
   register?: RateLimitRule;
   changePassword?: RateLimitRule;
   /**
-   * The budget for one email this instance sends, on both of its keys. The
-   * registration link and the resend are the same kind of act, so they share
-   * one budget rather than each getting their own (email/02).
+   * The budget for one email this instance sends, on both of its keys. Every
+   * route that can mail a user shares it — registration, the resends, the reset
+   * requests, the email changes, and the admin panel's two (email/02, email/05).
+   * The panel draws on the same counters because its messages drain the
+   * provider's cap exactly as a customer's own do; a meter of its own would be a
+   * second way to drain it that nothing bounds.
    */
   emailSend?: SendRateLimitConfig;
 }
@@ -73,6 +76,31 @@ export interface SendRateLimitConfig {
   perAddress: RateLimitRule;
   /** The caller's address as our proxy saw it. */
   perIp: RateLimitRule;
+}
+
+/** One shared budget, held as its two keys. */
+export interface SendLimiter {
+  perAddress: FixedWindowRateLimiter;
+  perIp: FixedWindowRateLimiter;
+}
+
+/**
+ * Builds the send budget. Called once, at the composition root, and the same
+ * object is handed to every route that can send — so "one budget for all of
+ * them" (spec §Rate limits) is a fact about the wiring rather than a convention
+ * each router has to remember.
+ *
+ * The keys merge shallowly, the way `authRoutes` always has: a config that
+ * names `emailSend` replaces it whole.
+ */
+export function createSendLimiter(
+  limits: AuthRateLimitConfig = {},
+): SendLimiter {
+  const merged = { ...DEFAULT_AUTH_RATE_LIMITS, ...limits };
+  return {
+    perAddress: new FixedWindowRateLimiter(merged.emailSend.perAddress),
+    perIp: new FixedWindowRateLimiter(merged.emailSend.perIp),
+  };
 }
 
 /** Conservative defaults; tests/ops may tighten per route. */
