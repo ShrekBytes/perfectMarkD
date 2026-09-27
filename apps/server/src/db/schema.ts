@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   primaryKey,
   sqliteTable,
@@ -212,6 +213,12 @@ export const emailTokens = sqliteTable('email_tokens', {
 });
 
 /**
+ * The provider an identity belongs to. One today; a second is a new value, and
+ * a new column read (`/api/me`'s sign-in methods) rather than a migration.
+ */
+export const GOOGLE_PROVIDER = 'google';
+
+/**
  * A third-party identity linked to an account (google-signin/01): Google's
  * stable account id plus the address Google had proven at the moment it was
  * linked. The provider is part of the key, so one identity belongs to one
@@ -237,7 +244,13 @@ export const identities = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => [primaryKey({ columns: [t.provider, t.subject] })],
+  (t) => [
+    primaryKey({ columns: [t.provider, t.subject] }),
+    // The primary key answers "which account is this identity?"; this answers
+    // "which identities does this account have?" — what GET /api/me reports as
+    // the caller's sign-in methods (google-signin/01b).
+    index('identities_user_id_idx').on(t.userId),
+  ],
 );
 
 /**

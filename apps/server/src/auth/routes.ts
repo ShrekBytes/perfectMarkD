@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
 import { isUniqueViolation } from '../db/sqlite-errors.js';
 import { asRecord, parseJson } from '../request-body.js';
@@ -63,6 +63,12 @@ export interface AuthOptions {
 }
 
 const MIN_PASSWORD_LENGTH = 8;
+
+/**
+ * The policy every route that writes a password applies, in one wording, so
+ * the sentence a user reads for the same refusal cannot drift between them.
+ */
+const NEW_PASSWORD_TOO_SHORT = `New password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
 
 /** The two answers to a wrong or missing current password, shared by the routes
  *  that ask for one (change-password, change-email) so the words a user reads
@@ -417,12 +423,7 @@ export function authRoutes(options: AuthOptions) {
       typeof newPassword !== 'string' ||
       newPassword.length < MIN_PASSWORD_LENGTH
     ) {
-      return c.json(
-        {
-          error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
-        },
-        400,
-      );
+      return c.json({ error: NEW_PASSWORD_TOO_SHORT }, 400);
     }
 
     const redeemed = redeemToken(c.var.db, 'password_reset', token, now());
@@ -517,12 +518,7 @@ export function authRoutes(options: AuthOptions) {
       typeof newPassword !== 'string' ||
       newPassword.length < MIN_PASSWORD_LENGTH
     ) {
-      return c.json(
-        {
-          error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
-        },
-        400,
-      );
+      return c.json({ error: NEW_PASSWORD_TOO_SHORT }, 400);
     }
 
     const matches = await verifyPassword(user.passwordHash, currentPassword);
@@ -538,6 +534,56 @@ export function authRoutes(options: AuthOptions) {
     // A password change signs out every other device: a session someone else
     // obtained with the old password must not survive it. The current session
     // (the one making the change) stays valid.
+    if (c.var.sessionToken) {
+      deleteOtherSessions(c.var.db, user.id, c.var.sessionToken);
+    }
+    return c.body(null, 204);
+  });
+
+  /**
+   * The first password on an account that has none (google-signin/01b) — the
+   * Account page's route for a Google-registered user, who cannot answer Change
+   * Password's question about a current password they never chose.
+   *
+   * The session is the whole check. There is no secret to guess here — the
+   * caller is already in — so this route deliberately spends none of the
+   * password routes' limiter, which exists to bound guessing.
+   *
+   * An account that already has a password is refused: otherwise this would be
+   * a second way to overwrite a password without the current one, and the
+   * Account page is offered the form that matches what /api/me reported. That
+   * refusal is the write's own condition, not a check above it — two requests
+   * racing must not both pass one, so the row is only written while it still
+   * has no password. The policy is the same minimum everywhere else, and the
+   * outcome is Change Password's: this session stays, every other one the
+   * account has is revoked. No mail goes out — the address is already verified,
+   * and the account did not ask to be reachable somewhere new.
+   */
+  app.post('/set-password', async (c) => {
+    const user = c.var.user;
+    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+
+    const newPassword = asRecord(parseJson(await c.req.text()))?.newPassword;
+    if (
+      typeof newPassword !== 'string' ||
+      newPassword.length < MIN_PASSWORD_LENGTH
+    ) {
+      return c.json({ error: NEW_PASSWORD_TOO_SHORT }, 400);
+    }
+
+    const written = c.var.db
+      .update(users)
+      .set({ passwordHash: await hashPassword(newPassword) })
+      .where(and(eq(users.id, user.id), eq(users.passwordHash, '')))
+      .returning({ id: users.id })
+      .get();
+    if (!written) {
+      return c.json(
+        { error: 'This account already has a password. Change it instead.' },
+        409,
+      );
+    }
+
     if (c.var.sessionToken) {
       deleteOtherSessions(c.var.db, user.id, c.var.sessionToken);
     }

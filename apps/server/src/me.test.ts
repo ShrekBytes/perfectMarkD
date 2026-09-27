@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp, type AppType } from './index.js';
-import { registerAndVerify, testMailComposition } from './auth/testing.js';
+import {
+  fakeGoogleSignIn,
+  registerAndVerify,
+  signInWithGoogle,
+  testMailComposition,
+} from './auth/testing.js';
 import type { RecordingMailer } from './mail/testing.js';
 import { createTestDatabase, removeTestDatabase } from './db/testing.js';
 import type { AppDatabase } from './db/database.js';
 import { aiUsage, entitlements, exportUsage, users } from './db/schema.js';
+import type { GoogleIdentity } from './google/exchange.js';
 import { usagePeriod } from './quota.js';
 import {
   AI_PROVIDER_KEY,
@@ -30,6 +36,8 @@ function makeApp(
     adminEmail?: string;
     now?: () => Date;
     ai?: { apiKey?: string | null };
+    /** Mount the Google flow; the exchange answers the given codes. */
+    google?: Record<string, GoogleIdentity>;
   } = {},
 ): {
   app: AppType;
@@ -47,6 +55,7 @@ function makeApp(
     now: options.now,
     ai: options.ai,
     ...composition,
+    ...(options.google ? { google: fakeGoogleSignIn(options.google) } : {}),
   });
   return { app, db };
 }
@@ -88,6 +97,7 @@ interface MeResponse {
   expiresAt: string | null;
   quota: { used: number; limit: number };
   flags: Record<string, boolean>;
+  signIn: { password: boolean; google: boolean };
   ai: {
     configured: boolean;
     included: boolean;
@@ -133,6 +143,8 @@ describe('GET /api/me', () => {
         backgroundImage: false,
         customFonts: false,
       },
+      // google-signin/01b: a password, and no Google identity.
+      signIn: { password: true, google: false },
       // ai-transforms/03: no key in the environment, no plan — AI is off,
       // the caller's own switch stays on.
       ai: {
@@ -268,6 +280,42 @@ describe('GET /api/me', () => {
 
     const me = (await (await getMe(app, cookie)).json()) as MeResponse;
     expect(me.isAdmin).toBe(true);
+  });
+});
+
+describe('GET /api/me — sign-in methods (google-signin/01b)', () => {
+  it('reports a Google-registered account: no password of its own, one identity', async () => {
+    const { app } = makeApp({
+      google: { ada: { subject: 'sub-ada', email: 'ada@test.dev' } },
+    });
+    const cookie = await signInWithGoogle(app, 'ada');
+
+    const me = (await (await getMe(app, cookie)).json()) as MeResponse;
+    expect(me.signIn).toEqual({ password: false, google: true });
+  });
+
+  it('reports a password account that has never touched Google', async () => {
+    const { app } = makeApp({
+      google: { ada: { subject: 'sub-ada', email: 'ada@test.dev' } },
+    });
+    const cookie = await registerViaApi(app);
+
+    const me = (await (await getMe(app, cookie)).json()) as MeResponse;
+    expect(me.signIn).toEqual({ password: true, google: false });
+  });
+
+  it('reports both when a password account later signs in with Google', async () => {
+    const email = 'grace@test.dev';
+    const { app } = makeApp({
+      google: { grace: { subject: 'sub-grace', email } },
+    });
+    await registerViaApi(app, email);
+    // The auto-link rule (story 3): the same address, one account, and the
+    // password it already had is left alone.
+    const cookie = await signInWithGoogle(app, 'grace');
+
+    const me = (await (await getMe(app, cookie)).json()) as MeResponse;
+    expect(me.signIn).toEqual({ password: true, google: true });
   });
 });
 

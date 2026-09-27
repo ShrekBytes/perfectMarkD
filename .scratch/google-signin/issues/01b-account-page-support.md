@@ -1,6 +1,6 @@
 # 01b — Account page's server support: first password, and how an account signs in
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: google-signin/01
 
 The two facts the Account page needs, which Google Sign-In's flow (01) did not
@@ -41,3 +41,20 @@ its migration. No SPA work in this ticket — rendering these is 02.
 - Not rate limited, deliberately: the limiter the password routes share exists to
   bound password *guessing*, and this endpoint asks for no secret. The session
   is the gate.
+- The two facts land as `signIn: { password, google }` on `/api/me`, beside the
+  other blocks (`flags`, `ai`). A password of its own is a non-empty
+  `password_hash`; a Google identity is an `identities` row, and that lookup by
+  account is what migration `0009`'s `identities_user_id_idx` serves.
+- The route is `POST /api/auth/set-password` (204, 409 when the account already
+  has one). The refusal is the *write's* `where password_hash = ''`, not a
+  check above it: two requests that both read the account before either wrote
+  would otherwise both pass one check, and the second would overwrite the
+  first's password — a test drives exactly that race and expects `[204, 409]`.
+- `Set Password` is now a CONTEXT.md term, distinct from Password Reset (followed
+  while signed out) and Change Password (replaces one, asks for the current).
+  Note for 02: `apps/web/src/auth/SetPasswordPage.tsx` is the *Password Reset*
+  page, so the Account page's section needs its own name.
+- The Google flow helpers the new tests need (`fakeGoogleSignIn`, `cookiePair`,
+  `signInWithGoogle`) live in `auth/testing.ts` rather than in each suite;
+  `google/routes.test.ts` keeps its own versions, which are entangled with the
+  per-code identity maps and `exchange.codes` assertions that suite is built on.

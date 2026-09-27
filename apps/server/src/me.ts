@@ -2,18 +2,21 @@
 // GET /api/me (server/04 + billing/04 + ai-transforms/03) — the signed-in
 // user's identity and gates: who they are, their active Entitlement, where
 // they stand against the monthly Server Export quota, the instance's and the
-// caller's AI state, and which gated features their plan opens. The single
-// source of truth the web app's account store consumes: the quota chip, the
-// gated Inspector controls, and every AI surface read from this one payload.
+// caller's AI state, which gated features their plan opens, and which sign-in
+// methods the account has. The single source of truth the web app's account
+// store consumes: the quota chip, the gated Inspector controls, the Account
+// page's password section, and every AI surface read from this one payload.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Hono } from 'hono';
+import { and, eq } from 'drizzle-orm';
 import type { AppEnv } from './index.js';
 import type { Clock } from './auth/sessions.js';
 import { featureFlagsFor } from './flags.js';
 import { getAiProviderConfig, getPlanLimits } from './db/settings.js';
 import { findActiveEntitlement, quotaState } from './quota.js';
 import { aiAccountState } from './ai/state.js';
+import { identities, GOOGLE_PROVIDER } from './db/schema.js';
 import type { AiContext } from './ai/context.js';
 
 export interface MeRoutesOptions {
@@ -48,6 +51,27 @@ export function meRoutes({ now = () => new Date(), ai }: MeRoutesOptions = {}) {
       // The gated Inspector controls (billing/04): open exactly while an
       // Entitlement is active — the same condition as plan/expiresAt above.
       flags: featureFlagsFor(activeEntitlement?.plan ?? null),
+      // Which sign-in methods (CONTEXT.md) this account has (google-signin/01b).
+      // A password of its own is a non-empty hash — that is all a Google
+      // registration stores — and a Google identity is an `identities` row. The
+      // Account page renders the form this reports and never guesses: an
+      // account with a password gets Change Password, one without gets the
+      // section that sets its first.
+      signIn: {
+        password: user.passwordHash !== '',
+        google: Boolean(
+          db
+            .select({ subject: identities.subject })
+            .from(identities)
+            .where(
+              and(
+                eq(identities.userId, user.id),
+                eq(identities.provider, GOOGLE_PROVIDER),
+              ),
+            )
+            .get(),
+        ),
+      },
       // The AI state (ai-transforms/03): configured is the instance's kill
       // switch plus key; included is the caller's plan; access is the caller's
       // own switch. Every AI surface reads this block rather than guessing.

@@ -3,6 +3,8 @@ import { createApp, type AppType } from '../index.js';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import {
+  fakeGoogleSignIn,
+  signInWithGoogle,
   TEST_PUBLIC_ORIGIN as PUBLIC_ORIGIN,
   testMailComposition,
 } from './testing.js';
@@ -801,6 +803,129 @@ describe('POST /api/auth/change-password', () => {
     const res = await postJson(app, '/api/auth/change-password', {
       currentPassword: 'x',
       newPassword: 'a brand new password',
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /api/auth/set-password', () => {
+  const NEW_PASSWORD = 'a brand new password';
+
+  /** A composition whose Google flow answers one identity, and the session it
+   *  issues — an account with no password of its own (google-signin/01). */
+  async function passwordless() {
+    const composed = makeApp({
+      google: fakeGoogleSignIn({
+        'auth-code': { subject: 'sub-ada', email: 'ada@example.com' },
+      }),
+    });
+    return { ...composed, cookie: await signInWithGoogle(composed.app) };
+  }
+
+  it('gives a passwordless account a password, and mails nothing', async () => {
+    const { app, mailer, cookie } = await passwordless();
+
+    const res = await postJson(
+      app,
+      '/api/auth/set-password',
+      { newPassword: NEW_PASSWORD },
+      { cookie },
+    );
+    expect(res.status).toBe(204);
+
+    const login = await postJson(app, '/api/auth/login', {
+      email: 'ada@example.com',
+      password: NEW_PASSWORD,
+    });
+    expect(login.status).toBe(200);
+    // The address was proven by Google, so there is nowhere new to reach the
+    // user and nothing to say.
+    expect(mailer.sends).toEqual([]);
+  });
+
+  it('revokes other sessions but keeps the one that set the password', async () => {
+    const { app, cookie } = await passwordless();
+    // A second signed-in device for the same account.
+    const other = await signInWithGoogle(app);
+
+    const res = await postJson(
+      app,
+      '/api/auth/set-password',
+      { newPassword: NEW_PASSWORD },
+      { cookie: other },
+    );
+    expect(res.status).toBe(204);
+
+    expect(
+      (await app.request('/api/auth/me', { headers: { cookie } })).status,
+    ).toBe(401);
+    expect(
+      (await app.request('/api/auth/me', { headers: { cookie: other } }))
+        .status,
+    ).toBe(200);
+  });
+
+  it('refuses an account that already has a password, and changes nothing', async () => {
+    const { app, mailer } = makeApp();
+    const cookie = await signedIn(app, mailer);
+
+    const res = await postJson(
+      app,
+      '/api/auth/set-password',
+      { newPassword: NEW_PASSWORD },
+      { cookie },
+    );
+    expect(res.status).toBe(409);
+
+    // Not a second way to overwrite a password without the current one: the
+    // account's own password still works, and the new one does not.
+    const unchanged = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: PASSWORD,
+    });
+    expect(unchanged.status).toBe(200);
+    const overwritten = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: NEW_PASSWORD,
+    });
+    expect(overwritten.status).toBe(401);
+  });
+
+  it('lets only one of two racing requests set the password', async () => {
+    const { app, cookie } = await passwordless();
+
+    // Both read the account while it has no password, and both hash before
+    // writing: the refusal is the write's own condition, so the second finds
+    // no row to write and cannot overwrite the first one's password.
+    const statuses = (
+      await Promise.all(
+        ['first try', 'second try'].map((newPassword) =>
+          postJson(app, '/api/auth/set-password', { newPassword }, { cookie }),
+        ),
+      )
+    ).map((res) => res.status);
+    expect(statuses.sort()).toEqual([204, 409]);
+  });
+
+  it('holds the account to the same password policy', async () => {
+    const { app, cookie } = await passwordless();
+
+    const res = await postJson(
+      app,
+      '/api/auth/set-password',
+      { newPassword: 'short' },
+      { cookie },
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'New password must be at least 8 characters.',
+    });
+  });
+
+  it('requires a session', async () => {
+    const { app } = makeApp();
+    const res = await postJson(app, '/api/auth/set-password', {
+      newPassword: NEW_PASSWORD,
     });
     expect(res.status).toBe(401);
   });

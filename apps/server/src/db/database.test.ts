@@ -36,6 +36,18 @@ describe('createDatabase', () => {
     expect(tables).toEqual(expect.arrayContaining(SPEC_TABLES));
   });
 
+  it('indexes the identities table by account (google-signin/01b)', () => {
+    // The first query of that table by account: what sign-in methods an
+    // account has. Looked up on every GET /api/me.
+    const { db } = createTestDatabase();
+    const indexes = db
+      .all<{ name: string }>(
+        sql`select name from sqlite_master where type = 'index' and tbl_name = 'identities'`,
+      )
+      .map((row) => row.name);
+    expect(indexes).toContain('identities_user_id_idx');
+  });
+
   it('enables WAL journaling and foreign key enforcement', () => {
     const { db } = createTestDatabase();
     expect(db.get<{ journal_mode: string }>(sql`pragma journal_mode`)).toEqual({

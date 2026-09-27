@@ -25,7 +25,7 @@ import { and, eq } from 'drizzle-orm';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppEnv } from '../index.js';
 import type { AppDatabase } from '../db/database.js';
-import { identities, users, type User } from '../db/schema.js';
+import { identities, users, GOOGLE_PROVIDER, type User } from '../db/schema.js';
 import { newOpaqueToken } from '../auth/opaque-token.js';
 import { normalizeEmail } from '../auth/routes.js';
 import { clientIp, isHttps, setSessionCookie } from '../auth/http.js';
@@ -48,9 +48,6 @@ const STATE_COOKIE = 'pmd_google_state';
 /** Long enough to walk a consent screen, short enough that a state captured
  *  from someone's own browser is worthless a moment later. */
 const STATE_TTL_MS = 10 * 60 * 1000;
-
-/** The provider an identity belongs to. One today; a second is a new value. */
-const PROVIDER = 'google';
 
 /**
  * What the sign-in page is told about a callback it could not complete. The
@@ -230,14 +227,17 @@ function claimAccount(
     .from(identities)
     .innerJoin(users, eq(users.id, identities.userId))
     .where(
-      and(eq(identities.provider, PROVIDER), eq(identities.subject, subject)),
+      and(
+        eq(identities.provider, GOOGLE_PROVIDER),
+        eq(identities.subject, subject),
+      ),
     )
     .get();
   if (linked) return linked.user;
 
   const account = verifiedAccount(db, email, at, isAdmin);
   db.insert(identities)
-    .values({ provider: PROVIDER, subject, userId: account.id, email })
+    .values({ provider: GOOGLE_PROVIDER, subject, userId: account.id, email })
     .run();
   return account;
 }
