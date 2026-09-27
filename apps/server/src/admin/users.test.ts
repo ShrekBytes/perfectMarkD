@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp, type AppType } from '../index.js';
-import { registerAndVerify, testMailComposition } from '../auth/testing.js';
+import {
+  TEST_PUBLIC_ORIGIN,
+  registerAndVerify,
+  testMailComposition,
+} from '../auth/testing.js';
 import type { RecordingMailer } from '../mail/testing.js';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { LTC_RATE_KEY, WALLETS_KEY, setSetting } from '../db/settings.js';
 import {
   aiUsage,
+  emailTokens,
   entitlements,
   exportUsage,
   exportsHistory,
@@ -118,6 +123,12 @@ function userIdFor(db: AppDatabase, email: string): number {
   return row.id;
 }
 
+function userRow(db: AppDatabase, id: number) {
+  const row = db.select().from(users).where(eq(users.id, id)).get();
+  if (!row) throw new Error(`no user ${id}`);
+  return row;
+}
+
 function seedEntitlement(
   db: AppDatabase,
   userId: number,
@@ -199,6 +210,9 @@ describe('gate', () => {
     ).toBe(403);
     expect(
       (await postJson(app, '/api/admin/users/1/password', {}, cookie)).status,
+    ).toBe(403);
+    expect(
+      (await postJson(app, '/api/admin/users/1/email', {}, cookie)).status,
     ).toBe(403);
     expect((await deleteJson(app, '/api/admin/users/1', cookie)).status).toBe(
       403,
@@ -820,11 +834,15 @@ describe('POST /api/admin/users/:id/quota/comp', () => {
 });
 
 describe('POST /api/admin/users/:id/password', () => {
-  it('returns a temporary password that works, and revokes existing sessions', async () => {
+  it('mails a reset link and changes nothing until the user follows it', async () => {
+    // Story 21: the Admin never sees or sets a password again. The panel mails a
+    // link, and the account is untouched until the user opens it.
     const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
     const oldCookie = await signedIn(app);
     const admin = await adminSignedIn(app);
     const id = userIdFor(db, 'reader@example.com');
+    const hashBefore = userRow(db, id).passwordHash;
+    mailer.sends.length = 0;
 
     const res = await postJson(
       app,
@@ -834,23 +852,121 @@ describe('POST /api/admin/users/:id/password', () => {
     );
 
     expect(res.status).toBe(200);
-    const { temporaryPassword } = (await res.json()) as {
-      temporaryPassword: string;
-    };
-    expect(temporaryPassword.length).toBeGreaterThanOrEqual(16);
-
-    // The old session is gone; the temp password signs in.
-    expect((await getJson(app, '/api/auth/me', oldCookie)).status).toBe(401);
-    const login = await postJson(app, '/api/auth/login', {
-      email: 'reader@example.com',
-      password: temporaryPassword,
+    // The window is in the reply so the panel states the server's own.
+    expect(await res.json()).toEqual({
+      sent: true,
+      kind: 'password_reset',
+      expiresInMinutes: 30,
     });
-    expect(login.status).toBe(200);
+    expect(mailer.sends).toEqual([
+      {
+        kind: 'password_reset',
+        to: 'reader@example.com',
+        url: expect.stringMatching(
+          new RegExp(`^${TEST_PUBLIC_ORIGIN}/set-password\\?token=`),
+        ) as unknown as string,
+      },
+    ]);
+    // No password set, no session ended, and the user is still signed in.
+    expect(userRow(db, id).passwordHash).toBe(hashBefore);
+    expect(
+      db.select().from(sessions).where(eq(sessions.userId, id)).all(),
+    ).toHaveLength(1);
+    expect((await getJson(app, '/api/auth/me', oldCookie)).status).toBe(200);
   });
 
-  it('refuses resetting your own password through the panel', async () => {
+  it('sets the new password and ends every session when the link is followed', async () => {
+    // The round trip that replaces the old handoff: the panel's link is the same
+    // one the sign-in page's reset request sends, so the user sets their own
+    // password and the reset does what it always did (story 12).
+    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    const oldCookie = await signedIn(app);
+    const admin = await adminSignedIn(app);
+    const id = userIdFor(db, 'reader@example.com');
+    await postJson(app, `/api/admin/users/${id}/password`, {}, admin);
+
+    const res = await postJson(app, '/api/auth/reset-password', {
+      token: mailer.tokenTo('reader@example.com'),
+      newPassword: 'a brand new password',
+    });
+
+    expect(res.status).toBe(204);
+    expect(
+      db.select().from(sessions).where(eq(sessions.userId, id)).all(),
+    ).toEqual([]);
+    expect((await getJson(app, '/api/auth/me', oldCookie)).status).toBe(401);
+    expect(
+      (
+        await postJson(app, '/api/auth/login', {
+          email: 'reader@example.com',
+          password: 'a brand new password',
+        })
+      ).status,
+    ).toBe(200);
+  });
+
+  it('sends a verification link to an account that was never verified', async () => {
+    // A reset link buys an unverified account nothing: sign-in stays locked
+    // until the address is proven. email/03's repair rule applies here too, and
+    // the response says which link went out — the Admin is already allowed to
+    // know the state of an account they are looking at.
+    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    const registered = await postJson(app, '/api/auth/register', {
+      email: 'unproven@example.com',
+      password: 'correct horse battery',
+    });
+    expect(registered.status).toBe(201);
+    const admin = await adminSignedIn(app);
+    mailer.sends.length = 0;
+
+    const res = await postJson(
+      app,
+      `/api/admin/users/${userIdFor(db, 'unproven@example.com')}/password`,
+      {},
+      admin,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      sent: true,
+      kind: 'verification',
+      expiresInMinutes: 1440,
+    });
+    expect(mailer.sends).toEqual([
+      {
+        kind: 'verification',
+        to: 'unproven@example.com',
+        url: expect.stringMatching(
+          new RegExp(`^${TEST_PUBLIC_ORIGIN}/verify-email\\?token=`),
+        ) as unknown as string,
+      },
+    ]);
+    // The link really is the way in: following it proves the address, and only
+    // then does the password they registered with sign them in.
+    expect(
+      (
+        await postJson(app, '/api/auth/verify-email', {
+          token: mailer.tokenTo('unproven@example.com'),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await postJson(app, '/api/auth/login', {
+          email: 'unproven@example.com',
+          password: 'correct horse battery',
+        })
+      ).status,
+    ).toBe(200);
+  });
+
+  it('mails the Admin their own link, because a link needs no session to redeem', async () => {
+    // The panel used to refuse this: it showed a temporary password, and an Admin
+    // who had lost theirs had no way back. That reason is gone with the display,
+    // and forgetting your own password is the likeliest reason to be here.
     const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
     const admin = await adminSignedIn(app);
+    mailer.sends.length = 0;
 
     const res = await postJson(
       app,
@@ -859,28 +975,230 @@ describe('POST /api/admin/users/:id/password', () => {
       admin,
     );
 
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      sent: true,
+      kind: 'password_reset',
+      expiresInMinutes: 30,
+    });
+    expect(mailer.sends).toEqual([
+      {
+        kind: 'password_reset',
+        to: 'owner@example.com',
+        url: expect.stringMatching(
+          new RegExp(`^${TEST_PUBLIC_ORIGIN}/set-password\\?token=`),
+        ) as unknown as string,
+      },
+    ]);
+    // And the Admin's own session is untouched, exactly like anyone else's.
+    expect((await getJson(app, '/api/auth/me', admin)).status).toBe(200);
   });
 
-  it('audit-logs the reset with the revoked session count', async () => {
+  it('audit-logs the link without recording the address', async () => {
     const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
     await signedIn(app);
     const admin = await adminSignedIn(app);
-    const id = userIdFor(db, 'reader@example.com');
 
-    await postJson(app, `/api/admin/users/${id}/password`, {}, admin);
+    await postJson(
+      app,
+      `/api/admin/users/${userIdFor(db, 'reader@example.com')}/password`,
+      {},
+      admin,
+    );
 
     const entries = (await auditEntries(app, admin)) as Array<{
       action: string;
       after: unknown;
     }>;
     expect(entries[0]).toMatchObject({
-      action: 'user.password_reset',
-      after: { sessionsRevoked: 1 },
+      action: 'user.reset_link',
+      after: { linkSent: true },
     });
+    // The audit trail records the action, never who it was for.
+    expect(JSON.stringify(entries[0])).not.toContain('reader@example.com');
+  });
+});
+
+describe('POST /api/admin/users/:id/email', () => {
+  it('mails a link to the new address and moves nothing until it is opened', async () => {
+    // Story 22: the dead-mailbox escape hatch, with email/04's mechanics — the
+    // swap waits for the new address's owner, so a typo cannot lock the user
+    // out of an account the Admin is trying to rescue.
+    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+    const id = userIdFor(db, 'reader@example.com');
+    mailer.sends.length = 0;
+
+    const res = await postJson(
+      app,
+      `/api/admin/users/${id}/email`,
+      { email: '  Moved@Example.com ' },
+      admin,
+    );
+
+    expect(res.status).toBe(200);
+    // Normalized, and the link goes to the new address — not the dead one.
+    expect(await res.json()).toEqual({ email: 'moved@example.com' });
+    expect(mailer.sends).toEqual([
+      {
+        kind: 'email_change',
+        to: 'moved@example.com',
+        url: expect.stringMatching(
+          new RegExp(`^${TEST_PUBLIC_ORIGIN}/confirm-email-change\\?token=`),
+        ) as unknown as string,
+      },
+    ]);
+    expect(userRow(db, id).email).toBe('reader@example.com');
+  });
+
+  it('swaps and verifies the address when the new address opens the link', async () => {
+    // The same public route the Account page's link uses, so one implementation
+    // of the swap serves both seats.
+    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+    const id = userIdFor(db, 'reader@example.com');
+    await postJson(
+      app,
+      `/api/admin/users/${id}/email`,
+      { email: 'moved@example.com' },
+      admin,
+    );
+    const token = mailer.tokenTo('moved@example.com');
+    mailer.sends.length = 0;
+
+    const res = await postJson(app, '/api/auth/confirm-email-change', {
+      token,
+    });
+
+    expect(res.status).toBe(200);
+    expect(userRow(db, id)).toMatchObject({ email: 'moved@example.com' });
+    // The address that was left hears about it, and the password is untouched:
+    // an email change never signs anyone out.
+    expect(mailer.sends).toEqual([
+      { kind: 'email_changed_notice', to: 'reader@example.com' },
+    ]);
     expect(
-      db.select().from(sessions).where(eq(sessions.userId, id)).all(),
-    ).toEqual([]);
+      (
+        await postJson(app, '/api/auth/login', {
+          email: 'moved@example.com',
+          password: 'correct horse battery',
+        })
+      ).status,
+    ).toBe(200);
+  });
+
+  it('refuses a malformed address and the one already in use, mailing nothing', async () => {
+    // Uniqueness is decided at swap time, the way it is for the Account page: an
+    // address another account took is a different request, not a fresh link.
+    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+    const id = userIdFor(db, 'reader@example.com');
+    mailer.sends.length = 0;
+
+    const malformed = await postJson(
+      app,
+      `/api/admin/users/${id}/email`,
+      { email: 'not-an-address' },
+      admin,
+    );
+    expect(malformed.status).toBe(400);
+    const same = await postJson(
+      app,
+      `/api/admin/users/${id}/email`,
+      { email: 'reader@example.com' },
+      admin,
+    );
+    expect(same.status).toBe(400);
+
+    expect(mailer.sends).toEqual([]);
+    expect(userRow(db, id).email).toBe('reader@example.com');
+  });
+
+  it('refuses a user that does not exist', async () => {
+    const { app } = makeApp({ adminEmail: 'owner@example.com' });
+    const admin = await adminSignedIn(app);
+
+    expect(
+      (await postJson(app, '/api/admin/users/9999/email', {}, admin)).status,
+    ).toBe(404);
+    expect(
+      (await postJson(app, '/api/admin/users/9999/password', {}, admin)).status,
+    ).toBe(404);
+  });
+
+  it('audit-logs the request without recording either address', async () => {
+    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+
+    await postJson(
+      app,
+      `/api/admin/users/${userIdFor(db, 'reader@example.com')}/email`,
+      { email: 'moved@example.com' },
+      admin,
+    );
+
+    const entries = (await auditEntries(app, admin)) as Array<{
+      action: string;
+      after: unknown;
+    }>;
+    expect(entries[0]).toMatchObject({
+      action: 'user.email_change',
+      after: { linkSent: true },
+    });
+    const logged = JSON.stringify(entries[0]);
+    expect(logged).not.toContain('moved@example.com');
+    expect(logged).not.toContain('reader@example.com');
+  });
+});
+
+describe('the links the panel issues', () => {
+  it('leaves an earlier link spendable when a second one is issued', async () => {
+    // A second attempt is where the panel comes from (a mistyped address, a link
+    // the user lost), so a fresh link has to work — and it must not quietly
+    // cancel the one already in an inbox. The tokens are independent; whichever
+    // is opened first wins, and the other then fails the way any spent link does.
+    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+    const id = userIdFor(db, 'reader@example.com');
+
+    await postJson(
+      app,
+      `/api/admin/users/${id}/email`,
+      { email: 'moved@example.com' },
+      admin,
+    );
+    const first = mailer.tokenTo('moved@example.com');
+    await postJson(
+      app,
+      `/api/admin/users/${id}/email`,
+      { email: 'moved-again@example.com' },
+      admin,
+    );
+    const second = mailer.tokenTo('moved-again@example.com');
+
+    expect(
+      db
+        .select()
+        .from(emailTokens)
+        .all()
+        .map((row) => row.purpose),
+    ).toEqual(['email_change', 'email_change']);
+    expect(
+      (await postJson(app, '/api/auth/confirm-email-change', { token: first }))
+        .status,
+    ).toBe(200);
+    expect(userRow(db, id).email).toBe('moved@example.com');
+    // The second link still moves the account: it named an address nobody has.
+    expect(
+      (await postJson(app, '/api/auth/confirm-email-change', { token: second }))
+        .status,
+    ).toBe(200);
+    expect(userRow(db, id).email).toBe('moved-again@example.com');
   });
 });
 

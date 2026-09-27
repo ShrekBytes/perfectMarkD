@@ -63,14 +63,22 @@ export interface AiProviderConfig {
   burstPerMinute: number;
 }
 
-/** Admin actions recorded in the audit log (billing/02, billing/03). */
+/**
+ * Admin actions recorded in the audit log (billing/02, billing/03, email/05).
+ *
+ * `user.reset_link` and `user.email_change` are what the panel does now that
+ * there is a mailer: it mails a one-time link, and the account moves only when
+ * the user follows it. Neither records an address, for the reason `user.delete`
+ * does not — the trail documents the action without outliving the data it names.
+ */
 export const AUDIT_ACTIONS = [
   'order.verify',
   'order.reject',
   'entitlement.grant',
   'entitlement.revoke',
   'quota.comp',
-  'user.password_reset',
+  'user.reset_link',
+  'user.email_change',
   'user.delete',
   'settings.update',
 ] as const;

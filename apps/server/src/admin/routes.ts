@@ -29,6 +29,11 @@ import type { AiContext } from '../ai/context.js';
 export interface AdminRoutesOptions {
   /** Injectable clock; expiry math and audit timestamps use it. */
   now?: () => Date;
+  /**
+   * PUBLIC_ORIGIN, the address users reach this instance on. The panel's
+   * one-time links are built from it, and from nothing else.
+   */
+  publicOrigin: string;
   /** Removes an Export History file on account deletion (see usersRoutes). */
   removeStoredFile?: (storedPath: string) => void;
   /** The AI context for the settings panel's Test connection (03). */
@@ -61,9 +66,10 @@ function parseReason(body: unknown): string | { error: string } {
 
 export function adminRoutes({
   now = () => new Date(),
+  publicOrigin,
   removeStoredFile,
   ai,
-}: AdminRoutesOptions = {}) {
+}: AdminRoutesOptions) {
   const app = new Hono<AppEnv>();
 
   app.use('*', async (c, next) => {
@@ -291,7 +297,7 @@ export function adminRoutes({
     });
   });
 
-  app.route('/users', usersRoutes({ now, removeStoredFile }));
+  app.route('/users', usersRoutes({ now, publicOrigin, removeStoredFile }));
   app.route('/settings', settingsRoutes({ now, ai }));
 
   return app;

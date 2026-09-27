@@ -54,21 +54,23 @@ const ENTER_CURRENT_PASSWORD = 'Enter your current password.';
 const CURRENT_PASSWORD_WRONG = 'Current password is incorrect.';
 // Deliberately permissive: an address with a local part, an @, and a domain
 // with a dot. Anything stricter rejects valid addresses; verification is a
-// link the owner follows, which is what proves the address.
+// link the owner follows, which is what proves the address. See normalizeEmail.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The SPA page a verification link resolves to; it spends the token over the
  *  API, so a link scanner that follows the URL in an inbox cannot spend it. */
-const VERIFY_PATH = '/verify-email';
+export const VERIFY_PATH = '/verify-email';
 
 /** The SPA page a reset link resolves to. It holds the new-password form and
  *  spends the token when one is chosen — not on load, or a link preview that
- *  fetched the page would burn it before the user typed anything. */
-const SET_PASSWORD_PATH = '/set-password';
+ *  fetched the page would burn it before the user typed anything. Also the page
+ *  the Admin panel's reset link points at, so the two cannot drift. */
+export const SET_PASSWORD_PATH = '/set-password';
 
 /** The SPA page an email-change link resolves to; it spends the token over the
- *  API, the way the verification and reset links do. */
-const CONFIRM_EMAIL_CHANGE_PATH = '/confirm-email-change';
+ *  API, the way the verification and reset links do. Also the page the Admin
+ *  panel's email change points at — the swap is the same operation. */
+export const CONFIRM_EMAIL_CHANGE_PATH = '/confirm-email-change';
 
 /**
  * Codes the client branches on, never the message beside them: the sign-in gate
@@ -105,7 +107,15 @@ interface Credentials {
   password: string;
 }
 
-function normalizeEmail(value: unknown): string | null {
+/**
+ * An address, normalized to what the users table stores, or null when it is not
+ * an address at all. Deliberately permissive: a local part, an @, and a domain
+ * with a dot. Anything stricter rejects valid addresses; verification is a link
+ * the owner follows, which is what proves the address. Exported because the
+ * Admin panel's email change accepts an address too, and two normalizers would
+ * be two spellings of the same address.
+ */
+export function normalizeEmail(value: unknown): string | null {
   if (typeof value !== 'string' || !EMAIL_PATTERN.test(value.trim())) {
     return null;
   }
@@ -245,6 +255,30 @@ export function authRoutes(options: AuthOptions) {
   };
 
   /**
+   * The branch a reset request and the Admin panel's reset link share: a verified
+   * account gets a reset link, an unverified one gets a verification link
+   * (story 14). A reset link for an unverified account is a dead end — the
+   * password it sets buys nothing while sign-in stays locked on Email
+   * Verification — so the two flows repair each other instead.
+   *
+   * The branch has two sides that must not drift (the token's purpose and the
+   * link's page), which is what made it worth one name rather than a `kind`
+   * variable compared twice at each call site.
+   */
+  const mailResetLink = async (
+    c: Context<AppEnv>,
+    userId: number,
+    email: string,
+  ): Promise<'password_reset' | 'verification'> => {
+    if (!accountFor(c, email)?.verifiedAt) {
+      await sendVerification(c, userId, email);
+      return 'verification';
+    }
+    await sendPasswordReset(c, userId, email);
+    return 'password_reset';
+  };
+
+  /**
    * The account id a registration should use, or null when the address already
    * belongs to a verified account (the one rejection registration keeps).
    *
@@ -380,10 +414,7 @@ export function authRoutes(options: AuthOptions) {
     if (limited) return limited;
 
     const user = accountFor(c, parsed);
-    if (user) {
-      if (user.verifiedAt) await sendPasswordReset(c, user.id, parsed);
-      else await sendVerification(c, user.id, parsed);
-    }
+    if (user) await mailResetLink(c, user.id, parsed);
     return c.json({ sent: true });
   });
 
@@ -651,7 +682,7 @@ export function authRoutes(options: AuthOptions) {
       return c.json(
         {
           error:
-            'That address is already used by another account. Ask for a new link from the Account page with a different address.',
+            'That address is already used by another account. Start again with a different address — from the Account page, or by asking the Admin.',
           code: EMAIL_TAKEN_CODE,
         },
         409,

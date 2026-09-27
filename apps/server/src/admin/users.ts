@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { unlinkSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { Hono } from 'hono';
@@ -7,7 +6,18 @@ import type { AppEnv } from '../index.js';
 import { orderView, type OrderView } from '../orders/routes.js';
 import { methodForCoinNetwork } from '../orders/payment.js';
 import { getPlanLimits, getWallets } from '../db/settings.js';
-import { hashPassword } from '../auth/passwords.js';
+import {
+  normalizeEmail,
+  CONFIRM_EMAIL_CHANGE_PATH,
+  SET_PASSWORD_PATH,
+  VERIFY_PATH,
+} from '../auth/routes.js';
+import {
+  issueToken,
+  oneTimeLink,
+  PASSWORD_RESET_TOKEN_TTL_MS,
+  VERIFICATION_TOKEN_TTL_MS,
+} from '../auth/tokens.js';
 import {
   auditLogs,
   entitlements,
@@ -15,7 +25,6 @@ import {
   exportsHistory,
   orders,
   PLANS,
-  sessions,
   users,
   type Order,
   type User,
@@ -30,16 +39,30 @@ import { parseGrant } from './grant.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin user management (billing/03): search, a detail view, and the actions
-// that need a human — grant/extend/revoke an Entitlement, comp quota, manual
-// password reset (no email infrastructure: a temporary password is shown once
-// for out-of-band handoff), and GDPR-ish account deletion. Every action lands
-// with its audit entry in the same transaction, and the panel's views here are
-// shared with the Verification queue so the two can't drift.
+// that need a human — grant/extend/revoke an Entitlement, comp quota, mail a
+// password-reset link or move a dead mailbox, and GDPR-ish account deletion.
+// Every action that changes state lands with its audit entry in the same
+// transaction, and the panel's views here are shared with the Verification queue
+// so the two can't drift.
+//
+// The two mail actions (email/05) are the panel's whole recovery story now that
+// transactional email exists: the Admin never sees or sets a password, and an
+// address only moves when the user proves they can read the new one. Both send
+// the same links the sign-in page and the Account page send, so one route — not
+// a panel copy of it — is what spends them. Neither is transactional with
+// anything: the only row either writes is its own audit entry, and that lands
+// after the send so a provider that refused the message leaves no entry
+// claiming it went out.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface UsersRoutesOptions {
   /** Injectable clock; stacking math, periods, and audit timestamps use it. */
   now?: () => Date;
+  /**
+   * PUBLIC_ORIGIN, the address users reach this instance on. The one-time links
+   * this panel mails are built from it and from nothing else.
+   */
+  publicOrigin: string;
   /**
    * Removes an Export History file after account deletion. Defaults to
    * best-effort unlinking of absolute paths; server/03 owns the storage
@@ -245,6 +268,49 @@ function parseUserId(raw: string): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+/**
+ * The SPA page a link of each kind points at. The same map the sign-in page's
+ * reset request follows, so the panel's link and the user's own land on the same
+ * form — a link's authority and the page that spends it are one decision.
+ */
+const LINK_PATH = {
+  verification: VERIFY_PATH,
+  password_reset: SET_PASSWORD_PATH,
+} as const;
+
+function pathFor(kind: keyof typeof LINK_PATH): string {
+  return LINK_PATH[kind];
+}
+
+/**
+ * The audit entry for a link this panel mailed.
+ *
+ * `after` says a link went out and stops there: the account does not move until
+ * the user follows it, so there is no "before" to record and no "after" that
+ * exists yet. No address is written either, for the reason `user.delete` does
+ * not write one — the trail documents the action without outliving the data it
+ * names. The row lands after the send, not before it, so a provider that refused
+ * the message leaves no entry claiming it went out.
+ */
+function recordMailedLink(
+  db: AppDatabase,
+  admin: User,
+  userId: number,
+  action: 'user.reset_link' | 'user.email_change',
+): void {
+  db.insert(auditLogs)
+    .values({
+      adminUserId: admin.id,
+      adminEmail: admin.email,
+      action,
+      targetType: 'user',
+      targetId: String(userId),
+      before: null,
+      after: { linkSent: true },
+    })
+    .run();
+}
+
 /** LIKE pattern for an email substring search, with wildcards escaped. */
 function emailPattern(query: string): string {
   return `%${query.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
@@ -252,8 +318,9 @@ function emailPattern(query: string): string {
 
 export function usersRoutes({
   now = () => new Date(),
+  publicOrigin,
   removeStoredFile = removeStoredFileDefault,
-}: UsersRoutesOptions = {}) {
+}: UsersRoutesOptions) {
   const app = new Hono<AppEnv>();
 
   app.get('/', (c) => {
@@ -505,9 +572,19 @@ export function usersRoutes({
   });
 
   /**
-   * Manual password reset (no email infrastructure): a temporary password is
-   * generated, returned once for out-of-band handoff, and every session is
-   * revoked — the user signs back in with the temp password.
+   * Send a password-reset link (email/05, story 21).
+   *
+   * This used to generate a temporary password and show it once for the Admin to
+   * hand over. Now that the server can send mail, it mails the same link the
+   * sign-in page's reset request sends: the user chooses their own password, and
+   * the Admin never sees or sets one. Nothing about the account changes here —
+   * the password, every session, and the address all stand until the link is
+   * followed, at which point the reset route ends every session.
+   *
+   * The reply names which link went out, and an unverified account gets the one
+   * that can actually let them in: a reset link buys nothing while sign-in stays
+   * locked on Email Verification. The Admin is looking at this account already,
+   * so telling them its state is not the enumeration story/10 is about.
    */
   app.post('/:id/password', async (c) => {
     const admin = c.var.user;
@@ -519,41 +596,79 @@ export function usersRoutes({
     const db = c.var.db;
     const user = db.select().from(users).where(eq(users.id, id)).get();
     if (!user) return c.json({ error: 'User not found.' }, 404);
-    if (user.id === admin.id) {
-      return c.json(
-        {
-          error:
-            'Use “Change password” in your account menu to change your own password.',
-        },
-        409,
-      );
+
+    const kind = user.verifiedAt ? 'password_reset' : 'verification';
+    const token = issueToken(db, { purpose: kind, userId: user.id }, now());
+    const url = oneTimeLink(publicOrigin, pathFor(kind), token);
+    if (kind === 'verification') {
+      await c.var.mailer.sendVerification({ to: user.email, url });
+    } else {
+      await c.var.mailer.sendPasswordReset({ to: user.email, url });
+    }
+    recordMailedLink(db, admin, user.id, 'user.reset_link');
+    // The window in minutes, so the panel states the server's own rather than a
+    // copy of it that can fall behind.
+    return c.json({
+      sent: true,
+      kind,
+      expiresInMinutes: Math.round(
+        (kind === 'verification'
+          ? VERIFICATION_TOKEN_TTL_MS
+          : PASSWORD_RESET_TOKEN_TTL_MS) / 60_000,
+      ),
+    });
+  });
+
+  /**
+   * Move a dead mailbox (email/05, story 22): mail a link to the new address,
+   * and the account follows it to that address when its owner opens it.
+   *
+   * The mechanics are the Account page's, deliberately (email/04): the swap waits
+   * for the new address, so a typo cannot lock a user out of the account the
+   * Admin is rescuing, and it re-verifies the address, because a link that was
+   * opened is the proof Email Verification asks for. There is no password check
+   * — the Admin is the operator, already authenticated, and the user in front of
+   * them cannot produce one.
+   *
+   * Uniqueness is decided at swap time, not here, for the same reason it is not:
+   * the address can be claimed while the link is in flight, so an early refusal
+   * would be a refusal of a state that might not be the one the user lands in.
+   */
+  app.post('/:id/email', async (c) => {
+    const admin = c.var.user;
+    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
+
+    const id = parseUserId(c.req.param('id'));
+    if (id === null) return c.json({ error: 'User not found.' }, 404);
+
+    const db = c.var.db;
+    const user = db.select().from(users).where(eq(users.id, id)).get();
+    if (!user) return c.json({ error: 'User not found.' }, 404);
+
+    const newEmail = normalizeEmail(
+      asRecord(parseJson(await c.req.text()))?.email,
+    );
+    if (newEmail === null) {
+      return c.json({ error: 'Enter a valid email address.' }, 400);
+    }
+    // The one address this can refuse without hedging: the one already in use.
+    if (newEmail === user.email) {
+      return c.json({ error: 'That is already the user’s login email.' }, 400);
     }
 
-    // 12 random bytes → 16 base64url characters. Displayed once in the panel.
-    const temporaryPassword = randomBytes(12).toString('base64url');
-    const passwordHash = await hashPassword(temporaryPassword);
-
-    db.transaction((tx) => {
-      tx.update(users).set({ passwordHash }).where(eq(users.id, user.id)).run();
-      const revoked = tx
-        .delete(sessions)
-        .where(eq(sessions.userId, user.id))
-        .returning({ token: sessions.token })
-        .all();
-      tx.insert(auditLogs)
-        .values({
-          adminUserId: admin.id,
-          adminEmail: admin.email,
-          action: 'user.password_reset',
-          targetType: 'user',
-          targetId: String(user.id),
-          before: null,
-          after: { sessionsRevoked: revoked.length },
-        })
-        .run();
+    // The new address rides along as the link's payload, so the swap needs
+    // nothing but the token to know where the account is going.
+    const token = issueToken(
+      db,
+      { purpose: 'email_change', userId: user.id, payload: newEmail },
+      now(),
+    );
+    await c.var.mailer.sendEmailChange({
+      to: newEmail,
+      url: oneTimeLink(publicOrigin, CONFIRM_EMAIL_CHANGE_PATH, token),
     });
-
-    return c.json({ temporaryPassword });
+    recordMailedLink(db, admin, user.id, 'user.email_change');
+    return c.json({ email: newEmail });
   });
 
   /**

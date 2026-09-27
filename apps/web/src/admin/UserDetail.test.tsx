@@ -94,7 +94,8 @@ it('shows entitlement, usage with comps, and the action buttons', async () => {
   expect(screen.getByTestId('user-grant')).toHaveTextContent('Extend');
   expect(screen.getByTestId('user-revoke')).toBeInTheDocument();
   expect(screen.getByTestId('user-comp')).toBeInTheDocument();
-  expect(screen.getByTestId('user-reset-password')).toBeInTheDocument();
+  expect(screen.getByTestId('user-send-reset-link')).toBeInTheDocument();
+  expect(screen.getByTestId('user-change-email')).toBeInTheDocument();
   expect(screen.getByTestId('user-delete')).toBeInTheDocument();
   expect(onChanged).toHaveBeenCalled();
 });
@@ -204,7 +205,9 @@ it('comps quota and shows the new allowance', async () => {
   expect(screen.queryByTestId('comp-dialog')).not.toBeInTheDocument();
 });
 
-it('resets a password and shows the temp password once', async () => {
+it('sends a reset link instead of handing over a password', async () => {
+  // The Account pane is where the temporary password used to be displayed; the
+  // action is now a link, and the panel's answer is which inbox to watch.
   const user = userEvent.setup();
   vi.stubGlobal(
     'fetch',
@@ -215,18 +218,52 @@ it('resets a password and shows the temp password once', async () => {
           path: '/api/admin/users/42/password',
           method: 'POST',
           respond: () =>
-            jsonResponse(200, { temporaryPassword: 'temp-pass-1234' }),
+            jsonResponse(200, {
+              sent: true,
+              kind: 'password_reset',
+              expiresInMinutes: 30,
+            }),
         },
       ],
     ),
   );
 
   render(<UserDetail userId={42} onBack={onBack} onChanged={onChanged} />);
-  await user.click(await screen.findByTestId('user-reset-password'));
-  await user.click(screen.getByTestId('confirm-reset'));
+  await user.click(await screen.findByTestId('user-send-reset-link'));
+  await user.click(screen.getByTestId('confirm-send-reset-link'));
 
-  expect(await screen.findByTestId('temp-password')).toHaveTextContent(
-    'temp-pass-1234',
+  expect(await screen.findByTestId('reset-link-sent')).toHaveTextContent(
+    'reader@example.com',
+  );
+  expect(screen.queryByTestId('temp-password')).not.toBeInTheDocument();
+});
+
+it('moves a dead mailbox onto a new address', async () => {
+  const user = userEvent.setup();
+  vi.stubGlobal(
+    'fetch',
+    mockApi(
+      () => adminUserDetail(),
+      [
+        {
+          path: '/api/admin/users/42/email',
+          method: 'POST',
+          respond: () => jsonResponse(200, { email: 'moved@example.com' }),
+        },
+      ],
+    ),
+  );
+
+  render(<UserDetail userId={42} onBack={onBack} onChanged={onChanged} />);
+  await user.click(await screen.findByTestId('user-change-email'));
+  await user.type(
+    screen.getByTestId('change-email-input'),
+    'moved@example.com',
+  );
+  await user.click(screen.getByTestId('confirm-change-email'));
+
+  expect(await screen.findByTestId('change-email-sent')).toHaveTextContent(
+    'moved@example.com',
   );
 });
 

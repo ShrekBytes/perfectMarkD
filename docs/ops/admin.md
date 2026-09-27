@@ -1,8 +1,8 @@
 # Admin runbook
 
 The day-to-day jobs of running PerfectMarkD as its Admin: verifying a payment,
-resetting a password, and changing a wallet address. Everything here is done in
-the `/admin` panel.
+getting a user back into their account, and changing a wallet address.
+Everything here is done in the `/admin` panel.
 
 Deployment and backups are separate: [README's Deployment
 section](../../README.md#deployment) for bringing the stack up,
@@ -58,19 +58,45 @@ match. Never reject over a cosmetic discrepancy the user can fix by resubmitting
 Rejections are not the end of an Order: a rejected user can submit again, and
 the corrected submission comes back to this queue.
 
-## Reset a password
+## Send a reset link
 
-There is no email infrastructure (a documented non-goal), so a reset is manual
-and you are the delivery channel.
+You never see or set anyone's password. The panel mails a one-time link, the
+user chooses their own password from it, and nothing about the account changes
+until they do.
 
-1. `/admin` → **Users** → the user → **Reset password**.
-2. The panel generates a temporary password and shows it **once**. Copy it
-   before closing — the server stores only its argon2id hash, so it cannot be
-   displayed again.
-3. Send it to the user over a channel you trust, and ask them to change it
-   immediately. They can do that from their Account page.
-4. Every one of that user's existing sessions was signed out when the reset
-   happened. Say so, or they will be surprised by the logouts.
+1. `/admin` → **Users** → the user → **Send reset link**.
+2. Read the confirmation: it names the address the link went to. Ask the user to
+   watch that inbox — a link that was never delivered is the failure mode here,
+   and the only way to tell is for them to say so.
+3. The link works **once** and expires in **30 minutes**. If it has gone stale,
+   send another; sending a second link does not cancel the first.
+4. Nothing is signed out until they choose a password, at which point **every**
+   one of their devices is signed out. Say so, or they will be surprised by the
+   logouts.
+
+If the account has never verified its email, the confirmation says a
+**verification link** went instead. That is deliberate: sign-in stays locked
+until the address is proven, so a reset link would have been a dead end. The
+verification link is what gets that user in.
+
+## Move a dead mailbox
+
+The escape hatch for a user whose address no longer reaches them. The account
+follows a link sent to the new address, so a mistyped address costs you a second
+request rather than the account.
+
+1. `/admin` → **Users** → the user → **Change login email**.
+2. Type the new address and **Send the link**. The link goes to the **new**
+   address, not the dead one.
+3. The login email changes only when whoever owns the new inbox opens the link.
+   Until then the old address is still the login email, and the password is
+   untouched either way.
+4. If the new address already belongs to another account, the swap is refused
+   when the link is opened. The address has to be free, and the fix is a fresh
+   link for a different one.
+
+Every session survives an email change, and the address being left is told about
+it, so a hijack cannot cut a user off silently.
 
 ## Change a wallet address
 
@@ -109,8 +135,11 @@ Compensate with a grant or a refund conversation, not an edit.
 
 ## The audit log
 
-Every payment decision, entitlement change, password reset, account deletion,
+Every payment decision, entitlement change, mailed link, account deletion,
 and settings save lands in **Audit log** with the acting admin, the subject, and
 a timestamp. It is append-only and there is no delete affordance in the panel.
 It covers the operations that move money and the ones that spend provider
-budget, which is the reason it exists rather than a nice-to-have.
+budget, which is the reason it exists rather than a nice-to-have. The two mail
+actions (`user.reset_link`, `user.email_change`) record that a link went out and
+to which account — never an address, so the trail does not outlive the data it
+names.

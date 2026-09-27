@@ -156,12 +156,38 @@ export async function compQuota(
   return ((await res.json()) as { user: AdminUser }).user;
 }
 
-/** The one-time temporary password, for out-of-band handoff to the user. */
-export async function resetUserPassword(userId: number): Promise<string> {
+/**
+ * Mails the user a password-reset link; the Admin never sees or sets a password.
+ * The reply says which link went out — an account whose email was never verified
+ * gets the verification link instead, because a reset link cannot get it in — and
+ * how long it lives, so the panel states the server's window rather than a copy
+ * of it.
+ */
+export interface SentResetLink {
+  kind: 'password_reset' | 'verification';
+  expiresInMinutes: number;
+}
+
+export async function sendUserResetLink(
+  userId: number,
+): Promise<SentResetLink> {
   const res = await postJson(`/api/admin/users/${userId}/password`, {});
   if (!res.ok) throw await errorFrom(res);
-  return ((await res.json()) as { temporaryPassword: string })
-    .temporaryPassword;
+  return (await res.json()) as SentResetLink;
+}
+
+/**
+ * Mails a link to `email`; the account moves onto it only when that address's
+ * owner opens the link. Resolves to the normalized address the server stored, so
+ * the confirmation names the inbox that will actually receive it.
+ */
+export async function changeUserEmail(
+  userId: number,
+  email: string,
+): Promise<string> {
+  const res = await postJson(`/api/admin/users/${userId}/email`, { email });
+  if (!res.ok) throw await errorFrom(res);
+  return ((await res.json()) as { email: string }).email;
 }
 
 export async function deleteAdminUser(userId: number): Promise<void> {

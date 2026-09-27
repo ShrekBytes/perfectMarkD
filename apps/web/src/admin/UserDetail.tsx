@@ -10,11 +10,13 @@ import { planName } from '../pricing/plans';
 import { Dialog } from '../shell/Dialog';
 import { GrantEntitlementDialog } from './GrantEntitlementDialog';
 import { CompQuotaDialog } from './CompQuotaDialog';
-import { ResetPasswordDialog } from './ResetPasswordDialog';
+import { SendResetLinkDialog } from './SendResetLinkDialog';
+import { ChangeEmailDialog } from './ChangeEmailDialog';
 import { DeleteAccountDialog } from './DeleteAccountDialog';
 import type { OrderStatus } from '../billing/api';
 
-type DetailDialog = 'grant' | 'revoke' | 'comp' | 'reset' | 'delete' | null;
+type DetailDialog =
+  'grant' | 'revoke' | 'comp' | 'reset' | 'email' | 'delete' | null;
 
 /** One line for the user's AI Action count, in their own counter (03). */
 function aiUsageLine(ai: AiUsageView): string {
@@ -30,9 +32,9 @@ function aiUsageLine(ai: AiUsageView): string {
 /**
  * The admin's view of one user (billing/03): their Entitlement, this period's
  * quota usage, and their Order history, with the actions that need a human —
- * grant/extend/revoke the Entitlement, comp quota, manual password reset, and
- * account deletion. Every action re-reads the user: the server is the only
- * authority on state, the panel just shows it.
+ * grant/extend/revoke the Entitlement, comp quota, mail a password-reset link,
+ * move a dead mailbox (email/05), and account deletion. Every action re-reads the
+ * user: the server is the only authority on state, the panel just shows it.
  */
 export function UserDetail({
   userId,
@@ -210,14 +212,22 @@ export function UserDetail({
 
       <div className="mt-2 rounded-pane border border-hairline bg-surface p-3">
         <p className="text-xs font-medium text-ink-soft">Account</p>
-        <div className="mt-2.5 flex gap-2">
+        <div className="mt-2.5 flex flex-wrap gap-2">
           <button
             type="button"
-            data-testid="user-reset-password"
+            data-testid="user-send-reset-link"
             onClick={() => setDialog('reset')}
             className="h-8 rounded-control border border-hairline px-3 text-xs font-medium text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
           >
-            Reset password
+            Send reset link
+          </button>
+          <button
+            type="button"
+            data-testid="user-change-email"
+            onClick={() => setDialog('email')}
+            className="h-8 rounded-control border border-hairline px-3 text-xs font-medium text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+          >
+            Change login email
           </button>
           <button
             type="button"
@@ -277,7 +287,14 @@ export function UserDetail({
         />
       )}
       {dialog === 'reset' && (
-        <ResetPasswordDialog
+        <SendResetLinkDialog
+          user={user}
+          onDone={onChanged}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'email' && (
+        <ChangeEmailDialog
           user={user}
           onDone={onChanged}
           onClose={() => setDialog(null)}

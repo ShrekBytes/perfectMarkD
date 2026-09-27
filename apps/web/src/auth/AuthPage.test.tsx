@@ -161,8 +161,9 @@ describe('password policy hint', () => {
     );
     unmount();
 
-    // An admin reset can set a temp password shorter than the policy; login
-    // must still accept it client-side.
+    // The 8-character rule belongs to registration and to choosing a new
+    // password, not to sign-in: a client-side minimum here would pre-empt the
+    // server's own answer with a bubble the user cannot act on.
     render(<AuthPage mode="login" />);
     expect(screen.getByLabelText(/password/i)).not.toHaveAttribute('minlength');
   });

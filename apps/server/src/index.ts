@@ -207,7 +207,10 @@ export function createApp({
       }),
     )
     .route('/api/orders', orderRoutes())
-    .route('/api/admin', adminRoutes({ now: clock, removeStoredFile, ai }))
+    .route(
+      '/api/admin',
+      adminRoutes({ now: clock, publicOrigin, removeStoredFile, ai }),
+    )
     // AI Actions (ai-transforms/05): always mounted so the AI Access switch
     // and typed gate refusals work even on an instance with no key. The
     // commands themselves are hidden client-side when unconfigured.

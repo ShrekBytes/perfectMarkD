@@ -129,11 +129,11 @@ The state of a login email after Email Verification has succeeded for it. An acc
 _Avoid_: active account, confirmed email, approved
 
 **Password Reset**:
-Setting a new password by following a one-time emailed link, without signing in. Also how an account signed in with Google gains a password, or recovers when it can't tell which sign-in method it used. Distinct from changing the password while signed in.
+Setting a new password by following a one-time emailed link, without signing in. Requested from the sign-in page, or mailed by the Admin from the panel — the Admin never sees or sets a password. Also how an account signed in with Google gains a password, or recovers when it can't tell which sign-in method it used. Distinct from changing the password while signed in.
 _Avoid_: forgot password, recovery, password change
 
 **Email Change**:
-Moving an account's login email to a new address, from the Account page. It asks for the current password, and it happens only when the owner of the new address follows the emailed link — which is what makes the new address a Verified Email — after which the old address is told. The password and every session survive it. Distinct from Password Reset, which replaces the password and signs every device out.
+Moving an account's login email to a new address. From the Account page it asks for the current password; the Admin can start one from the panel, for a dead mailbox, with no password check. Either way it happens only when the owner of the new address follows the emailed link — which is what makes the new address a Verified Email — after which the old address is told. The password and every session survive it. Distinct from Password Reset, which replaces the password and signs every device out.
 _Avoid_: address change, re-registration, email verification (that proves one inbox)
 
 **Google Sign-In**:
