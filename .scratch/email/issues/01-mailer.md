@@ -1,6 +1,6 @@
 # 01 — Mailer: Resend client, env config, boot gate
 
-Status: ready-for-human
+Status: resolved
 
 The foundation ticket: the server gains the ability to send transactional
 email, and nothing user-visible changes yet. A Mailer with one send operation
@@ -95,3 +95,44 @@ the DNS host, create an API key, and paste `RESEND_API_KEY` + `MAIL_FROM` into
 so that is also what gates a real end-to-end email check — the code path is
 verified here with `MAIL_MODE=console` and the stubbed-fetch tests. Use the
 `wizard` skill for the dashboard steps.
+
+## Answer
+
+The human step is done and the ticket is closed. Verified against the running
+instance on 2026-09-27, not just against the local checkout:
+
+- **The deployed artifact is this code.** The self-host runs
+  `ghcr.io/shrekbytes/perfectmarkd-api:latest`, and `/healthz` reports
+  `commit a0f81c4` — the commit after `b6a3836` — with
+  `/app/dist/mail/resend.js` present in the image.
+- **The boot gate, on the deployed image, four ways.** No mail configuration
+  refuses with the `RESEND_API_KEY` message; `RESEND_API_KEY` without
+  `MAIL_FROM` refuses naming `MAIL_FROM`; `MAIL_MODE=off` refuses the same way
+  (still no kill switch); `MAIL_MODE=console` passes the gate. The instance's
+  own `.env` supplies a key and a from-address, and the API boots.
+- **A real send through the app's own client**, run inside the api container
+  against its own environment: `sendVerification` from
+  `PerfectMarkD <hello@perfectmarkd.00022000.xyz>` was accepted in ~1s, and the
+  operator confirms the message arrived. That is the end-to-end check this
+  ticket was waiting on.
+- **DNS is Resend's verified pattern**: DKIM at
+  `resend._domainkey.perfectmarkd.00022000.xyz`, SPF and MX on
+  `send.perfectmarkd.00022000.xyz` → `send.forge.rmta.net`.
+- **The Privacy page** was re-checked in a real browser on the live host: the
+  Email section renders in the Light Table, no console or page errors.
+- The API key is a **send-only** (restricted) Resend key, so the domain cannot
+  be read back through the API — least privilege, and the reason "verified" is
+  established above by a send rather than a query.
+
+Two things this ticket leaves for the next one:
+
+- **No public-origin variable exists**, so the caller that builds the absolute
+  one-time link has nothing to build it from. `EXPORT_ORIGIN` is not a
+  substitute — on this instance it is `http://caddy`, the loopback origin the
+  export worker loads `/export` from, which would put a dead link in a real
+  inbox. email/02 settles this before it writes a route that sends.
+- The Privacy copy already promises an address is "verified once before the
+  first sign-in". That promise is email/02's to keep.
+
+No `map.md` exists for this effort, so there is no Decisions-so-far to append
+to; the `Blocked by:` line on email/02 is what this resolution unblocks.
