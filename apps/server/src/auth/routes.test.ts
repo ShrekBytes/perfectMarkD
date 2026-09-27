@@ -8,7 +8,10 @@ import {
 } from './testing.js';
 import type { RecordingMailer } from '../mail/testing.js';
 import { users } from '../db/schema.js';
-import { VERIFICATION_TOKEN_TTL_MS } from './tokens.js';
+import {
+  PASSWORD_RESET_TOKEN_TTL_MS,
+  VERIFICATION_TOKEN_TTL_MS,
+} from './tokens.js';
 
 const SESSION_SECRET = 'test-session-secret';
 
@@ -99,6 +102,20 @@ async function signedIn(
 ): Promise<string> {
   await register(app, email, password);
   return sessionCookie(await verifyEmail(app, mailer, email));
+}
+
+/** Asks for a reset link the way the sign-in page does. */
+function requestReset(app: AppType, email: string) {
+  return postJson(app, '/api/auth/request-password-reset', { email });
+}
+
+/** Chooses a new password with a reset link, the way the link's page does. */
+function setPasswordWith(
+  app: AppType,
+  token: string,
+  newPassword = 'a brand new password',
+) {
+  return postJson(app, '/api/auth/reset-password', { token, newPassword });
 }
 
 describe('POST /api/auth/register', () => {
@@ -369,6 +386,247 @@ describe('POST /api/auth/resend-verification', () => {
     const limited = await resend('two@example.com');
     expect(limited.status).toBe(429);
     expect(mailer.sends).toHaveLength(before + 1);
+  });
+});
+
+describe('POST /api/auth/request-password-reset', () => {
+  it('mails a reset link to a verified account', async () => {
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
+    mailer.sends.length = 0;
+
+    const res = await requestReset(app, 'reader@example.com');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ sent: true });
+    expect(mailer.sends).toEqual([
+      {
+        kind: 'password_reset',
+        to: 'reader@example.com',
+        url: expect.stringMatching(
+          new RegExp(`^${PUBLIC_ORIGIN}/set-password\\?token=[A-Za-z0-9_-]+$`),
+        ) as unknown as string,
+      },
+    ]);
+  });
+
+  it('sends the verification link to an unverified account instead', async () => {
+    // Story 14: an account that never verified cannot be reset into a working
+    // sign-in, so the mail repairs the flow that unblocks it — the two dead-end
+    // in neither direction.
+    const { app, mailer } = makeApp();
+    await register(app);
+    mailer.sends.length = 0;
+
+    const res = await requestReset(app, 'reader@example.com');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ sent: true });
+    expect(mailer.sends).toEqual([
+      {
+        kind: 'verification',
+        to: 'reader@example.com',
+        url: expect.stringMatching(
+          new RegExp(`^${PUBLIC_ORIGIN}/verify-email\\?token=[A-Za-z0-9_-]+$`),
+        ) as unknown as string,
+      },
+    ]);
+    // And the link it carries does what it says: the account verifies.
+    expect((await verifyEmail(app, mailer, 'reader@example.com')).status).toBe(
+      200,
+    );
+  });
+
+  it('answers an unregistered address identically, mailing nothing', async () => {
+    // Story 10: the form must not be able to discover who has an account.
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
+    mailer.sends.length = 0;
+
+    const registered = await requestReset(app, 'reader@example.com');
+    const unknown = await requestReset(app, 'nobody@example.com');
+
+    expect(unknown.status).toBe(registered.status);
+    expect(await unknown.json()).toEqual(await registered.json());
+    expect(mailer.sends).toHaveLength(1);
+  });
+
+  it('rejects a malformed address', async () => {
+    const { app } = makeApp();
+    const res = await requestReset(app, 'not-an-email');
+    expect(res.status).toBe(400);
+  });
+
+  it('spends the same send budget as the other send endpoints', async () => {
+    // One budget for every message this instance sends (email/02): a reset
+    // request is as capable of draining the provider's daily cap as a
+    // registration is, so it draws on the same two keys.
+    const { app, mailer } = makeApp({
+      authRateLimit: {
+        emailSend: {
+          // The registration below spends the first of the two, because it is
+          // a send endpoint too — which is the point: one budget, one counter.
+          perAddress: { limit: 2, windowMs: 60_000 },
+          perIp: { limit: 10, windowMs: 60_000 },
+        },
+      },
+    });
+    await signedIn(app, mailer);
+    const before = mailer.sends.length;
+
+    expect((await requestReset(app, 'reader@example.com')).status).toBe(200);
+    const limited = await requestReset(app, 'reader@example.com');
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBeTruthy();
+    expect(mailer.sends).toHaveLength(before + 1);
+  });
+});
+
+describe('POST /api/auth/reset-password', () => {
+  it('sets the new password, signs everyone out, and refuses the link again', async () => {
+    // Stories 11–12: regain access with credentials only I know, and a stolen
+    // session must not survive the recovery.
+    const { app, mailer } = makeApp();
+    const phone = await signedIn(app, mailer);
+    // A second signed-in device, the one a recovery is meant to evict.
+    const laptop = sessionCookie(
+      await postJson(app, '/api/auth/login', {
+        email: 'reader@example.com',
+        password: PASSWORD,
+      }),
+    );
+    await requestReset(app, 'reader@example.com');
+
+    const res = await setPasswordWith(
+      app,
+      mailer.tokenTo('reader@example.com'),
+    );
+
+    expect(res.status).toBe(204);
+    // No session starts: the user asked to set a password, not to sign in, and
+    // the page sends them to the sign-in form for that. (The Set-Cookie that is
+    // there clears one — see the next test.)
+    expect(res.headers.get('set-cookie') ?? '').not.toMatch(/pmd_session=[^;]/);
+    for (const cookie of [phone, laptop]) {
+      expect(
+        (await app.request('/api/auth/me', { headers: { cookie } })).status,
+      ).toBe(401);
+    }
+    // The old password is dead, the new one works.
+    const oldLogin = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: PASSWORD,
+    });
+    expect(oldLogin.status).toBe(401);
+    const newLogin = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: 'a brand new password',
+    });
+    expect(newLogin.status).toBe(200);
+
+    // One-time: the link buys one password, not a second.
+    const replay = await setPasswordWith(
+      app,
+      mailer.tokenTo('reader@example.com'),
+    );
+    expect(replay.status).toBe(400);
+    expect(await replay.json()).toMatchObject({ code: 'link_invalid' });
+  });
+
+  it('sets a password on an account that never had one', async () => {
+    // Story 13: the recovery path for a Google-only account. The row is written
+    // the same way whatever it held before, so the account gains a password it
+    // can sign in with and the old hash is simply gone.
+    const { app, mailer, db } = makeApp();
+    await signedIn(app, mailer);
+    // What a Google-registered account looks like to this table: no password of
+    // its own. (The column is NOT NULL today, so the empty string stands in for
+    // the null google-signin introduces.) This database holds one account.
+    db.update(users).set({ passwordHash: '' }).run();
+    await requestReset(app, 'reader@example.com');
+
+    const res = await setPasswordWith(
+      app,
+      mailer.tokenTo('reader@example.com'),
+    );
+
+    expect(res.status).toBe(204);
+    expect(db.select().from(users).get()?.passwordHash).not.toBe('');
+    const login = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: 'a brand new password',
+    });
+    expect(login.status).toBe(200);
+  });
+
+  it('clears the caller’s own cookie, so the browser drops the dead session', async () => {
+    // The other half of the revocation: the browser that followed the link must
+    // not keep a cookie pointing at a session row that no longer exists.
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
+    await requestReset(app, 'reader@example.com');
+
+    const res = await setPasswordWith(
+      app,
+      mailer.tokenTo('reader@example.com'),
+    );
+
+    expect(res.status).toBe(204);
+    const cookie = res.headers.get('set-cookie');
+    expect(cookie).toContain('pmd_session=');
+    expect(cookie).toContain('Max-Age=0');
+  });
+
+  it('refuses a link past its 30 minutes, leaving the password alone', async () => {
+    const { app, mailer } = makeApp({ now: () => current });
+    await signedIn(app, mailer);
+    await requestReset(app, 'reader@example.com');
+    const token = mailer.tokenTo('reader@example.com');
+
+    current = new Date(current.getTime() + PASSWORD_RESET_TOKEN_TTL_MS + 1000);
+    const res = await setPasswordWith(app, token);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'link_invalid' });
+    // The old password still signs in: a refused link changes nothing.
+    const login = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: PASSWORD,
+    });
+    expect(login.status).toBe(200);
+  });
+
+  it('refuses an unknown, missing, or wrong-purpose token', async () => {
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
+    // A verification link is not a reset link: the purpose is the authority.
+    const verification = mailer.tokenTo('reader@example.com');
+
+    const unknown = await setPasswordWith(app, 'not-a-real-token');
+    expect(unknown.status).toBe(400);
+    const missing = await postJson(app, '/api/auth/reset-password', {
+      newPassword: 'a brand new password',
+    });
+    expect(missing.status).toBe(400);
+    const wrongPurpose = await setPasswordWith(app, verification);
+    expect(wrongPurpose.status).toBe(400);
+    expect(await wrongPurpose.json()).toMatchObject({ code: 'link_invalid' });
+  });
+
+  it('rejects a short password without spending the link', async () => {
+    // A typo in the new password must not cost the user their only link — the
+    // form states the policy, but the server is what enforces it.
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
+    await requestReset(app, 'reader@example.com');
+    const token = mailer.tokenTo('reader@example.com');
+
+    const tooShort = await setPasswordWith(app, token, 'short');
+    expect(tooShort.status).toBe(400);
+    expect(await tooShort.json()).toMatchObject({ error: expect.any(String) });
+
+    // The same link still works for a password that meets the policy.
+    expect((await setPasswordWith(app, token)).status).toBe(204);
   });
 });
 

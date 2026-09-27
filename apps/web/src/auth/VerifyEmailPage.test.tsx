@@ -84,6 +84,23 @@ describe('VerifyEmailPage', () => {
     );
   });
 
+  it('names a body it could not read as its own failure, not a bad link', async () => {
+    // A body the client cannot read is a failure, never a verdict on the link:
+    // the two recoveries are different pages, so guessing wrong strands the user.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('Bad Gateway', { status: 400 })),
+    );
+    render(<VerifyEmailPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: /couldn’t verify/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /the server couldn't complete that/i,
+    );
+  });
+
   it('says the link is incomplete when it carries no token', async () => {
     const verifyEmail = vi.spyOn(api, 'verifyEmail');
     window.history.pushState({}, '', '/verify-email');

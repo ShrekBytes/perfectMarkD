@@ -3,11 +3,11 @@ import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { emailTokens, users } from '../db/schema.js';
 import {
+  PASSWORD_RESET_TOKEN_TTL_MS,
   VERIFICATION_TOKEN_TTL_MS,
   issueToken,
   oneTimeLink,
   redeemToken,
-  type TokenPurpose,
 } from './tokens.js';
 
 const NOW = new Date('2026-09-27T12:00:00.000Z');
@@ -54,6 +54,18 @@ describe('issueToken', () => {
       new Date(NOW.getTime() + VERIFICATION_TOKEN_TTL_MS),
     );
   });
+
+  it('expires 30 minutes out for a reset link', () => {
+    // A reset link is worth less and lasts less than a verification one: it
+    // hands over the account, so the window is minutes rather than a day.
+    const { db, userId } = makeDb();
+
+    issueToken(db, { purpose: 'password_reset', userId }, NOW);
+
+    expect(db.select().from(emailTokens).get()?.expiresAt).toEqual(
+      new Date(NOW.getTime() + PASSWORD_RESET_TOKEN_TTL_MS),
+    );
+  });
 });
 
 describe('redeemToken', () => {
@@ -84,14 +96,25 @@ describe('redeemToken', () => {
 
   it('refuses a token spent as a different purpose', () => {
     // The purpose is the link's authority: one flow's token can never be
-    // redeemed as another's. (`password_reset` is email/03's.)
+    // redeemed as another's. A reset link must not verify an address, and a
+    // verification link must not set a password.
     const { db, userId } = makeDb();
     const token = issueToken(db, { purpose: 'verification', userId }, NOW);
-    const other = 'password_reset' as TokenPurpose;
 
-    expect(redeemToken(db, other, token, NOW)).toBeNull();
+    expect(redeemToken(db, 'password_reset', token, NOW)).toBeNull();
     // Still redeemable as what it actually is.
     expect(redeemToken(db, 'verification', token, NOW)).toEqual({
+      userId,
+      payload: null,
+    });
+  });
+
+  it('refuses a reset link redeemed as a verification', () => {
+    const { db, userId } = makeDb();
+    const token = issueToken(db, { purpose: 'password_reset', userId }, NOW);
+
+    expect(redeemToken(db, 'verification', token, NOW)).toBeNull();
+    expect(redeemToken(db, 'password_reset', token, NOW)).toEqual({
       userId,
       payload: null,
     });

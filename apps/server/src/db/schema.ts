@@ -174,7 +174,7 @@ export const sessions = sqliteTable('sessions', {
 });
 
 /** What a one-time emailed link is for. One table covers every flow's link. */
-export const TOKEN_PURPOSES = ['verification'] as const;
+export const TOKEN_PURPOSES = ['verification', 'password_reset'] as const;
 export type TokenPurpose = (typeof TOKEN_PURPOSES)[number];
 
 /**

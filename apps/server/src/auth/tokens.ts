@@ -26,6 +26,23 @@ export type { TokenPurpose };
 /** Email Verification links live 24 hours (spec §One-time tokens). */
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Password Reset links live 30 minutes (spec §One-time tokens). A reset link
+ * hands over the account, so its window is minutes where a verification link
+ * has a day: the second an address is proven, the link is spent and worthless.
+ */
+export const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
+
+/**
+ * How long each kind of link stays live. Keyed by purpose so a new flow brings
+ * its own length with it and cannot inherit someone else's — a reset link
+ * quietly living for 24 hours would be a quiet hole in this feature.
+ */
+const TOKEN_TTL_MS = {
+  verification: VERIFICATION_TOKEN_TTL_MS,
+  password_reset: PASSWORD_RESET_TOKEN_TTL_MS,
+} satisfies Record<TokenPurpose, number>;
+
 /** What a redeemed link carries back to the flow that spends it. */
 export interface RedeemedToken {
   userId: number;
@@ -57,9 +74,7 @@ export function issueToken(
       purpose,
       userId,
       payload,
-      // The one length that exists today; email/03's reset links bring their
-      // own 30 minutes with them.
-      expiresAt: new Date(now.getTime() + VERIFICATION_TOKEN_TTL_MS),
+      expiresAt: new Date(now.getTime() + TOKEN_TTL_MS[purpose]),
     })
     .run();
   return token;

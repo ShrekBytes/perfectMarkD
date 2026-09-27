@@ -317,30 +317,23 @@ describe('error recovery', () => {
 });
 
 describe('forgot password', () => {
-  it('reveals the honest recovery path from the login form', async () => {
+  it('leads to the reset request page', async () => {
+    // Story 9: self-service recovery, one click from the form a user is stuck
+    // on. (It used to be a disclosure that named the Admin as the only way in.)
     const user = userEvent.setup();
     render(<AuthPage mode="login" />);
 
-    const trigger = screen.getByRole('button', { name: /forgot password/i });
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(/ask the admin/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: /forgot password/i }));
 
-    await user.click(trigger);
-
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    const panel = screen.getByText(/ask the admin/i);
-    expect(trigger).toHaveAttribute('aria-controls', panel.id);
-
-    await user.click(trigger);
-
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(/ask the admin/i)).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(window.location.pathname).toBe('/reset-password'),
+    );
   });
 
   it('offers no recovery affordance on register', () => {
     render(<AuthPage mode="register" />);
     expect(
-      screen.queryByRole('button', { name: /forgot password/i }),
+      screen.queryByRole('link', { name: /forgot password/i }),
     ).not.toBeInTheDocument();
   });
 });

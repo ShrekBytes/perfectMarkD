@@ -103,6 +103,34 @@ export async function me(): Promise<MePayload | null> {
   return (await res.json()) as MePayload;
 }
 
+/**
+ * Asks for a Password Reset link. Success-shaped for every address, so this is
+ * safe to call with anything the user typed: the page cannot tell a registered
+ * address from an unknown one, and must not appear to.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const res = await postJson('/api/auth/request-password-reset', { email });
+  if (!res.ok) throw await errorFrom(res);
+}
+
+/**
+ * Chooses a new password with a live reset link. The token travels in the
+ * request body, never the URL: the link's page holds it in memory and spends it
+ * here, so an inbox link scanner that follows the URL cannot set a password.
+ * Throws AuthError with `link_invalid` when the link is dead, which the page
+ * answers with a fresh-link route.
+ */
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<void> {
+  const res = await postJson('/api/auth/reset-password', {
+    token,
+    newPassword,
+  });
+  if (!res.ok) throw await errorFrom(res);
+}
+
 export async function changePassword(
   currentPassword: string,
   newPassword: string,

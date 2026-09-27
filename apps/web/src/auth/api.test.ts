@@ -6,7 +6,9 @@ import {
   logout,
   me,
   register,
+  requestPasswordReset,
   resendVerification,
+  resetPassword,
   verifyEmail,
 } from './api';
 
@@ -103,6 +105,75 @@ describe('the verification link', () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('/api/auth/verify-email');
     expect(init).toMatchObject({ body: JSON.stringify({ token: 't0ken' }) });
+  });
+});
+
+describe('Password Reset', () => {
+  it('asks for a link, and reports the server message on refusal', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ sent: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await requestPasswordReset('a@b.co');
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/request-password-reset');
+    expect(init).toMatchObject({
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ email: 'a@b.co' }),
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ error: 'Too many attempts. Try again shortly.' }, 429),
+        ),
+    );
+    await expect(requestPasswordReset('a@b.co')).rejects.toThrow(
+      new AuthError('Too many attempts. Try again shortly.', 429),
+    );
+  });
+
+  it('sends the link’s token with the new password and resolves on 204', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await resetPassword('t0ken', 'a brand new password');
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/reset-password');
+    expect(init).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({
+        token: 't0ken',
+        newPassword: 'a brand new password',
+      }),
+    });
+  });
+
+  it('surfaces a dead link with the code the page branches on', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: 'That link is no longer valid.',
+            code: 'link_invalid',
+          },
+          400,
+        ),
+      ),
+    );
+
+    await expect(
+      resetPassword('t0ken', 'a brand new password'),
+    ).rejects.toThrow(
+      new AuthError('That link is no longer valid.', 400, 'link_invalid'),
+    );
   });
 });
 

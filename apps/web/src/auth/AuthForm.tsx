@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { FALLBACK_CODE } from '../api/client';
+import { errorToUserMessage, FALLBACK_CODE } from '../api/client';
 import { Link } from '../router';
 import {
   AuthError,
@@ -19,7 +19,6 @@ const PASSWORD_MIN = 8;
  *  AuthForm at a time, so the IDs are stable and unique in the document. */
 const PASSWORD_HINT_ID = 'auth-password-hint';
 const ERROR_ID = 'auth-error';
-const RECOVERY_ID = 'auth-recovery';
 
 const COPY = {
   login: {
@@ -56,30 +55,29 @@ function isFieldError(status: number | undefined): boolean {
   return status === 400 || status === 401 || status === 409 || status === 422;
 }
 
-/** Name the problem and the recovery (DESIGN.md → Do's). The server's own
- *  message wins when it carries one; the generic strings are ours. A 5xx or
- *  the fallback marker (a body the client couldn't read) is never about the
- *  input, so the status is dropped and no field is flagged. */
+/** Name the problem and the recovery (DESIGN.md → Do's). The message is the
+ *  house one (`errorToUserMessage`); the status comes along so the field rule
+ *  can tell "your input" from "our fault" — a 5xx or the fallback marker (a body
+ *  the client couldn't read) is never about what was typed, so the status is
+ *  dropped and no field is flagged. */
 function messageFor(cause: unknown): { message: string; status?: number } {
-  if (cause instanceof AuthError) {
-    if (cause.status >= 500 || cause.code === FALLBACK_CODE) {
-      return {
-        message: "The server couldn't complete that. Try again in a moment.",
-      };
-    }
-    return { message: cause.message, status: cause.status };
-  }
+  const ours =
+    cause instanceof AuthError &&
+    (cause.status >= 500 || cause.code === FALLBACK_CODE);
+  if (ours) return { message: errorToUserMessage(cause) };
   // fetch rejects with a TypeError when the request never reaches the API —
   // the API process is down, or the device is offline.
-  return {
-    message: "Couldn't reach the server. Check your connection and try again.",
-  };
+  if (cause instanceof AuthError) {
+    return { message: cause.message, status: cause.status };
+  }
+  return { message: errorToUserMessage(cause) };
 }
 
-/** The honest recovery for a product with no email infrastructure: no
- *  self-serve reset, but the Admin can set a temporary password (billing/03). */
-const RECOVERY_COPY =
-  'No automatic resets. Ask the Admin to set a temporary password, then sign in with it here.';
+/** The honest route out of a password a user cannot remember: the Password
+ *  Reset request page (email/03). A link, not a disclosure panel — the request
+ *  is its own surface with a result of its own, and a form inside this form
+ *  would be invalid HTML (the upgrade dialog embeds this one). */
+const FORGOT_PATH = '/reset-password';
 
 export interface AuthFormProps {
   mode: AuthMode;
@@ -121,17 +119,15 @@ export function AuthForm({
   // The sign-in gate (email/02): the credentials were right and the address is
   // unverified, so the recovery is a new link rather than a corrected field.
   const [awaitingVerification, setAwaitingVerification] = useState(false);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // A failure or an open recovery panel on one form must not follow the user
+  // A failure or the unverified notice on one form must not follow the user
   // to the other. Email and password are kept — it is the same account either
   // way, and the register hint states the password policy as the user types,
   // so a carried password announces the contract it now sits under.
   useEffect(() => {
     setFailure(null);
     setAwaitingVerification(false);
-    setRecoveryOpen(false);
   }, [mode]);
 
   const onSubmit = async (event: FormEvent) => {
@@ -245,25 +241,12 @@ export function AuthForm({
       )}
 
       {mode === 'login' && (
-        <>
-          <button
-            type="button"
-            onClick={() => setRecoveryOpen((open) => !open)}
-            aria-expanded={recoveryOpen}
-            aria-controls={RECOVERY_ID}
-            className="touch-target mt-2 flex w-fit items-center rounded-control px-1 text-xs text-ink-soft outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2"
-          >
-            Forgot password?
-          </button>
-          {recoveryOpen && (
-            <p
-              id={RECOVERY_ID}
-              className="mt-1 text-[11px] leading-relaxed text-ink-faint"
-            >
-              {RECOVERY_COPY}
-            </p>
-          )}
-        </>
+        <Link
+          to={FORGOT_PATH}
+          className="touch-target mt-2 flex w-fit items-center rounded-control px-1 text-xs text-ink-soft underline underline-offset-2 outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2"
+        >
+          Forgot password?
+        </Link>
       )}
 
       <button

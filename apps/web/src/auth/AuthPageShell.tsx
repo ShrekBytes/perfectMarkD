@@ -4,8 +4,9 @@
 // job jacket — the proof-sheet panel with the registration marks, which DESIGN.md
 // reserves for this surface: the one chrome a user meets outside the editor.
 //
-// /login, /register, /check-inbox and /verify-email all render inside it, so
-// the marks and the panel geometry are decided once.
+// /login, /register, /check-inbox, /verify-email, /reset-password and
+// /set-password all render inside it, so the marks and the panel geometry are
+// decided once.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ReactNode } from 'react';

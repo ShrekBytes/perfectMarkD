@@ -1,6 +1,6 @@
 import { AuthPageShell, SignInFooter } from './AuthPageShell';
 import { ResendVerification } from './ResendVerification';
-import { readVerificationEmail } from './pending-verification';
+import { readVerificationEmail } from './pending-email';
 
 /**
  * Where a new registration lands: the address is named, the next step is

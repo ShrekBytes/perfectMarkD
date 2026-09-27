@@ -4,7 +4,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CheckInboxPage } from './CheckInboxPage';
-import { rememberVerificationEmail } from './pending-verification';
+import { rememberVerificationEmail } from './pending-email';
 import * as api from './api';
 import { stubSystemTheme } from '../testing/match-media';
 

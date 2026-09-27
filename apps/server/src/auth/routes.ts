@@ -13,6 +13,7 @@ import {
   createSession,
   deleteOtherSessions,
   deleteSession,
+  deleteUserSessions,
 } from './sessions.js';
 import type { Clock } from './sessions.js';
 import { clearSessionCookie, clientIp, setSessionCookie } from './http.js';
@@ -50,6 +51,11 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *  API, so a link scanner that follows the URL in an inbox cannot spend it. */
 const VERIFY_PATH = '/verify-email';
 
+/** The SPA page a reset link resolves to. It holds the new-password form and
+ *  spends the token when one is chosen — not on load, or a link preview that
+ *  fetched the page would burn it before the user typed anything. */
+const SET_PASSWORD_PATH = '/set-password';
+
 /**
  * Codes the client branches on, never the message beside them: the sign-in gate
  * offers a resend, and a spent link offers a fresh one.
@@ -61,13 +67,14 @@ export const LINK_INVALID_CODE = 'link_invalid';
  * One answer for every way a link fails to redeem — unknown, expired, already
  * spent, or issued for another flow. Distinguishing them would tell a stranger
  * holding a dead link something about the account behind it, and the recovery is
- * the same either way: ask for a fresh link.
+ * the same either way: ask for a fresh link. The wording names no flow, because
+ * the same answer serves a verification link and a reset link.
  */
 function invalidLink(c: Context<AppEnv>) {
   return c.json(
     {
       error:
-        'That verification link is no longer valid — it may have expired or already been used.',
+        'That link is no longer valid — it may have expired or already been used.',
       code: LINK_INVALID_CODE,
     },
     400,
@@ -164,6 +171,23 @@ export function authRoutes(options: AuthOptions) {
     return c.json({ error: 'Too many attempts. Try again shortly.' }, 429);
   };
 
+  /** The send budget every "mail me a link" endpoint spends, on both its keys.
+   *  One budget for all of them: a reset request is as capable of draining the
+   *  provider's daily cap as a registration is, so it draws on the same
+   *  counters rather than getting its own. */
+  const rejectOverSendBudget = (c: Context<AppEnv>, address: string) =>
+    rejectRateLimited(c, limiters.sendIp) ??
+    rejectRateLimited(c, limiters.sendAddress, address);
+
+  /** The account an address belongs to, or null. Every flow that answers about
+   *  an address without revealing whether it is registered reads it here. */
+  const accountFor = (c: Context<AppEnv>, email: string) =>
+    c.var.db
+      .select({ id: users.id, verifiedAt: users.verifiedAt })
+      .from(users)
+      .where(eq(users.email, email))
+      .get();
+
   /** Issues a fresh verification link and mails it. */
   const sendVerification = async (
     c: Context<AppEnv>,
@@ -178,6 +202,23 @@ export function authRoutes(options: AuthOptions) {
     await c.var.mailer.sendVerification({
       to: email,
       url: oneTimeLink(options.publicOrigin, VERIFY_PATH, token),
+    });
+  };
+
+  /** Issues a reset link and mails it — the same email the Admin panel sends. */
+  const sendPasswordReset = async (
+    c: Context<AppEnv>,
+    userId: number,
+    email: string,
+  ) => {
+    const token = issueToken(
+      c.var.db,
+      { purpose: 'password_reset', userId },
+      now(),
+    );
+    await c.var.mailer.sendPasswordReset({
+      to: email,
+      url: oneTimeLink(options.publicOrigin, SET_PASSWORD_PATH, token),
     });
   };
 
@@ -198,11 +239,7 @@ export function authRoutes(options: AuthOptions) {
     email: string,
     password: string,
   ): Promise<number | null> => {
-    const existing = c.var.db
-      .select({ id: users.id, verifiedAt: users.verifiedAt })
-      .from(users)
-      .where(eq(users.email, email))
-      .get();
+    const existing = accountFor(c, email);
     if (existing) return existing.verifiedAt ? null : existing.id;
 
     const isAdmin =
@@ -220,11 +257,7 @@ export function authRoutes(options: AuthOptions) {
       // concurrently; the UNIQUE index is the real arbiter, and the row it
       // protected is unverified by definition — the same case as finding it.
       if (!isUniqueViolation(error)) throw error;
-      const raced = c.var.db
-        .select({ id: users.id, verifiedAt: users.verifiedAt })
-        .from(users)
-        .where(eq(users.email, email))
-        .get();
+      const raced = accountFor(c, email);
       return raced && !raced.verifiedAt ? raced.id : null;
     }
   };
@@ -261,21 +294,16 @@ export function authRoutes(options: AuthOptions) {
       return c.json({ error: 'Enter a valid email address.' }, 400);
     }
 
-    // The same send budget, on the same two keys: this endpoint exists to send
-    // mail, so it is the one an attacker aims at the provider's daily cap with.
-    const limited =
-      rejectRateLimited(c, limiters.sendIp) ??
-      rejectRateLimited(c, limiters.sendAddress, parsed);
+    // The same send budget as the resend, on the same two keys: this endpoint
+    // exists to send mail, so it is one an attacker aims at the provider's daily
+    // cap with.
+    const limited = rejectOverSendBudget(c, parsed);
     if (limited) return limited;
 
     // Success-shaped for every address — a response that differed for a
     // registered one would turn this into an account-enumeration oracle. The
     // only account that gets a message is one that still needs verifying.
-    const user = c.var.db
-      .select({ id: users.id, verifiedAt: users.verifiedAt })
-      .from(users)
-      .where(eq(users.email, parsed))
-      .get();
+    const user = accountFor(c, parsed);
     if (user && !user.verifiedAt) await sendVerification(c, user.id, parsed);
     return c.json({ sent: true });
   });
@@ -304,6 +332,85 @@ export function authRoutes(options: AuthOptions) {
       createSession(c.var.db, user.id, at),
     );
     return c.json({ user: publicUser(user) });
+  });
+
+  /**
+   * Password Reset, requested from the sign-in page. Success-shaped for every
+   * address (story 10): a response that differed for a registered one would
+   * turn the form into an account-enumeration oracle.
+   *
+   * Which link goes out depends on the account: a verified one gets a reset
+   * link, an unverified one gets a verification link (story 14). A reset link
+   * for an unverified account would be a dead end — the password it sets buys
+   * nothing while sign-in stays locked on the gate — so the two flows repair
+   * each other instead. The response is identical either way, so the branch
+   * tells a stranger nothing.
+   */
+  app.post('/request-password-reset', async (c) => {
+    const parsed = normalizeEmail(
+      asRecord(parseJson(await c.req.text()))?.email,
+    );
+    if (parsed === null) {
+      return c.json({ error: 'Enter a valid email address.' }, 400);
+    }
+
+    const limited = rejectOverSendBudget(c, parsed);
+    if (limited) return limited;
+
+    const user = accountFor(c, parsed);
+    if (user) {
+      if (user.verifiedAt) await sendPasswordReset(c, user.id, parsed);
+      else await sendVerification(c, user.id, parsed);
+    }
+    return c.json({ sent: true });
+  });
+
+  /**
+   * The Password Reset itself: a live link plus a new password sets the hash
+   * and ends every session the account has.
+   *
+   * The policy is checked before the token is redeemed, so a password that
+   * does not meet it costs the user nothing — a refused request leaves the link
+   * spendable, which matters because a reset link is often a user's only way in.
+   * The hash is written the same way whatever the account held before, so an
+   * account with no password of its own (Google) gains one (story 13).
+   */
+  app.post('/reset-password', async (c) => {
+    const body = asRecord(parseJson(await c.req.text()));
+    const token = body?.token;
+    if (typeof token !== 'string' || token === '') {
+      return invalidLink(c);
+    }
+    const newPassword = body?.newPassword;
+    if (
+      typeof newPassword !== 'string' ||
+      newPassword.length < MIN_PASSWORD_LENGTH
+    ) {
+      return c.json(
+        {
+          error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+        },
+        400,
+      );
+    }
+
+    const redeemed = redeemToken(c.var.db, 'password_reset', token, now());
+    if (!redeemed) return invalidLink(c);
+
+    c.var.db
+      .update(users)
+      .set({ passwordHash: await hashPassword(newPassword) })
+      .where(eq(users.id, redeemed.userId))
+      .run();
+    // Every session, with no exception: a session that outlived a recovery is
+    // the stolen one the recovery exists to kill (story 12). No session is
+    // started in exchange — the user signs in with the password they just chose.
+    deleteUserSessions(c.var.db, redeemed.userId);
+    // The browser's half of the same revocation: the caller's own cookie, if it
+    // had one, now points at a row that is gone, so it is cleared rather than
+    // left to fail on the next request.
+    clearSessionCookie(c);
+    return c.body(null, 204);
   });
 
   app.post('/login', async (c) => {

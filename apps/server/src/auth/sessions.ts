@@ -95,3 +95,14 @@ export function deleteOtherSessions(
     )
     .run();
 }
+
+/**
+ * Revokes every session for `userId`, with no exception — Password Reset
+ * (email/03). There is no device to keep here: nobody is signed in when a reset
+ * link is followed, and a session that outlived the recovery is exactly the
+ * stolen one the recovery exists to kill. The user signs in again with the
+ * password they just chose.
+ */
+export function deleteUserSessions(db: AppDatabase, userId: number): void {
+  db.delete(sessions).where(eq(sessions.userId, userId)).run();
+}

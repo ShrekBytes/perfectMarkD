@@ -2,7 +2,7 @@ import { navigate } from '../router';
 import { AuthForm, type AuthMode } from './AuthForm';
 import { AuthPageShell } from './AuthPageShell';
 import { useAccountStore } from './account-store';
-import { rememberVerificationEmail } from './pending-verification';
+import { rememberVerificationEmail } from './pending-email';
 
 interface AuthPageProps {
   mode: AuthMode;

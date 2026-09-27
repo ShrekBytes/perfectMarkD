@@ -80,6 +80,8 @@ it.each([
   ['/register', 'Create account'],
   ['/check-inbox', 'Check your inbox'],
   ['/verify-email', 'This link is incomplete'],
+  ['/reset-password', 'Reset your password'],
+  ['/set-password', 'This link is incomplete'],
 ])('renders the auth surface at %s', (path, heading) => {
   window.history.pushState({}, '', path);
   render(<App />);

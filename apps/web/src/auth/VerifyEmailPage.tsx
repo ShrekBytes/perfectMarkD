@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ApiError, errorToMessage } from '../api/client';
+import { useEffect, useRef, useState } from 'react';
+import { ApiError, errorToUserMessage } from '../api/client';
 import { navigate } from '../router';
 import { AuthPageShell, SignInFooter } from './AuthPageShell';
+import { COPY_CLASS, Panel, tokenFromUrl } from './link-page';
 import { ResendVerification } from './ResendVerification';
 import { LINK_INVALID_CODE, verifyEmail } from './api';
 import { useAccountStore } from './account-store';
@@ -14,39 +15,6 @@ type State =
   | { kind: 'dead' }
   | { kind: 'failed'; message: string }
   | { kind: 'no-token' };
-
-/** The token travels in the query string the emailed link carries. */
-function tokenFromUrl(): string | null {
-  return new URLSearchParams(window.location.search).get('token');
-}
-
-/** The house rule for a failure (AuthForm's messageFor): a body the server owns
- *  is for the user's input, a 5xx is ours to name, and a body we could not read
- *  is a failure, not a verdict on the link. */
-function messageFor(cause: unknown): string {
-  if (cause instanceof ApiError && cause.status >= 500) {
-    return "The server couldn't complete that. Try again in a moment.";
-  }
-  return errorToMessage(cause);
-}
-
-/** The panel's heading and its copy — one shape, five states. */
-function Panel({
-  heading,
-  children,
-}: {
-  heading: string;
-  children?: ReactNode;
-}) {
-  return (
-    <>
-      <h1 className="text-lg font-semibold tracking-tight">{heading}</h1>
-      {children}
-    </>
-  );
-}
-
-const COPY_CLASS = 'mt-1 text-xs leading-relaxed text-ink-soft';
 
 /**
  * The page a verification link resolves to (email/02). It spends the token over
@@ -87,7 +55,7 @@ export function VerifyEmailPage() {
         setState(
           cause instanceof ApiError && cause.code === LINK_INVALID_CODE
             ? { kind: 'dead' }
-            : { kind: 'failed', message: messageFor(cause) },
+            : { kind: 'failed', message: errorToUserMessage(cause) },
         );
       });
   }, [signedIn]);
