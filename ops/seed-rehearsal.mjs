@@ -37,7 +37,15 @@ const user = await (async () => {
   const hash = await hashPassword(PASSWORD);
   return db
     .insert(users)
-    .values({ email: EMAIL, passwordHash: hash, isAdmin: 0 })
+    .values({
+      email: EMAIL,
+      passwordHash: hash,
+      isAdmin: 0,
+      // The sign-in gate (email/02): a seeded account that never followed a
+      // verification link cannot sign in, and the rehearsal verifies by logging
+      // in. Nothing here is mailed, so the seed stands in as verified.
+      verifiedAt: new Date(),
+    })
     .returning()
     .get();
 })();

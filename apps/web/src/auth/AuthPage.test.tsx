@@ -12,6 +12,7 @@ import { stubSystemTheme } from '../testing/match-media';
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   document.documentElement.removeAttribute('data-theme');
   stubSystemTheme('light');
   window.history.pushState({}, '', '/login');
@@ -72,6 +73,37 @@ describe('login mode', () => {
     );
     expect(window.location.pathname).toBe('/login');
   });
+
+  it('explains an unverified address and offers a new link', async () => {
+    // Story 3: a user who cannot get in must be told why, and given the way
+    // out — not a generic failure.
+    const user = userEvent.setup();
+    vi.spyOn(api, 'login').mockRejectedValue(
+      new AuthError(
+        'Your email address is not verified yet.',
+        403,
+        'email_unverified',
+      ),
+    );
+    const resend = vi.spyOn(api, 'resendVerification').mockResolvedValue();
+    render(<AuthPage mode="login" />);
+
+    await user.type(screen.getByLabelText(/email/i), 'a@b.co');
+    await user.type(screen.getByLabelText(/password/i), 'correct horse');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(await screen.findByTestId('auth-unverified')).toHaveTextContent(
+      /isn’t verified yet/i,
+    );
+    // The credentials were right, so no field is flagged as the problem.
+    expect(screen.getByLabelText(/password/i)).not.toHaveAttribute(
+      'aria-invalid',
+    );
+
+    await user.click(screen.getByRole('button', { name: /send a new link/i }));
+
+    await waitFor(() => expect(resend).toHaveBeenCalledWith('a@b.co'));
+  });
 });
 
 describe('register mode', () => {
@@ -86,11 +118,11 @@ describe('register mode', () => {
     ).toBeInTheDocument();
   });
 
-  it('registers and returns to the editor', async () => {
+  it('registers and sends the user to check their inbox', async () => {
     const user = userEvent.setup();
     const register = vi
       .spyOn(api, 'register')
-      .mockResolvedValue({ email: 'a@b.co', isAdmin: false });
+      .mockResolvedValue({ email: 'a@b.co' });
     render(<AuthPage mode="register" />);
 
     await user.type(screen.getByLabelText(/email/i), 'a@b.co');
@@ -101,7 +133,13 @@ describe('register mode', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    // No session exists yet (email/02), so the editor is not where this goes.
+    await waitFor(() => expect(window.location.pathname).toBe('/check-inbox'));
+  });
+
+  it('states the verification step before it happens', () => {
+    render(<AuthPage mode="register" />);
+    expect(screen.getByText(/one-time link/i)).toBeInTheDocument();
   });
 });
 
@@ -314,6 +352,7 @@ describe('mode switch in place', () => {
       <AuthForm
         mode={mode}
         onAuthenticated={() => {}}
+        onRegistered={() => {}}
         onSwitchMode={() =>
           setMode((current) => (current === 'login' ? 'register' : 'login'))
         }

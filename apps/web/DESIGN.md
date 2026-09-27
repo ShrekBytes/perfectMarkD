@@ -289,12 +289,15 @@ L-marks in `--ink-faint`, held 6px off the page edge. Two live on
 no DOM, no images — and they scale with zoom because they ride the zoomed
 frame. Do not remove them; they are the world's one authored moment.
 
-The auth surface (`/login`, `/register`) is the one chrome surface users meet
+The auth surface (`/login`, `/register`, and Email Verification's
+`/check-inbox` and `/verify-email`) is the one chrome surface users meet
 outside the editor, so it borrows the same marks as a **proof sheet**: the
 `.pm-reg-marks` / `.pm-reg-host` pair draws all four corners on a panel (the
 host is a DOM span inside the card — two pseudo-elements alone give two), and
-the sheet sits centered on the bench the way a canvas page does. Elevation
-stays declared once — the hairline — never a border+shadow stack.
+the sheet sits centered on the bench the way a canvas page does. One
+`AuthPageShell` renders that panel for all four, so the marks and the geometry
+are decided once. Elevation stays declared once — the hairline — never a
+border+shadow stack.
 
 ### Preset Thumbnail
 

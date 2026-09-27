@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { AdminPage } from './admin/AdminPage';
 import { AccountPage } from './account/AccountPage';
 import { AuthPage } from './auth/AuthPage';
+import { CheckInboxPage } from './auth/CheckInboxPage';
+import { VerifyEmailPage } from './auth/VerifyEmailPage';
 import { ExportPage } from './export/ExportPage';
 import { AboutPage } from './pages/AboutPage';
 import { DocsPage } from './pages/DocsPage';
@@ -16,7 +18,8 @@ import { initAnalytics, trackPageView } from './analytics/tracker';
  * Route switch for the SPA's surfaces (PLAN.md §3): the `/` editor, the
  * static `/pricing`, About, Privacy, and Docs pages, the Account page
  * (`/account`), the two auth forms (`/login`, `/register`) the upgrade flow
- * uses, the Admin's panel (`/admin`, billing/02), and the hidden `/export`
+ * uses, the two Email Verification pages (`/check-inbox`, `/verify-email`),
+ * the Admin's panel (`/admin`, billing/02), and the hidden `/export`
  * render surface the server's worker loads (server/03, ADR-0003). Unknown
  * paths get the 404 (launch-chrome spec) instead of falling through to the
  * editor.
@@ -50,6 +53,10 @@ export function App() {
       return <AuthPage mode="login" />;
     case 'register':
       return <AuthPage mode="register" />;
+    case 'check-inbox':
+      return <CheckInboxPage />;
+    case 'verify-email':
+      return <VerifyEmailPage />;
     case 'admin':
       return <AdminPage />;
     case 'export':

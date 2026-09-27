@@ -1,7 +1,7 @@
-import { createHash, randomBytes } from 'node:crypto';
 import { and, eq, gt, ne } from 'drizzle-orm';
 import type { AppDatabase } from '../db/database.js';
 import { sessions, users, type User } from '../db/schema.js';
+import { hashOpaqueToken, newOpaqueToken } from './opaque-token.js';
 
 export const SESSION_COOKIE = 'pmd_session';
 /** Rolling 30-day session lifetime (spec §Security posture). */
@@ -12,28 +12,16 @@ const SESSION_ROLL_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 /** Injectable clock — real time in production, controlled in tests. */
 export type Clock = () => Date;
 
-/**
- * Tokens are opaque 256-bit random values. Only the SHA-256 digest is stored,
- * so a database leak can't be replayed as a live session.
- */
-function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
-}
-
-function generateToken(): string {
-  return randomBytes(32).toString('base64url');
-}
-
 /** Issues a session for `userId` and returns the raw token for the cookie. */
 export function createSession(
   db: AppDatabase,
   userId: number,
   now: Date = new Date(),
 ): string {
-  const token = generateToken();
+  const token = newOpaqueToken();
   db.insert(sessions)
     .values({
-      token: hashToken(token),
+      token: hashOpaqueToken(token),
       userId,
       expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
     })
@@ -59,7 +47,7 @@ export function userForSessionToken(
   token: string,
   now: Date = new Date(),
 ): ResolvedSession | null {
-  const digest = hashToken(token);
+  const digest = hashOpaqueToken(token);
   const row = db
     .select({ user: users, expiresAt: sessions.expiresAt })
     .from(sessions)
@@ -84,7 +72,7 @@ export function userForSessionToken(
 /** Revokes a single session (logout). Unknown tokens are a no-op. */
 export function deleteSession(db: AppDatabase, token: string): void {
   db.delete(sessions)
-    .where(eq(sessions.token, hashToken(token)))
+    .where(eq(sessions.token, hashOpaqueToken(token)))
     .run();
 }
 
@@ -102,7 +90,7 @@ export function deleteOtherSessions(
     .where(
       and(
         eq(sessions.userId, userId),
-        ne(sessions.token, hashToken(keepToken)),
+        ne(sessions.token, hashOpaqueToken(keepToken)),
       ),
     )
     .run();

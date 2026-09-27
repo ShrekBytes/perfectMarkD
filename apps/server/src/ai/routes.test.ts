@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp, type AppType } from '../index.js';
+import { registerAndVerify, testMailComposition } from '../auth/testing.js';
+import type { RecordingMailer } from '../mail/testing.js';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import {
@@ -27,6 +29,7 @@ const NOW = new Date('2026-09-11T00:00:00.000Z');
 const PERIOD = '2026-09';
 
 let cleanup: (() => void) | undefined;
+let mailer: RecordingMailer;
 afterEach(() => {
   cleanup?.();
   cleanup = undefined;
@@ -59,11 +62,14 @@ function makeApp(
 ): { app: AppType; db: AppDatabase } {
   const { db, dir } = createTestDatabase();
   cleanup = () => removeTestDatabase(dir);
+  const composition = testMailComposition();
+  mailer = composition.mail;
   const app = createApp({
     db,
     log: () => {},
     sessionSecret: SESSION_SECRET,
     now: () => NOW,
+    ...composition,
     ai: {
       apiKey: options.apiKey === undefined ? 'sk-test-key' : options.apiKey,
       provider: options.provider ?? fakeProvider(async () => okReply('ok')),
@@ -111,23 +117,15 @@ function putJson(app: AppType, path: string, body: unknown, cookie?: string) {
   });
 }
 
-function sessionCookie(res: Response): string {
-  const header = res.headers.get('set-cookie');
-  if (!header) throw new Error('no set-cookie header');
-  return header.split(';')[0]!;
-}
-
 async function registerUser(
   app: AppType,
   db: AppDatabase,
 ): Promise<{ cookie: string; userId: number }> {
   const email = `u${Math.random().toString(36).slice(2)}@test.dev`;
-  const res = await postJson(app, '/api/auth/register', {
+  const cookie = await registerAndVerify(app, mailer, {
     email,
     password: 'correct horse battery staple',
   });
-  expect(res.status).toBe(201);
-  const cookie = sessionCookie(res);
   const userId = db
     .select({ id: users.id })
     .from(users)

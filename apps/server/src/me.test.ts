@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp, type AppType } from './index.js';
+import { registerAndVerify, testMailComposition } from './auth/testing.js';
+import type { RecordingMailer } from './mail/testing.js';
 import { createTestDatabase, removeTestDatabase } from './db/testing.js';
 import type { AppDatabase } from './db/database.js';
 import { aiUsage, entitlements, exportUsage, users } from './db/schema.js';
@@ -17,6 +19,7 @@ const SESSION_SECRET = 'test-session-secret';
 const NOW = new Date('2026-09-11T00:00:00.000Z');
 
 let cleanup: (() => void) | undefined;
+let mailer: RecordingMailer;
 afterEach(() => {
   cleanup?.();
   cleanup = undefined;
@@ -34,6 +37,8 @@ function makeApp(
 } {
   const { db, dir } = createTestDatabase();
   cleanup = () => removeTestDatabase(dir);
+  const composition = testMailComposition();
+  mailer = composition.mail;
   const app = createApp({
     db,
     log: () => {},
@@ -41,34 +46,19 @@ function makeApp(
     adminEmail: options.adminEmail ?? null,
     now: options.now,
     ai: options.ai,
+    ...composition,
   });
   return { app, db };
-}
-
-function postJson(app: AppType, path: string, body: unknown) {
-  return app.request(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-function sessionCookie(res: Response): string {
-  const header = res.headers.get('set-cookie');
-  if (!header) throw new Error('no set-cookie header');
-  return header.split(';')[0]!;
 }
 
 async function registerViaApi(
   app: AppType,
   email = `u${Math.random().toString(36).slice(2)}@test.dev`,
 ): Promise<string> {
-  const res = await postJson(app, '/api/auth/register', {
+  return registerAndVerify(app, mailer, {
     email,
     password: 'correct horse battery staple',
   });
-  expect(res.status).toBe(201);
-  return sessionCookie(res);
 }
 
 function grant(

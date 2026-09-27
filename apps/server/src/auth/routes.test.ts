@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp, type AppType } from '../index.js';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
+import type { AppDatabase } from '../db/database.js';
+import {
+  TEST_PUBLIC_ORIGIN as PUBLIC_ORIGIN,
+  testMailComposition,
+} from './testing.js';
+import type { RecordingMailer } from '../mail/testing.js';
+import { users } from '../db/schema.js';
+import { VERIFICATION_TOKEN_TTL_MS } from './tokens.js';
 
 const SESSION_SECRET = 'test-session-secret';
 
@@ -13,17 +21,25 @@ afterEach(() => {
   current = new Date('2026-09-11T00:00:00Z');
 });
 
-function makeApp(
-  options: Partial<Parameters<typeof createApp>[0]> = {},
-): AppType {
+function makeApp(options: Partial<Parameters<typeof createApp>[0]> = {}): {
+  app: AppType;
+  mailer: RecordingMailer;
+  db: AppDatabase;
+} {
   const { db, dir } = createTestDatabase();
   cleanup = () => removeTestDatabase(dir);
-  return createApp({
+  const composition = testMailComposition();
+  return {
     db,
-    log: () => {},
-    sessionSecret: SESSION_SECRET,
-    ...options,
-  });
+    mailer: composition.mail,
+    app: createApp({
+      db,
+      log: () => {},
+      sessionSecret: SESSION_SECRET,
+      ...composition,
+      ...options,
+    }),
+  };
 }
 
 function postJson(
@@ -52,128 +68,140 @@ function sessionCookie(res: Response): string {
   return pair;
 }
 
-describe('POST /api/auth/register', () => {
-  it('creates the account and starts a session', async () => {
-    const app = makeApp();
+const PASSWORD = 'correct horse battery';
 
-    const res = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
+/** Registers and returns the response, whatever shape it took. */
+function register(
+  app: AppType,
+  email = 'reader@example.com',
+  password = PASSWORD,
+) {
+  return postJson(app, '/api/auth/register', { email, password });
+}
+
+/** Follows the emailed link, which both verifies the address and signs in. */
+async function verifyEmail(
+  app: AppType,
+  mailer: RecordingMailer,
+  email: string,
+) {
+  return postJson(app, '/api/auth/verify-email', {
+    token: mailer.tokenTo(email),
+  });
+}
+
+/** A verified account, the way every other suite in the repo needs one. */
+async function signedIn(
+  app: AppType,
+  mailer: RecordingMailer,
+  email = 'reader@example.com',
+  password = PASSWORD,
+): Promise<string> {
+  await register(app, email, password);
+  return sessionCookie(await verifyEmail(app, mailer, email));
+}
+
+describe('POST /api/auth/register', () => {
+  it('creates an unverified account and mails a link to it', async () => {
+    const { app, mailer } = makeApp();
+
+    const res = await register(app);
 
     expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({
-      user: { email: 'reader@example.com', isAdmin: false },
-    });
-
-    const me = await app.request('/api/auth/me', {
-      headers: { cookie: sessionCookie(res) },
-    });
-    expect(me.status).toBe(200);
-    expect(await me.json()).toEqual({
-      user: { email: 'reader@example.com', isAdmin: false },
-    });
-  });
-
-  it('sets an httpOnly, SameSite=Lax, 30-day session cookie', async () => {
-    const app = makeApp();
-
-    const res = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-
-    const header = res.headers.get('set-cookie');
-    expect(header).toMatch(/^pmd_session=[A-Za-z0-9_-]{20,}/);
-    expect(header).toContain('HttpOnly');
-    expect(header).toContain('SameSite=Lax');
-    expect(header).toContain('Path=/');
-    expect(header).toContain('Max-Age=2592000');
-  });
-
-  it('adds Secure only when the request arrived over HTTPS (proxy header)', async () => {
-    const app = makeApp();
-    const body = JSON.stringify({
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-
-    const plain = await app.request('/api/auth/register', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body,
-    });
-    expect(plain.headers.get('set-cookie')).not.toContain('Secure');
-
-    const tls = await app.request('/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-forwarded-proto': 'https',
+    expect(await res.json()).toEqual({ email: 'reader@example.com' });
+    // The address, and a link built from PUBLIC_ORIGIN — the one thing the
+    // caller knows that the Mailer does not.
+    expect(mailer.sends).toEqual([
+      {
+        kind: 'verification',
+        to: 'reader@example.com',
+        url: expect.stringMatching(
+          new RegExp(`^${PUBLIC_ORIGIN}/verify-email\\?token=[A-Za-z0-9_-]+$`),
+        ) as unknown as string,
       },
-      body: JSON.stringify({
-        email: 'other@example.com',
-        password: 'correct horse battery',
-      }),
-    });
-    expect(tls.headers.get('set-cookie')).toContain('Secure');
+    ]);
   });
 
-  it('normalizes the email to lowercase', async () => {
-    const app = makeApp();
+  it('starts no session: there is nothing to sign in to yet', async () => {
+    const { app } = makeApp();
 
-    await postJson(app, '/api/auth/register', {
-      email: 'Reader@Example.COM',
-      password: 'correct horse battery',
-    });
-    const res = await postJson(app, '/api/auth/login', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
+    const res = await register(app);
 
-    expect(res.status).toBe(200);
+    expect(res.headers.get('set-cookie')).toBeNull();
   });
 
-  it('rejects a duplicate email with 409', async () => {
-    const app = makeApp();
+  it('rejects a duplicate verified address with 409', async () => {
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
 
-    await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    const res = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'another password',
-    });
+    const res = await register(app);
 
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ error: expect.any(String) });
   });
 
-  it('turns a duplicate that races the email check into 409, not 500', async () => {
-    const app = makeApp();
+  it('re-registers an unverified address identically, and re-sends', async () => {
+    // Story 7: the response must not reveal that the address is registered.
+    const { app, mailer } = makeApp();
+    const fresh = await register(app);
+    mailer.sends.length = 0;
 
-    const [first, second] = await Promise.all([
-      postJson(app, '/api/auth/register', {
-        email: 'racer@example.com',
-        password: 'correct horse battery',
-      }),
-      postJson(app, '/api/auth/register', {
-        email: 'racer@example.com',
-        password: 'another good password',
-      }),
-    ]);
+    const again = await register(
+      app,
+      'reader@example.com',
+      'a different password',
+    );
 
-    const statuses = [first.status, second.status].sort();
-    expect(statuses).toEqual([201, 409]);
+    expect(again.status).toBe(fresh.status);
+    expect(await again.json()).toEqual(await fresh.json());
+    expect(mailer.sends).toHaveLength(1);
+    expect(mailer.sends[0]?.kind).toBe('verification');
+    // A different link, so the second email supersedes the first.
+    expect(mailer.tokenTo('reader@example.com')).not.toBe('');
+  });
+
+  it('leaves an unverified account one row, with its first password', async () => {
+    const { app, mailer } = makeApp();
+    await register(app, 'reader@example.com', PASSWORD);
+    await register(app, 'reader@example.com', 'a different password');
+
+    const verified = await verifyEmail(app, mailer, 'reader@example.com');
+    expect(verified.status).toBe(200);
+
+    // The original password still signs in: re-registration re-sends, it does
+    // not re-key the account behind a link anyone can trigger.
+    const original = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: PASSWORD,
+    });
+    expect(original.status).toBe(200);
+    const replaced = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: 'a different password',
+    });
+    expect(replaced.status).toBe(401);
+  });
+
+  it('normalizes the email to lowercase', async () => {
+    const { app, mailer } = makeApp();
+
+    await register(app, 'Reader@Example.COM');
+    const res = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: PASSWORD,
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'email_unverified' });
+    expect(mailer.sends[0]?.to).toBe('reader@example.com');
   });
 
   it('rejects a malformed email and a short password with 400 and a message', async () => {
-    const app = makeApp();
+    const { app } = makeApp();
 
     const badEmail = await postJson(app, '/api/auth/register', {
       email: 'not-an-email',
-      password: 'correct horse battery',
+      password: PASSWORD,
     });
     expect(badEmail.status).toBe(400);
     expect(await badEmail.json()).toMatchObject({ error: expect.any(String) });
@@ -189,21 +217,169 @@ describe('POST /api/auth/register', () => {
   });
 });
 
-describe('POST /api/auth/login', () => {
-  async function register(app: AppType, email = 'reader@example.com') {
-    await postJson(app, '/api/auth/register', {
-      email,
-      password: 'correct horse battery',
-    });
-  }
-
-  it('starts a session for valid credentials', async () => {
-    const app = makeApp();
+describe('POST /api/auth/verify-email', () => {
+  it('verifies the address, signs the user in, and refuses the link again', async () => {
+    const { app, mailer } = makeApp();
     await register(app);
+
+    const res = await verifyEmail(app, mailer, 'reader@example.com');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      user: { email: 'reader@example.com', isAdmin: false },
+    });
+    const me = await app.request('/api/auth/me', {
+      headers: { cookie: sessionCookie(res) },
+    });
+    expect(me.status).toBe(200);
+
+    // One-time: a second click on the same link is a dead link, and the account
+    // is still verified.
+    const replay = await verifyEmail(app, mailer, 'reader@example.com');
+    expect(replay.status).toBe(400);
+    expect(await replay.json()).toMatchObject({ code: 'link_invalid' });
+    const login = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: PASSWORD,
+    });
+    expect(login.status).toBe(200);
+  });
+
+  it('refuses a link past its 24 hours, and the account stays locked', async () => {
+    const { app, mailer } = makeApp({ now: () => current });
+    await register(app);
+
+    current = new Date(current.getTime() + VERIFICATION_TOKEN_TTL_MS + 1000);
+    const res = await verifyEmail(app, mailer, 'reader@example.com');
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'link_invalid' });
+    const login = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: PASSWORD,
+    });
+    expect(login.status).toBe(403);
+  });
+
+  it('refuses an unknown or missing token', async () => {
+    const { app } = makeApp();
+
+    const unknown = await postJson(app, '/api/auth/verify-email', {
+      token: 'not-a-real-token',
+    });
+    expect(unknown.status).toBe(400);
+    const missing = await postJson(app, '/api/auth/verify-email', {});
+    expect(missing.status).toBe(400);
+  });
+});
+
+describe('POST /api/auth/resend-verification', () => {
+  it('mails a fresh link to an unverified account', async () => {
+    const { app, mailer } = makeApp();
+    await register(app);
+    const first = mailer.tokenTo('reader@example.com');
+    mailer.sends.length = 0;
+
+    const res = await postJson(app, '/api/auth/resend-verification', {
+      email: 'reader@example.com',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ sent: true });
+    expect(mailer.sends).toHaveLength(1);
+    // A resend does not invalidate the link already in flight — the sweep only
+    // collects spent and expired rows, so an email that arrived before the
+    // resend still works.
+    expect(mailer.tokenTo('reader@example.com')).not.toBe(first);
+    expect((await verifyEmail(app, mailer, 'reader@example.com')).status).toBe(
+      200,
+    );
+  });
+
+  it('answers an unknown or already-verified address the same way, mailing nothing', async () => {
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
+    mailer.sends.length = 0;
+
+    const verified = await postJson(app, '/api/auth/resend-verification', {
+      email: 'reader@example.com',
+    });
+    const unknown = await postJson(app, '/api/auth/resend-verification', {
+      email: 'nobody@example.com',
+    });
+
+    expect(verified.status).toBe(unknown.status);
+    expect(await verified.json()).toEqual(await unknown.json());
+    expect(mailer.sends).toEqual([]);
+  });
+
+  it('rejects a malformed address', async () => {
+    const { app } = makeApp();
+    const res = await postJson(app, '/api/auth/resend-verification', {
+      email: 'not-an-email',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 429 once the per-address limit is exceeded', async () => {
+    const { app, mailer } = makeApp({
+      authRateLimit: {
+        emailSend: {
+          // The registration below spends the first of the two, because
+          // registration is a send endpoint too.
+          perAddress: { limit: 2, windowMs: 60_000 },
+          perIp: { limit: 10, windowMs: 60_000 },
+        },
+      },
+    });
+    await register(app);
+    const before = mailer.sends.length;
+    const resend = (ip: string) =>
+      postJson(
+        app,
+        '/api/auth/resend-verification',
+        { email: 'reader@example.com' },
+        { headers: { 'x-forwarded-for': ip } },
+      );
+
+    expect((await resend('1.1.1.1')).status).toBe(200);
+    const limited = await resend('2.2.2.2');
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBeTruthy();
+    // The refused request sent nothing: the address key is checked before any
+    // mail, which is the whole point of limiting it here.
+    expect(mailer.sends).toHaveLength(before + 1);
+  });
+
+  it('returns 429 once the per-IP limit is exceeded', async () => {
+    const { app, mailer } = makeApp({
+      authRateLimit: {
+        emailSend: {
+          perAddress: { limit: 10, windowMs: 60_000 },
+          perIp: { limit: 2, windowMs: 60_000 },
+        },
+      },
+    });
+    await register(app, 'one@example.com');
+    const before = mailer.sends.length;
+    const resend = (email: string) =>
+      postJson(app, '/api/auth/resend-verification', { email });
+
+    expect((await resend('one@example.com')).status).toBe(200);
+    const limited = await resend('two@example.com');
+    expect(limited.status).toBe(429);
+    expect(mailer.sends).toHaveLength(before + 1);
+  });
+});
+
+describe('POST /api/auth/login', () => {
+  it('starts a session for a verified account', async () => {
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
 
     const res = await postJson(app, '/api/auth/login', {
       email: 'reader@example.com',
-      password: 'correct horse battery',
+      password: PASSWORD,
     });
 
     expect(res.status).toBe(200);
@@ -216,9 +392,41 @@ describe('POST /api/auth/login', () => {
     expect(me.status).toBe(200);
   });
 
-  it('rejects a wrong password and an unknown email the same way', async () => {
-    const app = makeApp();
+  it('refuses an unverified account with a resend-offering answer', async () => {
+    const { app } = makeApp();
     await register(app);
+
+    const res = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: PASSWORD,
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'email_unverified' });
+    // No session: the gate is the point.
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('still says nothing about an unverified address without the password', async () => {
+    // The gate sits behind the password check, so it is not an enumeration
+    // oracle for anyone who does not already know the password.
+    const { app } = makeApp();
+    await register(app);
+
+    const res = await postJson(app, '/api/auth/login', {
+      email: 'reader@example.com',
+      password: 'not the password',
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      error: 'Incorrect email or password.',
+    });
+  });
+
+  it('rejects a wrong password and an unknown email the same way', async () => {
+    const { app, mailer } = makeApp();
+    await signedIn(app, mailer);
 
     const wrongPassword = await postJson(app, '/api/auth/login', {
       email: 'reader@example.com',
@@ -230,7 +438,7 @@ describe('POST /api/auth/login', () => {
 
     const unknownEmail = await postJson(app, '/api/auth/login', {
       email: 'nobody@example.com',
-      password: 'correct horse battery',
+      password: PASSWORD,
     });
     expect(unknownEmail.status).toBe(401);
     expect(await unknownEmail.json()).toEqual(wrongBody);
@@ -239,12 +447,8 @@ describe('POST /api/auth/login', () => {
 
 describe('POST /api/auth/logout', () => {
   it('revokes the session, so /me is unauthenticated afterwards', async () => {
-    const app = makeApp();
-    const registered = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    const cookie = sessionCookie(registered);
+    const { app, mailer } = makeApp();
+    const cookie = await signedIn(app, mailer);
 
     const res = await app.request('/api/auth/logout', {
       method: 'POST',
@@ -257,7 +461,7 @@ describe('POST /api/auth/logout', () => {
   });
 
   it('is a no-op without a session', async () => {
-    const app = makeApp();
+    const { app } = makeApp();
     const res = await app.request('/api/auth/logout', { method: 'POST' });
     expect(res.status).toBe(204);
   });
@@ -265,12 +469,8 @@ describe('POST /api/auth/logout', () => {
 
 describe('POST /api/auth/change-password', () => {
   it('replaces the password and requires the current one', async () => {
-    const app = makeApp();
-    const registered = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    const cookie = sessionCookie(registered);
+    const { app, mailer } = makeApp();
+    const cookie = await signedIn(app, mailer);
 
     const wrong = await postJson(
       app,
@@ -284,7 +484,7 @@ describe('POST /api/auth/change-password', () => {
       app,
       '/api/auth/change-password',
       {
-        currentPassword: 'correct horse battery',
+        currentPassword: PASSWORD,
         newPassword: 'a brand new password',
       },
       { cookie },
@@ -293,7 +493,7 @@ describe('POST /api/auth/change-password', () => {
 
     const oldLogin = await postJson(app, '/api/auth/login', {
       email: 'reader@example.com',
-      password: 'correct horse battery',
+      password: PASSWORD,
     });
     expect(oldLogin.status).toBe(401);
     const newLogin = await postJson(app, '/api/auth/login', {
@@ -304,17 +504,13 @@ describe('POST /api/auth/change-password', () => {
   });
 
   it('revokes other sessions but keeps the one that changed the password', async () => {
-    const app = makeApp();
-    const first = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    const cookie = sessionCookie(first);
+    const { app, mailer } = makeApp();
+    const cookie = await signedIn(app, mailer);
 
     // A second signed-in device (e.g. a stolen cookie elsewhere).
     const other = await postJson(app, '/api/auth/login', {
       email: 'reader@example.com',
-      password: 'correct horse battery',
+      password: PASSWORD,
     });
     const otherCookie = sessionCookie(other);
 
@@ -322,7 +518,7 @@ describe('POST /api/auth/change-password', () => {
       app,
       '/api/auth/change-password',
       {
-        currentPassword: 'correct horse battery',
+        currentPassword: PASSWORD,
         newPassword: 'a brand new password',
       },
       { cookie },
@@ -339,7 +535,7 @@ describe('POST /api/auth/change-password', () => {
   });
 
   it('requires a session', async () => {
-    const app = makeApp();
+    const { app } = makeApp();
     const res = await postJson(app, '/api/auth/change-password', {
       currentPassword: 'x',
       newPassword: 'a brand new password',
@@ -350,31 +546,22 @@ describe('POST /api/auth/change-password', () => {
 
 describe('admin bootstrap', () => {
   it('makes the first account matching ADMIN_EMAIL an admin', async () => {
-    const app = makeApp({ adminEmail: 'owner@example.com' });
+    const { app, mailer } = makeApp({ adminEmail: 'owner@example.com' });
 
-    const owner = await postJson(app, '/api/auth/register', {
-      email: 'Owner@Example.com',
-      password: 'correct horse battery',
-    });
+    await register(app, 'Owner@Example.com');
+    const owner = await verifyEmail(app, mailer, 'owner@example.com');
+
     expect(await owner.json()).toEqual({
       user: { email: 'owner@example.com', isAdmin: true },
-    });
-
-    const other = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    expect(await other.json()).toEqual({
-      user: { email: 'reader@example.com', isAdmin: false },
     });
   });
 
   it('makes nobody admin when ADMIN_EMAIL is unset', async () => {
-    const app = makeApp();
-    const res = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
+    const { app, mailer } = makeApp();
+
+    await register(app);
+    const res = await verifyEmail(app, mailer, 'reader@example.com');
+
     expect(await res.json()).toEqual({
       user: { email: 'reader@example.com', isAdmin: false },
     });
@@ -385,16 +572,14 @@ describe('session lifetime', () => {
   it('survives a server restart (same database and secret)', async () => {
     const { db, dir } = createTestDatabase();
     cleanup = () => removeTestDatabase(dir);
+    const composition = testMailComposition();
     const before = createApp({
       db,
       sessionSecret: SESSION_SECRET,
       log: () => {},
+      ...composition,
     });
-    const registered = await postJson(before, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    const cookie = sessionCookie(registered);
+    const cookie = await signedIn(before, composition.mail);
 
     // A fresh app object over the same database models a process restart:
     // sessions live in SQLite and the cookie signature depends only on the
@@ -403,19 +588,16 @@ describe('session lifetime', () => {
       db,
       sessionSecret: SESSION_SECRET,
       log: () => {},
+      ...testMailComposition(),
     });
     const me = await after.request('/api/auth/me', { headers: { cookie } });
     expect(me.status).toBe(200);
   });
 
   it('rolls the 30-day expiry forward on each authenticated request', async () => {
-    const app = makeApp({ now: () => current });
+    const { app, mailer } = makeApp({ now: () => current });
     // Register, then advance 20 days and hit /me: still valid.
-    const registered = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    const cookie = sessionCookie(registered);
+    const cookie = await signedIn(app, mailer);
 
     const day = 24 * 60 * 60 * 1000;
     current = new Date(current.getTime() + 20 * day);
@@ -432,12 +614,8 @@ describe('session lifetime', () => {
   });
 
   it('rejects a session once 30 days pass with no use', async () => {
-    const app = makeApp({ now: () => current });
-    const registered = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    const cookie = sessionCookie(registered);
+    const { app, mailer } = makeApp({ now: () => current });
+    const cookie = await signedIn(app, mailer);
 
     current = new Date(current.getTime() + 31 * 24 * 60 * 60 * 1000);
     expect(
@@ -446,12 +624,8 @@ describe('session lifetime', () => {
   });
 
   it('re-issues the browser cookie when the session rolls', async () => {
-    const app = makeApp({ now: () => current });
-    const registered = await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-    const cookie = sessionCookie(registered);
+    const { app, mailer } = makeApp({ now: () => current });
+    const cookie = await signedIn(app, mailer);
 
     // The fresh cookie needs no refresh.
     const fresh = await app.request('/api/auth/me', { headers: { cookie } });
@@ -469,14 +643,9 @@ describe('session lifetime', () => {
 
 describe('auth rate limiting', () => {
   it('returns 429 once the per-IP login limit is exceeded', async () => {
-    const app = makeApp({
+    const { app } = makeApp({
       authRateLimit: { login: { limit: 2, windowMs: 60_000 } },
     });
-    await postJson(app, '/api/auth/register', {
-      email: 'reader@example.com',
-      password: 'correct horse battery',
-    });
-
     const attempt = () =>
       postJson(app, '/api/auth/login', {
         email: 'reader@example.com',
@@ -490,8 +659,40 @@ describe('auth rate limiting', () => {
     expect(limited.headers.get('retry-after')).toBeTruthy();
   });
 
+  it('spends the send budget when registration sends, on both keys', async () => {
+    // Story 24: registration is a send endpoint like any other. The per-IP
+    // registration rule is about account creation and allows ten a minute, so
+    // without the send budget one host could put hundreds of DKIM-signed links
+    // into fresh inboxes an hour.
+    const { app, mailer } = makeApp({
+      authRateLimit: {
+        emailSend: {
+          perAddress: { limit: 1, windowMs: 60_000 },
+          perIp: { limit: 2, windowMs: 60_000 },
+        },
+      },
+    });
+    const sign = (email: string, ip: string) =>
+      postJson(
+        app,
+        '/api/auth/register',
+        { email, password: PASSWORD },
+        { headers: { 'x-forwarded-for': ip } },
+      );
+
+    // The address key: the same address again is refused even from a host that
+    // has sent nothing.
+    expect((await sign('one@example.com', '1.1.1.1')).status).toBe(201);
+    expect((await sign('one@example.com', '2.2.2.2')).status).toBe(429);
+    // The per-IP key: every address here is fresh, so only the host's own
+    // budget can stop the third message.
+    expect((await sign('two@example.com', '1.1.1.1')).status).toBe(201);
+    expect((await sign('three@example.com', '1.1.1.1')).status).toBe(429);
+    expect(mailer.sends).toHaveLength(2);
+  });
+
   it('counts each IP separately', async () => {
-    const app = makeApp({
+    const { app } = makeApp({
       authRateLimit: { register: { limit: 1, windowMs: 60_000 } },
     });
     const first = await app.request('/api/auth/register', {
@@ -502,7 +703,7 @@ describe('auth rate limiting', () => {
       },
       body: JSON.stringify({
         email: 'one@example.com',
-        password: 'correct horse battery',
+        password: PASSWORD,
       }),
     });
     expect(first.status).toBe(201);
@@ -515,7 +716,7 @@ describe('auth rate limiting', () => {
       },
       body: JSON.stringify({
         email: 'two@example.com',
-        password: 'correct horse battery',
+        password: PASSWORD,
       }),
     });
     expect(secondIp.status).toBe(201);
@@ -525,7 +726,7 @@ describe('auth rate limiting', () => {
     // The client controls the left of the header; Caddy appends the address it
     // observed. Trusting the first hop would let an attacker rotate fake IPs
     // and never hit the limit.
-    const app = makeApp({
+    const { app } = makeApp({
       authRateLimit: { login: { limit: 1, windowMs: 60_000 } },
     });
     const attempt = (spoofedPrefix: string) =>
@@ -542,5 +743,35 @@ describe('auth rate limiting', () => {
 
     expect((await attempt('1.1.1.1')).status).toBe(401);
     expect((await attempt('2.2.2.2')).status).toBe(429);
+  });
+});
+
+describe('the account row', () => {
+  it('carries no verified-at until the link is followed', async () => {
+    const { app, mailer, db } = makeApp();
+
+    await register(app);
+    expect(
+      db.select({ verifiedAt: users.verifiedAt }).from(users).get(),
+    ).toEqual({
+      verifiedAt: null,
+    });
+
+    await verifyEmail(app, mailer, 'reader@example.com');
+
+    expect(
+      db.select({ verifiedAt: users.verifiedAt }).from(users).get()?.verifiedAt,
+    ).toBeInstanceOf(Date);
+  });
+
+  it('keeps one row when an unverified address registers twice', async () => {
+    const { app, db } = makeApp();
+
+    await register(app, 'reader@example.com', PASSWORD);
+    await register(app, 'reader@example.com', 'a different password');
+
+    expect(db.select({ email: users.email }).from(users).all()).toEqual([
+      { email: 'reader@example.com' },
+    ]);
   });
 });

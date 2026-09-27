@@ -1,7 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { FALLBACK_CODE } from '../api/client';
 import { Link } from '../router';
-import { AuthError, login, register, type AuthUser } from './api';
+import {
+  AuthError,
+  EMAIL_UNVERIFIED_CODE,
+  login,
+  register,
+  type AuthUser,
+} from './api';
+import { ResendVerification } from './ResendVerification';
 
 export type AuthMode = 'login' | 'register';
 
@@ -76,8 +83,15 @@ const RECOVERY_COPY =
 
 export interface AuthFormProps {
   mode: AuthMode;
-  /** Called after a successful login/register — the session cookie is set. */
+  /** Called after a successful login — the session cookie is set. */
   onAuthenticated: (user: AuthUser) => void;
+  /**
+   * Called after a registration, with the address the verification link went
+   * to. Registration starts no session (email/02), so there is no user to hand
+   * back: the caller decides where the "check your inbox" step lives — the
+   * standalone page navigates to it, the upgrade dialog shows it in place.
+   */
+  onRegistered: (email: string) => void;
   /**
    * Switches the form to the other mode in place (the upgrade dialog flips a
    * local state); when omitted the footer falls back to navigating between
@@ -94,6 +108,7 @@ export interface AuthFormProps {
 export function AuthForm({
   mode,
   onAuthenticated,
+  onRegistered,
   onSwitchMode,
 }: AuthFormProps) {
   const copy = COPY[mode];
@@ -103,6 +118,9 @@ export function AuthForm({
     message: string;
     status?: number;
   } | null>(null);
+  // The sign-in gate (email/02): the credentials were right and the address is
+  // unverified, so the recovery is a new link rather than a corrected field.
+  const [awaitingVerification, setAwaitingVerification] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -112,20 +130,28 @@ export function AuthForm({
   // so a carried password announces the contract it now sits under.
   useEffect(() => {
     setFailure(null);
+    setAwaitingVerification(false);
     setRecoveryOpen(false);
   }, [mode]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setFailure(null);
+    setAwaitingVerification(false);
     setSubmitting(true);
     try {
-      const user =
-        mode === 'login'
-          ? await login(email, password)
-          : await register(email, password);
-      onAuthenticated(user);
+      if (mode === 'register') {
+        // No session yet: the account is waiting on its verification link.
+        onRegistered((await register(email, password)).email);
+        return;
+      }
+      onAuthenticated(await login(email, password));
     } catch (cause) {
+      if (cause instanceof AuthError && cause.code === EMAIL_UNVERIFIED_CODE) {
+        setAwaitingVerification(true);
+        setSubmitting(false);
+        return;
+      }
       setFailure(messageFor(cause));
       setSubmitting(false);
     }
@@ -203,6 +229,19 @@ export function AuthForm({
         <p id={ERROR_ID} role="alert" className="mt-3 text-xs text-danger">
           {failure.message}
         </p>
+      )}
+
+      {awaitingVerification && (
+        <div
+          data-testid="auth-unverified"
+          className="mt-3 border-t border-hairline pt-3"
+        >
+          <p role="alert" className="text-xs text-ink">
+            Your email address isn’t verified yet, so sign-in is locked. Open
+            the link we sent you — or send a new one below.
+          </p>
+          <ResendVerification email={email} />
+        </div>
       )}
 
       {mode === 'login' && (

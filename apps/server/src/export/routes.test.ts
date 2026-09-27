@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { createApp, type AppType } from '../index.js';
+import { registerAndVerify, testMailComposition } from '../auth/testing.js';
+import type { RecordingMailer } from '../mail/testing.js';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { entitlements, exportJobs, exportUsage, users } from '../db/schema.js';
@@ -13,6 +15,7 @@ import { findExportJob } from './queue.js';
 const SESSION_SECRET = 'test-session-secret';
 
 let cleanup: (() => void) | undefined;
+let mailer: RecordingMailer;
 afterEach(() => {
   cleanup?.();
   cleanup = undefined;
@@ -36,8 +39,11 @@ function makeApp(
 ): { app: AppType; db: AppDatabase } {
   const { db, dir } = createTestDatabase();
   cleanup = () => removeTestDatabase(dir);
+  const composition = testMailComposition();
+  mailer = composition.mail;
   const app = createApp({
     db,
+    ...composition,
     log: () => {},
     sessionSecret: SESSION_SECRET,
     ...(options.withExport === false
@@ -69,20 +75,14 @@ function postJson(
   });
 }
 
-function sessionCookie(res: Response): string {
-  const header = res.headers.get('set-cookie');
-  if (!header) throw new Error('no set-cookie header');
-  return header.split(';')[0]!;
-}
-
 /** Registers through the real auth flow, returns the cookie. */
+/** Registers through the real auth flow, then follows the emailed
+ *  verification link — registration alone starts no session (email/02). */
 async function registerViaApi(app: AppType): Promise<string> {
-  const res = await postJson(app, '/api/auth/register', {
+  return registerAndVerify(app, mailer, {
     email: `u${Math.random().toString(36).slice(2)}@test.dev`,
     password: 'correct horse battery staple',
   });
-  expect(res.status).toBe(201);
-  return sessionCookie(res);
 }
 
 /** Grants an Entitlement directly (the Admin panel's DB effect). Returns the

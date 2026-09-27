@@ -159,13 +159,14 @@ describe('account step', () => {
     expect(screen.getByTestId('auth-form')).toBeInTheDocument();
   });
 
-  it('creates the order right after registering', async () => {
+  it('creates the order right after signing in', async () => {
     const user = userEvent.setup();
     render(<UpgradeFlow plan="pro" onClose={onClose} />);
     await user.click(screen.getByRole('button', { name: /Continue/ }));
+    await user.click(screen.getByRole('button', { name: /Sign in/i }));
 
-    const register = vi
-      .spyOn(authApi, 'register')
+    const login = vi
+      .spyOn(authApi, 'login')
       .mockResolvedValue({ email: 'a@b.co', isAdmin: false });
     // The flow fetches twice: the account store's post-sign-in /api/me
     // refresh (server/04) and the order creation itself.
@@ -196,14 +197,14 @@ describe('account step', () => {
 
     await user.type(screen.getByLabelText(/email/i), 'a@b.co');
     await user.type(screen.getByLabelText(/password/i), 'correct horse');
-    await user.click(screen.getByRole('button', { name: /create account/i }));
+    await user.click(screen.getByRole('button', { name: /^Sign in$/i }));
 
     await waitFor(() =>
       expect(
         screen.getByTestId('upgrade-step-instructions'),
       ).toBeInTheDocument(),
     );
-    expect(register).toHaveBeenCalledWith('a@b.co', 'correct horse');
+    expect(login).toHaveBeenCalledWith('a@b.co', 'correct horse');
     expect(useAccountStore.getState().user).toEqual({
       email: 'a@b.co',
       isAdmin: false,
@@ -211,6 +212,32 @@ describe('account step', () => {
     // Exactly one order-creation request — the /api/me refresh is the only
     // other fetch the flow makes.
     expect(createOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops at the inbox after registering, creating no order yet', async () => {
+    // A registration starts no session (email/02), so the Order cannot be
+    // created until the address is verified.
+    const user = userEvent.setup();
+    render(<UpgradeFlow plan="pro" onClose={onClose} />);
+    await user.click(screen.getByRole('button', { name: /Continue/ }));
+
+    const register = vi
+      .spyOn(authApi, 'register')
+      .mockResolvedValue({ email: 'a@b.co' });
+    const createOrder = vi.fn();
+
+    await user.type(screen.getByLabelText(/email/i), 'a@b.co');
+    await user.type(screen.getByLabelText(/password/i), 'correct horse');
+    await user.click(screen.getByRole('button', { name: /create account/i }));
+
+    expect(
+      await screen.findByTestId('upgrade-step-verify-email'),
+    ).toBeInTheDocument();
+    expect(register).toHaveBeenCalledWith('a@b.co', 'correct horse');
+    expect(createOrder).not.toHaveBeenCalled();
+    // Story 2 applies in the dialog too: the user learns which inbox to open.
+    expect(screen.getByText('a@b.co')).toBeInTheDocument();
+    expect(screen.getByText(/verification link/i)).toBeInTheDocument();
   });
 
   it('can switch between register and sign-in in place', async () => {

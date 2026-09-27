@@ -39,8 +39,8 @@ Docker Compose runs the whole stack on one origin — Caddy serves the built app
 ```sh
 cp .env.example .env    # then fill in the four secrets it asks for,
                         # UMAMI_APP_SECRET + UMAMI_DB_PASSWORD, and the
-                        # RESEND_API_KEY + MAIL_FROM the api refuses to
-                        # start without
+                        # RESEND_API_KEY + MAIL_FROM + PUBLIC_ORIGIN the api
+                        # refuses to start without
 
 # Dev checkout — build the app images locally:
 docker compose up -d --build

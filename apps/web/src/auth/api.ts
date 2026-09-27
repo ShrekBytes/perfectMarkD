@@ -17,14 +17,49 @@ export interface AuthUser {
   isAdmin: boolean;
 }
 
+/**
+ * What registration returns: the address the verification link went to. There
+ * is no user and no session — the account cannot be used until the link is
+ * followed (email/02), so all the form knows is which inbox to wait for.
+ */
+export interface RegistrationSent {
+  email: string;
+}
+
 export async function register(
   email: string,
   password: string,
-): Promise<AuthUser> {
-  return readUserOrThrow(
-    await postJson('/api/auth/register', { email, password }),
-  );
+): Promise<RegistrationSent> {
+  const res = await postJson('/api/auth/register', { email, password });
+  if (!res.ok) throw await errorFrom(res);
+  return (await res.json()) as RegistrationSent;
 }
+
+/**
+ * Asks for a fresh verification link. Success-shaped for every address, so
+ * this is safe to call with anything the user typed.
+ */
+export async function resendVerification(email: string): Promise<void> {
+  const res = await postJson('/api/auth/resend-verification', { email });
+  if (!res.ok) throw await errorFrom(res);
+}
+
+/** Spends a one-time link from a verification email, verifying the address and
+ *  signing the user in at once. */
+export async function verifyEmail(token: string): Promise<AuthUser> {
+  return readUserOrThrow(await postJson('/api/auth/verify-email', { token }));
+}
+
+/** The sign-in gate's code: the account exists but its address is unverified. */
+export const EMAIL_UNVERIFIED_CODE = 'email_unverified';
+
+/**
+ * The dead-link code: the token was unknown, expired, already spent, or issued
+ * for another flow — one answer for all four, because the recovery is the same
+ * and telling them apart would say something about the account to whoever holds
+ * a dead link.
+ */
+export const LINK_INVALID_CODE = 'link_invalid';
 
 export async function login(
   email: string,

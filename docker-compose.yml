@@ -99,6 +99,12 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-}
       MAIL_MODE: ${MAIL_MODE:-}
+      # The address users reach this instance on (email/02). The verification
+      # links in transactional email are absolute, and the server cannot derive
+      # them from a request — so the API refuses to boot without this, next to
+      # the mail keys above. Set it to the public domain, not to the loopback
+      # origin below: a link in a real inbox has to open.
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
       # The worker's Chromium loads the SPA's /export page from Caddy over
       # the internal network — the loopback origin (http://caddy) exists so
       # the worker has one regardless of how the public site is served.

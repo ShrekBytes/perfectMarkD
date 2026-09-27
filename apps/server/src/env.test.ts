@@ -9,6 +9,7 @@ describe('loadEnv', () => {
       sessionSecret: null,
       adminEmail: null,
       exportOrigin: 'http://localhost:3000',
+      publicOrigin: null,
       exportConcurrency: 2,
       exportBurstPerMinute: 10,
       exportRenderTimeoutMs: 60_000,
@@ -29,6 +30,7 @@ describe('loadEnv', () => {
         SESSION_SECRET: 's3cret',
         ADMIN_EMAIL: 'owner@example.com',
         EXPORT_ORIGIN: 'http://localhost:5173',
+        PUBLIC_ORIGIN: 'https://perfectmarkd.00022000.xyz',
         EXPORT_CONCURRENCY: '4',
         EXPORT_BURST_PER_MINUTE: '30',
         EXPORT_RENDER_TIMEOUT_MS: '60000',
@@ -45,6 +47,7 @@ describe('loadEnv', () => {
       sessionSecret: 's3cret',
       adminEmail: 'owner@example.com',
       exportOrigin: 'http://localhost:5173',
+      publicOrigin: 'https://perfectmarkd.00022000.xyz',
       exportConcurrency: 4,
       exportBurstPerMinute: 30,
       exportRenderTimeoutMs: 60_000,
@@ -78,6 +81,31 @@ describe('loadEnv', () => {
     expect(loadEnv({ AI_API_KEY: ' ' }).aiApiKey).toBeNull();
     expect(loadEnv({ RESEND_API_KEY: '  ' }).resendApiKey).toBeNull();
     expect(loadEnv({ MAIL_FROM: '' }).mailFrom).toBeNull();
+    expect(loadEnv({ PUBLIC_ORIGIN: '  ' }).publicOrigin).toBeNull();
+  });
+
+  it('accepts a public origin and strips its trailing slash', () => {
+    expect(
+      loadEnv({ PUBLIC_ORIGIN: 'http://localhost:5173' }).publicOrigin,
+    ).toBe('http://localhost:5173');
+    expect(
+      loadEnv({ PUBLIC_ORIGIN: 'https://perfectmarkd.example.com/' })
+        .publicOrigin,
+    ).toBe('https://perfectmarkd.example.com');
+  });
+
+  it('rejects a public origin no browser could open a link from', () => {
+    // A schemeless value is the mistake that would otherwise produce
+    // `perfectmarkd.example.com/verify-email?token=…` in a real inbox.
+    expect(() =>
+      loadEnv({ PUBLIC_ORIGIN: 'perfectmarkd.example.com' }),
+    ).toThrow(/PUBLIC_ORIGIN/);
+    expect(() => loadEnv({ PUBLIC_ORIGIN: 'ftp://example.com' })).toThrow(
+      /PUBLIC_ORIGIN/,
+    );
+    expect(() => loadEnv({ PUBLIC_ORIGIN: 'https://' })).toThrow(
+      /PUBLIC_ORIGIN/,
+    );
   });
 
   it('rejects a PORT that is not an integer in range', () => {

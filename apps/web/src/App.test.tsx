@@ -78,7 +78,9 @@ it('renders the pricing page at /pricing, then swaps to the editor on the wordma
 it.each([
   ['/login', 'Sign in'],
   ['/register', 'Create account'],
-])('renders the auth form at %s', (path, heading) => {
+  ['/check-inbox', 'Check your inbox'],
+  ['/verify-email', 'This link is incomplete'],
+])('renders the auth surface at %s', (path, heading) => {
   window.history.pushState({}, '', path);
   render(<App />);
 

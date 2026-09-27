@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp, type AppType } from '../index.js';
+import { registerAndVerify, testMailComposition } from '../auth/testing.js';
+import type { RecordingMailer } from '../mail/testing.js';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { LTC_RATE_KEY, WALLETS_KEY, setSetting } from '../db/settings.js';
@@ -18,6 +20,7 @@ const WALLETS = {
 const NOW = new Date('2026-09-11T00:00:00.000Z');
 
 let cleanup: (() => void) | undefined;
+let mailer: RecordingMailer;
 
 afterEach(() => {
   cleanup?.();
@@ -30,8 +33,11 @@ function makeApp(options: Partial<Parameters<typeof createApp>[0]> = {}): {
 } {
   const { db, dir } = createTestDatabase();
   cleanup = () => removeTestDatabase(dir);
+  const composition = testMailComposition();
+  mailer = composition.mail;
   const app = createApp({
     db,
+    ...composition,
     log: () => {},
     sessionSecret: SESSION_SECRET,
     ...options,
@@ -67,21 +73,9 @@ function postJson(app: AppType, path: string, body: unknown, cookie?: string) {
   return request(app, path, 'POST', { body, cookie });
 }
 
-/** The `pmd_session=...` pair from a Set-Cookie header, for replaying requests. */
-function sessionCookie(res: Response): string {
-  const header = res.headers.get('set-cookie');
-  if (!header) throw new Error('no set-cookie header');
-  const pair = header.split(';')[0];
-  if (!pair) throw new Error(`malformed set-cookie: ${header}`);
-  return pair;
-}
-
+/** Registered, then verified by following the emailed link. */
 async function signedIn(app: AppType, email = 'reader@example.com') {
-  const res = await postJson(app, '/api/auth/register', {
-    email,
-    password: 'correct horse battery',
-  });
-  return sessionCookie(res);
+  return registerAndVerify(app, mailer, { email });
 }
 
 /** Registers the ADMIN_EMAIL account; the app must be built with it set. */

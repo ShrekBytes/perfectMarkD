@@ -50,6 +50,13 @@
       "when": 1790113491191,
       "tag": "0006_tricky_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790509245528,
+      "tag": "0007_light_ultimates",
+      "breakpoints": true
     }
   ]
 }

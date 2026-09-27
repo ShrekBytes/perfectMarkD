@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AuthError, changePassword, login, logout, me, register } from './api';
+import {
+  AuthError,
+  changePassword,
+  login,
+  logout,
+  me,
+  register,
+  resendVerification,
+  verifyEmail,
+} from './api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -13,17 +22,17 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('register', () => {
-  it('POSTs the credentials to /api/auth/register and returns the user', async () => {
+  it('POSTs the credentials and returns the address a link went to', async () => {
+    // No user and no session: the account cannot be used until its address is
+    // verified (email/02), so the response carries the address to wait for.
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(
-        jsonResponse({ user: { email: 'a@b.co', isAdmin: false } }, 201),
-      );
+      .mockResolvedValue(jsonResponse({ email: 'a@b.co' }, 201));
     vi.stubGlobal('fetch', fetchMock);
 
-    const user = await register('a@b.co', 'correct horse battery');
+    const sent = await register('a@b.co', 'correct horse battery');
 
-    expect(user).toEqual({ email: 'a@b.co', isAdmin: false });
+    expect(sent).toEqual({ email: 'a@b.co' });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('/api/auth/register');
     expect(init).toMatchObject({
@@ -50,6 +59,50 @@ describe('register', () => {
     await expect(register('a@b.co', 'correct horse battery')).rejects.toThrow(
       new AuthError('That email is already registered.', 409),
     );
+  });
+});
+
+describe('the verification link', () => {
+  it('asks for a fresh link, and reports the server message on refusal', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ sent: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await resendVerification('a@b.co');
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/resend-verification');
+    expect(init).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ email: 'a@b.co' }),
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ error: 'Too many attempts. Try again shortly.' }, 429),
+        ),
+    );
+    await expect(resendVerification('a@b.co')).rejects.toThrow(
+      new AuthError('Too many attempts. Try again shortly.', 429),
+    );
+  });
+
+  it('spends a token and returns the user it signed in', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse({ user: { email: 'a@b.co', isAdmin: false } }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = await verifyEmail('t0ken');
+
+    expect(user).toEqual({ email: 'a@b.co', isAdmin: false });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/verify-email');
+    expect(init).toMatchObject({ body: JSON.stringify({ token: 't0ken' }) });
   });
 });
 

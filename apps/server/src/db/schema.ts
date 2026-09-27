@@ -139,6 +139,14 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
   /**
+   * Email Verification (CONTEXT.md): when this address was proven reachable by
+   * its owner. Null means unverified, and an unverified account cannot sign in —
+   * which is what makes every paying user reachable at a proven address
+   * (ADR-0005's Manual Payment flow). Written by the verification link, and
+   * later by Password Reset and Google Sign-In; nothing else.
+   */
+  verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+  /**
    * AI Access (CONTEXT.md): the user's own on/off switch, on by default —
    * the submit is the choice, so the switch only exists to decline (ADR-0009).
    */
@@ -163,6 +171,32 @@ export const sessions = sqliteTable('sessions', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+/** What a one-time emailed link is for. One table covers every flow's link. */
+export const TOKEN_PURPOSES = ['verification'] as const;
+export type TokenPurpose = (typeof TOKEN_PURPOSES)[number];
+
+/**
+ * The one-time links in transactional email (ADR-0013): opaque 256-bit tokens,
+ * stored only as a digest, single-use and expiring. One table for every purpose
+ * so the sweep is one statement and a link's authority is its `purpose` — a
+ * password-reset token can never be redeemed as a verification.
+ *
+ * `payload` carries the flow's own data when it has any (email/04's new
+ * address); verification and reset links have none.
+ */
+export const emailTokens = sqliteTable('email_tokens', {
+  /** SHA-256 of the token that was emailed — the raw value is never stored. */
+  token: text('token').primaryKey(),
+  purpose: text('purpose').notNull(), // TokenPurpose
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  payload: text('payload'),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  /** Set when the link is redeemed; a second redemption finds it already set. */
+  usedAt: integer('used_at', { mode: 'timestamp_ms' }),
 });
 
 /**

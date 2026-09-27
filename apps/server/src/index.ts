@@ -31,11 +31,11 @@ export interface AppEnv {
     /** Raw session token from a verified cookie; null when absent. */
     sessionToken: string | null;
     /**
-     * The Mailer (ADR-0013), resolved once at the composition root. Null only
-     * in a composition that wires none — every real one must, since the mail
-     * boot gate refuses to start an API that cannot send.
+     * The Mailer (ADR-0013), resolved once at the composition root. There is no
+     * "no mailer" composition: sign-in is blocked until an address is verified,
+     * and the boot gate refuses to start an API that cannot send.
      */
-    mailer: Mailer | null;
+    mailer: Mailer;
   };
 }
 
@@ -96,10 +96,18 @@ export interface CreateAppOptions {
   /**
    * The Mailer (ADR-0013), injected at the composition root beside the session
    * secret and the clock: production passes the provider client, tests a fake
-   * that records sends. Omitted only by tests that touch no email flow —
-   * main.ts's boot gate is what stops a real composition without one.
+   * that records sends. Required — a registration that cannot mail a
+   * verification link creates an account nobody can ever sign into.
    */
-  mail?: Mailer;
+  mail: Mailer;
+  /**
+   * PUBLIC_ORIGIN: the address users reach this instance on, and the only thing
+   * the one-time links in those emails are built from. Required for the same
+   * reason as the Mailer, and never taken from a request: `Host` is
+   * attacker-supplied, and a link we send to their page from our domain
+   * carries our DKIM signature.
+   */
+  publicOrigin: string;
 }
 
 /**
@@ -118,6 +126,7 @@ export function createApp({
   export: exportOptions,
   ai: aiOptions,
   mail,
+  publicOrigin,
 }: CreateAppOptions) {
   const clock: Clock = now ?? (() => new Date());
   // The AI context is resolved once: the environment key plus the provider
@@ -164,7 +173,7 @@ export function createApp({
     .use('*', requestLogger(log))
     .use('*', async (c, next) => {
       c.set('db', db);
-      c.set('mailer', mail ?? null);
+      c.set('mailer', mail);
       // Resolve the session once per request; `me` and future gated routes
       // read the result rather than re-querying. The cookie is signed, so an
       // invalid signature (false) counts as no session.
@@ -188,7 +197,13 @@ export function createApp({
     .route('/api/me', meRoutes({ now: clock, ai }))
     .route(
       '/api/auth',
-      authRoutes({ sessionSecret, adminEmail, authRateLimit, now: clock }),
+      authRoutes({
+        sessionSecret,
+        adminEmail,
+        publicOrigin,
+        authRateLimit,
+        now: clock,
+      }),
     )
     .route('/api/orders', orderRoutes())
     .route('/api/admin', adminRoutes({ now: clock, removeStoredFile, ai }))

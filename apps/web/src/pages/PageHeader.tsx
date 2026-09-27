@@ -4,8 +4,9 @@ import { ThemeToggle } from '../theme/ThemeToggle';
 
 /**
  * The minimal header the static pages share (launch-chrome spec): the
- * wordmark linking to the editor and the theme toggle — the auth pages'
- * pattern, borrowed verbatim so the static surfaces never drift from it.
+ * wordmark linking to the editor and the theme toggle. The auth surfaces use
+ * this one too (AuthPageShell), so the wordmark and the toggle cannot drift
+ * between the two sets of pages.
  */
 export function PageHeader() {
   const { theme, toggle } = useTheme();

@@ -13,6 +13,15 @@ export interface ServerEnv {
    * static serving lands (server/06). Defaults to this API's own port.
    */
   exportOrigin: string;
+  /**
+   * Origin users' browsers reach the instance on (email/02). The absolute
+   * one-time links in transactional email are built from it, and nothing in
+   * the server can derive it from a request — the Host header is
+   * attacker-supplied, and a link sent to an attacker's page from our domain
+   * carries our DKIM signature. The composition root (main.ts) requires it: a
+   * link nobody can open is an account nobody can verify.
+   */
+  publicOrigin: string | null;
   /** Simultaneous Server Export renders (the ticket's default: 2). */
   exportConcurrency: number;
   /** Max exports one user may enqueue per rolling minute. */
@@ -76,6 +85,7 @@ export function loadEnv(
     sessionSecret: nonEmpty(source.SESSION_SECRET),
     adminEmail: nonEmpty(source.ADMIN_EMAIL),
     exportOrigin: nonEmpty(source.EXPORT_ORIGIN) ?? `http://localhost:${port}`,
+    publicOrigin: parsePublicOrigin(source.PUBLIC_ORIGIN),
     exportConcurrency: parsePositiveInt(
       source.EXPORT_CONCURRENCY,
       DEFAULT_EXPORT_CONCURRENCY,
@@ -119,6 +129,27 @@ function parsePort(raw: string | undefined): number {
     );
   }
   return port;
+}
+
+function parsePublicOrigin(raw: string | undefined): string | null {
+  const value = nonEmpty(raw);
+  // Absent is the boot gate's business, not this function's (mail/config.ts):
+  // loadEnv reports "unset", it does not decide whether that is fatal.
+  if (value === null) return null;
+  const invalid = new Error(
+    `Invalid PUBLIC_ORIGIN: ${JSON.stringify(raw)} — expected an absolute http(s) URL, e.g. https://perfectmarkd.example.com`,
+  );
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw invalid;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw invalid;
+  // A schemeless value fails here rather than becoming a link no browser can
+  // open. The trailing slash goes so joining a path to the origin is
+  // unambiguous: origin + '/verify-email', never origin + 'verify-email'.
+  return value.replace(/\/+$/, '');
 }
 
 function parsePositiveInt(

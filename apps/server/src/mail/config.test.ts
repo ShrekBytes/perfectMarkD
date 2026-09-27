@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadEnv } from '../env.js';
-import { resolveMail } from './config.js';
+import { resolveMail, requirePublicOrigin } from './config.js';
 
 /**
  * The boot gate (ADR-0013). Sign-in is blocked until an address is verified, so
@@ -96,4 +96,30 @@ describe('resolveMail', () => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+/**
+ * The public origin gate (email/02). The one-time links in transactional email
+ * are absolute, and only the deployment knows the address a user reaches the
+ * instance on — a default or a derived one puts a dead link in a real inbox,
+ * which is exactly the failure the other three gates exist to prevent.
+ */
+describe('requirePublicOrigin', () => {
+  it('refuses to boot without it', () => {
+    expect(() => requirePublicOrigin(loadEnv({}).publicOrigin)).toThrow(
+      /PUBLIC_ORIGIN/,
+    );
+    expect(() =>
+      requirePublicOrigin(loadEnv({ PUBLIC_ORIGIN: '  ' }).publicOrigin),
+    ).toThrow(/PUBLIC_ORIGIN/);
+  });
+
+  it('returns the configured origin for the link builder', () => {
+    const { publicOrigin } = loadEnv({
+      PUBLIC_ORIGIN: 'https://perfectmarkd.00022000.xyz',
+    });
+    expect(requirePublicOrigin(publicOrigin)).toBe(
+      'https://perfectmarkd.00022000.xyz',
+    );
+  });
 });

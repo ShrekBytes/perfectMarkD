@@ -57,7 +57,9 @@ trees are pruned at 30 days with `rclone delete --min-age 30d`.
 
 1. The stack from the README: `git clone` this repo, `cp .env.example .env`,
    fill in `SESSION_SECRET` + `HISTORY_ENCRYPTION_KEY` + the mail
-   configuration (`RESEND_API_KEY` + `MAIL_FROM`), and bring the stack up
+   configuration (`RESEND_API_KEY` + `MAIL_FROM`) and `PUBLIC_ORIGIN` (the
+   address users reach the instance on — the verification links in that mail
+   are absolute), and bring the stack up
    — pull the published images on a deployment host, or build from a dev
    checkout (README's Deployment block).
 2. In `.env`: `BACKUP_ENABLED=1`. Without it the nightly job is a no-op — and
@@ -115,9 +117,9 @@ and doing nothing, and the switch that changes that lives in `.env`.
 The order matters: compose refuses to even parse without
 `SESSION_SECRET`/`HISTORY_ENCRYPTION_KEY` (and, since launch/01, the two
 `UMAMI_*` secrets), and the api refuses to boot without the mail
-configuration — but the real `.env` is *inside the backup* — so
-bootstrap with placeholder secrets, pull the real `.env` from the backup,
-then restore data.
+configuration or `PUBLIC_ORIGIN` — but the real `.env` is *inside the
+backup* — so bootstrap with placeholder secrets, pull the real `.env` from
+the backup, then restore data.
 
 1. **Fresh host, repo checked out** (`git clone` at e.g. `/opt/perfectmarkd`),
    `rclone` installed, the same rclone remote configured (`rclone config
@@ -125,11 +127,13 @@ then restore data.
    password manager, not in the backup).
 2. **Bootstrap `.env`** with placeholders (values are about to be replaced).
    `MAIL_MODE=console` is what lets the api boot before the real mail keys
-   exist; the restored `.env` replaces it with the real configuration:
+   exist, and `PUBLIC_ORIGIN` is the fourth boot gate (email/02) — a
+   placeholder is enough to start, and the restored `.env` replaces it with
+   the real configuration along with the mail keys:
 
    ```sh
    cp .env.example .env
-   printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nMAIL_MODE=console\n' \
+   printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nMAIL_MODE=console\nPUBLIC_ORIGIN=http://localhost:8901\n' \
      "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
      "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" >> .env
    printf 'BACKUP_REMOTE=b2backup:perfectmarkd-backups\n' >> .env
@@ -214,7 +218,7 @@ local backend):
 
 ```sh
 export BACKUP_REMOTE=/tmp/pmd-backup-rehearsal   # in .env, not just exported!
-cp .env.example .env && printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nMAIL_MODE=console\nBACKUP_ENABLED=1\nBACKUP_REMOTE=%s\n' \
+cp .env.example .env && printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nMAIL_MODE=console\nPUBLIC_ORIGIN=http://localhost:8901\nBACKUP_ENABLED=1\nBACKUP_REMOTE=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
 
@@ -226,7 +230,7 @@ docker compose exec -T api node /seed.mjs
 ops/backup.sh                         # needs BACKUP_ENABLED=1 in .env (above)
 docker compose down -v                # the "clean machine"
 rm .env && cp .env.example .env       # …placeholder secrets, real ones restored
-printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nMAIL_MODE=console\nBACKUP_ENABLED=1\nBACKUP_REMOTE=%s\n' \
+printf 'SESSION_SECRET=%s\nHISTORY_ENCRYPTION_KEY=%s\nUMAMI_APP_SECRET=%s\nUMAMI_DB_PASSWORD=%s\nMAIL_MODE=console\nPUBLIC_ORIGIN=http://localhost:8901\nBACKUP_ENABLED=1\nBACKUP_REMOTE=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$BACKUP_REMOTE" >> .env
 ops/restore.sh && docker compose up -d

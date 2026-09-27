@@ -13,7 +13,15 @@ import { PaymentInstructions } from './PaymentInstructions';
 import { METHOD_LABELS, PAYMENT_METHODS, type PaymentMethod } from './payment';
 
 export type UpgradeStep =
-  'details' | 'auth' | 'instructions' | 'payment' | 'submitted';
+  // A registration stops at 'verify-email' (email/02): the account cannot be
+  // used until its address is verified, so the Order waits for the round trip
+  // to the inbox.
+  | 'details'
+  | 'auth'
+  | 'verify-email'
+  | 'instructions'
+  | 'payment'
+  | 'submitted';
 
 interface UpgradeFlowProps {
   /** The plan whose CTA started the flow. */
@@ -27,7 +35,9 @@ interface UpgradeFlowProps {
  * account or sign in if needed → the server creates the Order → payment
  * instructions (Reference Code, wallet, network warning) → "I've sent the
  * payment" details → submitted. Everything after the Order exists is also
- * reachable later from the Account page's Orders section.
+ * reachable later from the Account page's Orders section. A new registration
+ * takes the Email Verification detour (email/02), so the flow can also stop at
+ * the inbox.
  */
 export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
   const user = useAccountStore((state) => state.user);
@@ -38,6 +48,8 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>('USDT-TRC20');
   const [authMode, setAuthMode] = useState<AuthMode>('register');
+  /** The address a fresh registration's verification link went to (email/02). */
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -200,6 +212,11 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
             <AuthForm
               mode={authMode}
               onAuthenticated={onAuthenticated}
+              onRegistered={(email) => {
+                // Name the inbox: story 2 is not only about the standalone page.
+                setPendingEmail(email);
+                setStep('verify-email');
+              }}
               onSwitchMode={() =>
                 setAuthMode((mode) =>
                   mode === 'register' ? 'login' : 'register',
@@ -214,6 +231,30 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
             className="touch-target mt-3 text-xs text-ink-soft outline-offset-2 outline-accent hover:text-ink focus-visible:outline-2"
           >
             ← Back to plan details
+          </button>
+        </div>
+      )}
+
+      {step === 'verify-email' && (
+        <div data-testid="upgrade-step-verify-email">
+          <h3 className="text-base font-semibold text-ink">Check your inbox</h3>
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+            We sent a verification link to{' '}
+            <span className="font-mono font-medium text-ink">
+              {pendingEmail}
+            </span>
+            . Open it to finish — then come back and pick your plan again. Your
+            selection is not lost; the Order can be created whenever you are
+            ready.
+          </p>
+
+          <button
+            type="button"
+            onClick={onClose}
+            autoFocus
+            className="touch-target mt-4 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
+          >
+            Close
           </button>
         </div>
       )}

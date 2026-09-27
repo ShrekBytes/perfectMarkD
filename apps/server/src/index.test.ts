@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HTTPException } from 'hono/http-exception';
 import { createApp, type AppType } from './index.js';
+import { testMailComposition } from './auth/testing.js';
 import type { LogSink } from './request-logger.js';
 import { createTestDatabase, removeTestDatabase } from './db/testing.js';
 
@@ -18,7 +19,12 @@ function makeApp() {
   const { db, dir } = createTestDatabase();
   cleanup = () => removeTestDatabase(dir);
   return {
-    app: createApp({ db, sessionSecret: 'test-secret', log: sink }),
+    app: createApp({
+      db,
+      sessionSecret: 'test-secret',
+      log: sink,
+      ...testMailComposition(),
+    }),
     lines,
   };
 }
@@ -105,6 +111,7 @@ describe('database on context', () => {
       db,
       sessionSecret: 'test-secret',
       log: (l) => lines.push(l),
+      ...testMailComposition(),
     }).get('/__probe', (c) => c.json({ hasDb: c.var.db === db }));
     const res = await app.request('/__probe');
     expect(await res.json()).toEqual({ hasDb: true });

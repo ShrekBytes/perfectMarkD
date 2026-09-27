@@ -4,7 +4,7 @@ import { loadEnv } from './env.js';
 import { createApp } from './index.js';
 import { createHistoryStore } from './history/store.js';
 import { startHistoryPurge } from './history/purge.js';
-import { resolveMail } from './mail/config.js';
+import { resolveMail, requirePublicOrigin } from './mail/config.js';
 
 const env = loadEnv(process.env);
 if (!env.sessionSecret) {
@@ -26,6 +26,11 @@ const mail = resolveMail({
   from: env.mailFrom,
   mode: env.mailMode,
 });
+// The fourth boot gate (email/02), beside the other three: the one-time links
+// in transactional email are absolute, and only the deployment knows the address
+// a user's browser reaches the instance on. A missing value cannot reach a
+// user — it would put a dead link in a real inbox — so it stops the boot.
+const publicOrigin = requirePublicOrigin(env.publicOrigin);
 const db = createDatabase(env.dbPath);
 // Export History storage (server/05): finished Premium exports, encrypted at
 // rest, live here. parseMasterKey rejects malformed key material — a bad key
@@ -55,6 +60,10 @@ const app = createApp({
   },
   history,
   mail,
+  // The one-time links in transactional email are absolute (email/02): the
+  // verification email a new account waits on, and the resend that replaces a
+  // lost one.
+  publicOrigin,
 });
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {

@@ -2,12 +2,13 @@ import { useEffect, useState, type AnchorHTMLAttributes } from 'react';
 
 /**
  * Minimal History-API routing for the SPA's few surfaces (PLAN.md §3: `/`
- * editor, `/pricing`, the static About, Privacy, and Docs pages, and the admin
- * panel). No router dependency — the surfaces are few and static. Same-tab
- * pushes fire a custom event because popstate only covers browser navigation;
- * deep links work wherever the host serves index.html as the SPA fallback
- * (Vite dev does by default; the server's static serving config handles it in
- * server/06). Unknown paths get the 404 page (launch-chrome spec).
+ * editor, `/pricing`, the static About, Privacy, and Docs pages, the auth
+ * surfaces, and the admin panel). No router dependency — the surfaces are few
+ * and static. Same-tab pushes fire a custom event because popstate only covers
+ * browser navigation; deep links work wherever the host serves index.html as the
+ * SPA fallback (Vite dev does by default; the server's static serving config
+ * handles it in server/06). Unknown paths get the 404 page (launch-chrome
+ * spec).
  */
 
 export type Route =
@@ -16,6 +17,8 @@ export type Route =
   | 'account'
   | 'login'
   | 'register'
+  | 'check-inbox'
+  | 'verify-email'
   | 'admin'
   | 'export'
   | 'about'
@@ -33,6 +36,12 @@ export function routeForPath(pathname: string): Route {
   if (pathname === '/account') return 'account';
   if (pathname === '/login') return 'login';
   if (pathname === '/register') return 'register';
+  // The two Email Verification pages (email/02): where a new registration
+  // lands, and the page a verification link resolves to. The link's token
+  // travels in the query string — the page spends it over the API, so a link
+  // scanner that follows the URL in an inbox cannot.
+  if (pathname === '/check-inbox') return 'check-inbox';
+  if (pathname === '/verify-email') return 'verify-email';
   if (pathname === '/admin') return 'admin';
   if (pathname === '/about') return 'about';
   if (pathname === '/privacy') return 'privacy';
