@@ -89,6 +89,10 @@ Umami's image is compiled by [`.github/workflows/umami-image.yml`](.github/workf
 
 Exposing a host directly instead? Set `SITE_ADDRESS=<domain>` in `.env` and Caddy provisions TLS automatically.
 
+## Operations
+
+Runbooks live in [`docs/ops/`](docs/ops/): [admin](docs/ops/admin.md) for verifying a payment, resetting a password, and changing a wallet · [restore](docs/ops/restore.md) for backup and recovery · [hosting](docs/ops/hosting.md) for what the stack does _not_ need · [launch checklist](docs/ops/launch-checklist.md) and [announcement drafts](docs/ops/announcements.md) for going live.
+
 ## License
 
 [AGPL-3.0](LICENSE) — see [docs/adr/0001-agpl3-open-codebase.md](docs/adr/0001-agpl3-open-codebase.md) for why.
