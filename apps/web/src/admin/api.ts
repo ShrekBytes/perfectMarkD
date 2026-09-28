@@ -268,8 +268,6 @@ export interface AiConnectionModel {
   id: string;
   contextLength: number | null;
   maxOutputTokens: number | null;
-  inputPricePerMillion: number | null;
-  outputPricePerMillion: number | null;
 }
 
 /** Test connection's report — Admin-only, never persisted. */

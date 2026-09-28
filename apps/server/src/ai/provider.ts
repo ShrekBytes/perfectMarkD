@@ -82,9 +82,6 @@ export interface AiModelInfoRequest {
 export interface AiModelInfo {
   contextLength: number | null;
   maxOutputTokens: number | null;
-  /** USD per million tokens. */
-  inputPricePerMillion: number | null;
-  outputPricePerMillion: number | null;
 }
 
 export interface AiProvider {
@@ -271,15 +268,12 @@ function parseModelInfo(payload: unknown, model: string): AiModelInfo | null {
   const entry = data.find((item) => isRecord(item) && item.id === model);
   if (!isRecord(entry)) return null;
   const topProvider = isRecord(entry.top_provider) ? entry.top_provider : null;
-  const pricing = isRecord(entry.pricing) ? entry.pricing : null;
   return {
     contextLength: positiveNumberOrNull(entry.context_length),
     maxOutputTokens:
       positiveNumberOrNull(topProvider?.max_completion_tokens) ??
       positiveNumberOrNull(entry.max_completion_tokens) ??
       positiveNumberOrNull(entry.max_output_tokens),
-    inputPricePerMillion: pricePerMillion(pricing?.prompt),
-    outputPricePerMillion: pricePerMillion(pricing?.completion),
   };
 }
 
@@ -291,18 +285,6 @@ function positiveNumberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value
     : null;
-}
-
-/** Providers publish per-token prices as decimal strings; the panel speaks
- *  per-million. */
-function pricePerMillion(value: unknown): number | null {
-  const raw =
-    typeof value === 'string'
-      ? Number(value)
-      : typeof value === 'number'
-        ? value
-        : Number.NaN;
-  return Number.isFinite(raw) && raw >= 0 ? raw * 1_000_000 : null;
 }
 
 function isAbortError(error: unknown): boolean {

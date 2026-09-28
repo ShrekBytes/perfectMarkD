@@ -64,11 +64,11 @@ export function estimateAiSize(text: string): AiSizeEstimate {
 
 /**
  * The worst-case token estimate for a character budget with no text to
- * measure, as the Admin's AI Provider Config needs it: the tighter,
- * script-aware ratio, so the panel's per-Action arithmetic errs toward
- * over-estimating rather than promising a cost the model can exceed. It is
- * the conservative end of `estimateAiSize`'s range, not a second estimator —
- * the ratio is the same constant that function selects from.
+ * measure: the tighter, script-aware ratio, so an estimate made from a
+ * character count alone errs toward over-estimating rather than promising a fit
+ * the model cannot meet. It is the conservative end of `estimateAiSize`'s
+ * range, not a second estimator — the ratio is the same constant that function
+ * selects from.
  */
 export function estimateTokensForCharacters(characters: number): number {
   if (!Number.isFinite(characters) || characters <= 0) return 0;

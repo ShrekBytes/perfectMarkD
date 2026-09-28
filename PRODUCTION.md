@@ -172,8 +172,8 @@ model can be changed without a redeploy.
 3. `/admin` → **Settings** → AI provider. Set:
    - the **base URL** — any OpenAI-compatible endpoint; OpenRouter's API root is
      the default
-   - the **model id** — pick it with the cost arithmetic in mind, because you
-     pay per call
+   - the **model id** — pick it with the provider's own published rates in
+     mind, because you pay per call
    - the **reasoning effort** — `off` / `low` / `medium` / `high`, default
      `medium`. Temperature is deliberately not configurable.
    - the **caps**: context window, max output tokens, max input characters.
@@ -181,14 +181,14 @@ model can be changed without a redeploy.
 4. Set the **enabled flag** on. Without it, no AI surface exists for anyone and
    no upsell appears.
 5. Run **Test connection.** Read what it reports: the model's published context
-   length, max completion tokens, and price per million input/output tokens when
-   the provider exposes them. A model the endpoint doesn't know fails here
-   rather than for the first user. A mismatch between the provider's numbers and
-   your caps is a **warning, not a silent correction** — read it.
-6. Check the **worst-case cost of one AI Action** against the plan's monthly AI
-   allowance (Pro 100, Premium 300). A pricey model should be a decision you
-   made, not a surprise. The price shows as unknown if the provider didn't
-   publish one.
+   length and max completion tokens when the provider exposes them. A model the
+   endpoint doesn't know fails here rather than for the first user. A mismatch
+   between the provider's numbers and your caps is a **warning, not a silent
+   correction** — read it.
+6. Price the model against the plan's monthly AI allowance (Pro 100, Premium
+   300) from the provider's published rates, off-panel. The panel states caps
+   and what the model publishes; it does no cost arithmetic, because a worst
+   case from two caps and two rates is too basic to plan a budget around.
 7. Optionally set a **cheaper model for stylesheet edits** — they're short, so
    a smaller model can serve `/ss` while the main model handles markdown.
 8. Confirm the **per-plan allowances** in the Limits section are what you intend

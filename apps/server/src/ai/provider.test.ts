@@ -213,12 +213,14 @@ describe('the OpenAI-compatible client: modelInfo', () => {
         id: 'vendor/model',
         context_length: 200_000,
         top_provider: { max_completion_tokens: 8_000 },
+        // Published pricing is not part of the report: the panel states a
+        // model's window and output cap, never a price.
         pricing: { prompt: '0.00000015', completion: '0.0000006' },
       },
     ],
   };
 
-  it("reads the model's published window, completion cap, and prices", async () => {
+  it("reads the model's published window and completion cap", async () => {
     const calls = stubFetch(() => Promise.resolve(jsonResponse(200, payload)));
 
     const info = await PROVIDER.modelInfo(REQUEST);
@@ -226,8 +228,6 @@ describe('the OpenAI-compatible client: modelInfo', () => {
     expect(info).toEqual({
       contextLength: 200_000,
       maxOutputTokens: 8_000,
-      inputPricePerMillion: 0.15,
-      outputPricePerMillion: 0.6,
     });
     expect(calls[0]?.url).toBe('https://ai.example.com/v1/models');
   });
@@ -250,8 +250,6 @@ describe('the OpenAI-compatible client: modelInfo', () => {
     expect(await PROVIDER.modelInfo(REQUEST)).toEqual({
       contextLength: 32_000,
       maxOutputTokens: 4_000,
-      inputPricePerMillion: null,
-      outputPricePerMillion: null,
     });
   });
 

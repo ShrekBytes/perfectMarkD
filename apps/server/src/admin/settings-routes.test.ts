@@ -534,8 +534,6 @@ function fakeProvider(overrides: Partial<AiProvider> = {}): AiProvider {
     modelInfo: async () => ({
       contextLength: 200_000,
       maxOutputTokens: 8_000,
-      inputPricePerMillion: 0.15,
-      outputPricePerMillion: 0.6,
     }),
     ...overrides,
   };
@@ -571,6 +569,7 @@ describe('POST /api/admin/settings/ai/test', () => {
 
     expect(res.status).toBe(200);
     const { report } = (await res.json()) as { report: unknown };
+    // The whole report, so a field that comes back uninvited is caught here.
     expect(report).toEqual({
       ok: true,
       keyPresent: true,
@@ -578,8 +577,6 @@ describe('POST /api/admin/settings/ai/test', () => {
         id: 'vendor/model',
         contextLength: 200_000,
         maxOutputTokens: 8_000,
-        inputPricePerMillion: 0.15,
-        outputPricePerMillion: 0.6,
       },
       // The published numbers disagree with the configured caps; the report
       // warns instead of silently correcting either side.

@@ -63,7 +63,8 @@ confirmed working by the Admin on 2026-09-28. `aiConfigured()` requires a
 non-empty model *and* a key *and* `enabled` (`apps/server/src/ai/state.ts`), and
 all three hold here — the model is in the settings table, not the seed default,
 which is why reading `DEFAULT_AI_PROVIDER_CONFIG` says nothing about the running
-instance. See [AI prerequisites](#ai-prerequisites), where one item is still open.
+instance. See [AI prerequisites](#ai-prerequisites), where the cost arithmetic was
+removed rather than used.
 
 ## Payment
 
@@ -253,9 +254,10 @@ an Admin session.
 ## AI prerequisites
 
 The ticket body's list, with the state of each as of 2026-09-28. The Admin
-confirmed five of the six are done, so **AI Actions are live on the instance** —
-the launch does include them. One item is open, and it is the one that became
-important only once the model turned out to be a paid one.
+confirmed five of the ticket's six are done, so **AI Actions are live on the
+instance** — the launch does include them. The sixth, the cost arithmetic, was
+resolved the other way round: the readout is gone rather than used. The caps
+item below is a warning, not an unfinished box.
 
 - [x] `AI_API_KEY` is set in the deployment's `.env` (environment-only, never
       the settings table, a tracked file, or a log — ADR-0008), and **the API has
@@ -264,16 +266,16 @@ important only once the model turned out to be a paid one.
 - [x] **A model is chosen:** `stealth/space-bunny-alpha`, live and working as of
       2026-09-28. Two free OpenRouter ids are also recorded on
       `ai-transforms/08` if a zero-cost option is ever wanted.
-- [ ] **⬜ The cost calculator is being removed rather than used.** The Admin's
-      call, 2026-09-28: the readout is deleted instead, because pricing a worst
-      case from two caps and two published rates is too basic to plan a budget
-      around. Tracked in
-      [`.scratch/launch/follow-up-todos.md`](../../.scratch/launch/follow-up-todos.md).
-      The Test connection **cap-mismatch warnings stay** — they are the part that
-      tells you a configured cap does not fit the model, and they are worth a
-      glance before announcing.
+- [x] **The cost calculator was removed rather than used.** The Admin's call,
+      2026-09-28, and it is now done —
+      [`launch/13`](../../.scratch/launch/issues/13-remove-ai-cost-readout.md).
+      The readout is gone, the price arithmetic and the token counts both:
+      pricing a worst case from two caps and two published rates is too basic to
+      plan a real budget around. The Test connection **cap-mismatch warnings
+      stay** — they are the part that tells you a configured cap does not fit
+      the model, and they are worth a glance before announcing.
 - [x] **Test connection has been run to completion** against the chosen model,
-      and its published window, output cap, and price read (Admin, 2026-09-28).
+      and its published window and output cap read (Admin, 2026-09-28).
 - [⚠️ **The caps were not resized.** They remain the seeded values —
       `contextWindow: 128_000`, `maxOutputTokens: 16_000`,
       `maxInputCharacters: 60_000` (`settings.ts:43-45`) — while Test connection
@@ -293,11 +295,13 @@ important only once the model turned out to be a paid one.
 
 Short version, for the announcement decision:
 
-1. **The four follow-up to-dos**, written up in
+1. **The three remaining follow-up to-dos**, written up in
    [`.scratch/launch/follow-up-todos.md`](../../.scratch/launch/follow-up-todos.md)
-   and not yet tickets: remove the AI cost calculator, make the pricing surface
-   read live admin settings, fetch the LTC rate every 12 hours instead of by
-   hand, and give a pending Order a 6-hour payment window.
+   and since cut into tickets: make the pricing surface read live admin
+   settings, fetch the LTC rate every 12 hours instead of by hand, and give a
+   pending Order a 6-hour payment window. The fourth to-do, removing the AI
+   cost calculator, is done —
+   [launch/13](../../.scratch/launch/issues/13-remove-ai-cost-readout.md).
 2. **One real USDT-TRC20 payment and one real LTC payment**, through to
    verification and expiry. The only remaining launch blocker that needs
    something this pass could not do.
@@ -314,11 +318,10 @@ announcing; 1 and 3–6 are "before you say it works".
 
 ## Follow-up work
 
-Two to-dos came out of this pass and are written up, ready to become tickets,
-in [`.scratch/launch/follow-up-todos.md`](../../.scratch/launch/follow-up-todos.md):
+Three to-dos came out of this pass. They are written up in
+[`.scratch/launch/follow-up-todos.md`](../../.scratch/launch/follow-up-todos.md),
+where they have since been cut into tickets:
 
-- **Remove the AI cost calculator.** The Admin's call — the arithmetic is too
-  basic to plan around, so the readout goes rather than gets used.
 - **Make the pricing surface read live admin settings.** This one is not
   cosmetic. `apps/web/src/pricing/plans.ts` hardcodes the prices while Orders are
   priced from the settings table, and the hardcoded module is imported by both

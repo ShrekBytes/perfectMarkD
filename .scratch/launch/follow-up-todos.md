@@ -1,5 +1,34 @@
 # Follow-up to-dos from `launch/06`
 
+> **Cut into tickets on 2026-09-28. Kept as the record, not as the work.**
+>
+> | To-do | Ticket |
+> |---|---|
+> | 1 — Remove the AI cost calculator | `launch/13` — **done**, 2026-09-28 |
+> | 2 — Make the pricing surface read live admin settings | `live-pricing/01`, under [the live-pricing spec](../live-pricing/spec.md) |
+> | 3 — Fetch the LTC rate every 12 hours, Admin cannot set it | `live-pricing/02` |
+> | 4 — A pending Order must be paid within 6 hours | `live-pricing/02` |
+>
+> To-dos 2–4 share one spec because they are one problem: the price a customer
+> sees must be the price they pay, and a quote must stop being payable. To-do 1
+> is not an instance of that problem and is tracked with the launch work.
+>
+> **Three claims below were checked against the code and are wrong.** Do not work
+> from them: to-do 2 does *not* affect the Verification queue (it displays the
+> Order's own amount; the catalog module's only contribution there is the list
+> of duration options); the catalog module has eleven importers, not ten, and
+> only four of them read prices; and the client and server duration arithmetic
+> already agree, so that drift is latent rather than present. To-do 1 also
+> undercounts its own test surface — three tests and five assertion sites — and
+> omits the production runbook, which tells the operator to check the readout
+> being deleted.
+>
+> To-dos 3 and 4 also gained decisions after the launch pass: the Rate ships
+> behind a validation band and a maximum age with a distinct refusal message, the
+> Payment Window is derived rather than stored as a status, and the write path is
+> removed in a second commit after a confirmed live fetch rather than alongside
+> the job.
+
 Two items the launch pass turned up, written to be lifted into tickets. **Not
 tickets** — no `Status:`, no `Blocked by:`, no spec files. They live here until
 someone cuts them.
@@ -16,6 +45,11 @@ outlive it.
 ---
 
 ## To-do 1 — Remove the AI cost calculator
+
+**Done** — [launch/13](issues/13-remove-ai-cost-readout.md), 2026-09-28. The
+readout, the price fields Test connection published to feed it, and every
+document that pointed at it are gone. The body below is kept as the record of
+what was asked for.
 
 **Decision (Admin, 2026-09-28):** the Admin panel's AI readout is removed
 entirely, price arithmetic and token counts both. The reasoning: the arithmetic

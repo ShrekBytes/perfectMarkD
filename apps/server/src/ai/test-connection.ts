@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Test connection (spec §AI Provider Config): one minimal request tells the
 // Admin whether the endpoint answered, what the model publishes about its
-// window, output cap, and price, and whether the configured caps disagree
-// with those numbers. Warnings are never hidden and never silently corrected.
+// window and output cap, and whether the configured caps disagree with those
+// numbers. Warnings are never hidden and never silently corrected.
 //
 // The report is Admin-only and may carry upstream detail for debugging; the
 // user-facing AI errors never come through here. Nothing is persisted.
