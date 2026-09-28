@@ -23,6 +23,14 @@ import type { LtcRateProvider } from './provider.js';
 export const RATE_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 /**
+ * How old the last good Rate may be before new LTC Orders are refused rather
+ * than quoted (ADR-0014). Four refreshes' worth, so a couple of consecutive
+ * failures do not switch LTC off; past it the figure is not a price anyone
+ * should be held to.
+ */
+export const RATE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+/**
  * How far the feed may be from the last good Rate before the answer is treated
  * as a provider fault rather than a market move. A real LTC move of this size
  * inside a day is news; a feed reporting one is a broken feed, and storing it

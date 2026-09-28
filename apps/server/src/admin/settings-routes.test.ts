@@ -375,7 +375,10 @@ describe('PUT /api/admin/settings/:key', () => {
   });
 
   it('an LTC Order captures the Rate the job wrote', async () => {
-    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    const { app, db } = makeApp({
+      adminEmail: 'owner@example.com',
+      now: () => NOW,
+    });
     await signedIn(app);
     setSetting(db, 'ltc_rate_usdt', {
       usdtPerLtc: 320.5,

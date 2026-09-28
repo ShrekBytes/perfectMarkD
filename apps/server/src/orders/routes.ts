@@ -15,6 +15,7 @@ import {
   type OrderStatus,
 } from '../db/schema.js';
 import { ltcAmountFor, toCryptoAmount } from './amounts.js';
+import { RATE_MAX_AGE_MS } from '../rate/job.js';
 import {
   METHOD_COIN_NETWORK,
   methodForCoinNetwork,
@@ -217,6 +218,20 @@ export function orderRoutes({
           {
             error:
               'LTC payments are not set up yet — please pick another payment method.',
+          },
+          503,
+        );
+      }
+      // A Rate past its maximum age is refused rather than quoted (ADR-0014).
+      // The message is deliberately not the one above: no fetch has ever
+      // landing and a feed that has been down for two days are different
+      // states, and only the second one resolves itself. It also points at the
+      // other coins, because the fix is one click and USDT is always open.
+      if (rate.ageMs !== null && rate.ageMs > RATE_MAX_AGE_MS) {
+        return c.json(
+          {
+            error:
+              'The LTC rate is refreshing and is too old to quote — please pay with USDT instead, or try again shortly.',
           },
           503,
         );
