@@ -236,11 +236,7 @@ describe('me', () => {
         quota: { used: 3, limit: 300 },
         signIn: { password: false, google: true },
         flags: {
-          customPageSize: true,
-          customStylesheet: true,
-          bannerImages: true,
-          backgroundImage: true,
-          customFonts: true,
+          paidTier: true,
         },
       }),
     );
@@ -258,11 +254,7 @@ describe('me', () => {
       // own — the Account page renders the form this reports.
       signIn: { password: false, google: true },
       flags: {
-        customPageSize: true,
-        customStylesheet: true,
-        bannerImages: true,
-        backgroundImage: true,
-        customFonts: true,
+        paidTier: true,
       },
     });
     const [url, init] = fetchMock.mock.calls[0]!;

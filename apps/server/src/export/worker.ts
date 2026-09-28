@@ -85,7 +85,6 @@ export class ExportWorker {
   private readonly log: LogSink;
 
   private running = 0;
-  private stopped = false;
   private readonly idleResolvers: Array<() => void> = [];
 
   constructor(options: ExportWorkerOptions) {
@@ -120,11 +119,6 @@ export class ExportWorker {
     this.checkIdle();
   }
 
-  /** Stops claiming new work; in-flight renders settle on their own. */
-  stop(): void {
-    this.stopped = true;
-  }
-
   /** Resolves once nothing is queued and nothing is running (tests await this). */
   waitIdle(): Promise<void> {
     if (this.isIdle()) return Promise.resolve();
@@ -151,7 +145,7 @@ export class ExportWorker {
   }
 
   private pump(): void {
-    while (!this.stopped && this.running < this.concurrency) {
+    while (this.running < this.concurrency) {
       const job = claimNextExportJob(this.db, this.now());
       if (!job) return;
       this.running += 1;

@@ -252,11 +252,7 @@ describe('account step', () => {
               expiresAt: null,
               quota: { used: 0, limit: 0 },
               flags: {
-                customPageSize: false,
-                customStylesheet: false,
-                bannerImages: false,
-                backgroundImage: false,
-                customFonts: false,
+                paidTier: false,
               },
             }),
           )

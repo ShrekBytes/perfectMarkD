@@ -13,6 +13,8 @@
 // knowing the wire.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { fetchWithTimeout, isAbortError } from '../fetch-with-timeout.js';
+
 /** The seam: one fetch, one figure, or a throw. */
 export interface LtcRateProvider {
   /** USDT per LTC. Throws `RateProviderError` for every failure. */
@@ -62,35 +64,33 @@ export function createLtcRateProvider({
 }: LtcRateProviderOptions = {}): LtcRateProvider {
   return {
     async fetchRate() {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(TICKER_URL, {
-          method: 'GET',
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new RateProviderError(
-            'http',
-            `The rate feed answered with HTTP ${response.status}.`,
-          );
-        }
-        return readLastPrice(await readJson(response));
-      } catch (error) {
-        if (error instanceof RateProviderError) throw error;
-        if (isAbortError(error)) {
-          throw new RateProviderError(
-            'timeout',
-            'The rate feed did not answer in time.',
-          );
-        }
-        throw new RateProviderError(
-          'transport',
-          'The rate feed could not be reached.',
-        );
-      } finally {
-        clearTimeout(timer);
-      }
+      return fetchWithTimeout({
+        url: TICKER_URL,
+        init: { method: 'GET' },
+        timeoutMs,
+        read: async (response) => {
+          if (!response.ok) {
+            throw new RateProviderError(
+              'http',
+              `The rate feed answered with HTTP ${response.status}.`,
+            );
+          }
+          return readLastPrice(await readJson(response));
+        },
+        errors: {
+          isOwnError: (error) => error instanceof RateProviderError,
+          timeout: () =>
+            new RateProviderError(
+              'timeout',
+              'The rate feed did not answer in time.',
+            ),
+          transport: () =>
+            new RateProviderError(
+              'transport',
+              'The rate feed could not be reached.',
+            ),
+        },
+      });
     },
   };
 }
@@ -99,6 +99,7 @@ async function readJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch (error) {
+    // An aborted body read is a timeout, not a malformed reply.
     if (isAbortError(error)) throw error;
     throw new RateProviderError(
       'invalid_response',
@@ -140,9 +141,4 @@ function readLastPrice(payload: unknown): number {
   if (!Array.isArray(c) || c.length === 0) return malformed();
   const rate = Number(c[0]);
   return Number.isFinite(rate) && rate > 0 ? rate : malformed();
-}
-
-function isAbortError(error: unknown): boolean {
-  const name = (error as { name?: unknown } | null)?.name;
-  return name === 'AbortError' || name === 'TimeoutError';
 }

@@ -85,6 +85,13 @@
       "when": 1790589183551,
       "tag": "0011_slippery_kree",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790636236806,
+      "tag": "0012_volatile_black_widow",
+      "breakpoints": true
     }
   ]
 }

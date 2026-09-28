@@ -19,6 +19,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
+import { RollingWindowRateLimiter } from '../auth/rate-limit.js';
 import type { AppDatabase } from '../db/database.js';
 import type { ExportJob, Plan } from '../db/schema.js';
 import { getPlanLimits, pageCapFor } from '../db/settings.js';
@@ -44,37 +45,9 @@ export interface ExportRoutesOptions {
   now: Clock;
 }
 
-/**
- * Rolling 60-second per-user window: at most `max` enqueues, so a runaway
- * client cannot flood the render queue (spec §Security posture). Only
- * accepted enqueues consume the window — rejected requests don't burn quota —
- * and expired windows are dropped on touch, so the map never holds more than
- * the users who exported within the last minute.
- */
-class BurstLimiter {
-  private readonly hits = new Map<number, number[]>();
-
-  constructor(
-    private readonly max: number,
-    private readonly now: Clock,
-  ) {}
-
-  tryAcquire(userId: number): boolean {
-    const now = this.now().getTime();
-    const recent = (this.hits.get(userId) ?? []).filter(
-      (t) => t > now - 60_000,
-    );
-    if (recent.length === 0) this.hits.delete(userId);
-    if (recent.length >= this.max) return false;
-    recent.push(now);
-    this.hits.set(userId, recent);
-    return true;
-  }
-}
-
 export function exportRoutes(options: ExportRoutesOptions) {
   const { db, payloads, results, worker } = options;
-  const burst = new BurstLimiter(options.burstPerMinute, options.now);
+  const burst = new RollingWindowRateLimiter(options.now);
   const app = new Hono<AppEnv>();
 
   app.use(
@@ -161,7 +134,7 @@ export function exportRoutes(options: ExportRoutesOptions) {
       return c.json({ error: parsed.error }, 400);
     }
 
-    if (!burst.tryAcquire(user.id)) {
+    if (!burst.tryAcquire(user.id, options.burstPerMinute)) {
       return c.json(
         {
           error: 'Too many exports in a minute — try again shortly.',

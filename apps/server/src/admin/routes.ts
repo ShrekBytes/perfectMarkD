@@ -1,11 +1,20 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { desc, eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
+import type { AppDatabase } from '../db/database.js';
 import { getWallets } from '../db/settings.js';
-import { auditLogs, entitlements, orders, users } from '../db/schema.js';
+import {
+  auditLogs,
+  entitlements,
+  orders,
+  users,
+  type Order,
+  type User,
+} from '../db/schema.js';
 import { asRecord, parseJson } from '../request-body.js';
 import { expiryForGrant } from './entitlement.js';
 import { parseGrant } from './grant.js';
+import { recordAudit, type Executor } from './audit.js';
 import {
   adminOrderView,
   entitlementFor,
@@ -71,6 +80,61 @@ function parseReason(body: unknown): string | { error: string } {
   return reason;
 }
 
+/**
+ * What both decision routes share up front: the id must parse, the Order must
+ * exist and still be pending. The Admin check is not here — this sub-app's
+ * middleware has already refused anyone but the Admin.
+ */
+function loadPendingOrder(
+  c: Context<AppEnv>,
+): { order: Order } | { response: Response } {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) {
+    return { response: c.json({ error: 'Order not found.' }, 404) };
+  }
+  const order = c.var.db.select().from(orders).where(eq(orders.id, id)).get();
+  if (!order) {
+    return { response: c.json({ error: 'Order not found.' }, 404) };
+  }
+  if (order.status !== 'pending') {
+    return {
+      response: c.json({ error: 'Only pending orders can be decided.' }, 409),
+    };
+  }
+  return { order };
+}
+
+/**
+ * The decide path both decision routes share (billing/02): the Order moves and
+ * its audit entry land in the same transaction, so the queue can never show a
+ * decided Order whose audit entry failed to land — or the reverse. `decide`
+ * runs the route's own writes inside that transaction and returns the audit
+ * snapshots beside the updated row; the action follows the status.
+ */
+function decidePendingOrder(
+  db: AppDatabase,
+  admin: User,
+  order: Order,
+  status: 'verified' | 'rejected',
+  decide: (tx: Executor) => {
+    updated: Order;
+    before: unknown;
+    after: unknown;
+  },
+): Order {
+  return db.transaction((tx) => {
+    const { updated, before, after } = decide(tx);
+    recordAudit(tx, admin, {
+      action: status === 'verified' ? 'order.verify' : 'order.reject',
+      targetType: 'order',
+      targetId: String(order.id),
+      before,
+      after,
+    });
+    return updated;
+  });
+}
+
 export function adminRoutes({
   now = () => new Date(),
   publicOrigin,
@@ -108,27 +172,16 @@ export function adminRoutes({
   });
 
   app.post('/orders/:id/verify', async (c) => {
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
-
-    const id = Number(c.req.param('id'));
-    if (!Number.isInteger(id) || id <= 0) {
-      return c.json({ error: 'Order not found.' }, 404);
-    }
+    const admin = c.var.user!;
+    const loaded = loadPendingOrder(c);
+    if ('response' in loaded) return loaded.response;
+    const order = loaded.order;
 
     const grant = parseGrant(parseJson(await c.req.text()), now());
     if ('error' in grant) {
       return c.json({ error: grant.error }, 400);
     }
 
-    const db = c.var.db;
-    const order = db.select().from(orders).where(eq(orders.id, id)).get();
-    if (!order) {
-      return c.json({ error: 'Order not found.' }, 404);
-    }
-    if (order.status !== 'pending') {
-      return c.json({ error: 'Only pending orders can be decided.' }, 409);
-    }
     if (!order.txid) {
       return c.json(
         {
@@ -151,6 +204,7 @@ export function adminRoutes({
     // (number | null), not this route's guarantees.
     const orderUserId: number = order.userId;
 
+    const db = c.var.db;
     const previous = db
       .select()
       .from(entitlements)
@@ -166,18 +220,17 @@ export function adminRoutes({
           )
         : grant.expiresAt;
 
-    const decided = db.transaction((tx) => {
+    const decided = decidePendingOrder(db, admin, order, 'verified', (tx) => {
       const entitlement = tx
         .insert(entitlements)
         .values({
           userId: orderUserId,
           plan: order.plan,
           expiresAt,
-          updatedAt: nowDate,
         })
         .onConflictDoUpdate({
           target: entitlements.userId,
-          set: { plan: order.plan, expiresAt, updatedAt: nowDate },
+          set: { plan: order.plan, expiresAt },
         })
         .returning()
         .get();
@@ -187,32 +240,25 @@ export function adminRoutes({
         .where(eq(orders.id, order.id))
         .returning()
         .get();
-      tx.insert(auditLogs)
-        .values({
-          adminUserId: admin.id,
-          adminEmail: admin.email,
-          action: 'order.verify',
-          targetType: 'order',
-          targetId: String(order.id),
-          before: {
-            order: { status: order.status },
-            entitlement: previous
-              ? {
-                  plan: previous.plan,
-                  expiresAt: previous.expiresAt.toISOString(),
-                }
-              : null,
+      return {
+        updated,
+        before: {
+          order: { status: order.status },
+          entitlement: previous
+            ? {
+                plan: previous.plan,
+                expiresAt: previous.expiresAt.toISOString(),
+              }
+            : null,
+        },
+        after: {
+          order: { status: 'verified' },
+          entitlement: {
+            plan: entitlement!.plan,
+            expiresAt: entitlement!.expiresAt.toISOString(),
           },
-          after: {
-            order: { status: 'verified' },
-            entitlement: {
-              plan: entitlement.plan,
-              expiresAt: entitlement.expiresAt.toISOString(),
-            },
-          },
-        })
-        .run();
-      return updated;
+        },
+      };
     });
 
     const wallets = getWallets(db);
@@ -229,13 +275,10 @@ export function adminRoutes({
   });
 
   app.post('/orders/:id/reject', async (c) => {
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
-
-    const id = Number(c.req.param('id'));
-    if (!Number.isInteger(id) || id <= 0) {
-      return c.json({ error: 'Order not found.' }, 404);
-    }
+    const admin = c.var.user!;
+    const loaded = loadPendingOrder(c);
+    if ('response' in loaded) return loaded.response;
+    const order = loaded.order;
 
     const reason = parseReason(parseJson(await c.req.text()));
     if (typeof reason === 'object') {
@@ -243,37 +286,19 @@ export function adminRoutes({
     }
 
     const db = c.var.db;
-    const order = db.select().from(orders).where(eq(orders.id, id)).get();
-    if (!order) {
-      return c.json({ error: 'Order not found.' }, 404);
-    }
-    if (order.status !== 'pending') {
-      return c.json({ error: 'Only pending orders can be decided.' }, 409);
-    }
-
     const nowDate = now();
-    const decided = db.transaction((tx) => {
-      const updated = tx
+    const decided = decidePendingOrder(db, admin, order, 'rejected', (tx) => ({
+      updated: tx
         .update(orders)
         .set({ status: 'rejected', rejectReason: reason, decidedAt: nowDate })
         .where(eq(orders.id, order.id))
         .returning()
-        .get();
-      tx.insert(auditLogs)
-        .values({
-          adminUserId: admin.id,
-          adminEmail: admin.email,
-          action: 'order.reject',
-          targetType: 'order',
-          targetId: String(order.id),
-          before: {
-            order: { status: order.status, rejectReason: order.rejectReason },
-          },
-          after: { order: { status: 'rejected', rejectReason: reason } },
-        })
-        .run();
-      return updated;
-    });
+        .get(),
+      before: {
+        order: { status: order.status, rejectReason: order.rejectReason },
+      },
+      after: { order: { status: 'rejected', rejectReason: reason } },
+    }));
 
     const wallets = getWallets(db);
     return c.json({

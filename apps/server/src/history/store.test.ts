@@ -55,6 +55,17 @@ function makeStore(): {
 const PDF = new Uint8Array([0x25, 0x50, 0x44, 0x2d, 1, 2, 3, 4, 5, 6, 7, 8]);
 const NOW = new Date('2026-09-12T00:00:00Z');
 
+/** Drains the streamed export — the read path the download route serves. */
+async function readAll(
+  store: HistoryStore,
+  input: { userId: number; id: number; now: Date },
+): Promise<Buffer> {
+  const { stream } = store.stream(input);
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks);
+}
+
 /** A row whose storedPath was tampered with (or corrupted) to point outside
  *  the history directory — the store must refuse it, not follow it. */
 function insertEscapedPathRow(
@@ -78,7 +89,7 @@ function insertEscapedPathRow(
 }
 
 describe('HistoryStore', () => {
-  it('round-trips a stored PDF through store → read', () => {
+  it('round-trips a stored PDF through store → stream', async () => {
     const { store, userA } = makeStore();
     const row = store.store({
       userId: userA,
@@ -93,9 +104,9 @@ describe('HistoryStore', () => {
     expect(row.expiresAt.getTime()).toBe(
       NOW.getTime() + HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000,
     );
-    expect(store.read({ userId: userA, id: row.id, now: NOW }).bytes).toEqual(
-      PDF,
-    );
+    expect(
+      await readAll(store, { userId: userA, id: row.id, now: NOW }),
+    ).toEqual(Buffer.from(PDF));
   });
 
   it('encrypts at rest: the file never contains the plaintext', () => {
@@ -117,7 +128,7 @@ describe('HistoryStore', () => {
     expect(row.storedPath).toContain(join(resolve(historyDir), '1'));
   });
 
-  it('derives a different key per user, so one user cannot read another’s', () => {
+  it('derives a different key per user, so one user cannot read another’s', async () => {
     const { store, userA, userB } = makeStore();
     const row = store.store({
       userId: userA,
@@ -127,21 +138,21 @@ describe('HistoryStore', () => {
       now: NOW,
     });
     // The row belongs to user 1; user 2 cannot read it…
-    expect(() => store.read({ userId: userB, id: row.id, now: NOW })).toThrow(
-      HistoryNotFoundError,
-    );
+    await expect(
+      readAll(store, { userId: userB, id: row.id, now: NOW }),
+    ).rejects.toThrow(HistoryNotFoundError);
     // …and the file itself lives in user 1's directory only.
     expect(row.storedPath).toContain('1');
   });
 
-  it('throws HistoryNotFoundError for an unknown id', () => {
+  it('throws HistoryNotFoundError for an unknown id', async () => {
     const { store, userA } = makeStore();
-    expect(() => store.read({ userId: userA, id: 999, now: NOW })).toThrow(
-      HistoryNotFoundError,
-    );
+    await expect(
+      readAll(store, { userId: userA, id: 999, now: NOW }),
+    ).rejects.toThrow(HistoryNotFoundError);
   });
 
-  it('throws HistoryExpiredError once the retention window has passed', () => {
+  it('throws HistoryExpiredError once the retention window has passed', async () => {
     const { store, userA } = makeStore();
     const row = store.store({
       userId: userA,
@@ -153,9 +164,9 @@ describe('HistoryStore', () => {
     const afterRetention = new Date(
       NOW.getTime() + HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000,
     );
-    expect(() =>
-      store.read({ userId: userA, id: row.id, now: afterRetention }),
-    ).toThrow(HistoryExpiredError);
+    await expect(
+      readAll(store, { userId: userA, id: row.id, now: afterRetention }),
+    ).rejects.toThrow(HistoryExpiredError);
     // And the expired row disappears from the list…
     expect(store.list(1, afterRetention)).toEqual([]);
     // …while it is still listed before expiry.
@@ -203,7 +214,7 @@ describe('HistoryStore', () => {
     expect(() => store.remove(row.storedPath)).not.toThrow();
   });
 
-  it('refuses a storedPath that escapes the history directory', () => {
+  it('refuses a storedPath that escapes the history directory', async () => {
     const { store, db, userA } = makeStore();
     const row = store.store({
       userId: userA,
@@ -213,9 +224,9 @@ describe('HistoryStore', () => {
       now: NOW,
     });
     const escaped = insertEscapedPathRow(db, userA, '/etc/passwd');
-    expect(() => store.read({ userId: userA, id: escaped, now: NOW })).toThrow(
-      HistoryNotFoundError,
-    );
+    await expect(
+      readAll(store, { userId: userA, id: escaped, now: NOW }),
+    ).rejects.toThrow(HistoryNotFoundError);
     expect(() => store.remove('/etc/passwd')).toThrow(HistoryNotFoundError);
     expect(existsSync(row.storedPath)).toBe(true);
   });
@@ -260,7 +271,7 @@ describe('HistoryStore', () => {
     );
   });
 
-  it('fails integrity when decrypted with a different master key', () => {
+  it('fails integrity when decrypted with a different master key', async () => {
     const { store, db, historyDir, userA } = makeStore();
     const row = store.store({
       userId: userA,
@@ -276,9 +287,9 @@ describe('HistoryStore', () => {
       dir: historyDir,
       masterKey: 'b'.repeat(64),
     });
-    expect(() =>
-      rotated.read({ userId: userA, id: row.id, now: NOW }),
-    ).toThrow();
+    await expect(
+      readAll(rotated, { userId: userA, id: row.id, now: NOW }),
+    ).rejects.toThrow();
   });
 
   it('falls back to "Untitled" for a blank name', () => {

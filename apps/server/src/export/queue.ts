@@ -41,10 +41,6 @@ export class PayloadStore {
     this.jobs.delete(id);
     return payload;
   }
-
-  get size(): number {
-    return this.jobs.size;
-  }
 }
 
 /** Rendered PDFs kept in memory until their owner fetches them. */
@@ -57,10 +53,6 @@ export class ResultStore {
 
   get(id: string): Uint8Array | undefined {
     return this.results.get(id);
-  }
-
-  get size(): number {
-    return this.results.size;
   }
 }
 

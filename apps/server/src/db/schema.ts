@@ -318,9 +318,6 @@ export const entitlements = sqliteTable('entitlements', {
     .references(() => users.id, { onDelete: 'cascade' }),
   plan: text('plan').notNull(), // Plan
   expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
-    .notNull()
-    .$defaultFn(() => new Date()),
 });
 
 export type Entitlement = typeof entitlements.$inferSelect;
@@ -385,9 +382,6 @@ export type ExportHistory = typeof exportsHistory.$inferSelect;
 export const settingsKv = sqliteTable('settings_kv', {
   key: text('key').primaryKey(),
   value: text('value', { mode: 'json' }).notNull().$type<unknown>(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
-    .notNull()
-    .$defaultFn(() => new Date()),
 });
 
 /**

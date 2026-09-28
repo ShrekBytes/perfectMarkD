@@ -1,3 +1,5 @@
+import type { Clock } from './sessions.js';
+
 export interface RateLimitRule {
   /** Allowed requests per window. */
   limit: number;
@@ -52,6 +54,41 @@ export class FixedWindowRateLimiter {
     for (const [key, entry] of this.hits) {
       if (now >= entry.resetAt) this.hits.delete(key);
     }
+  }
+}
+
+/** The window both burst gates run on: one rolling minute. */
+const ROLLING_WINDOW_MS = 60_000;
+
+/**
+ * Rolling one-minute window per user: at most `max` events, so a runaway
+ * client cannot flood a shared resource — the render queue (spec §Security
+ * posture) and the provider the AI Actions reach. Only accepted events consume
+ * the window — callers acquire after the other gates — and expired windows are
+ * dropped on touch, so the map never holds more than the users who acted
+ * within the last minute. In-memory and per-process, like the fixed-window
+ * limiter above.
+ */
+export class RollingWindowRateLimiter {
+  private readonly hits = new Map<number, number[]>();
+
+  constructor(private readonly now: Clock) {}
+
+  /**
+   * Records an event for `key` and reports whether it may proceed. `max` is
+   * read at acquire time rather than held: the AI routes' ceiling is a live
+   * Admin setting, and the export routes' is a fixed option — both fit here.
+   */
+  tryAcquire(key: number, max: number): boolean {
+    const at = this.now().getTime();
+    const recent = (this.hits.get(key) ?? []).filter(
+      (t) => t > at - ROLLING_WINDOW_MS,
+    );
+    if (recent.length === 0) this.hits.delete(key);
+    if (recent.length >= max) return false;
+    recent.push(at);
+    this.hits.set(key, recent);
+    return true;
   }
 }
 

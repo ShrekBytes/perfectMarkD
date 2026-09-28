@@ -137,10 +137,10 @@ export function getSetting(db: AppDatabase, key: string): unknown {
 
 export function setSetting<T>(db: AppDatabase, key: string, value: T): void {
   db.insert(settingsKv)
-    .values({ key, value, updatedAt: new Date() })
+    .values({ key, value })
     .onConflictDoUpdate({
       target: settingsKv.key,
-      set: { value, updatedAt: new Date() },
+      set: { value },
     })
     .run();
 }
@@ -217,9 +217,9 @@ export function parseLtcRate(value: unknown): number | null {
 
 /**
  * The Rate as it is stored: the figure, and the three timestamps that say how
- * much to trust it. They live in the Rate's own value rather than in the
- * settings row's `updated_at` so a failing fetch is distinguishable from a
- * fresh one, and so the Rate and its age cannot drift apart (ADR-0014).
+ * much to trust it. They live inside the Rate's own value rather than beside
+ * it in row metadata, so a failing fetch is distinguishable from a fresh one,
+ * and so the Rate and its age cannot drift apart (ADR-0014).
  */
 export interface StoredLtcRate {
   /**
@@ -437,8 +437,8 @@ export function pageCapFor(limits: PlanLimits, plan: string): number {
  * The Rate (ADR-0014): USDT per LTC, with the age of the last successful fetch
  * beside it. Absent until the refresh job has run once — nothing ships pointing
  * at a placeholder rate, and LTC Orders are refused while it is unset. The age
- * is derived from the Rate's own `lastSuccessAt` rather than the row's
- * `updated_at`, so a failed fetch cannot make a stale Rate look fresh.
+ * is derived from the Rate's own `lastSuccessAt`, so a failed fetch cannot
+ * make a stale Rate look fresh.
  */
 export interface LtcRate {
   usdtPerLtc: number;

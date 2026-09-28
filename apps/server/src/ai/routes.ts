@@ -28,21 +28,28 @@ import {
   planBriefText,
   MAX_AI_PLAN_STEPS,
   type AiPlanStep,
+  type AiSendSizeInput,
   type AiSizeRefusal,
   type AnchoredEdit,
 } from '@perfectmarkd/core';
 import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
 import type { LogSink } from '../request-logger.js';
+import { RollingWindowRateLimiter } from '../auth/rate-limit.js';
 import { asRecord, parseJson } from '../request-body.js';
 import { users, type AiProviderConfig } from '../db/schema.js';
 import { getAiProviderConfig, getPlanLimits } from '../db/settings.js';
 import { findActiveEntitlement } from '../quota.js';
-import { AiProviderError, type AiCompletionRequest } from './provider.js';
+import {
+  AiProviderError,
+  type AiCompletionRequest,
+  type AiMessage,
+} from './provider.js';
 import type { AiContext } from './context.js';
 import {
   aiAccountState,
   aiConfigured,
+  aiPeriodResetAt,
   aiUsageState,
   incrementAiUsage,
 } from './state.js';
@@ -138,7 +145,57 @@ type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
   const app = new Hono<AppEnv>();
   // Rolling 60-second per-user burst window (the Admin sets the ceiling).
-  const bursts = new Map<number, number[]>();
+  const bursts = new RollingWindowRateLimiter(now);
+
+  /**
+   * The one skeleton the three command routes share: size gate → burst gate →
+   * provider call → reply check → the success bookkeeping. Each route keeps
+   * its own words where they belong: what it parsed, what it sends, which
+   * model it points at, and how a reply becomes a proposal.
+   */
+  const runAiCommand = async (
+    c: Context<AppEnv>,
+    gate: GatePass,
+    command: {
+      /** What the size ladder sees (spec §scope and size). */
+      send: Omit<AiSendSizeInput, 'budgets'>;
+      /** The model this command points at; the stylesheet may pick a cheaper one. */
+      model: string;
+      /** The prompt. */
+      messages: AiMessage[];
+      /** How the reply becomes a proposal, with the command's own messages. */
+      propose: (reply: {
+        text: string;
+        finishReason: string;
+      }) => MarkdownProposalResult;
+    },
+  ): Promise<Response> => {
+    const sized = checkAiSendSize({
+      ...command.send,
+      budgets: aiBudgets(gate.config),
+    });
+    if (!sized.ok) return tooLong(c, sized.refusal);
+
+    if (!bursts.tryAcquire(gate.userId, gate.config.burstPerMinute)) {
+      return burstResponse(c);
+    }
+
+    const reply = await callProvider(ai, log, {
+      baseUrl: gate.config.baseUrl,
+      model: command.model,
+      messages: command.messages,
+      maxOutputTokens: gate.config.maxOutputTokens,
+      reasoningEffort: gate.config.reasoningEffort,
+      timeoutMs: gate.config.timeoutSeconds * 1000,
+    });
+    if (!reply.ok) return reply.response;
+
+    const proposal = command.propose(reply.value);
+    if (!proposal.ok) {
+      return c.json({ error: proposal.error, code: proposal.code }, 502);
+    }
+    return finish(c, gate, proposal.value, now);
+  };
 
   app.post('/markdown', async (c) => {
     const gate = gateFor(c, ai, now);
@@ -147,58 +204,32 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
     const parsed = parseMarkdownRequest(parseJson(await c.req.text()));
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
 
-    const budgets = aiBudgets(gate.config);
     const request = parsed.value;
 
     if (request.mode === 'plan') {
-      const sized = checkAiSendSize({
-        instruction: request.instruction,
-        targetText: '',
-        context: request.outline,
-        budgets,
-      });
-      if (!sized.ok) return tooLong(c, sized.refusal);
-
-      if (!acquireBurst(bursts, gate.userId, gate.config.burstPerMinute, now)) {
-        return burstResponse(c);
-      }
-
-      const reply = await callProvider(ai, log, {
-        baseUrl: gate.config.baseUrl,
+      return runAiCommand(c, gate, {
+        send: {
+          instruction: request.instruction,
+          targetText: '',
+          context: request.outline,
+        },
         model: gate.config.model,
         messages: buildPlanMessages({
           instruction: request.instruction,
           outline: request.outline,
         }),
-        maxOutputTokens: gate.config.maxOutputTokens,
-        reasoningEffort: gate.config.reasoningEffort,
-        timeoutMs: gate.config.timeoutSeconds * 1000,
+        propose: (reply) => planProposal(reply, request.sections),
       });
-      if (!reply.ok) return reply.response;
-
-      const plan = planProposal(reply.value, request.sections);
-      if (!plan.ok) {
-        return c.json({ error: plan.error, code: plan.code }, 502);
-      }
-      return finish(c, gate, plan.value, now);
     }
 
     const brief = request.plan === null ? null : planBriefText(request.plan);
-    const sized = checkAiSendSize({
-      instruction: request.instruction,
-      targetText: request.targetText,
-      context: request.context,
-      brief,
-      budgets,
-    });
-    if (!sized.ok) return tooLong(c, sized.refusal);
-
-    if (!acquireBurst(bursts, gate.userId, gate.config.burstPerMinute, now)) {
-      return burstResponse(c);
-    }
-
-    const reply = await callProvider(ai, log, {
-      baseUrl: gate.config.baseUrl,
+    return runAiCommand(c, gate, {
+      send: {
+        instruction: request.instruction,
+        targetText: request.targetText,
+        context: request.context,
+        brief,
+      },
       model: gate.config.model,
       messages: buildMarkdownMessages({
         instruction: request.instruction,
@@ -207,18 +238,8 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
         context: request.context,
         plan: request.plan,
       }),
-      maxOutputTokens: gate.config.maxOutputTokens,
-      reasoningEffort: gate.config.reasoningEffort,
-      timeoutMs: gate.config.timeoutSeconds * 1000,
+      propose: (reply) => markdownProposal(request, reply),
     });
-    if (!reply.ok) return reply.response;
-
-    const proposal = markdownProposal(request, reply.value);
-    if (!proposal.ok) {
-      return c.json({ error: proposal.error, code: proposal.code }, 502);
-    }
-
-    return finish(c, gate, proposal.value, now);
   });
 
   app.post('/stylesheet', async (c) => {
@@ -228,43 +249,31 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
     const parsed = parseStylesheetRequest(parseJson(await c.req.text()));
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
 
-    const sized = checkAiSendSize({
-      instruction: parsed.value.instruction,
-      targetText: parsed.value.css,
-      context: historyText(parsed.value.history),
-      budgets: aiBudgets(gate.config),
-    });
-    if (!sized.ok) return tooLong(c, sized.refusal);
-
-    if (!acquireBurst(bursts, gate.userId, gate.config.burstPerMinute, now)) {
-      return burstResponse(c);
-    }
-
-    // A stylesheet edit is short, so the Admin may point it at a cheaper model.
-    const model = gate.config.stylesheetModel ?? gate.config.model;
-    const reply = await callProvider(ai, log, {
-      baseUrl: gate.config.baseUrl,
-      model,
+    return runAiCommand(c, gate, {
+      send: {
+        instruction: parsed.value.instruction,
+        targetText: parsed.value.css,
+        context: historyText(parsed.value.history),
+      },
+      // A stylesheet edit is short, so the Admin may point it at a cheaper model.
+      model: gate.config.stylesheetModel ?? gate.config.model,
       messages: buildStylesheetMessages({
         instruction: parsed.value.instruction,
         css: parsed.value.css,
         history: parsed.value.history,
       }),
-      maxOutputTokens: gate.config.maxOutputTokens,
-      reasoningEffort: gate.config.reasoningEffort,
-      timeoutMs: gate.config.timeoutSeconds * 1000,
+      propose: (reply) => {
+        const text = stripCodeFence(reply.text).trim();
+        if (text === '') {
+          return {
+            ok: false,
+            code: AI_ERROR_CODES.invalidResponse,
+            error: UNUSABLE_MESSAGE,
+          };
+        }
+        return { ok: true, value: { kind: 'replace', text } };
+      },
     });
-    if (!reply.ok) return reply.response;
-
-    const text = stripCodeFence(reply.value.text).trim();
-    if (text === '') {
-      return c.json(
-        { error: UNUSABLE_MESSAGE, code: AI_ERROR_CODES.invalidResponse },
-        502,
-      );
-    }
-
-    return finish(c, gate, { kind: 'replace', text }, now);
   });
 
   /**
@@ -389,24 +398,7 @@ function gateFor(c: Context<AppEnv>, ai: AiContext, now: Clock): GateResult {
 }
 
 function aiPeriodResetDate(now: Date): string {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
-    .toISOString()
-    .slice(0, 10);
-}
-
-function acquireBurst(
-  bursts: Map<number, number[]>,
-  userId: number,
-  max: number,
-  now: Clock,
-): boolean {
-  const at = now().getTime();
-  const recent = (bursts.get(userId) ?? []).filter((t) => t > at - 60_000);
-  if (recent.length === 0) bursts.delete(userId);
-  if (recent.length >= max) return false;
-  recent.push(at);
-  bursts.set(userId, recent);
-  return true;
+  return aiPeriodResetAt(now).toISOString().slice(0, 10);
 }
 
 // ─── Request validation ─────────────────────────────────────────────────────

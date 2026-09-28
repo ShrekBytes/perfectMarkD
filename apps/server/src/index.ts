@@ -285,5 +285,5 @@ export function createApp({
   return exportApp ? withHistory.route('/api/export', exportApp) : withHistory;
 }
 
-/** Typed-routes handle for hono clients (RPC type inference). */
+/** The composed app's type — what the test suites drive requests against. */
 export type AppType = ReturnType<typeof createApp>;

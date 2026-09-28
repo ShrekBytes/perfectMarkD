@@ -15,6 +15,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ReasoningEffort } from '../db/schema.js';
+import {
+  fetchWithTimeout,
+  isAbortError,
+  readDetail,
+} from '../fetch-with-timeout.js';
 
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant';
@@ -98,9 +103,6 @@ export interface AiProvider {
  *  any other OpenAI-compatible endpoint. */
 const ATTRIBUTION_TITLE = 'PerfectMarkD';
 
-/** Bound on what an upstream error body can hold (Admin panel display). */
-const MAX_DETAIL_LENGTH = 2_000;
-
 /** The real client. Built once per app; network only happens per call. */
 export function createOpenAiCompatibleProvider(): AiProvider {
   return {
@@ -172,18 +174,17 @@ interface SendOptions {
 }
 
 /**
- * One request inside the timeout, handing the body to `read` before the
- * deadline is released: a provider that stalls mid-body times out exactly
- * like one that never answered.
+ * One request inside the timeout, mapped onto the one error shape. The body
+ * is read before the deadline is released: a provider that stalls mid-body
+ * times out exactly like one that never answered.
  */
 async function send<T>(
   options: SendOptions,
   read: (response: Response) => Promise<T>,
 ): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs);
-  try {
-    const response = await fetch(options.url, {
+  return fetchWithTimeout({
+    url: options.url,
+    init: {
       method: options.method ?? 'POST',
       headers: {
         authorization: `Bearer ${options.apiKey}`,
@@ -192,33 +193,27 @@ async function send<T>(
       },
       body:
         options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new AiProviderError(
-        'http',
-        `The provider answered with HTTP ${response.status}.`,
-        response.status,
-        await readDetail(response),
-      );
-    }
-    return await read(response);
-  } catch (error) {
-    // An AiProviderError already carries the right shape (http/invalid).
-    if (error instanceof AiProviderError) throw error;
-    if (isAbortError(error)) {
-      throw new AiProviderError(
-        'timeout',
-        'The provider did not answer in time.',
-      );
-    }
-    throw new AiProviderError(
-      'transport',
-      'The provider could not be reached.',
-    );
-  } finally {
-    clearTimeout(timer);
-  }
+    },
+    timeoutMs: options.timeoutMs,
+    read: async (response) => {
+      if (!response.ok) {
+        throw new AiProviderError(
+          'http',
+          `The provider answered with HTTP ${response.status}.`,
+          response.status,
+          await readDetail(response),
+        );
+      }
+      return read(response);
+    },
+    errors: {
+      isOwnError: (error) => error instanceof AiProviderError,
+      timeout: () =>
+        new AiProviderError('timeout', 'The provider did not answer in time.'),
+      transport: () =>
+        new AiProviderError('transport', 'The provider could not be reached.'),
+    },
+  });
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -231,17 +226,6 @@ async function readJson(response: Response): Promise<unknown> {
       'invalid_response',
       'The provider returned a malformed reply.',
     );
-  }
-}
-
-/** The upstream body, bounded and best-effort — it is debugging detail. */
-async function readDetail(response: Response): Promise<string | null> {
-  try {
-    const text = await response.text();
-    return text.slice(0, MAX_DETAIL_LENGTH) || null;
-  } catch (error) {
-    if (isAbortError(error)) throw error;
-    return null;
   }
 }
 
@@ -285,9 +269,4 @@ function positiveNumberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value
     : null;
-}
-
-function isAbortError(error: unknown): boolean {
-  const name = (error as { name?: unknown } | null)?.name;
-  return name === 'AbortError' || name === 'TimeoutError';
 }

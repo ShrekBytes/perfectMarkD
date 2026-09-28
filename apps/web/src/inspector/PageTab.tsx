@@ -54,12 +54,12 @@ export function PageTab({
       value: size as PageSize,
       label: size,
     })),
-    ...(flags.customPageSize || settings.pageSize === 'Custom'
+    ...(flags.paidTier || settings.pageSize === 'Custom'
       ? [
           {
             value: 'Custom' as PageSize,
             label: 'Custom…',
-            disabled: !flags.customPageSize,
+            disabled: !flags.paidTier,
           },
         ]
       : []),
@@ -76,7 +76,7 @@ export function PageTab({
             onChange={(pageSize) => set({ pageSize })}
           />
         </Field>
-        {flags.customPageSize ? (
+        {flags.paidTier ? (
           <Field label="Custom size (mm)">
             {/* The pair fills the control column and shrinks with it: two
                 56px inputs plus the separator do not fit the column at the
@@ -211,7 +211,7 @@ export function PageTab({
       </Section>
 
       <Section title="Background image">
-        {flags.backgroundImage ? (
+        {flags.paidTier ? (
           <Field label="Background image">
             <GateImagePicker
               ariaLabel="Background image"
@@ -245,7 +245,7 @@ export function PageTab({
               { value: 'tile', label: 'Tile' },
             ]}
             onChange={(backgroundImageSize) => set({ backgroundImageSize })}
-            disabled={!flags.backgroundImage}
+            disabled={!flags.paidTier}
           />
         </Field>
         <Field label="Scope">
@@ -257,7 +257,7 @@ export function PageTab({
               { value: 'content-only', label: 'Content only' },
             ]}
             onChange={(backgroundImageScope) => set({ backgroundImageScope })}
-            disabled={!flags.backgroundImage}
+            disabled={!flags.paidTier}
           />
         </Field>
         <Field label="Opacity (%)">
@@ -268,7 +268,7 @@ export function PageTab({
             onChange={(percent) =>
               set({ backgroundImageOpacity: Math.min(100, percent) / 100 })
             }
-            disabled={!flags.backgroundImage}
+            disabled={!flags.paidTier}
           />
         </Field>
       </Section>

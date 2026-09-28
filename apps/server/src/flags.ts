@@ -5,29 +5,21 @@
 // hardcodes the plan→feature mapping (billing/spec.md: "Client-side unlocking
 // via entitlement-aware feature flags").
 //
-// The five flags are exactly the gated Inspector controls (billing/spec.md
-// §Gated features): custom page size, custom stylesheet, header/footer banner
-// images, background image, custom fonts. Both paid plans include all of them.
-// A comped user without a plan (billing/03) spends comps on Server Export but
-// gains no features — the gate is the plan itself, not the allowance.
+// The gated Inspector controls are exactly five (billing/spec.md §Gated
+// features): custom page size, custom stylesheet, header/footer banner
+// images, background image, custom fonts — and both paid plans include all of
+// them, so the five flags can only ever move together and one boolean carries
+// them all. A comped user without a plan (billing/03) spends comps on Server
+// Export but gains no features — the gate is the plan itself, not the
+// allowance.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface FeatureFlags {
-  customPageSize: boolean;
-  customStylesheet: boolean;
-  bannerImages: boolean;
-  backgroundImage: boolean;
-  customFonts: boolean;
+  /** Every gated Inspector control is open (an active paid Entitlement). */
+  paidTier: boolean;
 }
 
-/** The flags for a caller's active plan; every flag locked without one. */
+/** The flags for a caller's active plan; locked without one. */
 export function featureFlagsFor(plan: string | null): FeatureFlags {
-  const open = plan === 'pro' || plan === 'premium';
-  return {
-    customPageSize: open,
-    customStylesheet: open,
-    bannerImages: open,
-    backgroundImage: open,
-    customFonts: open,
-  };
+  return { paidTier: plan === 'pro' || plan === 'premium' };
 }

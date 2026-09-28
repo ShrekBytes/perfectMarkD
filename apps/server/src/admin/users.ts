@@ -16,7 +16,6 @@ import {
 import { clientIp } from '../auth/http.js';
 import { createSendLimiter, type SendLimiter } from '../auth/rate-limit.js';
 import {
-  auditLogs,
   entitlements,
   exportUsage,
   exportsHistory,
@@ -31,6 +30,7 @@ import type { AppDatabase } from '../db/database.js';
 import { asRecord, parseJson } from '../request-body.js';
 import { quotaState, usagePeriod, type EntitlementLike } from '../quota.js';
 import { aiUsageState } from '../ai/state.js';
+import { recordAudit } from './audit.js';
 import { expiryForGrant } from './entitlement.js';
 import { parseGrant } from './grant.js';
 
@@ -269,9 +269,26 @@ function userView(
   };
 }
 
-function parseUserId(raw: string): number | null {
+function parseUserId(raw: string | undefined): number | null {
   const id = Number(raw);
   return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * The prelude every `/:id` route shares: the id must parse and the user must
+ * exist — anything else is the same 404, so a wrong guess learns nothing. The
+ * Admin check is not here: the sub-app's middleware has already refused
+ * non-admins before a handler runs.
+ */
+function loadTargetUser(
+  c: Context<AppEnv>,
+): { user: User } | { response: Response } {
+  const id = parseUserId(c.req.param('id'));
+  if (id === null)
+    return { response: c.json({ error: 'User not found.' }, 404) };
+  const user = c.var.db.select().from(users).where(eq(users.id, id)).get();
+  if (!user) return { response: c.json({ error: 'User not found.' }, 404) };
+  return { user };
 }
 
 /**
@@ -290,17 +307,13 @@ function recordMailedLink(
   userId: number,
   action: 'user.reset_link' | 'user.email_change',
 ): void {
-  db.insert(auditLogs)
-    .values({
-      adminUserId: admin.id,
-      adminEmail: admin.email,
-      action,
-      targetType: 'user',
-      targetId: String(userId),
-      before: null,
-      after: { linkSent: true },
-    })
-    .run();
+  recordAudit(db, admin, {
+    action,
+    targetType: 'user',
+    targetId: String(userId),
+    before: null,
+    after: { linkSent: true },
+  });
 }
 
 /** LIKE pattern for an email substring search, with wildcards escaped. */
@@ -377,13 +390,11 @@ export function usersRoutes({
   });
 
   app.get('/:id', (c) => {
-    const id = parseUserId(c.req.param('id'));
-    if (id === null) return c.json({ error: 'User not found.' }, 404);
+    const loaded = loadTargetUser(c);
+    if ('response' in loaded) return loaded.response;
+    const user = loaded.user;
 
     const db = c.var.db;
-    const user = db.select().from(users).where(eq(users.id, id)).get();
-    if (!user) return c.json({ error: 'User not found.' }, 404);
-
     const nowDate = now();
     const limits = getPlanLimits(db);
     const wallets = getWallets(db);
@@ -406,15 +417,10 @@ export function usersRoutes({
 
   /** Grant or extend the Entitlement by hand — no Order involved. */
   app.post('/:id/entitlement', async (c) => {
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
-
-    const id = parseUserId(c.req.param('id'));
-    if (id === null) return c.json({ error: 'User not found.' }, 404);
-
-    const db = c.var.db;
-    const user = db.select().from(users).where(eq(users.id, id)).get();
-    if (!user) return c.json({ error: 'User not found.' }, 404);
+    const admin = c.var.user!;
+    const loaded = loadTargetUser(c);
+    if ('response' in loaded) return loaded.response;
+    const user = loaded.user;
 
     const body = asRecord(parseJson(await c.req.text()));
     if (!body) return c.json({ error: 'Expected a JSON object.' }, 400);
@@ -428,6 +434,7 @@ export function usersRoutes({
     const grant = parseGrant(body, now());
     if ('error' in grant) return c.json({ error: grant.error }, 400);
 
+    const db = c.var.db;
     const previous = entitlementRow(db, user.id);
     const nowDate = now();
     const expiresAt =
@@ -441,33 +448,24 @@ export function usersRoutes({
 
     db.transaction((tx) => {
       tx.insert(entitlements)
-        .values({
-          userId: user.id,
-          plan,
-          expiresAt,
-          updatedAt: nowDate,
-        })
+        .values({ userId: user.id, plan, expiresAt })
         .onConflictDoUpdate({
           target: entitlements.userId,
-          set: { plan, expiresAt, updatedAt: nowDate },
+          set: { plan, expiresAt },
         })
         .run();
-      tx.insert(auditLogs)
-        .values({
-          adminUserId: admin.id,
-          adminEmail: admin.email,
-          action: 'entitlement.grant',
-          targetType: 'user',
-          targetId: String(user.id),
-          before: previous
-            ? {
-                plan: previous.plan,
-                expiresAt: previous.expiresAt.toISOString(),
-              }
-            : null,
-          after: { plan, expiresAt: expiresAt.toISOString() },
-        })
-        .run();
+      recordAudit(tx, admin, {
+        action: 'entitlement.grant',
+        targetType: 'user',
+        targetId: String(user.id),
+        before: previous
+          ? {
+              plan: previous.plan,
+              expiresAt: previous.expiresAt.toISOString(),
+            }
+          : null,
+        after: { plan, expiresAt: expiresAt.toISOString() },
+      });
     });
 
     // The response view uses the same instant the grant math and audit entry
@@ -478,16 +476,12 @@ export function usersRoutes({
   });
 
   app.delete('/:id/entitlement', (c) => {
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
-
-    const id = parseUserId(c.req.param('id'));
-    if (id === null) return c.json({ error: 'User not found.' }, 404);
+    const admin = c.var.user!;
+    const loaded = loadTargetUser(c);
+    if ('response' in loaded) return loaded.response;
+    const user = loaded.user;
 
     const db = c.var.db;
-    const user = db.select().from(users).where(eq(users.id, id)).get();
-    if (!user) return c.json({ error: 'User not found.' }, 404);
-
     const previous = entitlementRow(db, user.id);
     if (!previous) {
       return c.json({ error: 'This user has no entitlement to revoke.' }, 409);
@@ -496,20 +490,16 @@ export function usersRoutes({
     const nowDate = now();
     db.transaction((tx) => {
       tx.delete(entitlements).where(eq(entitlements.userId, user.id)).run();
-      tx.insert(auditLogs)
-        .values({
-          adminUserId: admin.id,
-          adminEmail: admin.email,
-          action: 'entitlement.revoke',
-          targetType: 'user',
-          targetId: String(user.id),
-          before: {
-            plan: previous.plan,
-            expiresAt: previous.expiresAt.toISOString(),
-          },
-          after: null,
-        })
-        .run();
+      recordAudit(tx, admin, {
+        action: 'entitlement.revoke',
+        targetType: 'user',
+        targetId: String(user.id),
+        before: {
+          plan: previous.plan,
+          expiresAt: previous.expiresAt.toISOString(),
+        },
+        after: null,
+      });
     });
 
     return c.json({
@@ -519,16 +509,12 @@ export function usersRoutes({
 
   /** Comp quota: add (or, with a negative amount, retract) extra exports. */
   app.post('/:id/quota/comp', async (c) => {
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
-
-    const id = parseUserId(c.req.param('id'));
-    if (id === null) return c.json({ error: 'User not found.' }, 404);
+    const admin = c.var.user!;
+    const loaded = loadTargetUser(c);
+    if ('response' in loaded) return loaded.response;
+    const user = loaded.user;
 
     const db = c.var.db;
-    const user = db.select().from(users).where(eq(users.id, id)).get();
-    if (!user) return c.json({ error: 'User not found.' }, 404);
-
     const body = asRecord(parseJson(await c.req.text()));
     const amount = body?.amount;
     if (!Number.isInteger(amount) || (amount as number) === 0) {
@@ -572,17 +558,13 @@ export function usersRoutes({
             set: { comps },
           })
           .run();
-        tx.insert(auditLogs)
-          .values({
-            adminUserId: admin.id,
-            adminEmail: admin.email,
-            action: 'quota.comp',
-            targetType: 'user',
-            targetId: String(user.id),
-            before: { period, comps: currentComps },
-            after: { period, comps },
-          })
-          .run();
+        recordAudit(tx, admin, {
+          action: 'quota.comp',
+          targetType: 'user',
+          targetId: String(user.id),
+          before: { period, comps: currentComps },
+          after: { period, comps },
+        });
       });
     } catch (error) {
       if (error instanceof CompsFloorError) {
@@ -615,16 +597,12 @@ export function usersRoutes({
    * so telling them its state is not the enumeration story/10 is about.
    */
   app.post('/:id/password', async (c) => {
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
-
-    const id = parseUserId(c.req.param('id'));
-    if (id === null) return c.json({ error: 'User not found.' }, 404);
+    const admin = c.var.user!;
+    const loaded = loadTargetUser(c);
+    if ('response' in loaded) return loaded.response;
+    const user = loaded.user;
 
     const db = c.var.db;
-    const user = db.select().from(users).where(eq(users.id, id)).get();
-    if (!user) return c.json({ error: 'User not found.' }, 404);
-
     const overBudget = rejectOverSendBudget(c, user.email);
     if (overBudget) return overBudget;
 
@@ -667,16 +645,12 @@ export function usersRoutes({
    * would be a refusal of a state that might not be the one the user lands in.
    */
   app.post('/:id/email', async (c) => {
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
-
-    const id = parseUserId(c.req.param('id'));
-    if (id === null) return c.json({ error: 'User not found.' }, 404);
+    const admin = c.var.user!;
+    const loaded = loadTargetUser(c);
+    if ('response' in loaded) return loaded.response;
+    const user = loaded.user;
 
     const db = c.var.db;
-    const user = db.select().from(users).where(eq(users.id, id)).get();
-    if (!user) return c.json({ error: 'User not found.' }, 404);
-
     const newEmail = normalizeEmail(
       asRecord(parseJson(await c.req.text()))?.email,
     );
@@ -714,15 +688,12 @@ export function usersRoutes({
    * (schema: audit_logs.admin_user_id is not a foreign key).
    */
   app.delete('/:id', (c) => {
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
-
-    const id = parseUserId(c.req.param('id'));
-    if (id === null) return c.json({ error: 'User not found.' }, 404);
+    const admin = c.var.user!;
+    const loaded = loadTargetUser(c);
+    if ('response' in loaded) return loaded.response;
+    const user = loaded.user;
 
     const db = c.var.db;
-    const user = db.select().from(users).where(eq(users.id, id)).get();
-    if (!user) return c.json({ error: 'User not found.' }, 404);
     if (user.id === admin.id) {
       return c.json(
         { error: 'You cannot delete the account you are signed in with.' },
@@ -752,20 +723,16 @@ export function usersRoutes({
       tx.delete(users).where(eq(users.id, user.id)).run();
       // The deleted user's email is deliberately not recorded — the audit
       // trail documents the action without outliving the anonymization.
-      tx.insert(auditLogs)
-        .values({
-          adminUserId: admin.id,
-          adminEmail: admin.email,
-          action: 'user.delete',
-          targetType: 'user',
-          targetId: String(user.id),
-          before: {
-            ordersAnonymized: anonymized.length,
-            historyPurged: storedPaths.length,
-          },
-          after: null,
-        })
-        .run();
+      recordAudit(tx, admin, {
+        action: 'user.delete',
+        targetType: 'user',
+        targetId: String(user.id),
+        before: {
+          ordersAnonymized: anonymized.length,
+          historyPurged: storedPaths.length,
+        },
+        after: null,
+      });
     });
 
     for (const storedPath of storedPaths) removeStoredFile(storedPath);

@@ -189,7 +189,7 @@ export function StyleTab({
           {/* The Custom Stylesheet layer tile (ai-transforms/01): not a
               Preset — it sits over whatever Preset is lit, so it sketches the
               current look with a CSS chip and never unselects the radio. */}
-          {flags.customStylesheet ? (
+          {flags.paidTier ? (
             <GalleryTile
               aria-pressed={settings.customStylesheetEnabled}
               title="Custom stylesheet"
@@ -259,7 +259,7 @@ export function StyleTab({
                 isCustom: settings.fontFamily === '__custom__',
                 name: settings.customFontName.trim(),
               },
-              flags.customFonts,
+              flags.paidTier,
             )}
             onChange={(value) =>
               set(fontChange(value, 'fontFamily', 'customFontName'))
@@ -398,7 +398,7 @@ export function StyleTab({
                 isCustom: settings.codeFontFamily === '__custom__',
                 name: settings.customCodeFontName.trim(),
               },
-              flags.customFonts,
+              flags.paidTier,
             )}
             onChange={(value) =>
               set(fontChange(value, 'codeFontFamily', 'customCodeFontName'))
@@ -416,7 +416,7 @@ export function StyleTab({
           gallery tile above (ai-transforms/01); this section keeps the
           custom-font library (billing/05). */}
       <Section title="Custom fonts">
-        {flags.customFonts ? (
+        {flags.paidTier ? (
           <Field label="Custom fonts">
             <GateFontPicker
               ariaLabel="Upload custom font"

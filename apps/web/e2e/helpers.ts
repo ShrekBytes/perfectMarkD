@@ -90,11 +90,7 @@ const PRO_ME = {
   expiresAt: '2030-01-01T00:00:00.000Z',
   quota: { used: 0, limit: 300 },
   flags: {
-    customPageSize: true,
-    customStylesheet: true,
-    bannerImages: true,
-    backgroundImage: true,
-    customFonts: true,
+    paidTier: true,
   },
 };
 

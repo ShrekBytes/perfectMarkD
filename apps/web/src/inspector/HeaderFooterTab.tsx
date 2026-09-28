@@ -63,7 +63,7 @@ function BannerImageField({
   disabled?: boolean;
 }) {
   const refKey = `${band}ImageRef` as const;
-  return flags.bannerImages ? (
+  return flags.paidTier ? (
     <Field label="Banner image">
       <GateImagePicker
         ariaLabel={`${bandLabel} banner image`}

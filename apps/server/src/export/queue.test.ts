@@ -162,16 +162,13 @@ describe('memory stores', () => {
   it('take removes and returns the payload', () => {
     const store = new PayloadStore();
     store.hold('a', { markdown: '# x', pageCount: 1 } as never);
-    expect(store.size).toBe(1);
     expect(store.take('a')?.markdown).toBe('# x');
     expect(store.take('a')).toBeUndefined();
-    expect(store.size).toBe(0);
   });
 
   it('ResultStore round-trips bytes', () => {
     const store = new ResultStore();
     store.put('a', new Uint8Array([1, 2, 3]));
     expect([...(store.get('a') ?? [])]).toEqual([1, 2, 3]);
-    expect(store.size).toBe(1);
   });
 });

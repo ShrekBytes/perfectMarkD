@@ -39,7 +39,7 @@ export function StylesheetTab({
   );
   const pending = pendingProposal(turns);
 
-  if (!flags.customStylesheet) {
+  if (!flags.paidTier) {
     return (
       <div className="px-3 py-3">
         <p className="text-xs leading-5 text-ink-soft">

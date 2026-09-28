@@ -8,32 +8,21 @@
 // the flags is `useFeatureFlags()` from ../auth/account-store.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The five gated Inspector controls (billing/spec.md §Gated features). */
+/**
+ * The gate every gated Inspector control reads: custom page size, custom
+ * stylesheet, header/footer banner images, background image, custom fonts.
+ * The server reports one boolean because the five can only move together —
+ * both paid plans include all of them (billing/spec.md §Gated features).
+ */
 export interface FeatureFlags {
-  customPageSize: boolean;
-  customStylesheet: boolean;
-  bannerImages: boolean;
-  backgroundImage: boolean;
-  customFonts: boolean;
+  paidTier: boolean;
 }
 
 /**
  * Every gate locked — the default before /api/me answers, and the standing
  * state for signed-out and Free users: they never gain gates.
  */
-export const LOCKED_FLAGS: FeatureFlags = {
-  customPageSize: false,
-  customStylesheet: false,
-  bannerImages: false,
-  backgroundImage: false,
-  customFonts: false,
-};
+export const LOCKED_FLAGS: FeatureFlags = { paidTier: false };
 
 /** Every gate open — what an active Pro/Premium Entitlement reports. */
-export const OPEN_FLAGS: FeatureFlags = {
-  customPageSize: true,
-  customStylesheet: true,
-  bannerImages: true,
-  backgroundImage: true,
-  customFonts: true,
-};
+export const OPEN_FLAGS: FeatureFlags = { paidTier: true };

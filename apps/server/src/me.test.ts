@@ -135,14 +135,8 @@ describe('GET /api/me', () => {
       plan: null,
       expiresAt: null,
       quota: { used: 0, limit: 0 },
-      // billing/04: the gated Inspector controls — every flag locked.
-      flags: {
-        customPageSize: false,
-        customStylesheet: false,
-        bannerImages: false,
-        backgroundImage: false,
-        customFonts: false,
-      },
+      // billing/04: the gated Inspector controls — the tier is locked.
+      flags: { paidTier: false },
       // google-signin/01b: a password, and no Google identity.
       signIn: { password: true, google: false },
       // ai-transforms/03: no key in the environment, no plan — AI is off,
@@ -174,17 +168,11 @@ describe('GET /api/me', () => {
     expect(me.expiresAt).toEqual(expect.any(String));
     expect(me.quota).toEqual({ used: 0, limit: 300 });
     // Both paid plans open every gated feature (billing/spec.md §Gated
-    // features) — spot-check one flag per plan below.
-    expect(me.flags).toEqual({
-      customPageSize: true,
-      customStylesheet: true,
-      bannerImages: true,
-      backgroundImage: true,
-      customFonts: true,
-    });
+    // features) — one boolean, since the five can only move together.
+    expect(me.flags).toEqual({ paidTier: true });
   });
 
-  it('a Premium Entitlement opens the same flags as Pro', async () => {
+  it('a Premium Entitlement opens the same tier as Pro', async () => {
     const { app, db } = makeApp();
     const email = `u${Math.random().toString(36).slice(2)}@test.dev`;
     const cookie = await registerViaApi(app, email);
@@ -192,8 +180,7 @@ describe('GET /api/me', () => {
 
     const me = (await (await getMe(app, cookie)).json()) as MeResponse;
     expect(me.plan).toBe('premium');
-    expect(me.flags.customPageSize).toBe(true);
-    expect(me.flags.customFonts).toBe(true);
+    expect(me.flags.paidTier).toBe(true);
   });
 
   it('an expired Entitlement re-locks: no plan, no plan quota', async () => {

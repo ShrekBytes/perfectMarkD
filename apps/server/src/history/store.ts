@@ -22,7 +22,6 @@ import {
   openSync,
   readSync,
   closeSync,
-  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -190,46 +189,11 @@ export class HistoryStore {
   }
 
   /**
-   * Decrypts the user's stored export, returning the bytes plus the row (the
-   * download's filename comes from `row.name`). The buffered variant — the
-   * route streams instead (`stream`).
-   */
-  read(input: { userId: number; id: number; now: Date }): {
-    bytes: Uint8Array;
-    row: ExportHistoryRow;
-  } {
-    const row = this.preflight(input);
-
-    let file: Buffer;
-    try {
-      file = readFileSync(row.storedPath);
-    } catch {
-      // The row outlived its file (manual deletion, partial purge): gone is
-      // gone, whatever the reason.
-      throw new HistoryNotFoundError();
-    }
-    if (file.length < IV_BYTES + TAG_BYTES) {
-      throw new HistoryNotFoundError();
-    }
-
-    const decipher = this.decipherFor(input.userId, file);
-    // A wrong key, rotated key material, or a corrupted file fails the GCM
-    // tag check here and surfaces as a server fault (500), never as bytes.
-    const bytes = new Uint8Array(
-      Buffer.concat([
-        decipher.update(file.subarray(IV_BYTES + TAG_BYTES)),
-        decipher.final(),
-      ]),
-    );
-    return { bytes, row };
-  }
-
-  /**
-   * The streaming read the ticket asks the download route to serve: the
-   * ciphertext flows from disk through the decipher to the response without
-   * ever being buffered whole. `sizeBytes` is the exact plaintext length.
-   * The GCM tag verifies only at stream end — an integrity failure truncates
-   * the response (like any streaming AEAD), it never yields a wrong file.
+   * The streaming read the download route serves: the ciphertext flows from
+   * disk through the decipher to the response without ever being buffered
+   * whole. `sizeBytes` is the exact plaintext length. The GCM tag verifies
+   * only at stream end — an integrity failure truncates the response (like
+   * any streaming AEAD), it never yields a wrong file.
    */
   stream(input: { userId: number; id: number; now: Date }): {
     stream: Readable;

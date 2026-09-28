@@ -14,6 +14,11 @@
 
 import { MailerError, type Mailer } from './mailer.js';
 import {
+  fetchWithTimeout,
+  isAbortError,
+  readDetail,
+} from '../fetch-with-timeout.js';
+import {
   emailChangeMessage,
   emailChangedNoticeMessage,
   passwordResetMessage,
@@ -25,9 +30,6 @@ const RESEND_EMAILS_URL = 'https://api.resend.com/emails';
 
 /** A send that has not answered in this long has failed. */
 const DEFAULT_TIMEOUT_MS = 10_000;
-
-/** Bound on what an upstream error body can hold (log detail). */
-const MAX_DETAIL_LENGTH = 2_000;
 
 export interface ResendMailerOptions {
   /** The deployment's provider key. */
@@ -44,15 +46,15 @@ export function createResendMailer({
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: ResendMailerOptions): Mailer {
   /**
-   * One send. The body carries the from, the recipient, and the message — the
-   * four fields a bare plain-text email needs, and nothing else the provider
-   * would accept (no HTML, no metadata, no headers to leak through).
+   * One send, mapped onto the one error shape. The body carries the from, the
+   * recipient, and the message — the four fields a bare plain-text email
+   * needs, and nothing else the provider would accept (no HTML, no metadata,
+   * no headers to leak through).
    */
   async function send(to: string, message: OutboundEmail): Promise<void> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetch(RESEND_EMAILS_URL, {
+    return fetchWithTimeout({
+      url: RESEND_EMAILS_URL,
+      init: {
         method: 'POST',
         headers: {
           authorization: `Bearer ${apiKey}`,
@@ -64,40 +66,40 @@ export function createResendMailer({
           subject: message.subject,
           text: message.text,
         }),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        throw new MailerError(
-          'http',
-          `The mail provider answered with HTTP ${response.status}.`,
-          response.status,
-          await readDetail(response),
-        );
-      }
-      // A 2xx the provider cannot identify is not proof of a send, so it is not
-      // reported as one.
-      if (!(await readMessageId(response))) {
-        throw new MailerError(
-          'invalid_response',
-          'The mail provider accepted the message without an id.',
-        );
-      }
-    } catch (error) {
-      // A MailerError already carries the right shape (http/invalid_response).
-      if (error instanceof MailerError) throw error;
-      if (isAbortError(error)) {
-        throw new MailerError(
-          'timeout',
-          'The mail provider did not answer in time.',
-        );
-      }
-      throw new MailerError(
-        'transport',
-        'The mail provider could not be reached.',
-      );
-    } finally {
-      clearTimeout(timer);
-    }
+      },
+      timeoutMs,
+      read: async (response) => {
+        if (!response.ok) {
+          throw new MailerError(
+            'http',
+            `The mail provider answered with HTTP ${response.status}.`,
+            response.status,
+            await readDetail(response),
+          );
+        }
+        // A 2xx the provider cannot identify is not proof of a send, so it is
+        // not reported as one.
+        if (!(await readMessageId(response))) {
+          throw new MailerError(
+            'invalid_response',
+            'The mail provider accepted the message without an id.',
+          );
+        }
+      },
+      errors: {
+        isOwnError: (error) => error instanceof MailerError,
+        timeout: () =>
+          new MailerError(
+            'timeout',
+            'The mail provider did not answer in time.',
+          ),
+        transport: () =>
+          new MailerError(
+            'transport',
+            'The mail provider could not be reached.',
+          ),
+      },
+    });
   }
 
   return {
@@ -128,20 +130,4 @@ async function readMessageId(response: Response): Promise<string | null> {
     if (isAbortError(error)) throw error;
     return null;
   }
-}
-
-/** The upstream body, bounded and best-effort — it is log detail. */
-async function readDetail(response: Response): Promise<string | null> {
-  try {
-    const text = await response.text();
-    return text.slice(0, MAX_DETAIL_LENGTH) || null;
-  } catch (error) {
-    if (isAbortError(error)) throw error;
-    return null;
-  }
-}
-
-function isAbortError(error: unknown): boolean {
-  const name = (error as { name?: unknown } | null)?.name;
-  return name === 'AbortError' || name === 'TimeoutError';
 }

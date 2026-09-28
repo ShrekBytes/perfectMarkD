@@ -206,10 +206,8 @@ async function runInPage(
   payload: unknown,
   timeoutMs: number,
 ): Promise<PageRenderResult> {
-  let settleDone!: (result: PageRenderResult) => void;
-  const done = new Promise<PageRenderResult>((resolve) => {
-    settleDone = resolve;
-  });
+  const { promise: done, resolve: settleDone } =
+    Promise.withResolvers<PageRenderResult>();
 
   await page.exposeFunction(DONE_FUNCTION_NAME, (raw: unknown) => {
     settleDone(parseResult(raw));

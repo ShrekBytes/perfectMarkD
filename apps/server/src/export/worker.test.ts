@@ -130,7 +130,7 @@ describe('ExportWorker', () => {
     await worker.waitIdle();
 
     // The ticket's "payload deleted (test asserts)".
-    expect(payloads.size).toBe(0);
+    expect(payloads.take('a')).toBeUndefined();
     expect(results.get('a')).toEqual(fakePdf(3));
     expect(
       db.select().from(exportUsage).where(eq(exportUsage.userId, userId)).get()
@@ -151,7 +151,7 @@ describe('ExportWorker', () => {
     pending[0]!.reject(new Error('Chromium crashed'));
     await worker.waitIdle();
 
-    expect(payloads.size).toBe(0);
+    expect(payloads.take('a')).toBeUndefined();
     const failed = job(db, 'a');
     expect(failed?.status).toBe('failed');
     expect(failed?.errorCode).toBe('render_failed');

@@ -279,7 +279,6 @@ describe('Server Export end-to-end (real Chromium)', () => {
       worker.notify();
 
       const job = await pollJob(db, jobId);
-      worker.stop();
       return { job, payloads };
     } finally {
       await rendererForOrigin.close();
@@ -307,7 +306,7 @@ describe('Server Export end-to-end (real Chromium)', () => {
     expect(done.status).toBe('done');
     expect(done.pages).toBe(2);
     // The ticket's "payload deleted (test asserts)" — in the real path.
-    expect(payloads.size).toBe(0);
+    expect(payloads.take('e2e-1')).toBeUndefined();
 
     const pdf = results.get('e2e-1')!;
     // A PDF, two pages, and the document title Chromium carried into the
@@ -331,7 +330,6 @@ describe('Server Export end-to-end (real Chromium)', () => {
       }
     }
     expect(baseFonts.some((name) => name.includes('IBMPlexMono'))).toBe(true);
-    worker.stop();
   });
 
   it('renders a Custom Stylesheet document: the rules reach print, @page does not (ai-transforms/01)', async () => {
@@ -380,7 +378,6 @@ describe('Server Export end-to-end (real Chromium)', () => {
     const on = await pollJob(db, 'e2e-ss-on');
     expect(off.status).toBe('done');
     expect(on.status).toBe('done');
-    worker.stop();
 
     const baseDoc = await PDFDocument.load(results.get('e2e-ss-off')!);
     const styledDoc = await PDFDocument.load(results.get('e2e-ss-on')!);
@@ -406,7 +403,7 @@ describe('Server Export end-to-end (real Chromium)', () => {
     );
     expect(job.status).toBe('failed');
     expect(job.errorCode).toBe('render_timeout');
-    expect(payloads.size).toBe(0);
+    expect(payloads.take(job.id)).toBeUndefined();
   });
 
   it('keeps the typed render_timeout when the page goes quiet after ready', async () => {
@@ -422,7 +419,7 @@ describe('Server Export end-to-end (real Chromium)', () => {
     );
     expect(job.status).toBe('failed');
     expect(job.errorCode).toBe('render_timeout');
-    expect(payloads.size).toBe(0);
+    expect(payloads.take(job.id)).toBeUndefined();
   });
 
   it('reuses one pooled browser context across sequential jobs', async () => {
@@ -458,6 +455,5 @@ describe('Server Export end-to-end (real Chromium)', () => {
     expect(
       (await PDFDocument.load(results.get('e2e-pool-2')!)).getPageCount(),
     ).toBe(2);
-    worker.stop();
   });
 });

@@ -18,6 +18,8 @@
 // routes are not mounted, and the SPA's button stays hidden.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { fetchWithTimeout } from '../fetch-with-timeout.js';
+
 /** What Google's identity answer is reduced to: an id and a proven address. */
 export interface GoogleIdentity {
   /** Google's `sub` — stable for the life of the Google account. */
@@ -191,32 +193,33 @@ async function getJson(
   init: RequestInit,
   timeoutMs: number,
 ): Promise<unknown> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { ...init, signal: controller.signal });
-    if (!response.ok) {
-      throw new GoogleExchangeError(
-        'http',
-        `The sign-in provider answered with HTTP ${response.status}.`,
-      );
-    }
-    return await response.json();
-  } catch (error) {
-    if (error instanceof GoogleExchangeError) throw error;
-    if (isAbortError(error)) {
-      throw new GoogleExchangeError(
-        'timeout',
-        'The sign-in provider did not answer in time.',
-      );
-    }
-    throw new GoogleExchangeError(
-      'transport',
-      'The sign-in provider could not be reached.',
-    );
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetchWithTimeout({
+    url,
+    init,
+    timeoutMs,
+    read: async (response) => {
+      if (!response.ok) {
+        throw new GoogleExchangeError(
+          'http',
+          `The sign-in provider answered with HTTP ${response.status}.`,
+        );
+      }
+      return response.json();
+    },
+    errors: {
+      isOwnError: (error) => error instanceof GoogleExchangeError,
+      timeout: () =>
+        new GoogleExchangeError(
+          'timeout',
+          'The sign-in provider did not answer in time.',
+        ),
+      transport: () =>
+        new GoogleExchangeError(
+          'transport',
+          'The sign-in provider could not be reached.',
+        ),
+    },
+  });
 }
 
 function readAccessToken(payload: unknown): string {
@@ -258,9 +261,4 @@ function readIdentity(payload: unknown): GoogleIdentity {
     );
   }
   return { subject, email };
-}
-
-function isAbortError(error: unknown): boolean {
-  const name = (error as { name?: unknown } | null)?.name;
-  return name === 'AbortError' || name === 'TimeoutError';
 }

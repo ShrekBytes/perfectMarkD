@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
-import { auditLogs, settingsKv } from '../db/schema.js';
+import { settingsKv } from '../db/schema.js';
 import type { AppDatabase } from '../db/database.js';
 import {
   AI_PROVIDER_KEY,
@@ -30,6 +30,7 @@ import { parseJson } from '../request-body.js';
 import type { Clock } from '../auth/sessions.js';
 import { resolveAiContext, type AiContext } from '../ai/context.js';
 import { testAiConnection } from '../ai/test-connection.js';
+import { recordAudit } from './audit.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin settings (billing/03 + ai-transforms/03): wallets, plan prices, plan
@@ -243,12 +244,10 @@ export function settingsRoutes({
     }
 
     const db = c.var.db;
-    const admin = c.var.user;
-    if (!admin) return c.json({ error: 'Not signed in.' }, 401);
+    const admin = c.var.user!;
 
     const kvKey = KV_KEYS[key as SettingKey];
     const before = getSetting(db, kvKey) ?? null;
-    const nowDate = now();
     db.transaction((tx) => {
       // settings_kv values are NOT NULL, so "clear" is a delete: the key
       // returns to absent, which the readers treat as the seeded/unset state.
@@ -256,24 +255,20 @@ export function settingsRoutes({
         tx.delete(settingsKv).where(eq(settingsKv.key, kvKey)).run();
       } else {
         tx.insert(settingsKv)
-          .values({ key: kvKey, value: parsed.value, updatedAt: nowDate })
+          .values({ key: kvKey, value: parsed.value })
           .onConflictDoUpdate({
             target: settingsKv.key,
-            set: { value: parsed.value, updatedAt: nowDate },
+            set: { value: parsed.value },
           })
           .run();
       }
-      tx.insert(auditLogs)
-        .values({
-          adminUserId: admin.id,
-          adminEmail: admin.email,
-          action: 'settings.update',
-          targetType: 'settings',
-          targetId: kvKey,
-          before,
-          after: parsed.value,
-        })
-        .run();
+      recordAudit(tx, admin, {
+        action: 'settings.update',
+        targetType: 'settings',
+        targetId: kvKey,
+        before,
+        after: parsed.value,
+      });
     });
 
     return c.json({ settings: settingsView(db, aiKeyPresent, now) });
