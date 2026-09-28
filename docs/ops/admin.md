@@ -127,9 +127,28 @@ to send money, and a wrong address takes their funds.
 4. The change is audit-logged.
 
 Prices, per-plan limits (pages per export, exports per month, AI actions per
-month), the LTC rate, and the AI provider config are edited in the same Settings
-tab, one section each with its own save. Every save is a separate
-`settings.update` audit entry.
+month), and the AI provider config are edited in the same Settings tab, one
+section each with its own save. Every save is a separate `settings.update` audit
+entry.
+
+**The LTC rate is not in that list, and there is nothing to edit.** A job fetches
+it from a public price feed every twelve hours (ADR-0014); the Settings tab
+reports the current figure, how long ago it was fetched, and the last error.
+The rate setting cannot be written at all — the write path returns 403 — so an
+`ltcRateUsdt` PUT failing is the system working, not a bug to work around. If
+the rate is wrong, the fix is the feed, not a value you can type over it. Two
+consequences worth knowing:
+
+- New LTC Orders are refused once the rate is more than 48 hours old, with a
+  message saying the rate is refreshing. That is distinct from "LTC payments are
+  not set up yet", which means no successful fetch has ever landed.
+- A rate set by hand before this existed is quoted until the job's first fetch
+  replaces it, which is seconds after a restart. It is reported with an unknown
+  age in the meantime.
+
+The rate fetch itself writes no audit entry on success — twice a day would be
+about 700 a year. A failure or a rejected value does write one, as
+`rate.refresh`.
 
 ## What is deliberately not here
 

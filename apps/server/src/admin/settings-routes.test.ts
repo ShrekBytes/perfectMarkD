@@ -12,6 +12,7 @@ import {
   getPlanPrices,
   getWallets,
   PRICES_KEY,
+  setSetting,
   WALLETS_KEY,
 } from '../db/settings.js';
 import { settingsKv } from '../db/schema.js';
@@ -160,7 +161,13 @@ describe('GET /api/admin/settings', () => {
         pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 100 },
         premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
       },
-      ltcRateUsdt: null,
+      ltcRate: {
+        usdtPerLtc: null,
+        lastFetchedAt: null,
+        ageMs: null,
+        lastAttemptAt: null,
+        lastError: null,
+      },
       aiProvider: {
         enabled: true,
         baseUrl: 'https://openrouter.ai/api/v1',
@@ -317,9 +324,8 @@ describe('PUT /api/admin/settings/:key', () => {
     });
   });
 
-  it('sets the LTC rate and LTC Orders capture it', async () => {
-    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
-    await signedIn(app);
+  it('refuses to set the LTC rate, and says the job owns it', async () => {
+    const { app } = makeApp({ adminEmail: 'owner@example.com' });
     const admin = await adminSignedIn(app);
 
     const res = await putJson(
@@ -328,20 +334,70 @@ describe('PUT /api/admin/settings/:key', () => {
       320.5,
       admin,
     );
-    expect(res.status).toBe(200);
 
-    await putJson(app, '/api/admin/settings/wallets', WALLETS, admin);
+    // 403, not 404: the key is real, and the refusal is the rule rather than a
+    // missing route. The message is the reason, so a missing control in the
+    // panel does not read as an oversight.
+    expect(res.status).toBe(403);
+    const { error } = (await res.json()) as { error: string };
+    expect(error).toMatch(/fetched/i);
+  });
+
+  it('reports the fetched Rate, its age, and the last error read-only', async () => {
+    const { app, db } = makeApp({
+      adminEmail: 'owner@example.com',
+      now: () => NOW,
+    });
+    await signedIn(app);
+    const admin = await adminSignedIn(app);
+    const twoHoursAgo = new Date(NOW.getTime() - 2 * 60 * 60 * 1000);
+    setSetting(db, 'ltc_rate_usdt', {
+      usdtPerLtc: 69.82,
+      lastSuccessAt: twoHoursAgo.toISOString(),
+      lastAttemptAt: twoHoursAgo.toISOString(),
+      lastError: 'The price feed could not be reached.',
+    });
+
+    const res = await request(app, '/api/admin/settings', 'GET', {
+      cookie: admin,
+    });
+
+    const { settings } = (await res.json()) as {
+      settings: { ltcRate: Record<string, unknown> };
+    };
+    expect(settings.ltcRate).toEqual({
+      usdtPerLtc: 69.82,
+      lastFetchedAt: twoHoursAgo.toISOString(),
+      ageMs: 2 * 60 * 60 * 1000,
+      lastAttemptAt: twoHoursAgo.toISOString(),
+      lastError: 'The price feed could not be reached.',
+    });
+  });
+
+  it('an LTC Order captures the Rate the job wrote', async () => {
+    const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
+    await signedIn(app);
+    setSetting(db, 'ltc_rate_usdt', {
+      usdtPerLtc: 320.5,
+      lastSuccessAt: NOW.toISOString(),
+      lastAttemptAt: NOW.toISOString(),
+      lastError: null,
+    });
+    await putJson(
+      app,
+      '/api/admin/settings/wallets',
+      WALLETS,
+      await adminSignedIn(app),
+    );
     const cookie = await signedIn(app, 'buyer@example.com');
+
     const created = await postJson(
       app,
       '/api/orders',
-      {
-        plan: 'pro',
-        durationMonths: 3,
-        paymentMethod: 'LTC',
-      },
+      { plan: 'pro', durationMonths: 3, paymentMethod: 'LTC' },
       cookie,
     );
+
     expect(created.status).toBe(201);
     const { order } = (await created.json()) as {
       order: {
@@ -354,25 +410,6 @@ describe('PUT /api/admin/settings/:key', () => {
     expect(order.ltcRateUsdt).toBe('320.5');
     // 9 USDT at 320.5 USDT/LTC, rounded to LTC's 8 decimals.
     expect(order.amountExpected).toBe('0.02808112');
-    void db;
-  });
-
-  it('clearing the LTC rate disables LTC payments again', async () => {
-    const { app } = makeApp({ adminEmail: 'owner@example.com' });
-    const admin = await adminSignedIn(app);
-
-    await putJson(app, '/api/admin/settings/ltcRateUsdt', 320.5, admin);
-    const cleared = await putJson(
-      app,
-      '/api/admin/settings/ltcRateUsdt',
-      null,
-      admin,
-    );
-    expect(cleared.status).toBe(200);
-    const { settings } = (await cleared.json()) as {
-      settings: { ltcRateUsdt: number | null };
-    };
-    expect(settings.ltcRateUsdt).toBeNull();
   });
 
   it('validates each key against the shapes the readers assume', async () => {
@@ -408,8 +445,6 @@ describe('PUT /api/admin/settings/:key', () => {
         premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
       },
     );
-    await expect400('ltcRateUsdt', -1);
-    await expect400('ltcRateUsdt', 'free');
     await expect400('aiProvider', {});
     await expect400('aiProvider', {
       ...DEFAULT_AI_PROVIDER_CONFIG,

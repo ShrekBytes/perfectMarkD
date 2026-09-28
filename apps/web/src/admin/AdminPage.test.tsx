@@ -28,7 +28,13 @@ const SEED_SETTINGS = {
     pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 100 },
     premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
   },
-  ltcRateUsdt: null,
+  ltcRate: {
+    usdtPerLtc: null,
+    lastFetchedAt: null,
+    ageMs: null,
+    lastAttemptAt: null,
+    lastError: null,
+  },
   aiProvider: {
     enabled: true,
     baseUrl: 'https://openrouter.ai/api/v1',

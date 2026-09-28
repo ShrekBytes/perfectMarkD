@@ -196,10 +196,11 @@ export async function deleteAdminUser(userId: number): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Settings (billing/03 + ai-transforms/03): wallets, prices, limits, LTC rate,
-// and the AI Provider Config — all in settings_kv on the server, editable
-// without a redeploy. The AI key is never part of any payload; the view only
-// says whether the environment has one.
+// Settings (billing/03 + ai-transforms/03): wallets, prices, limits, and the
+// AI Provider Config — all in settings_kv on the server, editable without a
+// redeploy. The Rate is reported here and cannot be written (ADR-0014). The AI
+// key is never part of any payload; the view only says whether the environment
+// has one.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type WalletAddresses = Record<PaymentMethod, string>;
@@ -234,19 +235,32 @@ export interface AiProviderConfig {
   burstPerMinute: number;
 }
 
+/** The Rate as the panel reads it. Read-only: a job writes it, not the Admin. */
+export interface LtcRateStatus {
+  /** USDT per LTC, or null while no fetch has ever produced one. */
+  usdtPerLtc: number | null;
+  /** When the Rate was last fetched, ISO 8601. */
+  lastFetchedAt: string | null;
+  /** Milliseconds since that fetch; null while the age is unknown. */
+  ageMs: number | null;
+  /** When a fetch was last attempted, successful or not. */
+  lastAttemptAt: string | null;
+  /** Why the last attempt failed, if it did. */
+  lastError: string | null;
+}
+
 export interface AdminSettings {
   wallets: WalletAddresses;
   prices: PlanPrices;
   limits: PlanLimits;
-  /** USDT per LTC captured into new Orders; null disables LTC payments. */
-  ltcRateUsdt: number | null;
+  ltcRate: LtcRateStatus;
   aiProvider: AiProviderConfig;
   /** Whether the deployment's environment has an AI key — never the key. */
   aiKeyPresent: boolean;
 }
 
-export type SettingsKey =
-  'wallets' | 'prices' | 'limits' | 'ltcRateUsdt' | 'aiProvider';
+/** The keys the panel can write. The Rate is not among them (ADR-0014). */
+export type SettingsKey = 'wallets' | 'prices' | 'limits' | 'aiProvider';
 
 export async function getAdminSettings(): Promise<AdminSettings> {
   const res = await fetch('/api/admin/settings', { credentials: 'include' });

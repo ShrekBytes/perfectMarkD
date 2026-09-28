@@ -227,7 +227,7 @@ export function createApp({
         log,
       }),
     )
-    .route('/api/orders', orderRoutes())
+    .route('/api/orders', orderRoutes({ now: clock }))
     // The public catalog read (live-pricing/01): prices and limits only, with
     // no session. Mounted unconditionally — it is how a prospective customer
     // reads the pricing page at all.

@@ -20,7 +20,13 @@ const SEEDED: AdminSettings = {
     pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 100 },
     premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
   },
-  ltcRateUsdt: null,
+  ltcRate: {
+    usdtPerLtc: null,
+    lastFetchedAt: null,
+    ageMs: null,
+    lastAttemptAt: null,
+    lastError: null,
+  },
   aiProvider: {
     enabled: true,
     baseUrl: 'https://openrouter.ai/api/v1',
@@ -70,7 +76,6 @@ it('renders every seeded setting', async () => {
   expect(screen.getByTestId('limit-pro-pageCap')).toHaveValue(300);
   expect(screen.getByTestId('limit-premium-quotaMonthly')).toHaveValue(1000);
   expect(screen.getByTestId('limit-pro-aiActionsMonthly')).toHaveValue(100);
-  expect(screen.getByTestId('ltc-rate-input')).toHaveValue(null);
   expect(screen.getByTestId('ai-base-url')).toHaveValue(
     'https://openrouter.ai/api/v1',
   );
@@ -161,12 +166,8 @@ it('saves plan limits and the LTC rate to their own keys', async () => {
   await user.type(premiumAi, '0');
   await user.click(screen.getByTestId('limits-save'));
 
-  const rate = screen.getByTestId('ltc-rate-input');
-  await user.type(rate, '320.5');
-  await user.click(screen.getByTestId('ltc-rate-save'));
-
   await waitFor(() =>
-    expect(screen.getByTestId('ltc-rate-save-saved')).toBeInTheDocument(),
+    expect(screen.getByTestId('limits-save-saved')).toBeInTheDocument(),
   );
   expect(savedBodies).toEqual([
     {
@@ -177,8 +178,89 @@ it('saves plan limits and the LTC rate to their own keys', async () => {
         premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 0 },
       },
     },
-    { key: 'ltcRateUsdt', body: 320.5 },
   ]);
+});
+
+it('shows the Rate, its age, and the last error, and offers no way to edit it', async () => {
+  const settings: AdminSettings = {
+    ...SEEDED,
+    ltcRate: {
+      usdtPerLtc: 69.82,
+      lastFetchedAt: '2026-09-28T10:00:00.000Z',
+      ageMs: 2 * 60 * 60 * 1000,
+      lastAttemptAt: '2026-09-28T10:00:00.000Z',
+      lastError: null,
+    },
+  };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { settings }))),
+  );
+
+  render(<SettingsPanel />);
+
+  expect(await screen.findByTestId('ltc-rate-value')).toHaveTextContent(
+    '69.82',
+  );
+  expect(screen.getByTestId('ltc-rate-age')).toHaveTextContent(
+    'Fetched 2 hours ago.',
+  );
+  // No control anywhere in the section: the number is not the Admin's to set.
+  expect(screen.queryByTestId('ltc-rate-input')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('ltc-rate-save')).not.toBeInTheDocument();
+});
+
+it('surfaces the last fetch failure and says the good rate is still in use', async () => {
+  const settings: AdminSettings = {
+    ...SEEDED,
+    ltcRate: {
+      usdtPerLtc: 69.82,
+      lastFetchedAt: '2026-09-27T10:00:00.000Z',
+      ageMs: 26 * 60 * 60 * 1000,
+      lastAttemptAt: '2026-09-28T09:00:00.000Z',
+      lastError: 'The price feed could not be reached.',
+    },
+  };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { settings }))),
+  );
+
+  render(<SettingsPanel />);
+
+  expect(await screen.findByTestId('ltc-rate-error')).toHaveTextContent(
+    'The price feed could not be reached. The last good rate is still in use.',
+  );
+  expect(screen.getByTestId('ltc-rate-age')).toHaveTextContent(
+    'Fetched 1 day ago.',
+  );
+});
+
+it('says the Rate is not set yet before the first successful fetch', async () => {
+  const settings: AdminSettings = {
+    ...SEEDED,
+    ltcRate: {
+      usdtPerLtc: null,
+      lastFetchedAt: null,
+      ageMs: null,
+      lastAttemptAt: '2026-09-28T09:00:00.000Z',
+      lastError: 'The price feed could not be reached.',
+    },
+  };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { settings }))),
+  );
+
+  render(<SettingsPanel />);
+
+  expect(await screen.findByTestId('ltc-rate-value')).toHaveTextContent(
+    'Not set yet',
+  );
+  expect(screen.getByTestId('ltc-rate-age')).toHaveTextContent(
+    'Never fetched.',
+  );
+  expect(screen.getByTestId('ltc-rate-error')).toBeInTheDocument();
 });
 
 it('rejects invalid limits client-side before a request', async () => {

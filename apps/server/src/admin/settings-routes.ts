@@ -6,15 +6,13 @@ import type { AppDatabase } from '../db/database.js';
 import {
   AI_PROVIDER_KEY,
   getAiProviderConfig,
-  getLtcRate,
+  getLtcRateStatus,
   getPlanLimits,
   getPlanPrices,
   getSetting,
   getWallets,
   LIMITS_KEY,
-  LTC_RATE_KEY,
   parseAiProviderConfig,
-  parseLtcRate,
   parsePlanLimits,
   parsePlanPrices,
   parseWalletAddresses,
@@ -33,24 +31,44 @@ import { testAiConnection } from '../ai/test-connection.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin settings (billing/03 + ai-transforms/03): wallets, plan prices, plan
-// limits, the LTC rate, and the AI Provider Config — all in settings_kv,
-// editable in-panel so a wallet change or a model swap needs no redeploy.
-// Each key updates (and audit-logs) on its own, so the trail shows exactly
-// which setting changed. Validation runs through the same parsers the readers
-// use, so a value the panel writes is always a value the app accepts.
+// limits, and the AI Provider Config — all in settings_kv, editable in-panel
+// so a wallet change or a model swap needs no redeploy. Each key updates (and
+// audit-logs) on its own, so the trail shows exactly which setting changed.
+// Validation runs through the same parsers the readers use, so a value the
+// panel writes is always a value the app accepts.
+//
+// The Rate is the exception: a job fetches it every twelve hours and the Admin
+// cannot set it (ADR-0014), so it is reported here and there is no key to
+// write. The settings PUT refuses the key outright rather than ignoring it,
+// because "the Admin cannot choose the number a customer is quoted" has to be
+// the server's rule and not a convention in the panel.
 //
 // The AI key is deliberately NOT a setting (ADR-0008): the view reports only
 // whether the environment carries one, and Test connection uses the key from
 // the app's AI context without ever echoing it.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** The Rate as the panel reads it: the figure, its age, and the last error. */
+export interface LtcRateStatusView {
+  /** USDT per LTC, or null while no fetch has ever produced one. */
+  usdtPerLtc: number | null;
+  /** When the Rate was last fetched, ISO 8601. */
+  lastFetchedAt: string | null;
+  /** Milliseconds since that fetch; null while the age is unknown. */
+  ageMs: number | null;
+  /** When a fetch was last attempted, successful or not. */
+  lastAttemptAt: string | null;
+  /** Why the last attempt failed, if it did. */
+  lastError: string | null;
+}
+
 /** The settings the panel edits, as one view. */
 export interface AdminSettingsView {
   wallets: WalletAddresses;
   prices: PlanPrices;
   limits: PlanLimits;
-  /** USDT per LTC captured into new Orders; null disables LTC payments. */
-  ltcRateUsdt: number | null;
+  /** Read-only: the machine-written Rate and how far to trust it. */
+  ltcRate: LtcRateStatusView;
   /** The Admin's AI Provider Config (ADR-0008). */
   aiProvider: AiProviderConfig;
   /** Whether the deployment's environment has an AI key — never the key. */
@@ -60,20 +78,33 @@ export interface AdminSettingsView {
 export function settingsView(
   db: AppDatabase,
   aiKeyPresent: boolean,
+  now: () => Date = () => new Date(),
 ): AdminSettingsView {
+  const status = getLtcRateStatus(db, now);
   return {
     wallets: getWallets(db),
     prices: getPlanPrices(db),
     limits: getPlanLimits(db),
-    ltcRateUsdt: getLtcRate(db),
+    ltcRate: {
+      usdtPerLtc: status.rate?.usdtPerLtc ?? null,
+      lastFetchedAt: status.rate?.lastSuccessAt ?? null,
+      ageMs: status.rate?.ageMs ?? null,
+      lastAttemptAt: status.lastAttemptAt,
+      lastError: status.lastError,
+    },
     aiProvider: getAiProviderConfig(db),
     aiKeyPresent,
   };
 }
 
-/** The panel-facing key (URL segment) for each settings_kv key. */
-type SettingKey =
-  'wallets' | 'prices' | 'limits' | 'ltcRateUsdt' | 'aiProvider';
+/** The settings the panel edits, as one view. The Rate is not among them. */
+type SettingKey = 'wallets' | 'prices' | 'limits' | 'aiProvider';
+
+/**
+ * The panel-facing name the Rate used to be written under, kept only so the
+ * PUT can refuse it with a reason instead of calling it unknown.
+ */
+const LTC_RATE_SETTING_KEY = 'ltcRateUsdt';
 
 interface ParsedSetting {
   ok: true;
@@ -121,17 +152,6 @@ const VALIDATORS: Record<
             'Plan limits must be an object with a whole-number pageCap and quotaMonthly above zero, and a whole-number aiActionsMonthly of zero or more, for every plan.',
         };
   },
-  ltcRateUsdt: (value) => {
-    if (value === null) return { ok: true, value: null };
-    const parsed = parseLtcRate(value);
-    return parsed
-      ? { ok: true, value: parsed }
-      : {
-          ok: false,
-          error:
-            'The LTC rate must be a positive USDT-per-LTC number, or null to disable LTC payments.',
-        };
-  },
   aiProvider: (value) => {
     const parsed = parseAiProviderConfig(value);
     return parsed
@@ -144,7 +164,6 @@ const KV_KEYS: Record<SettingKey, string> = {
   wallets: WALLETS_KEY,
   prices: PRICES_KEY,
   limits: LIMITS_KEY,
-  ltcRateUsdt: LTC_RATE_KEY,
   aiProvider: AI_PROVIDER_KEY,
 };
 
@@ -162,7 +181,7 @@ export function settingsRoutes({
   const aiKeyPresent = ai.apiKey !== null;
 
   app.get('/', (c) => {
-    return c.json({ settings: settingsView(c.var.db, aiKeyPresent) });
+    return c.json({ settings: settingsView(c.var.db, aiKeyPresent, now) });
   });
 
   /**
@@ -191,6 +210,18 @@ export function settingsRoutes({
 
   app.put('/:key', async (c) => {
     const key = c.req.param('key');
+    // The Rate is a real setting with no write path. It gets its own refusal
+    // rather than "Unknown setting", because the operator asking is not
+    // confused about the URL — they are told the number is fetched and why.
+    if (key === LTC_RATE_SETTING_KEY) {
+      return c.json(
+        {
+          error:
+            'The LTC rate is fetched from a public price feed every twelve hours and cannot be set by hand.',
+        },
+        403,
+      );
+    }
     const validator = VALIDATORS[key as SettingKey];
     if (!validator) {
       return c.json({ error: 'Unknown setting.' }, 404);
@@ -235,7 +266,7 @@ export function settingsRoutes({
         .run();
     });
 
-    return c.json({ settings: settingsView(db, aiKeyPresent) });
+    return c.json({ settings: settingsView(db, aiKeyPresent, now) });
   });
 
   return app;

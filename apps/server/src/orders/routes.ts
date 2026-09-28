@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { desc, eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
+import type { Clock } from '../auth/sessions.js';
 import { isUniqueViolation } from '../db/sqlite-errors.js';
 import { asRecord, parseJson } from '../request-body.js';
 import { getLtcRate, getPlanPrices, getWallets } from '../db/settings.js';
@@ -169,7 +170,14 @@ export function orderView(order: Order, walletAddress: string): OrderView {
   };
 }
 
-export function orderRoutes() {
+export interface OrderRoutesOptions {
+  /** Injectable clock; the Rate's age and the Payment Window both read it. */
+  now?: Clock;
+}
+
+export function orderRoutes({
+  now = () => new Date(),
+}: OrderRoutesOptions = {}) {
   const app = new Hono<AppEnv>();
 
   app.post('/', async (c) => {
@@ -203,7 +211,7 @@ export function orderRoutes() {
     let amountExpected = toCryptoAmount(amountUsdt);
     let ltcRateUsdt: string | null = null;
     if (coin === 'LTC') {
-      const rate = getLtcRate(c.var.db);
+      const rate = getLtcRate(c.var.db, now);
       if (rate === null) {
         return c.json(
           {
@@ -213,8 +221,8 @@ export function orderRoutes() {
           503,
         );
       }
-      ltcRateUsdt = toCryptoAmount(rate);
-      amountExpected = ltcAmountFor(amountUsdt, rate);
+      ltcRateUsdt = toCryptoAmount(rate.usdtPerLtc);
+      amountExpected = ltcAmountFor(amountUsdt, rate.usdtPerLtc);
     }
 
     // Reference codes are random; the UNIQUE index arbitrates the (vanishingly

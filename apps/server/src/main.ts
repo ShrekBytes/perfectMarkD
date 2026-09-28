@@ -4,6 +4,8 @@ import { loadEnv } from './env.js';
 import { createApp } from './index.js';
 import { createHistoryStore } from './history/store.js';
 import { startHistoryPurge } from './history/purge.js';
+import { startLtcRateRefresh } from './rate/job.js';
+import { createLtcRateProvider } from './rate/provider.js';
 import { resolveMail, requirePublicOrigin } from './mail/config.js';
 import { resolveGoogleSignIn } from './google/exchange.js';
 
@@ -51,6 +53,16 @@ const history = createHistoryStore({
   masterKey: env.historyEncryptionKey,
 });
 const stopHistoryPurge = startHistoryPurge({ db, store: history });
+// The Rate (ADR-0014): a job, beside the purge, on the same terms — started
+// here, released on shutdown. It fetches immediately on start, so a restarted
+// process quotes a current Rate rather than waiting out the interval, and it
+// is the only writer of the rate setting.
+const stopLtcRateRefresh = startLtcRateRefresh({
+  db,
+  provider: createLtcRateProvider(),
+  now: () => new Date(),
+  log: (line) => console.log(line),
+});
 const app = createApp({
   db,
   sessionSecret: env.sessionSecret,
@@ -81,12 +93,13 @@ serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`PerfectMarkD API listening on http://localhost:${info.port}`);
 });
 
-// Graceful shutdown: release the purge timer. In-flight Server Export
-// renders are abandoned at exit — the container runtime's stop timeout is
-// what bounds how long they can delay shutdown.
+// Graceful shutdown: release the scheduled jobs' timers. In-flight Server
+// Export renders are abandoned at exit — the container runtime's stop timeout
+// is what bounds how long they can delay shutdown.
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.on(signal, () => {
     stopHistoryPurge();
+    stopLtcRateRefresh();
     process.exit(0);
   });
 }

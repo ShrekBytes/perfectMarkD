@@ -7,6 +7,7 @@ import {
   type AdminSettings,
   type AiConnectionReport,
   type AiProviderConfig,
+  type LtcRateStatus,
   type PaymentMethod,
   type PlanLimits,
   type PlanPrices,
@@ -28,10 +29,11 @@ type PaidPlan = (typeof PLANS)[number];
 
 /**
  * The admin Settings tab (billing/03 + ai-transforms/03): wallet addresses,
- * plan prices, plan page caps, quota and AI allowances, the LTC rate, and the
- * AI Provider Config — everything the app reads from settings_kv, editable
- * here without a redeploy. Each section saves (and audit-logs) on its own, and
- * the server re-validates every value.
+ * plan prices, plan page caps, quota and AI allowances, and the AI Provider
+ * Config — everything the app reads from settings_kv that a person edits, here
+ * without a redeploy. Each section saves (and audit-logs) on its own, and the
+ * server re-validates every value. The Rate is shown here but never edited
+ * (ADR-0014).
  */
 export function SettingsPanel() {
   const [settings, setSettings] = useState<AdminSettings | null>(null);
@@ -78,7 +80,7 @@ export function SettingsPanel() {
       <WalletsSection saved={settings.wallets} onSaved={setSettings} />
       <PricesSection saved={settings.prices} onSaved={setSettings} />
       <LimitsSection saved={settings.limits} onSaved={setSettings} />
-      <LtcRateSection saved={settings.ltcRateUsdt} onSaved={setSettings} />
+      <LtcRateStatusSection status={settings.ltcRate} />
       <AiProviderSection
         saved={settings.aiProvider}
         aiKeyPresent={settings.aiKeyPresent}
@@ -476,63 +478,78 @@ function LimitsSection({
   );
 }
 
-function LtcRateSection({
-  saved,
-  onSaved,
-}: {
-  saved: number | null;
-  onSaved: OnSaved;
-}) {
-  const savedText = saved === null ? '' : String(saved);
-  const { draft, setDraft, dirty, saving, flash, error, onSave } =
-    useSectionSave<string>({
-      initialDraft: savedText,
-      toPayload: (draft) => {
-        const trimmed = draft.trim();
-        if (trimmed === '') {
-          // Empty clears the key: LTC payments disabled.
-          return { key: 'ltcRateUsdt', payload: null, baseline: '' };
-        }
-        const value = Number(trimmed);
-        return Number.isFinite(value) && value > 0
-          ? { key: 'ltcRateUsdt', payload: value, baseline: trimmed }
-          : {
-              error:
-                'The rate must be a number above zero, or empty to disable.',
-            };
-      },
-      onSaved,
-    });
+/**
+ * How long ago a moment was, in the coarse words a person reads at a glance:
+ * "just now", "14 minutes ago", "5 hours ago", "3 days ago". Deliberately
+ * vague at the extremes — the exact figure is in the tooltip-free text the
+ * server logged, and the thing the Admin needs here is fresh or not.
+ */
+function timeAgo(ms: number | null): string {
+  if (ms === null) return 'unknown';
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
 
+/**
+ * The Rate's status (ADR-0014). It is not a save section: a job fetches it from
+ * a public price feed every twelve hours, and the number a customer is quoted
+ * must not be one the Admin chose. So this reports the figure, how long ago it
+ * was fetched, and the last error — and offers no way to change any of it.
+ */
+function LtcRateStatusSection({ status }: { status: LtcRateStatus }) {
   return (
-    <section className="rounded-pane border border-hairline bg-surface p-3">
+    <section
+      data-testid="ltc-rate-status"
+      className="rounded-pane border border-hairline bg-surface p-3"
+    >
       <h3 className="text-xs font-medium text-ink-soft">
         LTC rate (USDT per LTC)
       </h3>
       <p className="mt-1 text-xs text-ink-faint">
-        The rate source captured into new LTC Orders at creation. Empty disables
-        LTC payments; changing it never affects existing Orders.
+        Fetched from a public price feed every twelve hours and captured into
+        new LTC Orders at creation. It cannot be set by hand — that is the
+        point: no one chooses the rate a customer is quoted.
       </p>
-      <div className="mt-2">
-        <NumberField
-          label="USDT per LTC"
-          testId="ltc-rate-input"
-          value={draft}
-          onChange={setDraft}
-        />
-      </div>
-      {error && (
-        <p role="alert" className="mt-2 text-xs text-danger">
-          {error}
+
+      <p className="mt-2 text-xs">
+        <span className="text-ink-soft">Current rate </span>
+        <span
+          data-testid="ltc-rate-value"
+          className="font-mono font-semibold text-ink"
+        >
+          {status.usdtPerLtc === null ? 'Not set yet' : status.usdtPerLtc}
+        </span>
+      </p>
+
+      <p className="mt-1 text-xs text-ink-soft">
+        <span data-testid="ltc-rate-age">
+          {status.lastFetchedAt === null
+            ? 'Never fetched.'
+            : `Fetched ${timeAgo(status.ageMs)}.`}
+        </span>
+        {status.lastAttemptAt !== null && status.lastError !== null && (
+          <span data-testid="ltc-rate-last-attempt">
+            {' '}
+            Last attempt{' '}
+            {timeAgo(Date.now() - Date.parse(status.lastAttemptAt))}.
+          </span>
+        )}
+      </p>
+
+      {status.lastError !== null && (
+        <p
+          role="alert"
+          data-testid="ltc-rate-error"
+          className="mt-2 rounded-control border border-danger/40 bg-danger/10 px-2.5 py-2 text-xs text-danger"
+        >
+          {status.lastError} The last good rate is still in use.
         </p>
       )}
-      <SectionFooter
-        dirty={dirty}
-        saving={saving}
-        saved={flash}
-        testId="ltc-rate-save"
-        onSave={() => void onSave()}
-      />
     </section>
   );
 }

@@ -209,10 +209,78 @@ export function parsePlanLimits(value: unknown): PlanLimits | null {
     : null;
 }
 
-/** A positive USDT-per-LTC number, or null when unset. */
+/** A positive USDT-per-LTC number, or null when it is not one. */
 export function parseLtcRate(value: unknown): number | null {
   if (value === undefined || value === null) return null;
   return isFiniteNumber(value) && value > 0 ? value : null;
+}
+
+/**
+ * The Rate as it is stored: the figure, and the three timestamps that say how
+ * much to trust it. They live in the Rate's own value rather than in the
+ * settings row's `updated_at` so a failing fetch is distinguishable from a
+ * fresh one, and so the Rate and its age cannot drift apart (ADR-0014).
+ */
+export interface StoredLtcRate {
+  /**
+   * The figure, or null while no fetch has ever succeeded. Null is not a
+   * disabled state on its own: it is a Rate that does not exist yet, and the
+   * timestamps beside it say whether that is because nothing has run or
+   * because everything that ran failed.
+   */
+  usdtPerLtc: number | null;
+  /** When a fetch last succeeded; null while none ever has. */
+  lastSuccessAt: string | null;
+  /** When a fetch was last attempted, whatever its outcome. */
+  lastAttemptAt: string | null;
+  /** Why the last attempt failed, for the Admin panel. Cleared on success. */
+  lastError: string | null;
+}
+
+function parseTimestamp(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) return null;
+  return value;
+}
+
+/**
+ * The stored Rate, or null when the key is absent or unusable. A bare number
+ * is still read: an instance that typed its Rate before the fetch job existed
+ * keeps quoting it rather than losing LTC mid-upgrade, and it reads as a Rate
+ * with no successful fetch behind it, which is exactly the state the first
+ * fetch treats as having nothing to compare against.
+ */
+export function parseStoredLtcRate(value: unknown): StoredLtcRate | null {
+  const bare = parseLtcRate(value);
+  if (bare !== null) {
+    return {
+      usdtPerLtc: bare,
+      lastSuccessAt: null,
+      lastAttemptAt: null,
+      lastError: null,
+    };
+  }
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  // Null is a legal figure here: it is the state after a first fetch that
+  // failed, and it is what makes the last error worth reading.
+  const usdtPerLtc =
+    record.usdtPerLtc === null ? null : parseLtcRate(record.usdtPerLtc);
+  if (usdtPerLtc === null && record.usdtPerLtc !== null) return null;
+  const lastError = record.lastError;
+  if (
+    lastError !== undefined &&
+    lastError !== null &&
+    typeof lastError !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    usdtPerLtc,
+    lastSuccessAt: parseTimestamp(record.lastSuccessAt),
+    lastAttemptAt: parseTimestamp(record.lastAttemptAt),
+    lastError: typeof lastError === 'string' ? lastError : null,
+  };
 }
 
 const AI_PROVIDER_FIELDS = [
@@ -366,21 +434,83 @@ export function pageCapFor(limits: PlanLimits, plan: string): number {
 }
 
 /**
- * USDT per LTC captured into new Orders (ADR-0005). Absent until the Admin
- * sets it — like wallet addresses, nothing ships pointing at a placeholder
- * rate, and LTC orders are refused while it is unset.
+ * The Rate (ADR-0014): USDT per LTC, with the age of the last successful fetch
+ * beside it. Absent until the refresh job has run once — nothing ships pointing
+ * at a placeholder rate, and LTC Orders are refused while it is unset. The age
+ * is derived from the Rate's own `lastSuccessAt` rather than the row's
+ * `updated_at`, so a failed fetch cannot make a stale Rate look fresh.
  */
-export function getLtcRate(db: AppDatabase): number | null {
+export interface LtcRate {
+  usdtPerLtc: number;
+  /**
+   * When a fetch last succeeded; null for a figure that was typed by hand
+   * before the refresh job existed. Such a figure is still quoted — refusing
+   * it would switch LTC off on a method that is working today — but it is not
+   * a fetched one, and the panel says so.
+   */
+  lastSuccessAt: string | null;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  /**
+   * How long ago the last successful fetch was, at the given clock. Null when
+   * this figure did not come from a fetch, which is the one state in which
+   * the age is unknown rather than merely large.
+   */
+  ageMs: number | null;
+}
+
+/**
+ * What the refresh job left behind, whether or not it is a quoteable Rate. The
+ * Admin panel reads this; the Order path reads `rate` and nothing else.
+ */
+export interface LtcRateStatus {
+  /** The quoteable Rate, or null while none has ever been fetched. */
+  rate: LtcRate | null;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+}
+
+export function getLtcRateStatus(
+  db: AppDatabase,
+  now: () => Date,
+): LtcRateStatus {
   const raw = getSetting(db, LTC_RATE_KEY);
-  // Absent and explicitly-null both mean "LTC payments disabled".
-  if (raw === undefined || raw === null) return null;
-  const value = parseLtcRate(raw);
+  // Absent and explicitly-null both mean the job has never run.
+  if (raw === undefined || raw === null) {
+    return { rate: null, lastAttemptAt: null, lastError: null };
+  }
+  const value = parseStoredLtcRate(raw);
   if (value === null) {
     throw new Error(
-      'settings_kv: ltc_rate_usdt setting is malformed — expected a positive USDT-per-LTC number',
+      'settings_kv: ltc_rate_usdt setting is malformed — expected a positive USDT-per-LTC number, or one with the fetch timestamps beside it',
     );
   }
-  return value;
+  if (value.usdtPerLtc === null) {
+    return {
+      rate: null,
+      lastAttemptAt: value.lastAttemptAt,
+      lastError: value.lastError,
+    };
+  }
+  return {
+    rate: {
+      usdtPerLtc: value.usdtPerLtc,
+      lastSuccessAt: value.lastSuccessAt,
+      lastAttemptAt: value.lastAttemptAt,
+      lastError: value.lastError,
+      ageMs:
+        value.lastSuccessAt === null
+          ? null
+          : now().getTime() - new Date(value.lastSuccessAt).getTime(),
+    },
+    lastAttemptAt: value.lastAttemptAt,
+    lastError: value.lastError,
+  };
+}
+
+/** The Rate captured into new Orders, or null while there is none to quote. */
+export function getLtcRate(db: AppDatabase, now: () => Date): LtcRate | null {
+  return getLtcRateStatus(db, now).rate;
 }
 
 /** The Admin's AI Provider Config (ADR-0008); seeded with defaults at open. */
