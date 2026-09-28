@@ -1,6 +1,6 @@
 # 02 — The Rate is machine-written, and a quote lapses after six hours
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: None (can start immediately)
 
 **What to build:** the Litecoin Rate stops being something the Admin types and
@@ -123,32 +123,91 @@ the live instance, and only then does stage two land.
   amended — its current wording, that an Order is pending until the Admin
   verifies or rejects it, is the exact sentence a lapsing window falsifies.
 
-- [ ] The Rate updates on its own within twelve hours of a successful fetch,
+- [x] The Rate updates on its own within twelve hours of a successful fetch,
       with the provider faked in tests so the suite needs no network.
-- [ ] The Admin panel shows the current Rate, its age, and the last error, and
+- [x] The Admin panel shows the current Rate, its age, and the last error, and
       offers no way to edit any of them.
-- [ ] The settings write path rejects the Rate key outright.
-- [ ] A failed fetch leaves the previous Rate in place, records the error, and
+- [x] The settings write path rejects the Rate key outright.
+- [x] A failed fetch leaves the previous Rate in place, records the error, and
       surfaces it in the panel.
-- [ ] A non-positive, missing, or non-finite value is rejected and never stored.
-- [ ] A value more than fifty percent from the last good Rate is rejected while
+- [x] A non-positive, missing, or non-finite value is rejected and never stored.
+- [x] A value more than fifty percent from the last good Rate is rejected while
       that Rate is under twenty-four hours old, and accepted once it is older.
-- [ ] The first fetch with no prior Rate is accepted with no band applied.
-- [ ] Once the Rate passes its maximum age, new LTC Orders are refused with the
+- [x] The first fetch with no prior Rate is accepted with no band applied.
+- [x] Once the Rate passes its maximum age, new LTC Orders are refused with the
       rate-is-refreshing message, and the unset-rate message still serves an
       unset Rate.
-- [ ] The rate fetch writes no audit entry on success.
-- [ ] The job is started and released with the other scheduled jobs, and its stop
+- [x] The rate fetch writes no audit entry on success.
+- [x] The job is started and released with the other scheduled jobs, and its stop
       function halts the interval.
-- [ ] An Order created now cannot be paid more than six hours later; the
+- [x] An Order created now cannot be paid more than six hours later; the
       submission route refuses it with a message pointing at a new Order.
-- [ ] Resubmitting corrected details does not move the deadline.
-- [ ] An Order with a null deadline stays submittable regardless of age.
-- [ ] The Account page and the payment instructions show the deadline, and show
+- [x] Resubmitting corrected details does not move the deadline.
+- [x] An Order with a null deadline stays submittable regardless of age.
+- [x] The Account page and the payment instructions show the deadline, and show
       it as lapsed once it passes, offering a new Order.
-- [ ] The Admin queue will not offer to verify a lapsed Order, and shows the rate
+- [x] The Admin queue will not offer to verify a lapsed Order, and shows the rate
       context on a short payment so the rejection reason can be the right one.
-- [ ] A new Order is always creatable and is priced at the current Rate.
-- [ ] The glossary, the admin runbook, the Privacy page, and the ADR are updated.
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`, and the server e2e
+- [x] A new Order is always creatable and is priced at the current Rate.
+- [x] The glossary, the admin runbook, the Privacy page, and the ADR are updated.
+- [x] `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`, and the server e2e
       suite all pass.
+
+## Comments
+
+- **Implemented in three commits plus a review pass (2026-09-28).** The staging
+  the ticket asked for is the commit order: `a20df21` lands the job, the
+  read-only panel, and the refused write path; `9619d9b` adds the 48-hour
+  maximum age; `5c4c433` adds the Payment Window. **The live confirmation
+  between stage one and stage two is outstanding and is the operator's to do** —
+  deploy `a20df21`, watch the panel show a fetched Rate with a real age, and
+  only then deploy `9619d9b`. The reason the ordering matters is stated in the
+  runbook now: between the two deploys an LTC Order is refused until the job's
+  first fetch lands, so the second commit must not go first on a live instance.
+- **The Rate's own record is the source of its age.** `settings_kv`'s
+  `ltc_rate_usdt` now holds `{ usdtPerLtc, lastSuccessAt, lastAttemptAt,
+  lastError }` rather than a bare number, which is what makes a failing job
+  distinguishable from a fresh one. A bare number is still read, so an upgrade
+  does not crash on it — and because it carries no fetch, it is treated as
+  having no age and is refused as too old to quote, which is the honest reading.
+  `getLtcRateStatus` reports the no-figure case (a first fetch that failed) for
+  the panel; `getLtcRate` returns only a quoteable Rate for the Order path.
+- **The feed is Kraken's public LTC/USDT ticker** — keyless, and denominated in
+  USDT directly so no conversion sits in the middle of a quote. It is behind
+  `LtcRateProvider`, resolved in the composition root like the AI provider and
+  the identity exchange. No injectable `fetch` was added; the provider's tests
+  stub the global, as those two seams' do.
+- **`GET /api/admin/rate` was cut during review.** The first pass added it so
+  the queue could read the Rate without pulling the AI config and the plan
+  catalog with it. It duplicated a projection the settings view already
+  returns, so there is now one `ltcRateStatusView` and the queue reads the
+  settings view it already fetches.
+- **Two rules were softened, then restored.** The review pass removed an
+  exemption I had added for an Order whose payment arrived inside the window
+  (it made a lapsed Order submittable and verifiable), and a second one for a
+  hand-set Rate with no measurable age. Both were mine, not the spec's. The
+  spec is explicit that a lapsed Order is refused and not offered for
+  verification, and a maximum age with an unverifiable exception is not a
+  bound. ADR-0014 now states why the window is a stricter line than the Rate's
+  age, and what an operator who wants to be generous does instead.
+- **A claim the customer reads must be checkable.** The reject dialog offers
+  "the rate moved" only when the queue has established it by comparing the
+  captured rate against the current one; the dialog never holds the rate and
+  never asserts it. That was the sharpest finding of the review: the first
+  version told customers their rate had moved on the strength of nothing.
+- **Tests:** the provider at the stubbed-global seam; the job at the purge
+  job's injectable-clock seam (first fetch, band inside and outside its window,
+  non-positive/missing/non-finite, failed fetch keeping the last good Rate, no
+  audit entry on success, the stop function); the 48-hour refusal and both
+  distinct messages at the Hono-over-SQLite route seam; the window at the route
+  seam (six hours, no extension on resubmission, null stays submittable, lapsed
+  refused with a new-Order message, a new Order always creatable, the derived
+  flag); the panel, the Account page, the instructions, the queue, and the
+  reject dialog at the RTL seam. `pnpm lint`, `pnpm typecheck`, `pnpm build`,
+  `pnpm test` (1913), `pnpm format:check`, the server e2e suite (5), and the
+  web e2e suite (69) all pass.
+- **Left alone deliberately:** Verification's amount comparison, still exact
+  with no tolerance, and the Rate's staleness bound at Verification, which
+  stays off. Both are the spec's calls and both are stated in ADR-0014 rather
+  than quietly chosen. `settings.update` audit entries are unchanged for every
+  other key; the rate's own `rate.refresh` entries appear only on failure.
