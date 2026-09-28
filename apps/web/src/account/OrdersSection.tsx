@@ -99,7 +99,7 @@ export function OrdersSection({
             <p
               role="status"
               data-testid="orders-lapsed-strip"
-              className="mt-3 rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger"
+              className="mt-3 rounded-control border border-hairline bg-canvas px-3 py-2 text-xs text-ink-soft"
             >
               An Order here is past its payment window and can no longer be
               paid. It is not cancelled — start a new Order and the price will
@@ -160,14 +160,14 @@ export function OrdersSection({
                     <p
                       role="status"
                       data-testid="order-window-lapsed"
-                      className="mt-2 rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-xs text-danger"
+                      className="mt-2 rounded-control border border-hairline bg-canvas px-2.5 py-2 text-xs text-ink-soft"
                     >
                       The payment window closed
                       {order.paymentDeadline
                         ? ` ${orderDateTime(order.paymentDeadline)}`
                         : ''}
-                      , so this Order can no longer be paid. It is not
-                      cancelled.
+                      , so this Order can no longer be paid. It is not cancelled
+                      — the button below starts a new one.
                     </p>
                   )}
 
@@ -189,7 +189,7 @@ export function OrdersSection({
                     <Link
                       to="/pricing"
                       data-testid="order-new-order"
-                      className="touch-target mt-2 inline-flex h-7 items-center rounded-control bg-accent-strong px-2.5 text-xs font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
+                      className="touch-target mt-2 inline-flex h-7 items-center rounded-control bg-accent-strong px-2.5 text-xs font-medium text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
                     >
                       Start a new order
                     </Link>
@@ -222,7 +222,7 @@ export function OrdersSection({
                         <Link
                           to="/pricing"
                           data-testid="order-new-order-expanded"
-                          className="touch-target mt-3 inline-flex h-9 items-center rounded-control bg-accent-strong px-3 text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
+                          className="touch-target mt-3 inline-flex h-9 items-center rounded-control bg-accent-strong px-3 text-sm font-medium text-accent-ink shadow-sm transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
                         >
                           Start a new order
                         </Link>

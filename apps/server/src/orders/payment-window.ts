@@ -32,27 +32,6 @@ export function paymentWindowClosed(
   );
 }
 
-/**
- * Whether the window has closed against a *new* submission.
- *
- * A window bounds when a customer may start paying, not what an Admin may read
- * later. An Order whose details arrived inside the window has a real on-chain
- * event behind it, and it stays amendable afterwards: refusing a correction
- * would reject someone who paid the figure they were quoted, which is a worse
- * outcome than a frozen quote. The Admin queue mirrors this exact rule, so the
- * server and the panel cannot disagree about what is still alive.
- */
-export function windowClosedForSubmission(
-  order: {
-    status: string;
-    paymentDeadline: Date | null;
-    txid: string | null;
-  },
-  now: Date,
-): boolean {
-  return paymentWindowClosed(order, now) && order.txid === null;
-}
-
 /** The deadline for an Order created now. */
 export function paymentDeadlineFor(createdAt: Date): Date {
   return new Date(createdAt.getTime() + PAYMENT_WINDOW_MS);

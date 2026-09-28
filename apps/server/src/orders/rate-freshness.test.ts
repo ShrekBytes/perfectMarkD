@@ -67,7 +67,7 @@ function configurePayments(
       usdtPerLtc: null,
       lastSuccessAt: null,
       lastAttemptAt: null,
-      lastError: 'The price feed could not be reached.',
+      lastError: 'The rate feed could not be reached.',
     });
     return;
   }
@@ -143,18 +143,22 @@ describe('a new LTC Order and the age of the Rate', () => {
     expect(RATE_MAX_AGE_MS).toBe(4 * RATE_REFRESH_INTERVAL_MS);
   });
 
-  it('quotes a hand-set Rate, whose age nothing can measure', async () => {
+  it('refuses a hand-set Rate, whose age nothing can measure', async () => {
     const { app, db } = makeApp();
     setSetting(db, WALLETS_KEY, WALLETS);
+    // An instance that typed its Rate before the job existed. Its age is
+    // unknown, and the maximum age cannot be shown to be satisfied.
     setSetting(db, LTC_RATE_KEY, 320.5);
     const cookie = await signedIn(app);
 
     const res = await postJson(app, '/api/orders', LTC_ORDER, cookie);
 
-    // Refusing here would switch LTC off on a method that is already
-    // configured and being paid in, and the job replaces the figure on its
-    // first run anyway.
-    expect(res.status).toBe(201);
+    // The bound does not carve out an exception it cannot verify. This lasts
+    // only until the job's immediate first run on the next start replaces the
+    // figure, which is why the two halves ship in the order they do.
+    expect(res.status).toBe(503);
+    const { error } = (await res.json()) as { error: string };
+    expect(error).toMatch(/refresh/i);
   });
 
   it('still creates a USDT Order while the LTC Rate is stale', async () => {

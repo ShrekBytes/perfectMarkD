@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  getLtcRateStatus,
+  getAdminSettings,
   listAdminOrders,
   type AdminOrder,
   type OrderStatus,
@@ -31,19 +31,6 @@ function usdtEquivalent(order: AdminOrder): string | null {
   const total = Number(order.amountExpected) * Number(order.ltcRateUsdt);
   if (!Number.isFinite(total)) return null;
   return `≈ ${total.toFixed(2)} USDT`;
-}
-
-/**
- * Whether the Payment Window has closed against a *new* payment — the mirror of
- * the server's `windowClosedForSubmission`, kept in step deliberately so the
- * queue and the API cannot disagree about what is still alive. A window bounds
- * when a customer may start paying, not what an Admin may read later: an Order
- * whose details arrived inside the window has a real on-chain event behind it
- * and stays verifiable, because refusing it would reject someone who paid the
- * figure they were quoted (live-pricing/02).
- */
-function isDead(order: AdminOrder): boolean {
-  return order.paymentExpired && order.txid === null;
 }
 
 /**
@@ -79,15 +66,17 @@ function rateMovedContext(
  *
  * A lapsed Payment Window (live-pricing/02) is shown rather than hidden: the
  * queue is also the financial record, and dropping the row would leave an
- * operator wondering where an Order went. It loses the Verify affordance,
- * because verifying an Order that can no longer be paid grants an Entitlement
- * against a quote the customer had no chance to meet.
+ * operator wondering where an Order went. It leaves the pending filter and
+ * loses the Verify affordance, because an Order that can no longer be paid has
+ * nothing to verify and granting against it means granting on a quote the
+ * customer had no chance to meet.
  */
 export function VerificationQueue() {
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   // Read beside the Orders so the queue can say "the Rate has moved" without
-  // becoming a second settings surface. It is public data (the payment phase
-  // already shows a rate), needs no session, and fails harmlessly.
+  // becoming a second settings surface: it carries nothing about an order or a
+  // user, it rides the settings read the panel already makes, and it fails
+  // harmlessly — without it the queue simply does not offer the explanation.
   const [currentRate, setCurrentRate] = useState<number | null>(null);
   const [filter, setFilter] = useState<QueueFilter>('pending');
   const [error, setError] = useState<string | null>(null);
@@ -111,13 +100,13 @@ export function VerificationQueue() {
 
   useEffect(() => {
     let live = true;
-    void getLtcRateStatus()
-      .then((status) => {
-        if (live) setCurrentRate(status.usdtPerLtc);
+    void getAdminSettings()
+      .then((settings) => {
+        if (live) setCurrentRate(settings.ltcRate.usdtPerLtc);
       })
       .catch(() => {
-        // The context is a nicety on a short payment. If it cannot be read,
-        // the queue simply does not offer the explanation.
+        // The context is a nicety on a short payment. If the settings read
+        // cannot be made, the queue simply does not offer the explanation.
         if (live) setCurrentRate(null);
       });
     return () => {
@@ -129,14 +118,13 @@ export function VerificationQueue() {
   for (const order of orders ?? []) {
     counts.set(order.status, (counts.get(order.status) ?? 0) + 1);
   }
-  // A lapsed Order with nothing submitted leaves the pending view: the
-  // pending queue is a work list, and a row nobody can act on is not work. One
-  // whose payment arrived inside the window stays, because it is payable work
-  // that is merely late to be read. Both remain under All and in the counts —
-  // the queue is also the financial record, and hiding rows would leave an
-  // operator wondering where an Order went.
+  // A lapsed Order leaves the pending view: the pending queue is a work list,
+  // and a row nobody can act on is not work. It remains under All and in the
+  // counts — the queue is also the financial record, and a vanished row would
+  // leave an operator wondering where an Order went.
   const visible = (orders ?? []).filter(
-    (order) => filter === 'all' || (order.status === filter && !isDead(order)),
+    (order) =>
+      filter === 'all' || (order.status === filter && !order.paymentExpired),
   );
 
   return (
@@ -213,13 +201,11 @@ export function VerificationQueue() {
             const mismatch = order.amountClaimed !== null && !match;
             const rateContext = rateMovedContext(order, currentRate);
             const usdt = usdtEquivalent(order);
-            // "Can no longer be paid" means the window closed with nothing
-            // submitted — there is no on-chain event to look at. An Order whose
-            // details arrived inside the window is a payment that happened, and
-            // the window does not reach back and unmake it: withholding Verify
-            // from those would reject customers who paid the figure they were
-            // quoted, which is the one outcome worse than a stale quote.
-            const dead = isDead(order);
+            // A lapsed Order can no longer be paid, so there is nothing to
+            // verify: the customer's window closed whether or not they had
+            // submitted. Verify is withheld on every one of them, and Reject
+            // stays so the user is told to start a new Order.
+            const lapsed = order.paymentExpired;
             return (
               <li
                 key={order.id}
@@ -319,15 +305,14 @@ export function VerificationQueue() {
                     }`}
                 </p>
 
-                {dead && (
+                {lapsed && (
                   <p
                     data-testid="order-window-lapsed"
-                    className="mt-1.5 text-xs text-danger"
+                    className="mt-1.5 text-xs text-ink-soft"
                   >
-                    The payment window closed with no payment submitted, so this
-                    Order can no longer be paid and there is nothing to verify.
-                    Reject it with a reason so the user knows to start a new
-                    one.
+                    The payment window closed, so this Order can no longer be
+                    paid and cannot be verified. Reject it with a reason so the
+                    user knows to start a new one.
                   </p>
                 )}
 
@@ -342,11 +327,10 @@ export function VerificationQueue() {
 
                 {order.status === 'pending' && (
                   <div className="mt-2.5 flex gap-2">
-                    {/* Verifying is withheld only where there is nothing on
-                        chain to verify. Reject always stays: the user is owed
-                        a reason, and a closed window is a perfectly good
-                        one. */}
-                    {!dead && (
+                    {/* Verify is withheld on a lapsed Order; Reject always
+                        stays, because the user is owed a reason and a closed
+                        window is a perfectly good one. */}
+                    {!lapsed && (
                       <button
                         type="button"
                         data-testid="verify-button"
@@ -385,6 +369,13 @@ export function VerificationQueue() {
       {rejecting && (
         <RejectDialog
           order={rejecting}
+          // The dialog offers the rate-move reason only when the queue has
+          // established it, so the customer is never told the rate moved on the
+          // strength of an Admin's guess.
+          rateMoved={
+            rateMovedContext(rejecting, currentRate) !== null &&
+            !rejecting.paymentExpired
+          }
           onRejected={() => {
             setRejecting(null);
             void refresh();

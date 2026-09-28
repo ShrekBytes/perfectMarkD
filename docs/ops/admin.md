@@ -132,7 +132,7 @@ section each with its own save. Every save is a separate `settings.update` audit
 entry.
 
 **The LTC rate is not in that list, and there is nothing to edit.** A job fetches
-it from a public price feed every twelve hours (ADR-0014); the Settings tab
+it from a public rate feed every twelve hours (ADR-0014); the Settings tab
 reports the current figure, how long ago it was fetched, and the last error.
 The rate setting cannot be written at all — the write path returns 403 — so an
 `ltcRateUsdt` PUT failing is the system working, not a bug to work around. If
@@ -142,9 +142,12 @@ consequences worth knowing:
 - New LTC Orders are refused once the rate is more than 48 hours old, with a
   message saying the rate is refreshing. That is distinct from "LTC payments are
   not set up yet", which means no successful fetch has ever landed.
-- A rate set by hand before this existed is quoted until the job's first fetch
-  replaces it, which is seconds after a restart. It is reported with an unknown
-  age in the meantime.
+- A rate set by hand before this existed has no fetch behind it, so its age
+  cannot be shown to be inside the 48-hour bound and LTC Orders are refused
+  until the job's first fetch replaces it. The panel distinguishes the two
+  states — "never fetched by a job" against "never fetched" — so an upgrade
+  that lands before the job's first run reads as the brief gap it is, not as a
+  broken instance.
 
 The rate fetch itself writes no audit entry on success — twice a day would be
 about 700 a year. A failure or a rejected value does write one, as

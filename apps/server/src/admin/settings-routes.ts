@@ -12,6 +12,7 @@ import {
   getSetting,
   getWallets,
   LIMITS_KEY,
+  type LtcRateStatus,
   parseAiProviderConfig,
   parsePlanLimits,
   parsePlanPrices,
@@ -26,6 +27,7 @@ import type {
   WalletAddresses,
 } from '../db/schema.js';
 import { parseJson } from '../request-body.js';
+import type { Clock } from '../auth/sessions.js';
 import { resolveAiContext, type AiContext } from '../ai/context.js';
 import { testAiConnection } from '../ai/test-connection.js';
 
@@ -75,23 +77,30 @@ export interface AdminSettingsView {
   aiKeyPresent: boolean;
 }
 
+/**
+ * The stored Rate as the panel reads it, from the accessor's own status shape.
+ * One projection, so the settings view and the queue's read cannot drift.
+ */
+export function ltcRateStatusView(status: LtcRateStatus): LtcRateStatusView {
+  return {
+    usdtPerLtc: status.rate?.usdtPerLtc ?? null,
+    lastFetchedAt: status.rate?.lastSuccessAt ?? null,
+    ageMs: status.rate?.ageMs ?? null,
+    lastAttemptAt: status.lastAttemptAt,
+    lastError: status.lastError,
+  };
+}
+
 export function settingsView(
   db: AppDatabase,
   aiKeyPresent: boolean,
-  now: () => Date = () => new Date(),
+  now: Clock,
 ): AdminSettingsView {
-  const status = getLtcRateStatus(db, now);
   return {
     wallets: getWallets(db),
     prices: getPlanPrices(db),
     limits: getPlanLimits(db),
-    ltcRate: {
-      usdtPerLtc: status.rate?.usdtPerLtc ?? null,
-      lastFetchedAt: status.rate?.lastSuccessAt ?? null,
-      ageMs: status.rate?.ageMs ?? null,
-      lastAttemptAt: status.lastAttemptAt,
-      lastError: status.lastError,
-    },
+    ltcRate: ltcRateStatusView(getLtcRateStatus(db, now)),
     aiProvider: getAiProviderConfig(db),
     aiKeyPresent,
   };
@@ -168,7 +177,8 @@ const KV_KEYS: Record<SettingKey, string> = {
 };
 
 export interface SettingsRoutesOptions {
-  now?: () => Date;
+  /** Injectable clock; the Rate's reported age is measured against it. */
+  now?: Clock;
   /** The AI context (key presence + provider seam) for Test connection. */
   ai?: AiContext;
 }
@@ -217,7 +227,7 @@ export function settingsRoutes({
       return c.json(
         {
           error:
-            'The LTC rate is fetched from a public price feed every twelve hours and cannot be set by hand.',
+            'The LTC rate is fetched from a public rate feed every twelve hours and cannot be set by hand.',
         },
         403,
       );

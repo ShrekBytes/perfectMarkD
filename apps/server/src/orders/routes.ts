@@ -19,7 +19,6 @@ import {
   PAYMENT_WINDOW_CLOSED_MESSAGE,
   paymentDeadlineFor,
   paymentWindowClosed,
-  windowClosedForSubmission,
 } from './payment-window.js';
 import { RATE_MAX_AGE_MS } from '../rate/job.js';
 import {
@@ -173,7 +172,7 @@ function parseSubmission(body: unknown): SubmissionInput | { error: string } {
 export function orderView(
   order: Order,
   walletAddress: string,
-  now: () => Date = () => new Date(),
+  now: Clock,
 ): OrderView {
   return {
     id: order.id,
@@ -248,12 +247,13 @@ export function orderRoutes({
           503,
         );
       }
-      // A Rate past its maximum age is refused rather than quoted (ADR-0014).
-      // The message is deliberately not the one above: no fetch has ever
-      // landing and a feed that has been down for two days are different
-      // states, and only the second one resolves itself. It also points at the
-      // other coins, because the fix is one click and USDT is always open.
-      if (rate.ageMs !== null && rate.ageMs > RATE_MAX_AGE_MS) {
+      // A Rate past its maximum age is refused rather than quoted (ADR-0014),
+      // and a figure no fetch ever produced is treated the same way: its age
+      // cannot be shown to be inside the bound, and the bound is the only thing
+      // standing between a quote and whatever the last good figure was. On an
+      // upgraded instance this lasts only until the job's immediate first run
+      // replaces the hand-set value, and the panel says which state it is in.
+      if (rate.ageMs === null || rate.ageMs > RATE_MAX_AGE_MS) {
         return c.json(
           {
             error:
@@ -345,10 +345,8 @@ export function orderRoutes({
     }
     // A lapsed window is checked before the details are even read: there is
     // nothing to amend on an Order that can no longer be paid, and the
-    // customer's next step is a new Order, not a corrected resubmission. An
-    // Order whose details arrived in time stays amendable — see
-    // windowClosedForSubmission.
-    if (windowClosedForSubmission(order, now())) {
+    // customer's next step is a new Order, not a corrected resubmission.
+    if (paymentWindowClosed(order, now())) {
       return c.json({ error: PAYMENT_WINDOW_CLOSED_MESSAGE }, 409);
     }
     if (!networkValidForCoin(order.coin, parsed.network)) {

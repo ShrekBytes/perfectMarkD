@@ -82,6 +82,10 @@ export const AUDIT_ACTIONS = [
   'user.email_change',
   'user.delete',
   'settings.update',
+  // The Rate refresh (ADR-0014), and only its failures: a successful fetch
+  // writes no entry, because twice a day is ~700 a year and would drown the
+  // ones that matter. A refusal is the state a human needs to find later.
+  'rate.refresh',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -422,10 +426,16 @@ export type ExportJob = typeof exportJobs.$inferSelect;
  * identity is snapshotted (`admin_user_id` is deliberately a plain integer,
  * not a foreign key) so the trail survives the account it names — deleting a
  * user must not be able to erase the record of what was done to others.
+ *
+ * `admin_user_id` is nullable and `admin_email` is never empty because one
+ * entry has no Admin behind it: the Rate refresh job's failures (ADR-0014).
+ * Writing a placeholder id there would name an account that does not exist, so
+ * null says "the instance did this" honestly, and the actor reads
+ * `system:rate-refresh`.
  */
 export const auditLogs = sqliteTable('audit_logs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  adminUserId: integer('admin_user_id').notNull(),
+  adminUserId: integer('admin_user_id'),
   adminEmail: text('admin_email').notNull(),
   action: text('action').notNull(), // AuditAction
   targetType: text('target_type').notNull(), // AuditTargetType

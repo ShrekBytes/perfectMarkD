@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { desc, eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
-import { getLtcRateStatus, getWallets } from '../db/settings.js';
+import { getWallets } from '../db/settings.js';
 import { auditLogs, entitlements, orders, users } from '../db/schema.js';
 import { asRecord, parseJson } from '../request-body.js';
 import { expiryForGrant } from './entitlement.js';
@@ -12,7 +12,7 @@ import {
   userEmailFor,
   usersRoutes,
 } from './users.js';
-import { settingsRoutes, type LtcRateStatusView } from './settings-routes.js';
+import { settingsRoutes } from './settings-routes.js';
 import type { AiContext } from '../ai/context.js';
 import type { SendLimiter } from '../auth/rate-limit.js';
 
@@ -87,25 +87,6 @@ export function adminRoutes({
       return c.json({ error: 'Admin access only.' }, 403);
     }
     return next();
-  });
-
-  /**
-   * The machine-written Rate (ADR-0014), read-only. Its own route rather than
-   * the settings view because the Verification queue needs it without
-   * dragging in the AI Provider Config, the wallets, and the plan catalog —
-   * the queue's only question is "has the rate moved since this order".
-   */
-  app.get('/rate', (c) => {
-    const status = getLtcRateStatus(c.var.db, now);
-    return c.json({
-      rate: {
-        usdtPerLtc: status.rate?.usdtPerLtc ?? null,
-        lastFetchedAt: status.rate?.lastSuccessAt ?? null,
-        ageMs: status.rate?.ageMs ?? null,
-        lastAttemptAt: status.lastAttemptAt,
-        lastError: status.lastError,
-      } satisfies LtcRateStatusView,
-    });
   });
 
   app.get('/orders', (c) => {

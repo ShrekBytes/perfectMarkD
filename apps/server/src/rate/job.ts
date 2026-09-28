@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The Rate refresh job (live-pricing/02, ADR-0014).
 //
-// The Rate is machine-written. A scheduled job fetches it from the public price
+// The Rate is machine-written. A scheduled job fetches it from the public exchange
 // feed every twelve hours, validates the answer before anything is stored, and
 // keeps the last good value when a fetch fails. Nobody — the Admin included —
 // can type it, which is what makes the number a customer is quoted something
@@ -25,7 +25,7 @@ export const RATE_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 /**
  * How old the last good Rate may be before new LTC Orders are refused rather
  * than quoted (ADR-0014). Four refreshes' worth, so a couple of consecutive
- * failures do not switch LTC off; past it the figure is not a price anyone
+ * failures do not switch LTC off; past it the figure is not a rate anyone
  * should be held to.
  */
 export const RATE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
@@ -34,7 +34,7 @@ export const RATE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
  * How far the feed may be from the last good Rate before the answer is treated
  * as a provider fault rather than a market move. A real LTC move of this size
  * inside a day is news; a feed reporting one is a broken feed, and storing it
- * would re-price every open quote on a bad number.
+ * would move every open quote onto a bad number.
  */
 const RATE_BAND = 0.5;
 
@@ -88,7 +88,7 @@ export async function refreshLtcRate({
     const reason =
       error instanceof Error
         ? error.message
-        : 'The price feed could not be read.';
+        : 'The rate feed could not be read.';
     recordFailure(db, previous, at, reason, log);
     return { outcome: 'failed', usdtPerLtc: null, reason };
   }
@@ -112,7 +112,7 @@ export async function refreshLtcRate({
 }
 
 /**
- * The rules that stand between a payload and the price every open Order is
+ * The rules that stand between a payload and the rate every open Order is
  * quoted: a positive, finite number, and — only while there is a recent Rate
  * to compare against — within the band. Returns why the value is refused, or
  * null when it is accepted. Nothing here clamps: a bad answer is rejected.
@@ -122,10 +122,10 @@ function validateFetchedRate(
   previous: ReturnType<typeof getLtcRateStatus>['rate'],
 ): string | null {
   if (typeof candidate !== 'number' || !Number.isFinite(candidate)) {
-    return 'The price feed returned a value that is not a number.';
+    return 'The rate feed returned a value that is not a number.';
   }
   if (candidate <= 0) {
-    return 'The price feed returned a price of zero or less.';
+    return 'The rate feed returned a rate of zero or less.';
   }
   // The first fetch has nothing to compare against and skips the band
   // entirely — including a Rate a human typed before this job existed, whose
@@ -134,7 +134,7 @@ function validateFetchedRate(
   if (previous.ageMs >= RATE_BAND_WINDOW_MS) return null;
   const drift = Math.abs(candidate - previous.usdtPerLtc) / previous.usdtPerLtc;
   if (drift > RATE_BAND) {
-    return `The price feed returned ${candidate}, more than 50% from the last good Rate of ${previous.usdtPerLtc} — refused as a provider fault.`;
+    return `The rate feed returned ${candidate}, more than 50% from the last good Rate of ${previous.usdtPerLtc} — refused as a provider fault.`;
   }
   return null;
 }
@@ -160,10 +160,10 @@ function recordFailure(
   log(`rate refresh: ${reason} The last good rate was kept.`);
   db.insert(auditLogs)
     .values({
-      // The job runs as the instance, not as a person. audit_logs requires an
-      // admin identity; this entry is attributable to the scheduler, and the
-      // operator is the one who reads it.
-      adminUserId: 0,
+      // The job runs as the instance, not as a person, so there is no Admin to
+      // name: a null id says that honestly, where a placeholder would name an
+      // account that does not exist. The actor string is what a reader sees.
+      adminUserId: null,
       adminEmail: RATE_AUDIT_ACTOR,
       action: RATE_AUDIT_ACTION,
       targetType: 'settings',

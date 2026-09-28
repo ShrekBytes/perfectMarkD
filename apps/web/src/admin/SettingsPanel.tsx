@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ToggleRow } from '../inspector/controls';
+import { formatRelativeTime } from '../documents/text';
 import {
   getAdminSettings,
   testAiConnection,
@@ -479,25 +480,8 @@ function LimitsSection({
 }
 
 /**
- * How long ago a moment was, in the coarse words a person reads at a glance:
- * "just now", "14 minutes ago", "5 hours ago", "3 days ago". Deliberately
- * vague at the extremes — the exact figure is in the tooltip-free text the
- * server logged, and the thing the Admin needs here is fresh or not.
- */
-function timeAgo(ms: number | null): string {
-  if (ms === null) return 'unknown';
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
-}
-
-/**
  * The Rate's status (ADR-0014). It is not a save section: a job fetches it from
- * a public price feed every twelve hours, and the number a customer is quoted
+ * a public rate feed every twelve hours, and the number a customer is quoted
  * must not be one the Admin chose. So this reports the figure, how long ago it
  * was fetched, and the last error — and offers no way to change any of it.
  */
@@ -511,9 +495,9 @@ function LtcRateStatusSection({ status }: { status: LtcRateStatus }) {
         LTC rate (USDT per LTC)
       </h3>
       <p className="mt-1 text-xs text-ink-faint">
-        Fetched from a public price feed every twelve hours and captured into
-        new LTC Orders at creation. It cannot be set by hand — that is the
-        point: no one chooses the rate a customer is quoted.
+        Fetched from a public rate feed every twelve hours and captured into new
+        LTC Orders at creation. It cannot be set by hand — that is the point: no
+        one chooses the rate a customer is quoted.
       </p>
 
       <p className="mt-2 text-xs">
@@ -528,15 +512,16 @@ function LtcRateStatusSection({ status }: { status: LtcRateStatus }) {
 
       <p className="mt-1 text-xs text-ink-soft">
         <span data-testid="ltc-rate-age">
-          {status.lastFetchedAt === null
-            ? 'Never fetched.'
-            : `Fetched ${timeAgo(status.ageMs)}.`}
+          {status.lastFetchedAt !== null
+            ? `Fetched ${formatRelativeTime(Date.parse(status.lastFetchedAt))}.`
+            : status.usdtPerLtc === null
+              ? 'Never fetched.'
+              : 'Never fetched by a job — a figure set by hand, still quoted until the first fetch replaces it.'}
         </span>
         {status.lastAttemptAt !== null && status.lastError !== null && (
           <span data-testid="ltc-rate-last-attempt">
             {' '}
-            Last attempt{' '}
-            {timeAgo(Date.now() - Date.parse(status.lastAttemptAt))}.
+            Last attempt {formatRelativeTime(Date.parse(status.lastAttemptAt))}.
           </span>
         )}
       </p>

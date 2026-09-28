@@ -7,6 +7,7 @@ import { orderView, type OrderView } from '../orders/routes.js';
 import { methodForCoinNetwork } from '../orders/payment.js';
 import { getPlanLimits, getWallets } from '../db/settings.js';
 import { normalizeEmail } from '../auth/routes.js';
+import type { Clock } from '../auth/sessions.js';
 import {
   createLinkSender,
   PASSWORD_RESET_TOKEN_TTL_MS,
@@ -173,7 +174,7 @@ export function adminOrderView(
   wallets: WalletAddresses,
   order: Order,
   userEmail: string | null,
-  now: () => Date = () => new Date(),
+  now: Clock,
 ): OrderView & AdminOrderView {
   const method = methodForCoinNetwork(order.coin, order.network);
   return {

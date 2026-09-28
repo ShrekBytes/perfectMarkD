@@ -1,10 +1,10 @@
-// ───────────────────────────────────────────��─────────────────────────────────
-// The Rate's price-feed seam (live-pricing/02).
+// ─────────────────────────────────────────────────────────────────────────────
+// The Rate's exchange seam (live-pricing/02).
 //
-// One number in, one USDT-per-LTC figure out: the last traded price on a
+// One number in, one USDT-per-LTC figure out: the last traded rate on a
 // public, keyless ticker. The request carries no credential and nothing about
-// the instance or its users — it is a price query, which is why the Privacy
-// page names it (ADR-0014).
+// the instance or its users — it is a rate query, which is why the Privacy page
+// names it (ADR-0014).
 //
 // The seam is resolved in the composition root the way the AI provider and the
 // identity exchange are, so nothing outside this file learns the endpoint and
@@ -13,7 +13,7 @@
 // knowing the wire.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The seam: one fetch, one price, or a throw. */
+/** The seam: one fetch, one figure, or a throw. */
 export interface LtcRateProvider {
   /** USDT per LTC. Throws `RateProviderError` for every failure. */
   fetchRate(): Promise<number>;
@@ -72,7 +72,7 @@ export function createLtcRateProvider({
         if (!response.ok) {
           throw new RateProviderError(
             'http',
-            `The price feed answered with HTTP ${response.status}.`,
+            `The rate feed answered with HTTP ${response.status}.`,
           );
         }
         return readLastPrice(await readJson(response));
@@ -81,12 +81,12 @@ export function createLtcRateProvider({
         if (isAbortError(error)) {
           throw new RateProviderError(
             'timeout',
-            'The price feed did not answer in time.',
+            'The rate feed did not answer in time.',
           );
         }
         throw new RateProviderError(
           'transport',
-          'The price feed could not be reached.',
+          'The rate feed could not be reached.',
         );
       } finally {
         clearTimeout(timer);
@@ -102,7 +102,7 @@ async function readJson(response: Response): Promise<unknown> {
     if (isAbortError(error)) throw error;
     throw new RateProviderError(
       'invalid_response',
-      'The price feed returned a malformed reply.',
+      'The rate feed returned a malformed reply.',
     );
   }
 }
@@ -111,24 +111,24 @@ async function readJson(response: Response): Promise<unknown> {
  * The last closed trade, as a positive number. Kraken keys the result by the
  * pair it recognised, which is not always the pair that was asked for, so the
  * first ticker in `result` is read rather than a hard-coded name. Anything
- * that is not a positive number here is a bad quote, not a bad price: it is
+ * that is not a positive number here is a bad quote, not a bad figure: it is
  * refused, and the Rate the instance already has is kept.
  */
 function readLastPrice(payload: unknown): number {
   const malformed = (): never => {
     throw new RateProviderError(
       'invalid_response',
-      'The price feed returned no usable price.',
+      'The rate feed returned no usable rate.',
     );
   };
   if (typeof payload !== 'object' || payload === null) return malformed();
   const { error, result } = payload as { error?: unknown; result?: unknown };
   // An error array is Kraken's own shape for "no", and it can arrive with a
-  // 200. It is a provider fault, never a price of zero.
+  // 200. It is a provider fault, never a rate of zero.
   if (Array.isArray(error) && error.length > 0) {
     throw new RateProviderError(
       'invalid_response',
-      'The price feed reported an error instead of a price.',
+      'The rate feed reported an error instead of a rate.',
     );
   }
   if (typeof result !== 'object' || result === null) return malformed();
@@ -138,8 +138,8 @@ function readLastPrice(payload: unknown): number {
   if (typeof ticker !== 'object' || ticker === null) return malformed();
   const { c } = ticker as { c?: unknown };
   if (!Array.isArray(c) || c.length === 0) return malformed();
-  const price = Number(c[0]);
-  return Number.isFinite(price) && price > 0 ? price : malformed();
+  const rate = Number(c[0]);
+  return Number.isFinite(rate) && rate > 0 ? rate : malformed();
 }
 
 function isAbortError(error: unknown): boolean {

@@ -182,13 +182,14 @@ it('saves plan limits and the LTC rate to their own keys', async () => {
 });
 
 it('shows the Rate, its age, and the last error, and offers no way to edit it', async () => {
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
   const settings: AdminSettings = {
     ...SEEDED,
     ltcRate: {
       usdtPerLtc: 69.82,
-      lastFetchedAt: '2026-09-28T10:00:00.000Z',
+      lastFetchedAt: twoHoursAgo.toISOString(),
       ageMs: 2 * 60 * 60 * 1000,
-      lastAttemptAt: '2026-09-28T10:00:00.000Z',
+      lastAttemptAt: twoHoursAgo.toISOString(),
       lastError: null,
     },
   };
@@ -203,7 +204,7 @@ it('shows the Rate, its age, and the last error, and offers no way to edit it', 
     '69.82',
   );
   expect(screen.getByTestId('ltc-rate-age')).toHaveTextContent(
-    'Fetched 2 hours ago.',
+    'Fetched 2 h ago.',
   );
   // No control anywhere in the section: the number is not the Admin's to set.
   expect(screen.queryByTestId('ltc-rate-input')).not.toBeInTheDocument();
@@ -211,14 +212,16 @@ it('shows the Rate, its age, and the last error, and offers no way to edit it', 
 });
 
 it('surfaces the last fetch failure and says the good rate is still in use', async () => {
+  const aDayAgo = new Date(Date.now() - 26 * 60 * 60 * 1000);
+  const anHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const settings: AdminSettings = {
     ...SEEDED,
     ltcRate: {
       usdtPerLtc: 69.82,
-      lastFetchedAt: '2026-09-27T10:00:00.000Z',
+      lastFetchedAt: aDayAgo.toISOString(),
       ageMs: 26 * 60 * 60 * 1000,
-      lastAttemptAt: '2026-09-28T09:00:00.000Z',
-      lastError: 'The price feed could not be reached.',
+      lastAttemptAt: anHourAgo.toISOString(),
+      lastError: 'The rate feed could not be reached.',
     },
   };
   vi.stubGlobal(
@@ -229,10 +232,13 @@ it('surfaces the last fetch failure and says the good rate is still in use', asy
   render(<SettingsPanel />);
 
   expect(await screen.findByTestId('ltc-rate-error')).toHaveTextContent(
-    'The price feed could not be reached. The last good rate is still in use.',
+    'The rate feed could not be reached. The last good rate is still in use.',
   );
   expect(screen.getByTestId('ltc-rate-age')).toHaveTextContent(
-    'Fetched 1 day ago.',
+    'Fetched 1 d ago.',
+  );
+  expect(screen.getByTestId('ltc-rate-last-attempt')).toHaveTextContent(
+    'Last attempt 1 h ago.',
   );
 });
 
@@ -243,8 +249,8 @@ it('says the Rate is not set yet before the first successful fetch', async () =>
       usdtPerLtc: null,
       lastFetchedAt: null,
       ageMs: null,
-      lastAttemptAt: '2026-09-28T09:00:00.000Z',
-      lastError: 'The price feed could not be reached.',
+      lastAttemptAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      lastError: 'The rate feed could not be reached.',
     },
   };
   vi.stubGlobal(
@@ -261,6 +267,35 @@ it('says the Rate is not set yet before the first successful fetch', async () =>
     'Never fetched.',
   );
   expect(screen.getByTestId('ltc-rate-error')).toBeInTheDocument();
+});
+
+it('distinguishes a never-fetched Rate from a hand-set one', async () => {
+  // An instance that typed its Rate before the job existed: a figure with no
+  // fetch behind it. It is still quoted, and saying "never fetched" alone
+  // would read as "nothing is configured" — which is not the same problem.
+  const settings: AdminSettings = {
+    ...SEEDED,
+    ltcRate: {
+      usdtPerLtc: 320.5,
+      lastFetchedAt: null,
+      ageMs: null,
+      lastAttemptAt: null,
+      lastError: null,
+    },
+  };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { settings }))),
+  );
+
+  render(<SettingsPanel />);
+
+  expect(await screen.findByTestId('ltc-rate-value')).toHaveTextContent(
+    '320.5',
+  );
+  expect(screen.getByTestId('ltc-rate-age')).toHaveTextContent(
+    /never fetched by a job/i,
+  );
 });
 
 it('rejects invalid limits client-side before a request', async () => {

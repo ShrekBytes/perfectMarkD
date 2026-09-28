@@ -153,6 +153,7 @@ it('offers a rate-move reason on a short LTC payment', async () => {
         ltcRateUsdt: '320.5',
         amountClaimed: '0.0187',
       })}
+      rateMoved
       onRejected={onRejected}
       onClose={onClose}
     />,
@@ -168,7 +169,7 @@ it('offers a rate-move reason on a short LTC payment', async () => {
   // their Account page, so it has to say what to do, not name a category.
   const reason = (screen.getByTestId('reject-reason') as HTMLTextAreaElement)
     .value;
-  expect(reason).toMatch(/LTC rate moved/i);
+  expect(reason).toMatch(/rate moved/i);
   expect(reason).toMatch(/start a new order/i);
 });
 
@@ -197,6 +198,27 @@ it('offers a new-order reason when the window has lapsed', async () => {
     .value;
   expect(reason).toMatch(/payment window closed/i);
   expect(reason).toMatch(/start a new order/i);
+});
+
+it('withholds the rate-move reason when the queue has not established it', () => {
+  render(
+    <RejectDialog
+      order={adminOrder({
+        coin: 'LTC',
+        network: 'mainnet',
+        amountExpected: '0.02',
+        ltcRateUsdt: '320.5',
+        amountClaimed: '0.0187',
+      })}
+      onRejected={onRejected}
+      onClose={onClose}
+    />,
+  );
+
+  // Asserting a rate move the customer cannot check is a claim made to them,
+  // not a suggestion made to the Admin. Only the queue holds the current rate,
+  // so only the queue may say it.
+  expect(screen.queryByTestId('reject-suggestions')).not.toBeInTheDocument();
 });
 
 it('offers no suggestions when nothing is short and no window lapsed', () => {

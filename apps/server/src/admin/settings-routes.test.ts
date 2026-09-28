@@ -355,7 +355,7 @@ describe('PUT /api/admin/settings/:key', () => {
       usdtPerLtc: 69.82,
       lastSuccessAt: twoHoursAgo.toISOString(),
       lastAttemptAt: twoHoursAgo.toISOString(),
-      lastError: 'The price feed could not be reached.',
+      lastError: 'The rate feed could not be reached.',
     });
 
     const res = await request(app, '/api/admin/settings', 'GET', {
@@ -370,7 +370,7 @@ describe('PUT /api/admin/settings/:key', () => {
       lastFetchedAt: twoHoursAgo.toISOString(),
       ageMs: 2 * 60 * 60 * 1000,
       lastAttemptAt: twoHoursAgo.toISOString(),
-      lastError: 'The price feed could not be reached.',
+      lastError: 'The rate feed could not be reached.',
     });
   });
 

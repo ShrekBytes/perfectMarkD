@@ -51,7 +51,7 @@ async function failureOf(): Promise<RateProviderError> {
   return thrown as RateProviderError;
 }
 
-describe('the price feed', () => {
+describe('the rate feed', () => {
   it('reports the last traded USDT per LTC as a number', async () => {
     stubFetch(() => Promise.resolve(jsonResponse(200, tickerPayload('69.82'))));
 

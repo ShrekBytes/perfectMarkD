@@ -321,36 +321,6 @@ describe('a new Order after a lapse', () => {
 });
 
 describe('the derived flag', () => {
-  it('a payment submitted inside the window stays amendable after it lapses', async () => {
-    const { app, db } = makeApp();
-    configureWallets(db);
-    const cookie = await signedIn(app);
-    const order = await createOrder(app, cookie);
-    await postJson(
-      app,
-      `/api/orders/${order.id}/submission`,
-      SUBMISSION,
-      cookie,
-    );
-    // Submitted in time, read by the Admin eight hours later.
-    db.update(orders)
-      .set({ paymentDeadline: new Date(NOW.getTime() - 8 * HOUR) })
-      .where(eq(orders.id, order.id))
-      .run();
-
-    const res = await postJson(
-      app,
-      `/api/orders/${order.id}/submission`,
-      { ...SUBMISSION, amount: 3 },
-      cookie,
-    );
-
-    // The window bounds when a customer may submit, not when an Admin may
-    // read. Refusing a correction to a payment that was made in time would
-    // reject someone who paid the figure they were quoted.
-    expect(res.status).toBe(200);
-  });
-
   it('is true only while the Order is pending and the deadline has passed', async () => {
     const { app, db } = makeApp();
     configureWallets(db);

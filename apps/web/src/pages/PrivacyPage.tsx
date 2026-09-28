@@ -26,7 +26,7 @@ const inlineLink =
  * beside a page load it never was. A Google Sign-In round trip is a navigation
  * the user starts, not a page load either, and the Google Sign-In section says
  * exactly that rather than leaving it to be argued about. live-pricing/02 adds
- * the price feed the same way, as its own section (ADR-0014): a scheduled
+ * the rate feed the same way, as its own section (ADR-0014): a scheduled
  * server-side lookup is not a page load, so it is disclosed rather than added
  * to the claim's exceptions, and the section says why the claim is untouched.
  */
@@ -170,15 +170,15 @@ export function PrivacyPage() {
             What we do not send anywhere when you pay
           </h2>
           <p className="mt-2 max-w-prose text-sm text-ink-soft">
-            Paying in Litecoin needs a price, so our server asks a public
-            exchange for the USDT-per-LTC rate twice a day. That request is a
-            plain price lookup for a currency pair: it carries no account, no
-            order, and nothing that identifies you, and the reply is stored on
-            our server and used only to work out what to ask you for. We do not
-            send the request when you open a page, so the “no page loads
-            anything from another company” promise above still stands exactly as
-            written. We use the last rate we fetched, and we would rather refuse
-            a Litecoin order than quote you a price we could not check.
+            Paying in Litecoin needs a current rate, so our server asks a public
+            exchange for the USDT-per-LTC figure twice a day. That request is a
+            plain lookup for one currency pair: it carries no account, no order,
+            and nothing that identifies you, and the answer is stored on our
+            server and used only to work out what to ask you for. We do not send
+            it when you open a page, so the “no page loads anything from another
+            company” promise above still stands exactly as written. We use the
+            last rate we fetched, and we would rather refuse a Litecoin order
+            than quote you a rate we could not check.
           </p>
         </section>
 

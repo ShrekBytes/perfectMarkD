@@ -241,7 +241,12 @@ export interface LtcRateStatus {
   usdtPerLtc: number | null;
   /** When the Rate was last fetched, ISO 8601. */
   lastFetchedAt: string | null;
-  /** Milliseconds since that fetch; null while the age is unknown. */
+  /**
+   * Milliseconds between that fetch and the read. Reported for the panel's
+   * benefit and for anything deciding freshness numerically; the *displayed*
+   * age is derived from `lastFetchedAt` in the browser, because a figure
+   * frozen at fetch time reads as current on a panel left open all afternoon.
+   */
   ageMs: number | null;
   /** When a fetch was last attempted, successful or not. */
   lastAttemptAt: string | null;
@@ -261,19 +266,6 @@ export interface AdminSettings {
 
 /** The keys the panel can write. The Rate is not among them (ADR-0014). */
 export type SettingsKey = 'wallets' | 'prices' | 'limits' | 'aiProvider';
-
-/**
- * The Rate as the machine currently holds it (live-pricing/02). The
- * Verification queue reads it to explain a short LTC payment, which is the
- * question the Admin would otherwise answer with "the user miscalculated".
- * Read-only by construction: the settings PUT refuses the key, so there is
- * nothing to call that could set it.
- */
-export async function getLtcRateStatus(): Promise<LtcRateStatus> {
-  const res = await fetch('/api/admin/rate', { credentials: 'include' });
-  if (!res.ok) throw await errorFrom(res);
-  return ((await res.json()) as { rate: LtcRateStatus }).rate;
-}
 
 export async function getAdminSettings(): Promise<AdminSettings> {
   const res = await fetch('/api/admin/settings', { credentials: 'include' });

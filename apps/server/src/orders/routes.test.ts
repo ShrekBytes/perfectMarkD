@@ -64,10 +64,18 @@ async function signedIn(app: AppType, email = 'reader@example.com') {
   return registerAndVerify(app, mailer, { email });
 }
 
-/** Wallets and the LTC rate seed empty; tests configure both explicitly. */
+/** Wallets and the LTC rate seed empty; tests configure both explicitly. The
+ *  rate is written the way the refresh job writes it — a figure with a fetch
+ *  behind it — because a figure with no fetch has no age and is refused as too
+ *  old to quote (live-pricing/02). */
 function configurePayments(db: AppDatabase): void {
   setSetting(db, WALLETS_KEY, WALLETS);
-  setSetting(db, LTC_RATE_KEY, 320.5);
+  setSetting(db, LTC_RATE_KEY, {
+    usdtPerLtc: 320.5,
+    lastSuccessAt: new Date().toISOString(),
+    lastAttemptAt: new Date().toISOString(),
+    lastError: null,
+  });
 }
 
 const TXID = '9f2c7a01b4e5d6f8a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0';

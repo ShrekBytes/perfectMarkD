@@ -300,7 +300,7 @@ it('shows a retryable error when the queue cannot load', async () => {
   expect(screen.getByTestId('queue-retry')).toBeInTheDocument();
 });
 
-it('will not offer to verify a lapsed Order that has no payment submitted', async () => {
+it('will not offer to verify an Order whose payment window lapsed', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(() =>
@@ -308,8 +308,6 @@ it('will not offer to verify a lapsed Order that has no payment submitted', asyn
         jsonResponse(200, {
           orders: [
             adminOrder({
-              txid: null,
-              amountClaimed: null,
               paymentDeadline: '2026-09-10T06:00:00.000Z',
               paymentExpired: true,
             }),
@@ -321,9 +319,8 @@ it('will not offer to verify a lapsed Order that has no payment submitted', asyn
 
   render(<VerificationQueue />);
 
-  // The pending queue is a work list, and there is no on-chain event to look
-  // at: a row nobody can act on is not work, so the default filter leaves it
-  // out.
+  // The pending queue is a work list: a row nobody can act on is not work, so
+  // the default filter leaves it out.
   expect(await screen.findByTestId('queue-empty')).toBeInTheDocument();
 
   // It is still in All, because the queue is also the financial record.
@@ -335,33 +332,6 @@ it('will not offer to verify a lapsed Order that has no payment submitted', asyn
   expect(screen.queryByTestId('verify-button')).not.toBeInTheDocument();
   // Reject stays: the user is owed a reason, and a closed window is one.
   expect(screen.getByTestId('reject-button')).toBeInTheDocument();
-});
-
-it('still offers Verify when the payment arrived inside the window', async () => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() =>
-      Promise.resolve(
-        jsonResponse(200, {
-          orders: [
-            adminOrder({
-              paymentDeadline: '2026-09-10T06:00:00.000Z',
-              paymentExpired: true,
-            }),
-          ],
-        }),
-      ),
-    ),
-  );
-
-  render(<VerificationQueue />);
-
-  // The window bounds when a customer may submit, not what an Admin may read.
-  // Withholding Verify from a payment that was made in time would reject
-  // someone who paid the figure they were quoted, which is worse than a stale
-  // quote ever was.
-  expect(await screen.findByTestId('verify-button')).toBeInTheDocument();
-  expect(screen.queryByTestId('order-window-lapsed')).not.toBeInTheDocument();
 });
 
 it('keeps offering Verify on an Order whose window is still open', async () => {
@@ -387,27 +357,35 @@ it('keeps offering Verify on an Order whose window is still open', async () => {
   expect(screen.queryByTestId('order-window-lapsed')).not.toBeInTheDocument();
 });
 
+/** The queue reads Orders and, for the rate context, the settings view. */
+function queueFetch(rows: AdminOrder[], usdtPerLtc: number | null): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === '/api/admin/settings') {
+        return Promise.resolve(
+          jsonResponse(200, { settings: { ltcRate: { usdtPerLtc } } }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, { orders: rows }));
+    }),
+  );
+}
+
 it('explains a short LTC payment as a rate move when the rate has moved', async () => {
-  const fetchMock = vi.fn((input: RequestInfo | URL) => {
-    if (String(input) === '/api/admin/rate') {
-      return Promise.resolve(jsonResponse(200, { rate: { usdtPerLtc: 400 } }));
-    }
-    return Promise.resolve(
-      jsonResponse(200, {
-        orders: [
-          adminOrder({
-            coin: 'LTC',
-            network: 'mainnet',
-            amountExpected: '0.02',
-            // 0.02 LTC at 320.5 is 6.41 USDT; the order paid 6.00's worth.
-            ltcRateUsdt: '320.5',
-            amountClaimed: '0.0187',
-          }),
-        ],
+  queueFetch(
+    [
+      adminOrder({
+        coin: 'LTC',
+        network: 'mainnet',
+        amountExpected: '0.02',
+        // 0.02 LTC at 320.5 is 6.41 USDT; the order paid about 6.00's worth.
+        ltcRateUsdt: '320.5',
+        amountClaimed: '0.0187',
       }),
-    );
-  });
-  vi.stubGlobal('fetch', fetchMock);
+    ],
+    400,
+  );
 
   render(<VerificationQueue />);
 
@@ -420,17 +398,7 @@ it('explains a short LTC payment as a rate move when the rate has moved', async 
 });
 
 it('says nothing about the rate when a USDT payment is short', async () => {
-  const fetchMock = vi.fn((input: RequestInfo | URL) => {
-    if (String(input) === '/api/admin/rate') {
-      return Promise.resolve(jsonResponse(200, { rate: { usdtPerLtc: 400 } }));
-    }
-    return Promise.resolve(
-      jsonResponse(200, {
-        orders: [adminOrder({ amountClaimed: '3' })],
-      }),
-    );
-  });
-  vi.stubGlobal('fetch', fetchMock);
+  queueFetch([adminOrder({ amountClaimed: '3' })], 400);
 
   render(<VerificationQueue />);
 
@@ -440,21 +408,39 @@ it('says nothing about the rate when a USDT payment is short', async () => {
   expect(screen.queryByTestId('rate-moved-context')).not.toBeInTheDocument();
 });
 
-it('says nothing about the rate when the claimed amount matches', async () => {
-  const fetchMock = vi.fn((input: RequestInfo | URL) => {
-    if (String(input) === '/api/admin/rate') {
-      return Promise.resolve(jsonResponse(200, { rate: { usdtPerLtc: 400 } }));
-    }
-    return Promise.resolve(
-      jsonResponse(200, {
-        orders: [adminOrder({ coin: 'LTC', ltcRateUsdt: '320.5' })],
-      }),
-    );
-  });
-  vi.stubGlobal('fetch', fetchMock);
+it('says nothing when the claimed amount matches', async () => {
+  queueFetch([adminOrder({ coin: 'LTC', ltcRateUsdt: '320.5' })], 400);
 
   render(<VerificationQueue />);
 
   await screen.findByTestId('admin-order-row');
   expect(screen.queryByTestId('rate-moved-context')).not.toBeInTheDocument();
+});
+
+it('offers the rate-move reason only once the queue has established it', async () => {
+  const user = userEvent.setup();
+  queueFetch(
+    [
+      adminOrder({
+        coin: 'LTC',
+        network: 'mainnet',
+        amountExpected: '0.02',
+        ltcRateUsdt: '320.5',
+        amountClaimed: '0.0187',
+      }),
+    ],
+    400,
+  );
+
+  render(<VerificationQueue />);
+  await screen.findByTestId('amount-mismatch');
+  await user.click(screen.getByTestId('reject-button'));
+
+  // The dialog is told rather than guessing: it never holds the current rate,
+  // and a claim it cannot check is a claim made to the customer.
+  expect(
+    screen
+      .getAllByTestId('reject-suggestion')
+      .some((node) => /rate moved/i.test(node.textContent ?? '')),
+  ).toBe(true);
 });

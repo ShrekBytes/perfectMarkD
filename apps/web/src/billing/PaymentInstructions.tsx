@@ -82,9 +82,9 @@ export function PaymentInstructions({ order }: { order: Order }) {
       {order.paymentExpired && (
         <div
           data-testid="payment-window-lapsed"
-          className="mt-3 rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger"
+          className="mt-3 rounded-control border border-hairline bg-surface px-3 py-2 text-xs text-ink-soft"
         >
-          <p role="alert">
+          <p role="status">
             This order’s payment window closed at{' '}
             {order.paymentDeadline === null
               ? ''

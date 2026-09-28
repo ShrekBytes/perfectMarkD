@@ -13,10 +13,17 @@ export function orderDate(iso: string): string {
 }
 
 /**
- * A Payment Window deadline, in the reader's locale and their own timezone: a
- * date alone is not actionable when the question is "do I have time to send
- * this", which is the only question the deadline is on the page to answer. The
- * precise instant is in the machine-readable `paymentDeadline` beside it.
+ * A Payment Window deadline, in the reader's own timezone: a date alone is not
+ * actionable when the question is "do I have time to send this", which is the
+ * only question the deadline is on the page to answer. The precise instant is
+ * in the machine-readable `paymentDeadline` beside it.
+ *
+ * The locale is deliberately the reader's rather than pinned to `en-US` (as
+ * the Library's compact dates are): a payment deadline is read under time
+ * pressure by someone deciding whether to send money now, and their own clock
+ * is the one that matters. The Library's dates are identifiers-adjacent and
+ * stay stable; this one is a local time and reads wrong in someone else's
+ * locale.
  */
 export function orderDateTime(iso: string): string {
   const date = new Date(iso);

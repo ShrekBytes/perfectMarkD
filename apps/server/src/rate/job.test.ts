@@ -29,7 +29,7 @@ function providerAnswering(...answers: Array<number | Error>): LtcRateProvider {
       const next = queue.shift();
       if (next === undefined) {
         return Promise.reject(
-          new RateProviderError('transport', 'The price feed is exhausted.'),
+          new RateProviderError('transport', 'The rate feed is exhausted.'),
         );
       }
       return next instanceof Error
