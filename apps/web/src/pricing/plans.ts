@@ -1,20 +1,30 @@
 /**
- * The plan catalog — the single source of truth for plan features and prices
- * (PLAN.md §1 tiers table). Phase 2's billing workstream feeds the same shape
- * from admin settings instead of these constants; both the /pricing page and
- * the pricing modal render exclusively from this module, so the swap needs no
- * redesign. Values match the plan table verbatim: `true`/`false` render as
- * included/not-included marks, strings render as-is (quotas, "never").
+ * The plan catalog — everything about a plan that is not a number: ids, names,
+ * blurbs, the feature-row labels and their group boundaries, the plan-facts
+ * prose, the duration options, and the display notes.
+ *
+ * No prices and no limits live here. Those are the Admin panel's, in admin
+ * settings, and reach the surfaces through `GET /api/pricing` (live-pricing/01)
+ * so a price changed in Settings is the price a customer reads and is charged.
+ * The numbers are displayed through the helpers below and never computed here:
+ * the endpoint returns the stored per-duration values verbatim, which is what
+ * keeps a deliberate twelve-month discount expressible.
+ *
+ * A feature cell is one of three things: a string that is already the whole
+ * answer, a boolean that renders as included/not-included, or a `LimitRef`
+ * naming the stored limit the response fills it from.
  */
 
+import type { DurationMonths, PlanLimits, PlanPrices } from './api';
+
+export type { DurationMonths };
+
 export type PlanId = 'free' | 'pro' | 'premium';
+export type PaidPlanId = 'pro' | 'premium';
 
 export interface Plan {
   id: PlanId;
   name: string;
-  /** Monthly price in USDT; null for the free plan. */
-  priceMonthlyUsdt: number | null;
-  /** One-line summary shown under the price. */
   blurb: string;
 }
 
@@ -22,35 +32,44 @@ export const PLANS: Plan[] = [
   {
     id: 'free',
     name: 'Free',
-    priceMonthlyUsdt: null,
     blurb: 'Write, preview, and print perfect PDFs. No account.',
   },
   {
     id: 'pro',
     name: 'Pro',
-    priceMonthlyUsdt: 3,
     blurb: 'One-click Server Export for everyday documents.',
   },
   {
     id: 'premium',
     name: 'Premium',
-    priceMonthlyUsdt: 7,
     blurb: 'High volume, priority rendering, and export history.',
   },
 ];
 
-export interface FeatureRow {
-  label: string;
-  values: Record<PlanId, string | boolean>;
-  /** Starts a visually separated group of rows in the comparison table. */
-  groupStart?: boolean;
+/** What a price or a limit figure reads as once the pricing read has failed.
+ *  Every surface renders this same word, so no two of them describe one state
+ *  differently and no surface can imply a number it does not have. */
+export const PRICE_UNAVAILABLE = 'Unavailable';
+
+/**
+ * A feature cell whose number comes from the pricing response: which stored
+ * limit fills it, and whether it reads as a monthly allowance. `zeroExcluded`
+ * is for the AI Allowance, where zero is a legal setting meaning AI Actions are
+ * off for the plan — so the cell reads as not-included rather than "0/mo".
+ */
+export interface LimitRef {
+  limit: 'quotaMonthly' | 'pageCap' | 'aiActionsMonthly';
+  perMonth?: boolean;
+  zeroExcluded?: boolean;
 }
 
-/** Display price for a plan column header. */
-export function formatPrice(plan: Plan): string {
-  return plan.priceMonthlyUsdt === null
-    ? 'Free'
-    : `${plan.priceMonthlyUsdt} USDT/mo`;
+export type FeatureValue = string | boolean | LimitRef;
+
+export interface FeatureRow {
+  label: string;
+  values: Record<PlanId, FeatureValue>;
+  /** Starts a visually separated group of rows in the comparison table. */
+  groupStart?: boolean;
 }
 
 export const FEATURE_ROWS: FeatureRow[] = [
@@ -64,11 +83,31 @@ export const FEATURE_ROWS: FeatureRow[] = [
   },
   {
     label: 'Server Export (one-click PDF)',
-    values: { free: 'never', pro: '300/mo', premium: '1000/mo' },
+    values: {
+      free: 'never',
+      pro: { limit: 'quotaMonthly', perMonth: true },
+      premium: { limit: 'quotaMonthly', perMonth: true },
+    },
   },
   {
     label: 'Pages per server export',
-    values: { free: false, pro: '300', premium: '1000' },
+    values: {
+      free: false,
+      pro: { limit: 'pageCap' },
+      premium: { limit: 'pageCap' },
+    },
+  },
+  {
+    label: 'AI Allowance',
+    values: {
+      free: false,
+      pro: { limit: 'aiActionsMonthly', perMonth: true, zeroExcluded: true },
+      premium: {
+        limit: 'aiActionsMonthly',
+        perMonth: true,
+        zeroExcluded: true,
+      },
+    },
   },
   {
     label: 'Custom page size',
@@ -120,33 +159,79 @@ export const CLIENT_EXPORT_NOTE =
 
 /**
  * Manual crypto billing (ADR-0005): no card processor, no auto-renewal —
- * payments in USDT or Litecoin, verified by hand.
+ * payments in USDT or Litecoin, verified by hand. The instruments are named
+ * because they are what the customer actually sends; the plan prices above are
+ * shown in dollars as the same numeral.
+ *
+ * No multiple is promised here, deliberately. The twelve-month price is a
+ * stored figure the Admin sets like any other, so the 10× (two months free) the
+ * seed happens to use is a pricing decision, not a rule this text may assert.
  */
 export const DURATION_NOTE =
-  'Paid plans run 1, 3, 6, or 12 months — 12 months costs 10× (two months free). ' +
+  'Paid plans run 1, 3, 6, or 12 months — longer terms are priced to save. ' +
   'Payments are manual crypto (USDT or Litecoin), verified by hand. Nothing auto-renews.';
 
-/** The Order duration options; 12 months costs 10× the monthly rate. */
-export const DURATIONS = [1, 3, 6, 12] as const;
-export type DurationMonths = (typeof DURATIONS)[number];
+/** The Order duration options. Their prices are per-duration figures the
+ *  Admin stores, not a multiple computed here. */
+export const DURATIONS: readonly DurationMonths[] = [1, 3, 6, 12];
 
 /** Display name for a plan id ("Free", "Pro", "Premium"). */
 export function planName(planId: PlanId): string {
   return PLANS.find((p) => p.id === planId)?.name ?? planId;
 }
 
-/** Display total for a plan + duration, mirroring the server's seeded prices.
- * Display only — the authoritative amount arrives with the Order itself.
+/**
+ * The one money formatter every catalog surface renders a plan price with: a
+ * whole amount without decimals, anything else with two. No locale
+ * formatting — the app has none today and this introduces none.
  */
-export function priceForDuration(
-  planId: 'pro' | 'premium',
+export function formatPrice(amount: number): string {
+  return `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+}
+
+/**
+ * The price line under a plan name in the comparison table: the stored monthly
+ * price, or `Free`. Null until the response has landed, so no surface ever
+ * paints a price it has not read.
+ */
+export function planPriceLabel(
+  planId: PlanId,
+  prices: PlanPrices | null,
+): string | null {
+  if (planId === 'free') return 'Free';
+  if (!prices) return null;
+  return `${formatPrice(prices[planId].monthly)}/mo`;
+}
+
+/** The stored total for a plan + duration, already formatted; null while
+ *  unknown. The stored figure, not months × a monthly rate. */
+export function durationPriceLabel(
+  planId: PaidPlanId,
   months: DurationMonths,
-): number {
-  const plan = PLANS.find((p) => p.id === planId);
-  if (!plan || plan.priceMonthlyUsdt === null) {
-    throw new Error(`no price for plan ${planId}`);
-  }
-  return months === 12
-    ? plan.priceMonthlyUsdt * 10
-    : plan.priceMonthlyUsdt * months;
+  prices: PlanPrices | null,
+): string | null {
+  if (!prices) return null;
+  return formatPrice(prices[planId].durations[months]);
+}
+
+/**
+ * What a comparison cell shows: the row's own text, the boolean the renderer
+ * turns into an included/not-included mark, or the stored limit read out of
+ * the response. A limit cell is `null` while the numbers are in flight, which
+ * is what keeps a stale figure from being painted — the caller renders `null`
+ * as nothing at all, or as unavailable once the read has failed.
+ */
+export function featureCellText(
+  value: FeatureValue,
+  planId: PlanId,
+  limits: PlanLimits | null,
+): string | boolean | null {
+  if (typeof value !== 'object') return value;
+  // The Free Tier has no stored limit, so its cells are always the static text
+  // the row carries; a paid plan's cell has nothing to read until the response
+  // lands.
+  if (planId === 'free' || limits === null) return null;
+  const amount = limits[planId][value.limit];
+  if (value.zeroExcluded && amount === 0) return false;
+  return value.perMonth ? `${amount}/mo` : `${amount}`;
 }

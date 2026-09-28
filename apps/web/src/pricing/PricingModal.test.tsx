@@ -2,8 +2,11 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PricingModal } from './PricingModal';
+import { resetPricingStoreForTests } from './store';
+import { jsonResponse } from '../testing/json-response';
+import { PRICING_RESPONSE } from '../testing/pricing-response';
 import { trackEvent } from '../analytics/tracker';
 
 vi.mock('../analytics/tracker', async () => {
@@ -11,18 +14,31 @@ vi.mock('../analytics/tracker', async () => {
   return stubAnalyticsModule;
 });
 
+const PRICING = PRICING_RESPONSE;
+
+beforeEach(() => {
+  resetPricingStoreForTests();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, PRICING))),
+  );
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
-it('renders the compact plan comparison', () => {
+it('renders the compact plan comparison at the endpoint prices', async () => {
   render(<PricingModal onClose={vi.fn()} />);
 
   const dialog = screen.getByRole('dialog', { name: /plans and pricing/i });
   expect(dialog).toBeInTheDocument();
   expect(screen.getByText('Premium')).toBeInTheDocument();
-  expect(screen.getByText('3 USDT/mo')).toBeInTheDocument();
+  // The same figure /pricing shows: opening the modal from the editor does not
+  // change the answer.
+  expect(await screen.findByText('$4.50/mo')).toBeInTheDocument();
   expect(screen.getByText('Priority render queue')).toBeInTheDocument();
   // Pitch and Client Export note render from the plans module.
   expect(screen.getByText(/unlock every paid feature/)).toBeInTheDocument();

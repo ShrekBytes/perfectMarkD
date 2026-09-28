@@ -5,7 +5,7 @@
 > | To-do | Ticket |
 > |---|---|
 > | 1 — Remove the AI cost calculator | `launch/13` — **done**, 2026-09-28 |
-> | 2 — Make the pricing surface read live admin settings | `live-pricing/01`, under [the live-pricing spec](../live-pricing/spec.md) |
+> | 2 — Make the pricing surface read live admin settings | `live-pricing/01`, under [the live-pricing spec](../live-pricing/spec.md) — **done**, 2026-09-28 |
 > | 3 — Fetch the LTC rate every 12 hours, Admin cannot set it | `live-pricing/02` |
 > | 4 — A pending Order must be paid within 6 hours | `live-pricing/02` |
 >
@@ -18,7 +18,10 @@
 > Order's own amount; the catalog module's only contribution there is the list
 > of duration options); the catalog module has eleven importers, not ten, and
 > only four of them read prices; and the client and server duration arithmetic
-> already agree, so that drift is latent rather than present. To-do 1 also
+> already agree, so that drift is latent rather than present. To-do 2's own
+> "Accepts" line listed the Verification queue as a place a new price must
+> appear, and it does not — the real risk is a customer quoted a stale price and
+> then charged the current one, which is what shipped. To-do 1 also
 > undercounts its own test surface — three tests and five assertion sites — and
 > omits the production runbook, which tells the operator to check the readout
 > being deleted.

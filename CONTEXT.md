@@ -69,8 +69,12 @@ A payment where the user sends crypto themselves and submits the transaction det
 _Avoid_: checkout, invoice
 
 **Order**:
-A user's submitted request to verify a Manual Payment: Reference Code, plan, duration, coin/network, transaction ID, and amount. Pending until the Admin verifies or rejects it.
-_Avoid_: payment, invoice, transaction (the transaction is the on-chain event; the Order is the request)
+A user's submitted request to verify a Manual Payment: Reference Code, plan, duration, coin/network, transaction ID, and amount. Pending until the Admin verifies or rejects it, and payable only within its Payment Window — letting a window lapse is not a decision, so it is not a status and leaves the Order pending.
+_Avoid_: payment, invoice, transaction (the transaction is the on-chain event; the Order is the request), expired order (a lapsed Order is still pending)
+
+**Payment Window**:
+The six hours from an Order's creation within which it can be paid. Fixed at creation and not extended by a resubmission, so a lapsing window is reached by letting time pass, not by a decision anyone made.
+_Avoid_: expiry, timeout, hold, grace period (Plan Expiry is when an Entitlement ends)
 
 **Reference Code**:
 An Order's short unique identifier, shown to the user so Verification can match an on-chain transaction to the Order.
@@ -79,6 +83,10 @@ _Avoid_: memo, note
 **Verification**:
 The Admin's manual on-chain confirmation of a submitted Order before granting or extending an Entitlement.
 _Avoid_: approval, validation
+
+**Rate**:
+The USDT-per-LTC figure a job fetches from a public price feed every twelve hours and that the Admin cannot set. It carries its own age: a fresh Rate is quoted, an old one is refused for new Orders. Captured onto an Order at creation, so the Rate an Order was quoted at does not move afterwards.
+_Avoid_: exchange rate, price, price feed, coin rate (the plan price is not a Rate; only the crypto conversion is)
 
 **Admin**:
 The single operator (the owner) who verifies Orders and manages Entitlements through an admin panel.

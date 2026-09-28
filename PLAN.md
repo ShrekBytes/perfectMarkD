@@ -27,12 +27,13 @@ Preview, client print, and server PDF are pixel-identical by construction (ADR-0
 
 ### Tiers
 
-| | Free | Pro — 3 USDT/mo | Premium — 7 USDT/mo |
+| | Free | Pro — $3/mo | Premium — $7/mo |
 |---|---|---|---|
 | Account | none | required | required |
 | Client Export (print dialog) | ✓ | ✓ | ✓ |
 | Server Export (one-click PDF) | never | 300/mo | 1000/mo |
 | Pages per server export | — | 300 | 1000 |
+| AI Allowance (AI Actions/mo) | — | 100/mo | 300/mo |
 | Custom page size | — | ✓ | ✓ |
 | Custom stylesheet | — | ✓ | ✓ |
 | Header/footer banner images | — | ✓ | ✓ |
@@ -42,7 +43,7 @@ Preview, client print, and server PDF are pixel-identical by construction (ADR-0
 | Export History (30 days) | — | — | ✓ |
 
 - All core styling is free: presets, typography, colors, code themes, header/footer *text*, page numbers, page frame, mermaid, math, outline. No watermarks anywhere.
-- Durations: 1 / 3 / 6 / 12 months; 12 months costs 10× (two months free). Prices editable in admin settings.
+- Durations: 1 / 3 / 6 / 12 months; each term has its own stored price, so a twelve-month term can be discounted without it being a rule. Prices shown in dollars, stored and demanded in USDT (ADR-0005) — the numeral is the same, and no conversion happens.
 - No public API on any plan (non-goal).
 
 ### Billing (ADR-0005)
@@ -101,7 +102,7 @@ Workstreams & tickets live in `.scratch/`: [`account-page`](.scratch/account-pag
 - **Manual verification fraud** — Mitigation: amount + Reference Code match, txid spot-check on explorer, Reject-with-reason flow.
 - **Client-side gate bypass (AGPL client)** — devtools can unlock client-only gates. Accepted: everything of value (Server Export) is server-enforced (ADR-0005).
 - **Self-hosting cannibalization** — accepted deliberately (ADR-0001); the moat is the hosted convenience + price.
-- **Crypto price volatility** — prices are denominated in USDT; LTC amount computed from a USDT rate captured at Order creation.
+- **Crypto price volatility** — plan prices are stored and demanded in USDT and shown as dollars; LTC amount computed from a USDT rate captured at Order creation. Prices, limits, and per-duration totals live only in admin settings, and every pricing surface reads them from `GET /api/pricing`, so a customer is never quoted one figure and charged another.
 
 ## 6. Non-goals (v1)
 

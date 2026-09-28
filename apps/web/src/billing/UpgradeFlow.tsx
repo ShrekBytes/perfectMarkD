@@ -4,9 +4,11 @@ import type { AuthUser } from '../auth/api';
 import { useAccountStore } from '../auth/account-store';
 import {
   DURATIONS,
-  priceForDuration,
+  PRICE_UNAVAILABLE,
+  durationPriceLabel,
   type DurationMonths,
 } from '../pricing/plans';
+import { usePricing } from '../pricing/store';
 import { createOrder, type Order } from './api';
 import { PaymentForm } from './PaymentForm';
 import { PaymentInstructions } from './PaymentInstructions';
@@ -42,6 +44,10 @@ interface UpgradeFlowProps {
 export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
   const user = useAccountStore((state) => state.user);
   const signedIn = useAccountStore((state) => state.signedIn);
+  // The duration totals come from the stored per-duration figures, so the total
+  // on this screen and the price on /pricing cannot disagree (live-pricing/01).
+  const { prices, status } = usePricing();
+  const priceUnavailable = status === 'unavailable';
 
   const [step, setStep] = useState<UpgradeStep>('details');
   const [durationMonths, setDurationMonths] = useState<DurationMonths>(1);
@@ -128,8 +134,12 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
                     <span className="block font-medium text-ink">
                       {months} {months === 1 ? 'month' : 'months'}
                     </span>
-                    <span className="block text-xs text-ink-soft">
-                      {priceForDuration(plan, months)} USDT
+                    <span
+                      data-testid={`duration-price-${months}`}
+                      className="block text-xs text-ink-soft"
+                    >
+                      {durationPriceLabel(plan, months, prices) ??
+                        (priceUnavailable ? PRICE_UNAVAILABLE : '')}
                     </span>
                   </button>
                 );
@@ -173,7 +183,8 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
           <p className="mt-4 text-sm text-ink">
             Total:{' '}
             <span data-testid="upgrade-total" className="font-semibold">
-              {priceForDuration(plan, durationMonths)} USDT
+              {durationPriceLabel(plan, durationMonths, prices) ??
+                (priceUnavailable ? PRICE_UNAVAILABLE : '')}
             </span>
           </p>
 

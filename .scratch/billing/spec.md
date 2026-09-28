@@ -4,8 +4,8 @@ Implements the Manual Payment → Order → Verification → Entitlement flow (A
 
 ## Flow (canonical)
 
-1. User picks plan + duration on `/pricing` or the pricing modal → prompted to register/login if needed.
-2. Order created: Reference Code (short, e.g. `PM-7F3K2`), exact amount (USDT-denominated; LTC amount computed from a rate captured at Order creation and shown alongside), wallet addresses per coin from admin settings, network warnings (send on the chosen network only).
+1. User picks plan + duration on `/pricing` or the pricing modal → prompted to register/login if needed. The prices and limits shown there come from the admin settings the Order is priced from, so the quoted figure and the demanded one are the same number.
+2. Order created: Reference Code (short, e.g. `PM-7F3K2`), exact amount (denominated in the coin actually demanded — USDT, or LTC computed from a rate captured at Order creation and shown alongside), wallet addresses per coin from admin settings, network warnings (send on the chosen network only).
 3. User sends crypto, then submits: network, txid, amount, optional note.
 4. Order sits `pending` — user sees it in an "Upgrade status" view.
 5. Admin verifies on-chain in `/admin` → Entitlement granted with chosen expiry (preset durations or custom date) → user's gates open, quota chip appears.

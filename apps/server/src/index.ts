@@ -6,6 +6,7 @@ import { requestLogger, type LogSink } from './request-logger.js';
 import { buildInfo } from './version.js';
 import { authRoutes, type AuthOptions } from './auth/routes.js';
 import { orderRoutes } from './orders/routes.js';
+import { pricingRoutes } from './pricing/routes.js';
 import { adminRoutes } from './admin/routes.js';
 import { setSessionCookie } from './auth/http.js';
 import { createSendLimiter } from './auth/rate-limit.js';
@@ -227,6 +228,10 @@ export function createApp({
       }),
     )
     .route('/api/orders', orderRoutes())
+    // The public catalog read (live-pricing/01): prices and limits only, with
+    // no session. Mounted unconditionally — it is how a prospective customer
+    // reads the pricing page at all.
+    .route('/api/pricing', pricingRoutes())
     .route(
       '/api/admin',
       adminRoutes({

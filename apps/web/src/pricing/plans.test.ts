@@ -6,44 +6,115 @@ import {
   FEATURE_ROWS,
   PAID_PLANS_PITCH,
   PLANS,
-  priceForDuration,
+  durationPriceLabel,
+  featureCellText,
+  formatPrice,
+  planPriceLabel,
   type PlanId,
 } from './plans';
+import type { PlanLimits, PlanPrices } from './api';
+
+const PRICES: PlanPrices = {
+  pro: { monthly: 3, durations: { 1: 3, 3: 9, 6: 18, 12: 30 } },
+  premium: { monthly: 7, durations: { 1: 7, 3: 21, 6: 42, 12: 70 } },
+};
+
+const LIMITS: PlanLimits = {
+  pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 100 },
+  premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
+};
 
 const valuesFor = (plan: PlanId) =>
-  FEATURE_ROWS.map((row) => ({ label: row.label, value: row.values[plan] }));
+  FEATURE_ROWS.map((row) => ({
+    label: row.label,
+    value: featureCellText(row.values[plan], plan, LIMITS),
+  }));
 
 describe('plan catalog (PLAN.md §1 tiers table)', () => {
-  it('lists Free, Pro, and Premium with their monthly USDT prices', () => {
+  it('lists Free, Pro, and Premium, and holds no prices', () => {
     expect(PLANS.map((plan) => plan.id)).toEqual(['free', 'pro', 'premium']);
-    expect(PLANS.map((plan) => plan.priceMonthlyUsdt)).toEqual([null, 3, 7]);
+    // The catalog is the display layer only: a price or limit here would be a
+    // second place to change one (live-pricing/01).
+    for (const plan of PLANS) {
+      expect(plan).not.toHaveProperty('priceMonthlyUsdt');
+    }
   });
 
   it('gives every feature row a value for every plan', () => {
     for (const row of FEATURE_ROWS) {
       for (const plan of PLANS) {
         expect(row.values[plan.id], `${row.label} × ${plan.id}`).toBeDefined();
+        // Every cell resolves to something renderable once the numbers land.
+        expect(
+          featureCellText(row.values[plan.id], plan.id, LIMITS),
+          `${row.label} × ${plan.id}`,
+        ).not.toBeNull();
       }
     }
   });
 
   it('keeps Client Export free on every plan', () => {
     const row = FEATURE_ROWS.find((r) => r.label.startsWith('Client Export'));
-    expect(valuesFor('free')).toContainEqual({
-      label: expect.stringMatching(/^Client Export/),
-      value: true,
-    });
     expect(row).toBeDefined();
     expect(row!.values).toEqual({ free: true, pro: true, premium: true });
   });
 
-  it('caps Server Export at the table quotas and never on Free', () => {
+  it('labels the AI Allowance row with the glossary term, not a restatement of it', () => {
+    // CONTEXT.md: the term is "AI Allowance"; the parenthetical restatement the
+    // table used to invite is the glossary's own definition, which the term
+    // already carries.
+    const row = FEATURE_ROWS.find((r) => r.label === 'AI Allowance');
+    expect(row).toBeDefined();
+    expect(row!.label).toBe('AI Allowance');
+  });
+
+  it('caps Server Export at the response Quotas and never on Free', () => {
     const row = FEATURE_ROWS.find((r) => r.label.startsWith('Server Export'));
-    expect(row!.values).toEqual({
-      free: 'never',
-      pro: '300/mo',
-      premium: '1000/mo',
+    expect(valuesFor('free')).toContainEqual({
+      label: expect.stringMatching(/^Server Export/),
+      value: 'never',
     });
+    expect(featureCellText(row!.values.pro, 'pro', LIMITS)).toBe('300/mo');
+    expect(featureCellText(row!.values.premium, 'premium', LIMITS)).toBe(
+      '1000/mo',
+    );
+  });
+
+  it('takes the page cap and the AI Allowance from the response too', () => {
+    const cap = FEATURE_ROWS.find((r) => r.label.startsWith('Pages per'));
+    const ai = FEATURE_ROWS.find((r) => r.label === 'AI Allowance');
+    expect(ai).toBeDefined();
+    expect(featureCellText(cap!.values.pro, 'pro', LIMITS)).toBe('300');
+    expect(featureCellText(ai!.values.pro, 'pro', LIMITS)).toBe('100/mo');
+    expect(featureCellText(ai!.values.premium, 'premium', LIMITS)).toBe(
+      '300/mo',
+    );
+    // A changed limit reaches the table with nothing else edited.
+    const raised: PlanLimits = {
+      pro: { pageCap: 500, quotaMonthly: 450, aiActionsMonthly: 150 },
+      premium: { pageCap: 2500, quotaMonthly: 2400, aiActionsMonthly: 800 },
+    };
+    expect(featureCellText(cap!.values.pro, 'pro', raised)).toBe('500');
+    expect(featureCellText(ai!.values.premium, 'premium', raised)).toBe(
+      '800/mo',
+    );
+  });
+
+  it('reads a zero AI Allowance as not included, since zero disables AI', () => {
+    const ai = FEATURE_ROWS.find((r) => r.label === 'AI Allowance')!;
+    const none: PlanLimits = {
+      pro: { pageCap: 300, quotaMonthly: 300, aiActionsMonthly: 0 },
+      premium: { pageCap: 1000, quotaMonthly: 1000, aiActionsMonthly: 300 },
+    };
+    expect(featureCellText(ai.values.pro, 'pro', none)).toBe(false);
+  });
+
+  it('renders no number for a limit cell before the response has landed', () => {
+    const cap = FEATURE_ROWS.find((r) => r.label.startsWith('Pages per'))!;
+    expect(featureCellText(cap.values.pro, 'pro', null)).toBeNull();
+    // The static cells are unaffected: a name paints on first paint.
+    const account = FEATURE_ROWS.find((r) => r.label === 'Account')!;
+    expect(featureCellText(account.values.pro, 'pro', null)).toBe('Required');
   });
 
   it('marks the gated styling features as Pro and above', () => {
@@ -98,19 +169,54 @@ describe('plan-facts copy (kept beside the matrix)', () => {
 describe('billing (ADR-0005 manual crypto)', () => {
   it('documents the manual crypto duration options', () => {
     expect(DURATION_NOTE).toMatch(/1.*3.*6.*12 months/);
-    expect(DURATION_NOTE).toMatch(/10×/);
     expect(DURATION_NOTE).toMatch(/auto-renew/i);
+    // No multiple is promised: the twelve-month price is a stored figure, so
+    // copy asserting 10× would contradict a deliberate discount the moment an
+    // Admin sets one.
+    expect(DURATION_NOTE).not.toMatch(/10×|ten times|10 times/i);
   });
 
   it('offers the four Order durations', () => {
     expect(DURATIONS).toEqual([1, 3, 6, 12]);
   });
+});
 
-  it('prices durations linearly, 12 months at 10× monthly', () => {
-    expect(priceForDuration('pro', 1)).toBe(3);
-    expect(priceForDuration('pro', 3)).toBe(9);
-    expect(priceForDuration('pro', 6)).toBe(18);
-    expect(priceForDuration('pro', 12)).toBe(30);
-    expect(priceForDuration('premium', 12)).toBe(70);
+describe('the money formatter', () => {
+  it('leaves a whole amount without decimals and gives anything else two', () => {
+    expect(formatPrice(3)).toBe('$3');
+    expect(formatPrice(30)).toBe('$30');
+    expect(formatPrice(3.5)).toBe('$3.50');
+    expect(formatPrice(4.25)).toBe('$4.25');
+  });
+
+  it('formats a plan header price, and Free for the free plan', () => {
+    expect(planPriceLabel('pro', PRICES)).toBe('$3/mo');
+    expect(planPriceLabel('premium', PRICES)).toBe('$7/mo');
+    expect(planPriceLabel('free', null)).toBe('Free');
+    // No price before the response lands: nothing is painted rather than a
+    // figure that is about to change.
+    expect(planPriceLabel('pro', null)).toBeNull();
+  });
+});
+
+describe('duration prices are read, never computed', () => {
+  it('renders the stored per-duration figures verbatim', () => {
+    expect(durationPriceLabel('pro', 1, PRICES)).toBe('$3');
+    expect(durationPriceLabel('pro', 12, PRICES)).toBe('$30');
+    expect(durationPriceLabel('premium', 12, PRICES)).toBe('$70');
+  });
+
+  it('passes a deliberate twelve-month discount through unchanged', () => {
+    const discounted: PlanPrices = {
+      pro: { monthly: 3, durations: { 1: 3, 3: 9, 6: 18, 12: 27 } },
+      premium: { monthly: 7, durations: { 1: 7, 3: 21, 6: 42, 12: 63 } },
+    };
+    // Nine times monthly, not ten: the client has no opinion about it.
+    expect(durationPriceLabel('pro', 12, discounted)).toBe('$27');
+    expect(durationPriceLabel('premium', 12, discounted)).toBe('$63');
+  });
+
+  it('reads no price at all before the response lands', () => {
+    expect(durationPriceLabel('pro', 1, null)).toBeNull();
   });
 });

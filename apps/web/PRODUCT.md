@@ -33,20 +33,24 @@ Success means a writer can go from Markdown to a PDF they are proud to send, in 
 
 ## Capabilities and Constraints
 
-**Confirmed tiers and gating** (editable prices live in admin settings):
+**Confirmed tiers and gating** (editable prices and limits live in admin
+settings, and every pricing surface reads them from `GET /api/pricing`; the
+figures below are the seeds, shown in dollars for a price stored and demanded
+in USDT — same numeral, no conversion):
 
-| | Free | Pro — 3 USDT/mo | Premium — 7 USDT/mo |
+| | Free | Pro — $3/mo | Premium — $7/mo |
 |---|---|---|---|
 | Account | none | required | required |
 | Client Export (print dialog) | ✓ | ✓ | ✓ |
 | Server Export | never | 300/mo | 1000/mo |
 | Pages per server export | — | 300 | 1000 |
+| AI Allowance (AI Actions/mo) | — | 100/mo | 300/mo |
 | Custom page size, custom CSS, fonts, banner/background images | — | ✓ | ✓ |
 | Priority render queue | — | — | ✓ |
 | Export History (30 days) | — | — | ✓ |
 
 - All core styling is free: presets, typography, colors, code themes, header/footer text, page numbers, page frame, mermaid, math, outline. No watermarks on any tier.
-- Durations: 1 / 3 / 6 / 12 months; 12 months costs 10× (two months free).
+- Durations: 1 / 3 / 6 / 12 months; each term has its own stored price, so a twelve-month term can be discounted without it being a rule.
 - Gated controls in the UI show a lock that opens the pricing modal — never a signup wall.
 - Client-side gates are bypassable by design (AGPL): everything of real value (Server Export) is enforced server-side.
 - Terminology is fixed by the glossary in `CONTEXT.md` (Document, Page Break, Preset, Outline, Client Export, Server Export, Quota, Order, Verification). Use those terms; respect the listed "avoid" words.

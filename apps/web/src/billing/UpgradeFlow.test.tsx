@@ -9,6 +9,9 @@ import {
   resetAccountStoreForTests,
   useAccountStore,
 } from '../auth/account-store';
+import { resetPricingStoreForTests } from '../pricing/store';
+import { jsonResponse } from '../testing/json-response';
+import { PRICING_FAILURE, PRICING_RESPONSE } from '../testing/pricing-response';
 
 const onClose = vi.fn();
 
@@ -43,12 +46,26 @@ const LTC_ORDER = {
 
 const TXID = 'a'.repeat(64);
 
+/** The shared stubbed pricing payload: the seeded figures, except Pro's twelve
+ *  months, which is 47 rather than 30 — a deliberate discount no client
+ *  arithmetic could produce. */
+const PRICING = PRICING_RESPONSE;
+
+/** Answers /api/pricing, failing the test on any other URL so a surface that
+ *  reaches for something else cannot slip through. */
+function stubApi(): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn((url: string | URL | Request) => {
+    expect(String(url)).toBe('/api/pricing');
+    return Promise.resolve(jsonResponse(200, PRICING));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
 beforeEach(() => {
   resetAccountStoreForTests();
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.reject(new Error('unexpected fetch'))),
-  );
+  resetPricingStoreForTests();
+  stubApi();
 });
 
 afterEach(() => {
@@ -56,13 +73,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
-}
 
 function stubClipboard(): ReturnType<typeof vi.fn> {
   const writeText = vi.fn().mockResolvedValue(undefined);
@@ -97,25 +107,82 @@ async function createOrderThroughUi(
 }
 
 describe('details step', () => {
-  it('offers the durations with their prices and the three payment methods', () => {
+  it('offers the durations with the prices the endpoint returned and the three payment methods', async () => {
     render(<UpgradeFlow plan="pro" onClose={onClose} />);
 
+    // Duration options and payment instruments are static; the price each one
+    // carries is not, and the coin named here is the instrument, not the price.
     expect(screen.getByText('1 month')).toBeInTheDocument();
     expect(screen.getByText('3 months')).toBeInTheDocument();
     expect(screen.getByText('12 months')).toBeInTheDocument();
     expect(screen.getByText('USDT · TRC-20')).toBeInTheDocument();
     expect(screen.getByText('USDT · BEP-20')).toBeInTheDocument();
     expect(screen.getByText('Litecoin · LTC')).toBeInTheDocument();
-    expect(screen.getByTestId('upgrade-total')).toHaveTextContent('3 USDT');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('upgrade-total')).toHaveTextContent('$4.50'),
+    );
+    expect(screen.getByTestId('duration-price-12')).toHaveTextContent('$47');
   });
 
-  it('recomputes the total when the duration changes', async () => {
+  it('shows no price at all before the response lands', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+    render(<UpgradeFlow plan="pro" onClose={onClose} />);
+
+    // The durations are on screen; the figures are not. A stale number read as
+    // current is the failure this removes.
+    expect(screen.getByText('12 months')).toBeInTheDocument();
+    expect(screen.getByTestId('upgrade-total')).toHaveTextContent('');
+    expect(screen.getByTestId('duration-price-12')).toHaveTextContent('');
+  });
+
+  it('says the total is unavailable when the prices cannot be read', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(jsonResponse(500, PRICING_FAILURE))),
+    );
+    render(<UpgradeFlow plan="pro" onClose={onClose} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('upgrade-total')).toHaveTextContent(
+        'Unavailable',
+      ),
+    );
+    expect(screen.getByTestId('duration-price-1')).toHaveTextContent(
+      'Unavailable',
+    );
+    // Never a fallback to the seeded default.
+    expect(screen.queryByText('$3')).toBeNull();
+    expect(screen.queryByText('$4.50')).toBeNull();
+  });
+
+  it('reads the total for the chosen duration, including a deliberate discount', async () => {
     const user = userEvent.setup();
-    render(<UpgradeFlow plan="premium" onClose={onClose} />);
+    render(<UpgradeFlow plan="pro" onClose={onClose} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('upgrade-total')).toHaveTextContent('$4.50'),
+    );
 
     await user.click(screen.getByRole('button', { name: /12 months/ }));
 
-    expect(screen.getByTestId('upgrade-total')).toHaveTextContent('70 USDT');
+    // 47, not 4.5 × 12: the stored figure is the whole price of twelve months,
+    // and the client never derives one.
+    expect(screen.getByTestId('upgrade-total')).toHaveTextContent('$47');
+  });
+
+  it('reads the total for the chosen duration on Premium', async () => {
+    const user = userEvent.setup();
+    render(<UpgradeFlow plan="premium" onClose={onClose} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('upgrade-total')).toHaveTextContent('$9'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /12 months/ }));
+
+    expect(screen.getByTestId('upgrade-total')).toHaveTextContent('$90');
   });
 
   it('sends the selected plan, duration, and method to the server', async () => {

@@ -1,6 +1,13 @@
 import { useId } from 'react';
-import { FEATURE_ROWS, PLANS, formatPrice } from './plans';
-import type { Plan } from './plans';
+import {
+  FEATURE_ROWS,
+  PLANS,
+  PRICE_UNAVAILABLE,
+  featureCellText,
+  planPriceLabel,
+  type Plan,
+} from './plans';
+import { usePricing } from './store';
 import { CheckIcon } from '../shell/icons';
 import { trackEvent } from '../analytics/tracker';
 import './pricing.css';
@@ -20,18 +27,35 @@ interface PlanComparisonProps {
  * the /pricing page and the pricing modal can never drift apart. Feature cells
  * keep visually hidden text so the table still reads as yes/no/quote for
  * screen readers.
+ *
+ * The names, blurbs, and feature labels are static and paint immediately; the
+ * prices and the Quota, page-cap, and AI Allowance figures come from
+ * `GET /api/pricing` and render only once they have landed, or read as
+ * unavailable (live-pricing/01).
  */
 export function PlanComparison({
   compact,
   onOpenEditor,
   onUpgrade,
 }: PlanComparisonProps) {
+  const { prices, limits, status } = usePricing();
   const comparisonId = useId();
   const bodyText = compact ? 'text-xs' : 'text-sm';
   const cellPad = compact ? 'px-2 py-1.5' : 'px-3 py-2';
+  const unavailable = status === 'unavailable';
 
   return (
     <div className="plan-comparison-container">
+      {unavailable && (
+        <p
+          role="status"
+          data-testid="pricing-unavailable"
+          className="mb-3 text-xs text-ink-soft"
+        >
+          Prices and limits could not be loaded, so the numbers below are
+          missing rather than free or zero. Reload the page to try again.
+        </p>
+      )}
       <table
         role="table"
         aria-label="Compare plans"
@@ -60,8 +84,14 @@ export function PlanComparison({
                 >
                   {plan.name}
                 </span>
-                <span className="mt-1 block font-mono text-xs tabular-nums text-ink-soft">
-                  {formatPrice(plan)}
+                <span
+                  data-testid={
+                    plan.id === 'free' ? 'price-free' : `price-${plan.id}`
+                  }
+                  className="mt-1 block font-mono text-xs tabular-nums text-ink-soft"
+                >
+                  {planPriceLabel(plan.id, prices) ??
+                    (unavailable ? PRICE_UNAVAILABLE : '')}
                 </span>
                 {!compact && (
                   <span className="plan-blurb mt-2 block text-xs font-normal text-ink-soft">
@@ -102,7 +132,14 @@ export function PlanComparison({
                   headers={`${comparisonId}-feature-${rowIndex} ${comparisonId}-${plan.id}`}
                   className={`border-b border-hairline text-center tabular-nums ${cellPad}`}
                 >
-                  <CellValue value={row.values[plan.id]} />
+                  <CellValue
+                    value={featureCellText(
+                      row.values[plan.id],
+                      plan.id,
+                      limits,
+                    )}
+                    unavailable={unavailable}
+                  />
                 </td>
               ))}
             </tr>
@@ -113,7 +150,22 @@ export function PlanComparison({
   );
 }
 
-function CellValue({ value }: { value: string | boolean }) {
+function CellValue({
+  value,
+  unavailable,
+}: {
+  value: string | boolean | null;
+  unavailable: boolean;
+}) {
+  // A limit cell the response has not filled yet: nothing is painted, because
+  // a blank and a stale figure look identical once read quickly.
+  if (value === null) {
+    return unavailable ? (
+      <span className="text-ink-faint">
+        —<span className="sr-only">Unavailable</span>
+      </span>
+    ) : null;
+  }
   if (value === true) {
     return (
       <span className="inline-flex items-center text-ink">
