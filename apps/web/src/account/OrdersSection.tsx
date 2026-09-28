@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Link } from '../router';
 import type { Order } from '../billing/api';
-import { orderDate, STATUS_BADGE, STATUS_LABEL } from '../billing/payment';
+import {
+  orderDate,
+  orderDateTime,
+  STATUS_BADGE,
+  STATUS_LABEL,
+} from '../billing/payment';
 import { PaymentForm } from '../billing/PaymentForm';
 import { PaymentInstructions } from '../billing/PaymentInstructions';
 
@@ -28,11 +33,16 @@ export function OrdersSection({
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   // The strip's two states: details submitted (the ball is in the Admin's
-  // court), or an Order still waiting for the user's payment details.
-  const anySubmitted = orders?.some(
-    (order) => order.status === 'pending' && order.txid !== null,
+  // court), or an Order still waiting for the user's payment details. A
+  // lapsed Order counts for neither: there is nothing left to submit and
+  // nothing left to wait for, and including it would leave the strip
+  // promising a payment window that has already closed.
+  const payable = orders?.filter(
+    (order) => order.status === 'pending' && !order.paymentExpired,
   );
-  const anyPending = orders?.some((order) => order.status === 'pending');
+  const anySubmitted = payable?.some((order) => order.txid !== null);
+  const anyPending = payable !== undefined && payable.length > 0;
+  const anyLapsed = orders?.some((order) => order.paymentExpired) ?? false;
 
   return (
     <section
@@ -85,6 +95,17 @@ export function OrdersSection({
 
       {orders !== null && orders.length > 0 && !error && (
         <>
+          {anyLapsed && (
+            <p
+              role="status"
+              data-testid="orders-lapsed-strip"
+              className="mt-3 rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger"
+            >
+              An Order here is past its payment window and can no longer be
+              paid. It is not cancelled — start a new Order and the price will
+              be the one shown today.
+            </p>
+          )}
           {anyPending && (
             <p
               role="status"
@@ -99,6 +120,11 @@ export function OrdersSection({
           <ul className="mt-3 space-y-2" data-testid="order-list">
             {orders.map((order) => {
               const expandedNow = order.id === expandedId;
+              // A lapsed window is not a fourth status, so the badge still
+              // says Pending. What changes is that there is nothing to pay and
+              // a new Order is the way out — saying that here beats letting
+              // someone send funds against a quote that closed hours ago.
+              const lapsed = order.paymentExpired;
               return (
                 <li
                   key={order.id}
@@ -130,7 +156,22 @@ export function OrdersSection({
                     </span>
                   </div>
 
-                  {order.status !== 'verified' && !expandedNow && (
+                  {lapsed && (
+                    <p
+                      role="status"
+                      data-testid="order-window-lapsed"
+                      className="mt-2 rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-xs text-danger"
+                    >
+                      The payment window closed
+                      {order.paymentDeadline
+                        ? ` ${orderDateTime(order.paymentDeadline)}`
+                        : ''}
+                      , so this Order can no longer be paid. It is not
+                      cancelled.
+                    </p>
+                  )}
+
+                  {!lapsed && order.status !== 'verified' && !expandedNow && (
                     <button
                       type="button"
                       onClick={() => setExpandedId(order.id)}
@@ -142,6 +183,16 @@ export function OrdersSection({
                           ? 'Edit details'
                           : 'Enter payment details'}
                     </button>
+                  )}
+
+                  {lapsed && !expandedNow && (
+                    <Link
+                      to="/pricing"
+                      data-testid="order-new-order"
+                      className="touch-target mt-2 inline-flex h-7 items-center rounded-control bg-accent-strong px-2.5 text-xs font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
+                    >
+                      Start a new order
+                    </Link>
                   )}
 
                   {expandedNow && (
@@ -163,16 +214,30 @@ export function OrdersSection({
                       >
                         <PaymentInstructions order={order} />
                       </div>
-                      <div className="mt-3">
-                        <PaymentForm
-                          order={order}
-                          onSubmitted={() => {
-                            setExpandedId(null);
-                            onRefresh();
-                          }}
-                          onCancel={() => setExpandedId(null)}
-                        />
-                      </div>
+                      {/* A lapsed Order shows the form's absence, never the
+                          form: submitting into a closed window is refused by
+                          the server, and an offered control that always fails
+                          is worse than none. */}
+                      {lapsed ? (
+                        <Link
+                          to="/pricing"
+                          data-testid="order-new-order-expanded"
+                          className="touch-target mt-3 inline-flex h-9 items-center rounded-control bg-accent-strong px-3 text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2"
+                        >
+                          Start a new order
+                        </Link>
+                      ) : (
+                        <div className="mt-3">
+                          <PaymentForm
+                            order={order}
+                            onSubmitted={() => {
+                              setExpandedId(null);
+                              onRefresh();
+                            }}
+                            onCancel={() => setExpandedId(null)}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </li>

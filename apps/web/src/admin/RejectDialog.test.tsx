@@ -26,6 +26,8 @@ function adminOrder(overrides: Partial<AdminOrder> = {}): AdminOrder {
     rejectReason: null,
     createdAt: '2026-09-10T00:00:00.000Z',
     decidedAt: null,
+    paymentDeadline: null,
+    paymentExpired: false,
     walletAddress: 'TTronWalletForTheTest',
     userEmail: 'reader@example.com',
     entitlement: null,
@@ -133,4 +135,79 @@ it('shows the server’s error and stays open on failure', async () => {
   );
   expect(onRejected).not.toHaveBeenCalled();
   expect(onClose).not.toHaveBeenCalled();
+});
+
+it('offers a rate-move reason on a short LTC payment', async () => {
+  const user = userEvent.setup();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { order: adminOrder() }))),
+  );
+
+  render(
+    <RejectDialog
+      order={adminOrder({
+        coin: 'LTC',
+        network: 'mainnet',
+        amountExpected: '0.02',
+        ltcRateUsdt: '320.5',
+        amountClaimed: '0.0187',
+      })}
+      onRejected={onRejected}
+      onClose={onClose}
+    />,
+  );
+
+  const suggestion = screen
+    .getAllByTestId('reject-suggestion')
+    .find((node) => /rate moved/i.test(node.textContent ?? ''));
+  expect(suggestion).toBeDefined();
+  await user.click(suggestion!);
+
+  // One click fills a complete sentence: the text is read by the customer on
+  // their Account page, so it has to say what to do, not name a category.
+  const reason = (screen.getByTestId('reject-reason') as HTMLTextAreaElement)
+    .value;
+  expect(reason).toMatch(/LTC rate moved/i);
+  expect(reason).toMatch(/start a new order/i);
+});
+
+it('offers a new-order reason when the window has lapsed', async () => {
+  const user = userEvent.setup();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { order: adminOrder() }))),
+  );
+
+  render(
+    <RejectDialog
+      order={adminOrder({
+        paymentDeadline: '2026-09-10T06:00:00.000Z',
+        paymentExpired: true,
+      })}
+      onRejected={onRejected}
+      onClose={onClose}
+    />,
+  );
+
+  const suggestions = screen.getAllByTestId('reject-suggestion');
+  expect(suggestions).toHaveLength(1);
+  await user.click(suggestions[0]!);
+  const reason = (screen.getByTestId('reject-reason') as HTMLTextAreaElement)
+    .value;
+  expect(reason).toMatch(/payment window closed/i);
+  expect(reason).toMatch(/start a new order/i);
+});
+
+it('offers no suggestions when nothing is short and no window lapsed', () => {
+  render(
+    <RejectDialog
+      order={adminOrder({ amountClaimed: '9' })}
+      onRejected={onRejected}
+      onClose={onClose}
+    />,
+  );
+
+  // The field stays free text, and an exact match is the Admin's own call.
+  expect(screen.queryByTestId('reject-suggestions')).not.toBeInTheDocument();
 });

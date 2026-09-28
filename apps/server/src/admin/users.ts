@@ -173,10 +173,11 @@ export function adminOrderView(
   wallets: WalletAddresses,
   order: Order,
   userEmail: string | null,
+  now: () => Date = () => new Date(),
 ): OrderView & AdminOrderView {
   const method = methodForCoinNetwork(order.coin, order.network);
   return {
-    ...orderView(order, method ? wallets[method] : ''),
+    ...orderView(order, method ? wallets[method] : '', now),
     userEmail,
     // The user's current Entitlement — what a duration grant stacks onto.
     entitlement:
@@ -396,7 +397,7 @@ export function usersRoutes({
       user: {
         ...view,
         orders: orderRows.map((order) =>
-          adminOrderView(db, wallets, order, user.email),
+          adminOrderView(db, wallets, order, user.email, now),
         ),
       } satisfies AdminUserDetailView,
     });

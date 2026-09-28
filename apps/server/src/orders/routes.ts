@@ -15,6 +15,12 @@ import {
   type OrderStatus,
 } from '../db/schema.js';
 import { ltcAmountFor, toCryptoAmount } from './amounts.js';
+import {
+  PAYMENT_WINDOW_CLOSED_MESSAGE,
+  paymentDeadlineFor,
+  paymentWindowClosed,
+  windowClosedForSubmission,
+} from './payment-window.js';
 import { RATE_MAX_AGE_MS } from '../rate/job.js';
 import {
   METHOD_COIN_NETWORK,
@@ -26,10 +32,14 @@ import {
 import { newReferenceCode } from './reference-code.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Orders (billing/01): a user's Manual Payment request, pending until the
-// Admin verifies or rejects it (billing/02's panel decides; this module only
-// creates and amends). All routes require a session — the upgrade flow is the
-// first thing an account is for.
+// Orders (billing/01): a user's Manual Payment request, payable within its
+// Payment Window and pending until the Admin verifies or rejects it (billing/
+// 02's panel decides; this module only creates and amends). All routes require
+// a session — the upgrade flow is the first thing an account is for.
+//
+// The window lapsing is not a decision and is not a status: a lapsed Order
+// stays pending, is simply refused further submissions, and is replaced by a
+// new one rather than swept (live-pricing/02).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The largest note a submission accepts; it is advisory text, not data. */
@@ -53,6 +63,16 @@ export interface OrderView {
   rejectReason: string | null;
   createdAt: string;
   decidedAt: string | null;
+  /**
+   * When this Order stops being payable; null means it has no Payment Window,
+   * which is the case for every Order created before the window existed.
+   */
+  paymentDeadline: string | null;
+  /**
+   * Whether that window has closed, derived on read from the status, the
+   * deadline, and the clock — never stored, and so never a fourth status.
+   */
+  paymentExpired: boolean;
   /** The receiving address for the Order's method — what payments go to. */
   walletAddress: string | null;
 }
@@ -150,7 +170,11 @@ function parseSubmission(body: unknown): SubmissionInput | { error: string } {
  * The client-facing Order view. Exported for the admin panel (billing/02),
  * whose view adds the user's email and Entitlement on top of the same shape.
  */
-export function orderView(order: Order, walletAddress: string): OrderView {
+export function orderView(
+  order: Order,
+  walletAddress: string,
+  now: () => Date = () => new Date(),
+): OrderView {
   return {
     id: order.id,
     referenceCode: order.referenceCode,
@@ -167,6 +191,8 @@ export function orderView(order: Order, walletAddress: string): OrderView {
     rejectReason: order.rejectReason,
     createdAt: order.createdAt.toISOString(),
     decidedAt: order.decidedAt?.toISOString() ?? null,
+    paymentDeadline: order.paymentDeadline?.toISOString() ?? null,
+    paymentExpired: paymentWindowClosed(order, now()),
     walletAddress: walletAddress === '' ? null : walletAddress,
   };
 }
@@ -240,6 +266,10 @@ export function orderRoutes({
       amountExpected = ltcAmountFor(amountUsdt, rate.usdtPerLtc);
     }
 
+    // The Payment Window is fixed here, at creation. Nothing later — a
+    // resubmission, a re-render, a retry — touches it, so the window means
+    // what it says.
+    const createdAt = now();
     // Reference codes are random; the UNIQUE index arbitrates the (vanishingly
     // unlikely) collision and the insert is retried with a fresh code.
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -255,10 +285,12 @@ export function orderRoutes({
             network,
             amountExpected,
             ltcRateUsdt,
+            paymentDeadline: paymentDeadlineFor(createdAt),
+            createdAt,
           })
           .returning()
           .get();
-        return c.json({ order: orderView(created, walletAddress) }, 201);
+        return c.json({ order: orderView(created, walletAddress, now) }, 201);
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
       }
@@ -280,7 +312,7 @@ export function orderRoutes({
     return c.json({
       orders: rows.map((order) => {
         const method = methodForCoinNetwork(order.coin, order.network);
-        return orderView(order, method ? wallets[method] : '');
+        return orderView(order, method ? wallets[method] : '', now);
       }),
     });
   });
@@ -311,6 +343,14 @@ export function orderRoutes({
         409,
       );
     }
+    // A lapsed window is checked before the details are even read: there is
+    // nothing to amend on an Order that can no longer be paid, and the
+    // customer's next step is a new Order, not a corrected resubmission. An
+    // Order whose details arrived in time stays amendable — see
+    // windowClosedForSubmission.
+    if (windowClosedForSubmission(order, now())) {
+      return c.json({ error: PAYMENT_WINDOW_CLOSED_MESSAGE }, 409);
+    }
     if (!networkValidForCoin(order.coin, parsed.network)) {
       return c.json(
         {
@@ -322,7 +362,8 @@ export function orderRoutes({
 
     // First submission and resubmission are the same operation: the details
     // are amended, a rejection reason no longer applies, and the Order is
-    // back in the pending queue for the Admin (billing/02).
+    // back in the pending queue for the Admin (billing/02). `paymentDeadline`
+    // is absent from this update on purpose — the window does not extend.
     const updated = c.var.db
       .update(orders)
       .set({
@@ -341,7 +382,7 @@ export function orderRoutes({
     const wallets = getWallets(c.var.db);
     const method = methodForCoinNetwork(updated.coin, updated.network);
     return c.json({
-      order: orderView(updated, method ? wallets[method] : ''),
+      order: orderView(updated, method ? wallets[method] : '', now),
     });
   });
 

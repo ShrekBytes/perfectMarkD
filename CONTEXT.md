@@ -73,7 +73,7 @@ A user's submitted request to verify a Manual Payment: Reference Code, plan, dur
 _Avoid_: payment, invoice, transaction (the transaction is the on-chain event; the Order is the request), expired order (a lapsed Order is still pending)
 
 **Payment Window**:
-The six hours from an Order's creation within which it can be paid. Fixed at creation and not extended by a resubmission, so a lapsing window is reached by letting time pass, not by a decision anyone made.
+The six hours from an Order's creation within which it can be paid. Fixed at creation and not extended by a resubmission, so a lapsing window is reached by letting time pass, not by a decision anyone made. Bounds when a customer may start paying, not when the Admin may read the Order afterwards: a payment submitted inside the window stays verifiable however long the queue takes to reach it.
 _Avoid_: expiry, timeout, hold, grace period (Plan Expiry is when an Entitlement ends)
 
 **Reference Code**:

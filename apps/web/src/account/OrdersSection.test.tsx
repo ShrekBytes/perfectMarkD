@@ -32,6 +32,8 @@ function order(overrides: Partial<Order> = {}): Order {
     rejectReason: null,
     createdAt: '2026-09-10T00:00:00.000Z',
     decidedAt: null,
+    paymentDeadline: null,
+    paymentExpired: false,
     walletAddress: 'TTronWalletForTheTest',
     ...overrides,
   };
@@ -60,6 +62,8 @@ it('lists the orders with their statuses as compact rows', () => {
           referenceCode: 'PM-AAAAA',
           status: 'verified',
           decidedAt: '2026-09-11T00:00:00.000Z',
+          paymentDeadline: null,
+          paymentExpired: false,
         }),
         order({ id: 1, referenceCode: 'PM-BBBBB' }),
       ]}
@@ -136,6 +140,8 @@ it('shows a rejected order’s reason when expanded, with a resubmit action', as
           txid: 'c'.repeat(64),
           amountClaimed: '8',
           decidedAt: '2026-09-11T00:00:00.000Z',
+          paymentDeadline: null,
+          paymentExpired: false,
         }),
       ]}
       error={null}
@@ -225,4 +231,138 @@ it('offers a Retry when the load failed', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Retry' }));
   expect(onRefresh).toHaveBeenCalledTimes(1);
+});
+
+it('shows the payment window deadline on a payable Order', async () => {
+  const user = userEvent.setup();
+  const payable = order({ paymentDeadline: '2099-06-11T18:00:00.000Z' });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { orders: [payable] }))),
+  );
+
+  render(
+    <OrdersSection orders={[payable]} error={null} onRefresh={onRefresh} />,
+  );
+
+  // The question the deadline exists to answer is "do I have time to send
+  // this", so the date alone is not enough — the time is shown.
+  await user.click(
+    screen.getByRole('button', { name: /enter payment details/i }),
+  );
+  expect(screen.getByTestId('payment-deadline')).toHaveTextContent(
+    /payable until .*cannot be paid after that/i,
+  );
+  expect(screen.getByTestId('payment-form')).toBeInTheDocument();
+  expect(screen.queryByTestId('payment-window-lapsed')).not.toBeInTheDocument();
+});
+
+it('shows a lapsed window as lapsed and offers a new Order, not a form', async () => {
+  const user = userEvent.setup();
+  const lapsed = order({
+    paymentDeadline: '2026-09-10T06:00:00.000Z',
+    paymentExpired: true,
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { orders: [lapsed] }))),
+  );
+
+  render(
+    <OrdersSection orders={[lapsed]} error={null} onRefresh={onRefresh} />,
+  );
+
+  expect(screen.getByTestId('order-window-lapsed')).toHaveTextContent(
+    /can no longer be paid/i,
+  );
+  // No submission control: the server refuses one, and a control that always
+  // fails is worse than none.
+  expect(
+    screen.queryByRole('button', { name: /enter payment details/i }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByTestId('order-new-order')).toHaveAttribute(
+    'href',
+    '/pricing',
+  );
+  expect(screen.getByTestId('orders-lapsed-strip')).toBeInTheDocument();
+  // The status badge is untouched: a lapsing window is not a decision.
+  expect(screen.getByTestId('order-status')).toHaveTextContent('Pending');
+  void user;
+});
+
+it('does not offer the payment form for a lapsed Order even when expanded', async () => {
+  const user = userEvent.setup();
+  const lapsed = order({
+    status: 'rejected',
+    rejectReason: 'Wrong amount.',
+    paymentDeadline: '2026-09-10T06:00:00.000Z',
+    paymentExpired: true,
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { orders: [lapsed] }))),
+  );
+
+  render(
+    <OrdersSection orders={[lapsed]} error={null} onRefresh={onRefresh} />,
+  );
+
+  // A rejected Order normally offers "Resubmit payment"; a lapsed one must not,
+  // because a resubmission into a closed window is refused.
+  expect(
+    screen.queryByRole('button', { name: /resubmit payment/i }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByTestId('order-new-order'));
+  void user;
+});
+
+it('a lapsed Order leaves the pending strip alone', async () => {
+  const lapsed = order({
+    paymentDeadline: '2026-09-10T06:00:00.000Z',
+    paymentExpired: true,
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { orders: [lapsed] }))),
+  );
+
+  render(
+    <OrdersSection orders={[lapsed]} error={null} onRefresh={onRefresh} />,
+  );
+
+  // The strip promises a payment window; on a lapsed Order there is none to
+  // promise.
+  expect(screen.queryByTestId('orders-pending-strip')).not.toBeInTheDocument();
+  expect(screen.getByTestId('orders-lapsed-strip')).toBeInTheDocument();
+});
+
+it('an Order with no deadline says nothing about a window', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { orders: [order()] }))),
+  );
+
+  render(
+    <OrdersSection orders={[order()]} error={null} onRefresh={onRefresh} />,
+  );
+
+  // Orders predating the window are exempt and must not be told they are late.
+  expect(
+    screen.queryByRole('button', { name: /enter payment details/i }),
+  ).toBeInTheDocument();
+});
+
+it('the pending strip still speaks for a payable Order', async () => {
+  const payable = order({ paymentDeadline: '2099-06-11T18:00:00.000Z' });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(jsonResponse(200, { orders: [payable] }))),
+  );
+
+  render(
+    <OrdersSection orders={[payable]} error={null} onRefresh={onRefresh} />,
+  );
+
+  expect(screen.getByTestId('orders-pending-strip')).toBeInTheDocument();
+  expect(screen.queryByTestId('orders-lapsed-strip')).not.toBeInTheDocument();
 });

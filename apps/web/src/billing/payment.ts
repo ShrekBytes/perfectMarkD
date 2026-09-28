@@ -12,6 +12,21 @@ export function orderDate(iso: string): string {
   return iso.slice(0, 10);
 }
 
+/**
+ * A Payment Window deadline, in the reader's locale and their own timezone: a
+ * date alone is not actionable when the question is "do I have time to send
+ * this", which is the only question the deadline is on the page to answer. The
+ * precise instant is in the machine-readable `paymentDeadline` beside it.
+ */
+export function orderDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return String(iso);
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
 export const PAYMENT_METHODS = ['USDT-TRC20', 'USDT-BEP20', 'LTC'] as const;
 export { type PaymentMethod };
 

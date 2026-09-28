@@ -116,6 +116,8 @@ it('shows the Verification queue to the admin, with the audit log a tab away', a
               rejectReason: null,
               createdAt: '2026-09-10T00:00:00.000Z',
               decidedAt: null,
+              paymentDeadline: null,
+              paymentExpired: false,
               walletAddress: 'W',
               userEmail: 'reader@example.com',
               entitlement: null,

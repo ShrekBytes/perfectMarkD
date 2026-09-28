@@ -36,6 +36,8 @@ const ORDER = {
   rejectReason: null,
   createdAt: '2026-09-11T00:00:00.000Z',
   decidedAt: null,
+  paymentDeadline: null,
+  paymentExpired: false,
   walletAddress: 'TTron',
 };
 

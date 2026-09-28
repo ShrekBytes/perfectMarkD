@@ -25,6 +25,8 @@ function adminOrder(overrides: Partial<AdminOrder> = {}): AdminOrder {
     rejectReason: null,
     createdAt: '2026-09-10T00:00:00.000Z',
     decidedAt: null,
+    paymentDeadline: null,
+    paymentExpired: false,
     walletAddress: 'TTronWalletForTheTest',
     userEmail: 'reader@example.com',
     entitlement: null,
@@ -140,6 +142,8 @@ it('filters the list by status, pending first', async () => {
               referenceCode: 'PM-VER1',
               status: 'verified',
               decidedAt: '2026-09-11T00:00:00.000Z',
+              paymentDeadline: null,
+              paymentExpired: false,
             }),
             adminOrder({
               id: 3,
@@ -147,6 +151,8 @@ it('filters the list by status, pending first', async () => {
               status: 'rejected',
               rejectReason: 'Wrong wallet.',
               decidedAt: '2026-09-11T00:00:00.000Z',
+              paymentDeadline: null,
+              paymentExpired: false,
             }),
           ],
         }),
@@ -182,6 +188,8 @@ it('verifies from the queue and refreshes', async () => {
       referenceCode: 'PM-PEND1',
       status: 'verified',
       decidedAt: '2026-09-11T00:00:00.000Z',
+      paymentDeadline: null,
+      paymentExpired: false,
       entitlement: { plan: 'pro', expiresAt: '2026-10-11T00:00:00.000Z' },
     }),
   ];
@@ -233,6 +241,8 @@ it('rejects from the queue with a reason and refreshes', async () => {
       status: 'rejected',
       rejectReason: 'Wrong amount.',
       decidedAt: '2026-09-11T00:00:00.000Z',
+      paymentDeadline: null,
+      paymentExpired: false,
     }),
   ];
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -288,4 +298,163 @@ it('shows a retryable error when the queue cannot load', async () => {
 
   expect(await screen.findByRole('alert')).toBeInTheDocument();
   expect(screen.getByTestId('queue-retry')).toBeInTheDocument();
+});
+
+it('will not offer to verify a lapsed Order that has no payment submitted', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(200, {
+          orders: [
+            adminOrder({
+              txid: null,
+              amountClaimed: null,
+              paymentDeadline: '2026-09-10T06:00:00.000Z',
+              paymentExpired: true,
+            }),
+          ],
+        }),
+      ),
+    ),
+  );
+
+  render(<VerificationQueue />);
+
+  // The pending queue is a work list, and there is no on-chain event to look
+  // at: a row nobody can act on is not work, so the default filter leaves it
+  // out.
+  expect(await screen.findByTestId('queue-empty')).toBeInTheDocument();
+
+  // It is still in All, because the queue is also the financial record.
+  const user = userEvent.setup();
+  await user.click(screen.getByTestId('filter-all'));
+  expect(await screen.findByTestId('order-window-lapsed')).toHaveTextContent(
+    'can no longer be paid',
+  );
+  expect(screen.queryByTestId('verify-button')).not.toBeInTheDocument();
+  // Reject stays: the user is owed a reason, and a closed window is one.
+  expect(screen.getByTestId('reject-button')).toBeInTheDocument();
+});
+
+it('still offers Verify when the payment arrived inside the window', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(200, {
+          orders: [
+            adminOrder({
+              paymentDeadline: '2026-09-10T06:00:00.000Z',
+              paymentExpired: true,
+            }),
+          ],
+        }),
+      ),
+    ),
+  );
+
+  render(<VerificationQueue />);
+
+  // The window bounds when a customer may submit, not what an Admin may read.
+  // Withholding Verify from a payment that was made in time would reject
+  // someone who paid the figure they were quoted, which is worse than a stale
+  // quote ever was.
+  expect(await screen.findByTestId('verify-button')).toBeInTheDocument();
+  expect(screen.queryByTestId('order-window-lapsed')).not.toBeInTheDocument();
+});
+
+it('keeps offering Verify on an Order whose window is still open', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(200, {
+          orders: [
+            adminOrder({
+              paymentDeadline: '2026-09-10T06:00:00.000Z',
+              paymentExpired: false,
+            }),
+          ],
+        }),
+      ),
+    ),
+  );
+
+  render(<VerificationQueue />);
+
+  expect(await screen.findByTestId('verify-button')).toBeInTheDocument();
+  expect(screen.queryByTestId('order-window-lapsed')).not.toBeInTheDocument();
+});
+
+it('explains a short LTC payment as a rate move when the rate has moved', async () => {
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    if (String(input) === '/api/admin/rate') {
+      return Promise.resolve(jsonResponse(200, { rate: { usdtPerLtc: 400 } }));
+    }
+    return Promise.resolve(
+      jsonResponse(200, {
+        orders: [
+          adminOrder({
+            coin: 'LTC',
+            network: 'mainnet',
+            amountExpected: '0.02',
+            // 0.02 LTC at 320.5 is 6.41 USDT; the order paid 6.00's worth.
+            ltcRateUsdt: '320.5',
+            amountClaimed: '0.0187',
+          }),
+        ],
+      }),
+    );
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  render(<VerificationQueue />);
+
+  // The Admin is deciding on an Entitlement here. Telling them the user
+  // miscalculated when the rate moved is sending them after the wrong thing.
+  expect(await screen.findByTestId('rate-moved-context')).toHaveTextContent(
+    'now 400 USDT per LTC',
+  );
+  expect(screen.getByTestId('amount-mismatch')).toBeInTheDocument();
+});
+
+it('says nothing about the rate when a USDT payment is short', async () => {
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    if (String(input) === '/api/admin/rate') {
+      return Promise.resolve(jsonResponse(200, { rate: { usdtPerLtc: 400 } }));
+    }
+    return Promise.resolve(
+      jsonResponse(200, {
+        orders: [adminOrder({ amountClaimed: '3' })],
+      }),
+    );
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  render(<VerificationQueue />);
+
+  await screen.findByTestId('amount-mismatch');
+  // A USDT order has no Rate at all. Nothing moved, and the queue must not
+  // invent a reason.
+  expect(screen.queryByTestId('rate-moved-context')).not.toBeInTheDocument();
+});
+
+it('says nothing about the rate when the claimed amount matches', async () => {
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    if (String(input) === '/api/admin/rate') {
+      return Promise.resolve(jsonResponse(200, { rate: { usdtPerLtc: 400 } }));
+    }
+    return Promise.resolve(
+      jsonResponse(200, {
+        orders: [adminOrder({ coin: 'LTC', ltcRateUsdt: '320.5' })],
+      }),
+    );
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  render(<VerificationQueue />);
+
+  await screen.findByTestId('admin-order-row');
+  expect(screen.queryByTestId('rate-moved-context')).not.toBeInTheDocument();
 });

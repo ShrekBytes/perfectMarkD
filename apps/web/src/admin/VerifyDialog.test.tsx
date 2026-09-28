@@ -26,6 +26,8 @@ function adminOrder(overrides: Partial<AdminOrder> = {}): AdminOrder {
     rejectReason: null,
     createdAt: '2026-09-10T00:00:00.000Z',
     decidedAt: null,
+    paymentDeadline: null,
+    paymentExpired: false,
     walletAddress: 'TTronWalletForTheTest',
     userEmail: 'reader@example.com',
     entitlement: null,

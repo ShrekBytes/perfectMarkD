@@ -30,6 +30,17 @@ export interface Order {
   rejectReason: string | null;
   createdAt: string;
   decidedAt: string | null;
+  /**
+   * When this Order stops being payable; null means it has no Payment Window,
+   * which is the case for every Order created before the window existed.
+   */
+  paymentDeadline: string | null;
+  /**
+   * Whether that window has closed. Derived server-side from the status, the
+   * deadline, and the clock — never a fourth status, and so never a thing the
+   * client has to work out and risk disagreeing with.
+   */
+  paymentExpired: boolean;
   walletAddress: string | null;
 }
 

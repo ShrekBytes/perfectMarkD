@@ -286,6 +286,18 @@ export const orders = sqliteTable('orders', {
   status: text('status').notNull().default('pending'), // OrderStatus
   rejectReason: text('reject_reason'),
   note: text('note'),
+  /**
+   * When the Payment Window closes (live-pricing/02). Fixed at creation and
+   * not moved by a resubmission, so a lapsing window is reached by letting
+   * time pass rather than by a decision anyone made.
+   *
+   * Nullable, and null means no window: Orders that already existed when this
+   * column landed are exempt, and there is no backfill, because backfilling
+   * would instantly lapse every pending Order — including any with a payment
+   * in flight. Expired is derived from this column and the status rather than
+   * stored, so no job has to maintain it.
+   */
+  paymentDeadline: integer('payment_deadline', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .$defaultFn(() => new Date()),

@@ -41,6 +41,8 @@ function adminUserDetail(
         rejectReason: null,
         createdAt: '2026-08-31T00:00:00.000Z',
         decidedAt: '2026-09-01T00:00:00.000Z',
+        paymentDeadline: null,
+        paymentExpired: false,
         walletAddress: 'TTronWalletForTheTest',
         userEmail: 'reader@example.com',
         entitlement: { plan: 'pro', expiresAt: '2027-01-05T00:00:00.000Z' },

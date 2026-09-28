@@ -22,6 +22,8 @@ function order(overrides: Partial<Order> = {}): Order {
     rejectReason: null,
     createdAt: '2026-06-10T00:00:00.000Z',
     decidedAt: '2026-06-11T00:00:00.000Z',
+    paymentDeadline: null,
+    paymentExpired: false,
     walletAddress: 'TTronWalletForTheTest',
     ...overrides,
   };
@@ -100,6 +102,8 @@ it('shows the expired state derived from the Order history', () => {
         order({
           status: 'verified',
           decidedAt: '2020-06-11T00:00:00.000Z',
+          paymentDeadline: null,
+          paymentExpired: false,
           durationMonths: 3,
         }),
       ]}
@@ -129,6 +133,8 @@ it('names an ended plan without a date claim while the window has not lapsed', (
         order({
           status: 'verified',
           decidedAt: '2099-06-11T00:00:00.000Z',
+          paymentDeadline: null,
+          paymentExpired: false,
           durationMonths: 3,
         }),
       ]}
@@ -185,12 +191,16 @@ describe('lastPlanPeriod', () => {
         plan: 'pro',
         durationMonths: 3,
         decidedAt: '2020-01-01T00:00:00.000Z',
+        paymentDeadline: null,
+        paymentExpired: false,
       }),
       order({
         id: 2,
         plan: 'premium',
         durationMonths: 1,
         decidedAt: '2020-06-01T00:00:00.000Z',
+        paymentDeadline: null,
+        paymentExpired: false,
       }),
       order({
         id: 3,
@@ -198,6 +208,8 @@ describe('lastPlanPeriod', () => {
         durationMonths: 12,
         status: 'pending',
         decidedAt: null,
+        paymentDeadline: null,
+        paymentExpired: false,
         createdAt: '2020-07-01T00:00:00.000Z',
       }),
     ]);
@@ -215,12 +227,16 @@ describe('lastPlanPeriod', () => {
         plan: 'pro',
         durationMonths: 1,
         decidedAt: '2020-01-01T00:00:00.000Z',
+        paymentDeadline: null,
+        paymentExpired: false,
       }),
       order({
         id: 2,
         plan: 'premium',
         durationMonths: 3,
         decidedAt: '2020-01-15T00:00:00.000Z',
+        paymentDeadline: null,
+        paymentExpired: false,
       }),
     ]);
     // 1 month from Jan 1 → Feb 1, still active on Jan 15; +3 → May 1.
@@ -234,6 +250,8 @@ describe('lastPlanPeriod', () => {
         status: 'verified',
         durationMonths: 1,
         decidedAt: '2020-01-31T00:00:00.000Z',
+        paymentDeadline: null,
+        paymentExpired: false,
       }),
     ]);
     // Jan 31 + 1 month → Feb 29 (2020 is a leap year), not Mar 2.
