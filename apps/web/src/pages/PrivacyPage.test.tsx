@@ -81,9 +81,9 @@ describe('PrivacyPage', () => {
     render(<PrivacyPage />);
 
     const google = screen.getByRole('region', { name: 'Google Sign-In' });
-    // What the consent screen asks for (story 14), what is stored, and what
-    // arrives and is dropped: the identity is the only import (spec §Out of
-    // Scope), and the server keeps exactly the two fields the paragraph names.
+    // What the consent screen asks for, what is stored, and what arrives and is
+    // dropped: the identity is the only import (spec §Out of Scope), and the
+    // server keeps exactly the two fields the paragraph names.
     expect(google).toHaveTextContent(/name, email address, and basic profile/i);
     expect(google).toHaveTextContent(
       /we keep two things: the address[\s\S]*your Google account id/i,
@@ -121,7 +121,7 @@ describe('PrivacyPage', () => {
   });
 
   it('covers an instance that has not set Google Sign-In up', () => {
-    // Self-Hosted Instances are never forced into Google Cloud setup (story 12).
+    // Self-Hosted Instances are never forced into Google Cloud setup.
     render(<PrivacyPage />);
 
     expect(

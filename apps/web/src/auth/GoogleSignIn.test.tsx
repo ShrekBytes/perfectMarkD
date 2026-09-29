@@ -92,8 +92,7 @@ it.each([
 it('still explains a failed callback when the advertisement never arrived', async () => {
   // The case the notice is not the button's to carry: Google's leg failed over
   // the same bad connection the check is riding, so a user who chose Google and
-  // got nothing is told why (story 9) rather than shown a page as if nothing
-  // happened.
+  // got nothing is told why rather than shown a page as if nothing happened.
   vi.spyOn(api, 'signInProviders').mockRejectedValue(new Error('offline'));
 
   render(<GoogleSignIn failure="error" />);

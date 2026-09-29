@@ -235,10 +235,10 @@ export function authRoutes(options: AuthOptions) {
 
   /**
    * The branch a reset request and the Admin panel's reset link share: a verified
-   * account gets a reset link, an unverified one gets a verification link
-   * (story 14). A reset link for an unverified account is a dead end — the
-   * password it sets buys nothing while sign-in stays locked on Email
-   * Verification — so the two flows repair each other instead.
+   * account gets a reset link, an unverified one gets a verification link. A
+   * reset link for an unverified account is a dead end — the password it sets
+   * buys nothing while sign-in stays locked on Email Verification — so the two
+   * flows repair each other instead.
    *
    * The branch has two sides that must not drift, which is why the *purpose* is
    * what's chosen here and `sendLink` turns it into a page, a window, and a
@@ -263,11 +263,10 @@ export function authRoutes(options: AuthOptions) {
    *
    * An unverified address re-uses its row and re-sends, behind a response
    * identical to a fresh registration — so the form cannot be used to learn
-   * whether an address is registered (story 7), and a user who mistyped one can
-   * still register the address they meant (story 6). The password hash is left
-   * untouched on that path: overwriting it would let anyone who knows an
-   * unverified address set the password and sign in the moment its owner
-   * verifies.
+   * whether an address is registered, and a user who mistyped one can still
+   * register the address they meant. The password hash is left untouched on
+   * that path: overwriting it would let anyone who knows an unverified address
+   * set the password and sign in the moment its owner verifies.
    */
   const unverifiedAccountId = async (
     c: Context<AppEnv>,
@@ -379,13 +378,13 @@ export function authRoutes(options: AuthOptions) {
 
   /**
    * Password Reset, requested from the sign-in page. Success-shaped for every
-   * address (story 10): a response that differed for a registered one would
-   * turn the form into an account-enumeration oracle.
+   * address: a response that differed for a registered one would turn the form
+   * into an account-enumeration oracle.
    *
    * Which link goes out depends on the account: a verified one gets a reset
-   * link, an unverified one gets a verification link (story 14). A reset link
-   * for an unverified account would be a dead end — the password it sets buys
-   * nothing while sign-in stays locked on the gate — so the two flows repair
+   * link, an unverified one gets a verification link. A reset link for an
+   * unverified account would be a dead end — the password it sets buys nothing
+   * while sign-in stays locked on the gate — so the two flows repair
    * each other instead. The response is identical either way, so the branch
    * tells a stranger nothing.
    */
@@ -411,7 +410,7 @@ export function authRoutes(options: AuthOptions) {
    * does not meet it costs the user nothing — a refused request leaves the link
    * spendable, which matters because a reset link is often a user's only way in.
    * The hash is written the same way whatever the account held before, so an
-   * account with no password of its own (Google) gains one (story 13).
+   * account with no password of its own (Google) gains one.
    */
   app.post('/reset-password', async (c) => {
     const body = await jsonBody(c);
@@ -436,7 +435,7 @@ export function authRoutes(options: AuthOptions) {
       .where(eq(users.id, redeemed.userId))
       .run();
     // Every session, with no exception: a session that outlived a recovery is
-    // the stolen one the recovery exists to kill (story 12). No session is
+    // the stolen one the recovery exists to kill. No session is
     // started in exchange — the user signs in with the password they just chose.
     deleteUserSessions(c.var.db, redeemed.userId);
     // The browser's half of the same revocation: the caller's own cookie, if it

@@ -297,7 +297,7 @@ describe('GET /api/me — sign-in methods (google-signin/01b)', () => {
       google: { grace: { subject: 'sub-grace', email } },
     });
     await registerViaApi(app, email);
-    // The auto-link rule (story 3): the same address, one account, and the
+    // The auto-link rule: the same address, one account, and the
     // password it already had is left alone.
     const cookie = await signInWithGoogle(app, 'grace');
 

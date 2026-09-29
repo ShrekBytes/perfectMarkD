@@ -47,7 +47,7 @@ export function AuthPage({ mode }: AuthPageProps) {
   const signedIn = useAccountStore((state) => state.signedIn);
   // How the Google leg ended, if it started at all: the server redirects every
   // failure to /login?google=<code> (google-signin/01), whichever form started
-  // it, and the password form is on the page it lands on (story 9).
+  // it, and the password form is on the page it lands on.
   const googleFailure = googleFailureFromUrl();
 
   return (

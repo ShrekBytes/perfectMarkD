@@ -82,7 +82,7 @@ describe('ResetPasswordPage', () => {
   it('still names the address after a refresh', async () => {
     // A refresh is the likeliest thing between "Send the link" and reading the
     // inbox. Component state would go back to the form there, and a form looks
-    // like nothing was sent (story 2).
+    // like nothing was sent.
     const user = userEvent.setup();
     vi.spyOn(api, 'requestPasswordReset').mockResolvedValue();
     const { unmount } = render(<ResetPasswordPage />);

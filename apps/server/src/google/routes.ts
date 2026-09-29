@@ -200,11 +200,11 @@ export function googleRoutes(options: GoogleRoutesOptions) {
  * right account. Only then is the email used, and only as a bridge to an account
  * that already exists — which is the whole point of the feature, since a user
  * who registered here before signing in there should end up with one account
- * and one inbox (story 3).
+ * and one inbox.
  *
  * An account found by email is signed into, never claimed: an unverified one
- * becomes verified (Google proved that address, story 10) and a password
- * account is left exactly as it was, password included.
+ * becomes verified (Google proved that address) and a password account is
+ * left exactly as it was, password included.
  *
  * Deliberately synchronous, all of it: nothing awaits between the uniqueness
  * check and the insert, so two callbacks racing on one fresh address cannot

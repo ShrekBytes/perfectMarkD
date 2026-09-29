@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Which address this tab last asked us to mail a link to, so the page that
-// follows can name it (story 2: the user has to know which inbox to open).
+// follows can name it (the user has to know which inbox to open).
 //
 // Two flows want it, and each keeps its own address: Email Verification, whose
 // link proves the inbox, and Password Reset, whose link opens the account. A tab

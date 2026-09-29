@@ -566,7 +566,7 @@ export function usersRoutes({
   });
 
   /**
-   * Send a password-reset link (email/05, story 21).
+   * Send a password-reset link (email/05).
    *
    * This used to generate a temporary password and show it once for the Admin to
    * hand over. Now that the server can send mail, it mails the same link the
@@ -578,7 +578,9 @@ export function usersRoutes({
    * The reply names which link went out, and an unverified account gets the one
    * that can actually let them in: a reset link buys nothing while sign-in stays
    * locked on Email Verification. The Admin is looking at this account already,
-   * so telling them its state is not the enumeration story/10 is about.
+   * so telling them its state is safe here, where the sign-in form's Password
+   * Reset reply is not — that one must stay success-shaped to avoid an
+   * account-enumeration oracle, and this reply is downstream of it.
    */
   app.post('/:id/password', async (c) => {
     const admin = c.var.user!;
@@ -614,7 +616,7 @@ export function usersRoutes({
   });
 
   /**
-   * Move a dead mailbox (email/05, story 22): mail a link to the new address,
+   * Move a dead mailbox (email/05): mail a link to the new address,
    * and the account follows it to that address when its owner opens it.
    *
    * The mechanics are the Account page's, deliberately (email/04): the swap waits

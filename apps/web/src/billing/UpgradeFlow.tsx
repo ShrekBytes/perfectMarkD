@@ -223,7 +223,8 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
               mode={authMode}
               onAuthenticated={onAuthenticated}
               onRegistered={(email) => {
-                // Name the inbox: story 2 is not only about the standalone page.
+                // Name the inbox: this flow's register step needs it too, not
+                // just the standalone page.
                 setPendingEmail(email);
                 setStep('verify-email');
               }}

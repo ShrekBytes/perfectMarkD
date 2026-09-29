@@ -23,14 +23,14 @@ interface Failure {
  * The Password Reset request (email/03): the page the sign-in form's "Forgot
  * password?" leads to. One field, and a promise the server keeps in the only
  * way it can — identical for every address, so this page cannot be used to
- * learn who has an account (story 10).
+ * learn who has an account.
  *
  * The confirmation names the address and then hedges on purpose: it says what
  * was sent, never that an account was found. An unverified account receives a
- * verification link instead of a reset one (story 14), and saying so is what
- * keeps a user from staring at an inbox waiting for a message that is not
- * coming. The address is remembered for the tab (pending-email), so a refresh
- * still names the inbox instead of asking the question all over again.
+ * verification link instead of a reset one, and saying so is what keeps a user
+ * from staring at an inbox waiting for a message that is not coming. The
+ * address is remembered for the tab (pending-email), so a refresh still names
+ * the inbox instead of asking the question all over again.
  */
 export function ResetPasswordPage() {
   const [email, setEmail] = useState('');

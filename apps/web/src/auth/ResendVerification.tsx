@@ -7,8 +7,8 @@ const BUTTON_CLASS =
   'touch-target mt-2 h-9 w-full rounded-control border border-hairline text-sm font-medium text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:opacity-60';
 
 /**
- * Asks for a fresh verification link — story 5: a spam filter or a mis-delivery
- * must not lock anyone out of their account.
+ * Asks for a fresh verification link: a spam filter or a mis-delivery must not
+ * lock anyone out of their account.
  *
  * With an address in hand it is one button, and no form element at all: the
  * sign-in form embeds this, and a form inside a form is invalid HTML. Without

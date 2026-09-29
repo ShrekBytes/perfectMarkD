@@ -4,8 +4,8 @@ import { readVerificationEmail } from './pending-email';
 
 /**
  * Where a new registration lands: the address is named, the next step is
- * stated, and the resend is one click away (story 2 — "which inbox do I open?",
- * and story 5 — a lost email must not lock anyone out).
+ * stated, and the resend is one click away ("which inbox do I open?", and a
+ * lost email must not lock anyone out).
  *
  * The address comes from this tab's session, not the URL, so the page is honest
  * even when it is opened cold: it still says what to do, just without naming an

@@ -144,7 +144,7 @@ test('a failed pricing read shows an unavailable state and no number', async ({
   await expect(page.getByTestId('price-pro')).toHaveText('Unavailable');
   await expect(page.getByTestId('price-premium')).toHaveText('Unavailable');
   // The outage is stated, so a grid of dashes is not read as a plan that
-  // includes nothing (story 6).
+  // includes nothing.
   await expect(page.getByTestId('pricing-unavailable')).toContainText(
     'could not be loaded',
   );

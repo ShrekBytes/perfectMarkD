@@ -878,7 +878,7 @@ describe('POST /api/admin/users/:id/password', () => {
   it('sets the new password and ends every session when the link is followed', async () => {
     // The round trip that replaces the old handoff: the panel's link is the same
     // one the sign-in page's reset request sends, so the user sets their own
-    // password and the reset does what it always did (story 12).
+    // password and the reset does what it always did.
     const { app, db } = makeApp({ adminEmail: 'owner@example.com' });
     const oldCookie = await signedIn(app);
     const admin = await adminSignedIn(app);
@@ -1157,11 +1157,11 @@ describe('POST /api/admin/users/:id/email', () => {
 
 describe('the links the panel issues', () => {
   it('spends the same send budget the sign-in page spends', async () => {
-    // Spec §Rate limits and story 24: one budget for every message this instance
-    // sends, whatever route it came out of. The panel's link is as capable of
-    // draining the provider's cap as a registration is, so a private meter here
-    // would be a second, unwatched way to drain it. This is the test that fails
-    // if the two routers stop sharing.
+    // One budget for every message this instance sends, whatever route it came
+    // out of. The panel's link is as capable of draining the provider's cap as
+    // a registration is, so a private meter here would be a second, unwatched
+    // way to drain it. This is the test that fails if the two routers stop
+    // sharing.
     //
     // Two per address: one goes to registering the account, one to the panel's
     // link. A third has nothing left, which is the whole point.

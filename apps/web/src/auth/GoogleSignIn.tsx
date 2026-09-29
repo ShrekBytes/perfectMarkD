@@ -7,9 +7,9 @@
 // flow is a browser navigation and the answers are redirects. Not a guess about
 // the deployment: the button appears only when /api/auth/providers says the
 // instance has an OAuth client, so an unconfigured Self-Hosted Instance shows
-// no option that leads nowhere (story 8). And not a page that can fail on its
-// own — a check that never lands renders no button, which is the same as a
-// deployment without the feature.
+// no option that leads nowhere. And not a page that can fail on its own — a
+// check that never lands renders no button, which is the same as a deployment
+// without the feature.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from 'react';
@@ -73,7 +73,7 @@ export function GoogleSignIn({ failure }: GoogleSignInProps) {
   useEffect(() => {
     let live = true;
     // Absent, not broken: an unconfigured deployment — and a check that never
-    // lands — renders no button at all (story 8).
+    // lands — renders no button at all.
     signInProviders()
       .then((providers) => {
         if (live) setAdvertised(providers.google);
@@ -85,8 +85,8 @@ export function GoogleSignIn({ failure }: GoogleSignInProps) {
   }, []);
 
   // The notice is not the button's to carry: a callback that failed while the
-  // advertisement was unreachable is the case story 9 is about, so it renders
-  // whatever the check said. Only the button waits on the check.
+  // advertisement was unreachable is the case the notice exists for, so it
+  // renders whatever the check said. Only the button waits on the check.
   if (!advertised && !failure) return null;
 
   return (

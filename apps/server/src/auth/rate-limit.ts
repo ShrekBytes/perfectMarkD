@@ -159,7 +159,7 @@ export const DEFAULT_AUTH_RATE_LIMITS: Required<AuthRateLimitConfig> = {
   // what these buy is that a single key cannot drain it in an afternoon.
   //
   // Per address is the sharp one: three links an hour is generous to a person
-  // who lost one (story 5) and nothing to a flood aimed at one inbox. Per IP is
+  // who lost one and nothing to a flood aimed at one inbox. Per IP is
   // deliberately looser than that arithmetic suggests, because behind a
   // Cloudflare Tunnel (ADR-0010) every visitor can share one key: an office, a
   // carrier's CGNAT, or the tunnel itself. Ten an hour is far above any real
