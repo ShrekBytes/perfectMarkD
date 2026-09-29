@@ -7,16 +7,17 @@
 // error. The from-address arrives as the provider takes it, display name
 // included, so a Self-Hosted Instance sends from its own domain.
 //
-// Every transport and HTTP failure becomes one MailerError shape, so callers
+// Every transport and HTTP failure becomes the shared UpstreamError, so callers
 // map failures without knowing the wire. This file is an implementation detail
 // behind the Mailer seam: nothing but its own error-mapping tests reaches it.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { MailerError, type Mailer } from './mailer.js';
+import { type Mailer } from './mailer.js';
 import {
+  UpstreamError,
   fetchWithTimeout,
-  isAbortError,
   readDetail,
+  readJson,
 } from '../fetch-with-timeout.js';
 import {
   emailChangeMessage,
@@ -70,7 +71,7 @@ export function createResendMailer({
       timeoutMs,
       read: async (response) => {
         if (!response.ok) {
-          throw new MailerError(
+          throw new UpstreamError(
             'http',
             `The mail provider answered with HTTP ${response.status}.`,
             response.status,
@@ -80,21 +81,20 @@ export function createResendMailer({
         // A 2xx the provider cannot identify is not proof of a send, so it is
         // not reported as one.
         if (!(await readMessageId(response))) {
-          throw new MailerError(
+          throw new UpstreamError(
             'invalid_response',
             'The mail provider accepted the message without an id.',
           );
         }
       },
       errors: {
-        isOwnError: (error) => error instanceof MailerError,
         timeout: () =>
-          new MailerError(
+          new UpstreamError(
             'timeout',
             'The mail provider did not answer in time.',
           ),
         transport: () =>
-          new MailerError(
+          new UpstreamError(
             'transport',
             'The mail provider could not be reached.',
           ),
@@ -120,14 +120,11 @@ export function createResendMailer({
 
 /** The provider's message id, or null when the reply carries none. */
 async function readMessageId(response: Response): Promise<string | null> {
-  try {
-    const payload: unknown = await response.json();
-    if (typeof payload !== 'object' || payload === null) return null;
-    const id = (payload as { id?: unknown }).id;
-    return typeof id === 'string' && id ? id : null;
-  } catch (error) {
-    // An aborted body read is a timeout, not a malformed reply.
-    if (isAbortError(error)) throw error;
-    return null;
-  }
+  const payload: unknown = await readJson(
+    response,
+    'The mail provider returned a malformed reply.',
+  );
+  if (typeof payload !== 'object' || payload === null) return null;
+  const id = (payload as { id?: unknown }).id;
+  return typeof id === 'string' && id ? id : null;
 }

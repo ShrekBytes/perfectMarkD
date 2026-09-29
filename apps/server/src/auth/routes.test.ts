@@ -10,7 +10,7 @@ import {
 } from './testing.js';
 import type { RecordingMailer } from '../mail/testing.js';
 import { createRecordingMailer } from '../mail/testing.js';
-import { MailerError } from '../mail/mailer.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
 import { users } from '../db/schema.js';
 import {
   EMAIL_CHANGE_TOKEN_TTL_MS,
@@ -1205,7 +1205,7 @@ describe('POST /api/auth/confirm-email-change', () => {
       mail: {
         ...recorder,
         async sendEmailChangedNotice() {
-          throw new MailerError('http', 'The mail provider refused it.', 502);
+          throw new UpstreamError('http', 'The mail provider refused it.', 502);
         },
       },
     });

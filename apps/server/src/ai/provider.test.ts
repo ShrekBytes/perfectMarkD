@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AiProviderError, createOpenAiCompatibleProvider } from './provider.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
+import { createOpenAiCompatibleProvider } from './provider.js';
 
 const PROVIDER = createOpenAiCompatibleProvider();
 
@@ -107,13 +108,13 @@ describe('the OpenAI-compatible client: complete', () => {
       (error: unknown) => error,
     );
 
-    expect(failure).toBeInstanceOf(AiProviderError);
+    expect(failure).toBeInstanceOf(UpstreamError);
     expect(failure).toMatchObject({
       code: 'transport',
       status: null,
       detail: null,
     });
-    expect((failure as AiProviderError).message).not.toContain('vendor/model');
+    expect((failure as UpstreamError).message).not.toContain('vendor/model');
   });
 
   it('maps an aborted request to a timeout error', async () => {
@@ -171,9 +172,9 @@ describe('the OpenAI-compatible client: complete', () => {
 
     const failure = (await PROVIDER.complete(REQUEST).catch(
       (error: unknown) => error,
-    )) as AiProviderError;
+    )) as UpstreamError;
 
-    expect(failure).toBeInstanceOf(AiProviderError);
+    expect(failure).toBeInstanceOf(UpstreamError);
     expect(failure.code).toBe('http');
     expect(failure.status).toBe(401);
     expect(failure.message).toBe('The provider answered with HTTP 401.');

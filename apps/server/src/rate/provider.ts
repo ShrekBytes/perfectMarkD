@@ -9,38 +9,20 @@
 // The seam is resolved in the composition root the way the AI provider and the
 // identity exchange are, so nothing outside this file learns the endpoint and
 // the refresh job's tests run against a fake. Every transport, HTTP, and shape
-// failure becomes one RateProviderError, so the job records a reason without
-// knowing the wire.
+// failure becomes the shared UpstreamError, so the job records a reason
+// without knowing the wire.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { fetchWithTimeout, isAbortError } from '../fetch-with-timeout.js';
+import {
+  UpstreamError,
+  fetchWithTimeout,
+  readJson,
+} from '../fetch-with-timeout.js';
 
 /** The seam: one fetch, one figure, or a throw. */
 export interface LtcRateProvider {
-  /** USDT per LTC. Throws `RateProviderError` for every failure. */
+  /** USDT per LTC. Throws `UpstreamError` for every failure. */
   fetchRate(): Promise<number>;
-}
-
-export const RATE_PROVIDER_ERROR_CODES = [
-  'transport',
-  'timeout',
-  'http',
-  'invalid_response',
-] as const;
-export type RateProviderErrorCode = (typeof RATE_PROVIDER_ERROR_CODES)[number];
-
-/**
- * Every feed failure in one shape. `message` is safe to log and to show the
- * Admin: it carries the status when there was one and never echoes a payload.
- */
-export class RateProviderError extends Error {
-  constructor(
-    readonly code: RateProviderErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'RateProviderError';
-  }
 }
 
 export interface LtcRateProviderOptions {
@@ -70,22 +52,26 @@ export function createLtcRateProvider({
         timeoutMs,
         read: async (response) => {
           if (!response.ok) {
-            throw new RateProviderError(
+            throw new UpstreamError(
               'http',
               `The rate feed answered with HTTP ${response.status}.`,
             );
           }
-          return readLastPrice(await readJson(response));
+          return readLastPrice(
+            await readJson(
+              response,
+              'The rate feed returned a malformed reply.',
+            ),
+          );
         },
         errors: {
-          isOwnError: (error) => error instanceof RateProviderError,
           timeout: () =>
-            new RateProviderError(
+            new UpstreamError(
               'timeout',
               'The rate feed did not answer in time.',
             ),
           transport: () =>
-            new RateProviderError(
+            new UpstreamError(
               'transport',
               'The rate feed could not be reached.',
             ),
@@ -93,19 +79,6 @@ export function createLtcRateProvider({
       });
     },
   };
-}
-
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch (error) {
-    // An aborted body read is a timeout, not a malformed reply.
-    if (isAbortError(error)) throw error;
-    throw new RateProviderError(
-      'invalid_response',
-      'The rate feed returned a malformed reply.',
-    );
-  }
 }
 
 /**
@@ -117,7 +90,7 @@ async function readJson(response: Response): Promise<unknown> {
  */
 function readLastPrice(payload: unknown): number {
   const malformed = (): never => {
-    throw new RateProviderError(
+    throw new UpstreamError(
       'invalid_response',
       'The rate feed returned no usable rate.',
     );
@@ -127,7 +100,7 @@ function readLastPrice(payload: unknown): number {
   // An error array is Kraken's own shape for "no", and it can arrive with a
   // 200. It is a provider fault, never a rate of zero.
   if (Array.isArray(error) && error.length > 0) {
-    throw new RateProviderError(
+    throw new UpstreamError(
       'invalid_response',
       'The rate feed reported an error instead of a rate.',
     );

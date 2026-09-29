@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MailerError } from './mailer.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
 import { createResendMailer } from './resend.js';
 
 const MAILER = createResendMailer({
@@ -42,7 +42,7 @@ afterEach(() => {
 
 /**
  * The Resend client is an implementation detail behind the Mailer seam, so this
- * file pins one thing: the mapping from every failure to one MailerError code.
+ * file pins one thing: the mapping from every failure to one UpstreamError code.
  * The request it makes is deliberately unpinned (spec §Testing Decisions) — the
  * seam's types are what keep a message to an address and a link, and nothing
  * outside this file should know the wire.
@@ -63,10 +63,10 @@ describe('the Resend client', () => {
       (error: unknown) => error,
     );
 
-    expect(failure).toBeInstanceOf(MailerError);
+    expect(failure).toBeInstanceOf(UpstreamError);
     expect(failure).toMatchObject({ code: 'transport', status: null });
     // No user-facing string names the provider, the way the AI routes' do not.
-    expect((failure as MailerError).message).not.toMatch(/resend/i);
+    expect((failure as UpstreamError).message).not.toMatch(/resend/i);
   });
 
   it('maps an aborted request to a timeout error', async () => {
@@ -127,9 +127,9 @@ describe('the Resend client', () => {
 
     const failure = (await MAILER.sendVerification(VERIFICATION).catch(
       (error: unknown) => error,
-    )) as MailerError;
+    )) as UpstreamError;
 
-    expect(failure).toBeInstanceOf(MailerError);
+    expect(failure).toBeInstanceOf(UpstreamError);
     expect(failure.code).toBe('http');
     expect(failure.status).toBe(422);
     expect(failure.message).toBe('The mail provider answered with HTTP 422.');
@@ -148,22 +148,26 @@ describe('the Resend client', () => {
 
     const failure = (await MAILER.sendVerification(VERIFICATION).catch(
       (error: unknown) => error,
-    )) as MailerError;
+    )) as UpstreamError;
 
     expect(failure.detail).toHaveLength(2_000);
   });
 
   it('maps a malformed or idless acceptance to invalid_response', async () => {
+    // A body that is not JSON is the shared reader's verdict, and this
+    // client's own sentence for it.
     stubFetch(() => Promise.resolve(new Response('not json', { status: 200 })));
-    await expect(MAILER.sendVerification(VERIFICATION)).rejects.toMatchObject({
-      code: 'invalid_response',
-    });
+    await expect(MAILER.sendVerification(VERIFICATION)).rejects.toThrow(
+      'The mail provider returned a malformed reply.',
+    );
 
     // Accepted but with nothing that identifies the message: not proof of a
-    // send, so it must not be reported as one.
+    // send, so it must not be reported as one. That is this client's own
+    // verdict, read off a well-formed body.
     stubFetch(() => Promise.resolve(jsonResponse(200, { queued: true })));
     await expect(MAILER.sendVerification(VERIFICATION)).rejects.toMatchObject({
       code: 'invalid_response',
+      message: 'The mail provider accepted the message without an id.',
     });
   });
 });

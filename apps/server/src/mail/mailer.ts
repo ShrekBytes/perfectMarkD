@@ -12,10 +12,10 @@
 // operator can pass the console mailer (console.ts), and tests pass a fake that
 // records sends. Nothing in this file sends anything.
 //
-// Every provider failure becomes one MailerError shape, so callers map failures
-// without knowing the wire. No user-facing string names the provider — the same
-// rule the AI routes follow — and the key never appears in a message, a log, or
-// an error.
+// Every provider failure becomes the shared UpstreamError (see
+// ../fetch-with-timeout.ts), so callers map failures without knowing the wire.
+// No user-facing string names the provider — the same rule the AI routes
+// follow — and the key never appears in a message, a log, or an error.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** A recipient: the one address the mail provider ever sees. */
@@ -60,31 +60,4 @@ export interface Mailer {
   sendPasswordReset(email: PasswordResetEmail): Promise<void>;
   sendEmailChange(email: EmailChangeEmail): Promise<void>;
   sendEmailChangedNotice(email: EmailChangedNotice): Promise<void>;
-}
-
-export const MAILER_ERROR_CODES = [
-  'transport',
-  'timeout',
-  'http',
-  'invalid_response',
-] as const;
-export type MailerErrorCode = (typeof MAILER_ERROR_CODES)[number];
-
-/**
- * Every send failure, in one shape. `message` is safe to surface or log; it
- * never names the provider, the key, or the recipient. `detail` carries the
- * provider's own body excerpt for the log line the caller writes.
- */
-export class MailerError extends Error {
-  constructor(
-    readonly code: MailerErrorCode,
-    message: string,
-    /** HTTP status, when the failure was an HTTP one. */
-    readonly status: number | null = null,
-    /** Provider body excerpt; log detail only. */
-    readonly detail: string | null = null,
-  ) {
-    super(message);
-    this.name = 'MailerError';
-  }
 }

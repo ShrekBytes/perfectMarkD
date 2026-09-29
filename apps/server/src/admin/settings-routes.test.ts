@@ -16,7 +16,8 @@ import {
   WALLETS_KEY,
 } from '../db/settings.js';
 import { settingsKv } from '../db/schema.js';
-import { AiProviderError, type AiProvider } from '../ai/provider.js';
+import type { AiProvider } from '../ai/provider.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
 
 const SESSION_SECRET = 'test-session-secret';
 
@@ -681,7 +682,7 @@ describe('POST /api/admin/settings/ai/test', () => {
   it('reports a provider failure with upstream detail, for the Admin', async () => {
     const provider = fakeProvider({
       complete: async () => {
-        throw new AiProviderError(
+        throw new UpstreamError(
           'http',
           'The provider answered with HTTP 401.',
           401,

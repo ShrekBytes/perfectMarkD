@@ -8,7 +8,7 @@
 // caller for the Admin's panel; where that body gets logged is the caller's
 // decision, not this seam's.
 //
-// Every transport and HTTP failure becomes one AiProviderError shape, so
+// Every transport and HTTP failure becomes the shared UpstreamError, so
 // callers map failures without knowing the wire. The seam is injected into the
 // app the way the export renderer is (createApp's `ai` option), so every test
 // runs against a fake and no test touches a live API.
@@ -16,9 +16,10 @@
 
 import type { ReasoningEffort } from '../db/schema.js';
 import {
+  UpstreamError,
   fetchWithTimeout,
-  isAbortError,
   readDetail,
+  readJson,
 } from '../fetch-with-timeout.js';
 
 export interface AiMessage {
@@ -47,33 +48,6 @@ export interface AiCompletionReply {
   text: string;
   /** The provider's finish reason, verbatim (`stop`, `length`, …). */
   finishReason: string;
-}
-
-export const AI_PROVIDER_ERROR_CODES = [
-  'transport',
-  'timeout',
-  'http',
-  'invalid_response',
-] as const;
-export type AiProviderErrorCode = (typeof AI_PROVIDER_ERROR_CODES)[number];
-
-/**
- * Every provider failure, in one shape. `message` is safe to surface (it
- * never names the provider or the model); `detail` carries the upstream body
- * excerpt for the Admin panel only.
- */
-export class AiProviderError extends Error {
-  constructor(
-    readonly code: AiProviderErrorCode,
-    message: string,
-    /** HTTP status, when the failure was an HTTP one. */
-    readonly status: number | null = null,
-    /** Upstream body excerpt; Admin-facing debugging only. */
-    readonly detail: string | null = null,
-  ) {
-    super(message);
-    this.name = 'AiProviderError';
-  }
 }
 
 export interface AiModelInfoRequest {
@@ -123,13 +97,13 @@ export function createOpenAiCompatibleProvider(): AiProvider {
               : { reasoning: { effort: request.reasoningEffort } }),
           },
         },
-        (response) => readJson(response),
+        (response) => readProviderJson(response),
       );
       const choice = firstChoice(payload);
       const content =
         choice && isRecord(choice.message) ? choice.message.content : undefined;
       if (typeof content !== 'string') {
-        throw new AiProviderError(
+        throw new UpstreamError(
           'invalid_response',
           'The provider returned no reply text.',
         );
@@ -155,7 +129,7 @@ export function createOpenAiCompatibleProvider(): AiProvider {
             timeoutMs: request.timeoutMs,
             method: 'GET',
           },
-          (response) => readJson(response),
+          (response) => readProviderJson(response),
         );
         return parseModelInfo(payload, request.model);
       } catch {
@@ -197,7 +171,7 @@ async function send<T>(
     timeoutMs: options.timeoutMs,
     read: async (response) => {
       if (!response.ok) {
-        throw new AiProviderError(
+        throw new UpstreamError(
           'http',
           `The provider answered with HTTP ${response.status}.`,
           response.status,
@@ -207,26 +181,19 @@ async function send<T>(
       return read(response);
     },
     errors: {
-      isOwnError: (error) => error instanceof AiProviderError,
       timeout: () =>
-        new AiProviderError('timeout', 'The provider did not answer in time.'),
+        new UpstreamError('timeout', 'The provider did not answer in time.'),
       transport: () =>
-        new AiProviderError('transport', 'The provider could not be reached.'),
+        new UpstreamError('transport', 'The provider could not be reached.'),
     },
   });
 }
 
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch (error) {
-    // An aborted body read is a timeout, not a malformed reply.
-    if (isAbortError(error)) throw error;
-    throw new AiProviderError(
-      'invalid_response',
-      'The provider returned a malformed reply.',
-    );
-  }
+/** This client's own sentence for a body the provider did not send as JSON. */
+function readProviderJson(response: Response): Promise<unknown> {
+  // Bound here, at the two call sites that want it, so the sentence stays this
+  // client's own rather than becoming the reader's.
+  return readJson(response, 'The provider returned a malformed reply.');
 }
 
 function firstChoice(

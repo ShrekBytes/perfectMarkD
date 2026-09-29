@@ -9,11 +9,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { AiProviderConfig } from '../db/schema.js';
-import {
-  AiProviderError,
-  type AiModelInfo,
-  type AiProvider,
-} from './provider.js';
+import { type AiModelInfo, type AiProvider } from './provider.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
 
 export interface AiConnectionModel extends AiModelInfo {
   /** The model id the metadata was read for. */
@@ -102,7 +99,7 @@ export async function testAiConnection({
     });
     ok = true;
   } catch (cause) {
-    if (cause instanceof AiProviderError) {
+    if (cause instanceof UpstreamError) {
       error = cause.message;
       detail = cause.detail;
     } else {

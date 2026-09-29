@@ -339,8 +339,8 @@ describe('POST /api/ai/markdown — the provider and metering', () => {
   it('maps a provider failure without leaking upstream detail or counting it', async () => {
     const { app, db } = makeApp({
       provider: fakeProvider(async () => {
-        const { AiProviderError } = await import('./provider.js');
-        throw new AiProviderError(
+        const { UpstreamError } = await import('../fetch-with-timeout.js');
+        throw new UpstreamError(
           'http',
           'Upstream says no.',
           429,

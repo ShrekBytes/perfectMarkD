@@ -39,11 +39,8 @@ import { asRecord, parseJson } from '../request-body.js';
 import { users, type AiProviderConfig } from '../db/schema.js';
 import { getAiProviderConfig, getPlanLimits } from '../db/settings.js';
 import { findActiveEntitlement } from '../quota.js';
-import {
-  AiProviderError,
-  type AiCompletionRequest,
-  type AiMessage,
-} from './provider.js';
+import { type AiCompletionRequest, type AiMessage } from './provider.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
 import type { AiContext } from './context.js';
 import {
   aiAccountState,
@@ -630,7 +627,7 @@ async function callProvider(
     const value = await ai.provider.complete({ ...request, apiKey: ai.apiKey });
     return { ok: true, value };
   } catch (cause) {
-    if (cause instanceof AiProviderError) {
+    if (cause instanceof UpstreamError) {
       // Server-side only: the upstream body and code, never the prompt.
       log?.(
         `ai provider failure: code=${cause.code} status=${cause.status ?? '-'} detail=${cause.detail ?? '-'}`,

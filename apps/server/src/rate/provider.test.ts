@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { RateProviderError, createLtcRateProvider } from './provider.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
+import { createLtcRateProvider } from './provider.js';
 
 const provider = createLtcRateProvider();
 
@@ -45,10 +46,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function failureOf(): Promise<RateProviderError> {
+async function failureOf(): Promise<UpstreamError> {
   const thrown = await provider.fetchRate().catch((error: unknown) => error);
-  expect(thrown).toBeInstanceOf(RateProviderError);
-  return thrown as RateProviderError;
+  expect(thrown).toBeInstanceOf(UpstreamError);
+  return thrown as UpstreamError;
 }
 
 describe('the rate feed', () => {
@@ -115,8 +116,8 @@ describe('the rate feed', () => {
     );
 
     const thrown = await stalled.fetchRate().catch((error: unknown) => error);
-    expect(thrown).toBeInstanceOf(RateProviderError);
-    expect((thrown as RateProviderError).code).toBe('timeout');
+    expect(thrown).toBeInstanceOf(UpstreamError);
+    expect((thrown as UpstreamError).code).toBe('timeout');
   });
 
   it('refuses a provider that cannot be reached', async () => {

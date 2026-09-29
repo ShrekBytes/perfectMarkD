@@ -18,7 +18,7 @@
 // routes are not mounted, and the SPA's button stays hidden.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { fetchWithTimeout } from '../fetch-with-timeout.js';
+import { UpstreamError, fetchWithTimeout } from '../fetch-with-timeout.js';
 
 /** What Google's identity answer is reduced to: an id and a proven address. */
 export interface GoogleIdentity {
@@ -29,33 +29,11 @@ export interface GoogleIdentity {
 }
 
 /**
- * The seam: one authorization code, one identity. Throws
- * `GoogleExchangeError` for every failure — a callback cannot act on a partial
+ * The seam: one authorization code, one identity. Throws the shared
+ * `UpstreamError` for every failure — a callback cannot act on a partial
  * answer, so there is no null to handle.
  */
 export type IdentityExchange = (code: string) => Promise<GoogleIdentity>;
-
-export const GOOGLE_EXCHANGE_ERROR_CODES = [
-  'transport',
-  'timeout',
-  'http',
-  'invalid_response',
-] as const;
-export type GoogleExchangeErrorCode =
-  (typeof GOOGLE_EXCHANGE_ERROR_CODES)[number];
-
-/** Every exchange failure, in one shape. `message` is safe to log: it never
- *  names the client secret or echoes the code, and it carries the status when
- *  there was one, so nothing else needs a field. */
-export class GoogleExchangeError extends Error {
-  constructor(
-    readonly code: GoogleExchangeErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'GoogleExchangeError';
-  }
-}
 
 /**
  * The non-sensitive scopes, and the only ones requested: a name, an email
@@ -199,7 +177,7 @@ async function getJson(
     timeoutMs,
     read: async (response) => {
       if (!response.ok) {
-        throw new GoogleExchangeError(
+        throw new UpstreamError(
           'http',
           `The sign-in provider answered with HTTP ${response.status}.`,
         );
@@ -207,14 +185,13 @@ async function getJson(
       return response.json();
     },
     errors: {
-      isOwnError: (error) => error instanceof GoogleExchangeError,
       timeout: () =>
-        new GoogleExchangeError(
+        new UpstreamError(
           'timeout',
           'The sign-in provider did not answer in time.',
         ),
       transport: () =>
-        new GoogleExchangeError(
+        new UpstreamError(
           'transport',
           'The sign-in provider could not be reached.',
         ),
@@ -225,7 +202,7 @@ async function getJson(
 function readAccessToken(payload: unknown): string {
   const token = (payload as { access_token?: unknown } | null)?.access_token;
   if (typeof token !== 'string' || !token) {
-    throw new GoogleExchangeError(
+    throw new UpstreamError(
       'invalid_response',
       'The sign-in provider accepted the code without an access token.',
     );
@@ -255,7 +232,7 @@ function readIdentity(payload: unknown): GoogleIdentity {
     !email ||
     record?.email_verified !== true
   ) {
-    throw new GoogleExchangeError(
+    throw new UpstreamError(
       'invalid_response',
       'The sign-in provider returned an identity without a verified email address.',
     );

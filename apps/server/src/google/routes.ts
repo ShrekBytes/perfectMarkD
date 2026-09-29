@@ -38,10 +38,10 @@ import {
 import type { LogSink } from '../request-logger.js';
 import {
   authorizationUrl,
-  GoogleExchangeError,
   type GoogleIdentity,
   type GoogleSignIn,
 } from './exchange.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
 
 /** The one-time value that binds a callback to the browser that started it. */
 const STATE_COOKIE = 'pmd_google_state';
@@ -160,7 +160,7 @@ export function googleRoutes(options: GoogleRoutesOptions) {
     } catch (cause) {
       options.log?.(
         `google sign-in exchange failed: ${
-          cause instanceof GoogleExchangeError ? cause.code : 'unknown'
+          cause instanceof UpstreamError ? cause.code : 'unknown'
         }`,
       );
       return fail(c, 'error');

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { UpstreamError } from '../fetch-with-timeout.js';
 import {
-  GoogleExchangeError,
   createGoogleIdentityExchange,
   type GoogleIdentity,
 } from './exchange.js';
@@ -46,11 +46,11 @@ function stubHappyPath(overrides: { userinfo?: () => Response } = {}): void {
   });
 }
 
-async function failureOf(code: string): Promise<GoogleExchangeError> {
+async function failureOf(code: string): Promise<UpstreamError> {
   const error = await exchange('auth-code').catch((thrown: unknown) => thrown);
-  expect(error).toBeInstanceOf(GoogleExchangeError);
-  expect((error as GoogleExchangeError).code).toBe(code);
-  return error as GoogleExchangeError;
+  expect(error).toBeInstanceOf(UpstreamError);
+  expect((error as UpstreamError).code).toBe(code);
+  return error as UpstreamError;
 }
 
 afterEach(() => {

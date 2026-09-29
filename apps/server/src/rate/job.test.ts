@@ -3,7 +3,8 @@ import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { getLtcRate, getLtcRateStatus, setSetting } from '../db/settings.js';
 import { auditLogs } from '../db/schema.js';
-import { RateProviderError, type LtcRateProvider } from './provider.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
+import type { LtcRateProvider } from './provider.js';
 import {
   RATE_BAND_WINDOW_MS,
   RATE_REFRESH_INTERVAL_MS,
@@ -29,7 +30,7 @@ function providerAnswering(...answers: Array<number | Error>): LtcRateProvider {
       const next = queue.shift();
       if (next === undefined) {
         return Promise.reject(
-          new RateProviderError('transport', 'The rate feed is exhausted.'),
+          new UpstreamError('transport', 'The rate feed is exhausted.'),
         );
       }
       return next instanceof Error
@@ -198,7 +199,7 @@ describe('refreshing the Rate: values that are refused', () => {
 });
 
 describe('refreshing the Rate: a failed fetch', () => {
-  const failure = new RateProviderError('transport', 'Unreachable.');
+  const failure = new UpstreamError('transport', 'Unreachable.');
 
   it('keeps the previous Rate and records why', async () => {
     const db = makeDb();

@@ -17,7 +17,7 @@ import {
 } from './sessions.js';
 import type { Clock } from './sessions.js';
 import { clearSessionCookie, clientIp, setSessionCookie } from './http.js';
-import { MailerError } from '../mail/mailer.js';
+import { UpstreamError } from '../fetch-with-timeout.js';
 import type { LogSink } from '../request-logger.js';
 import {
   DEFAULT_AUTH_RATE_LIMITS,
@@ -736,7 +736,7 @@ export function authRoutes(options: AuthOptions) {
     } catch (cause) {
       options.log?.(
         `email-changed courtesy notice failed for user ${user.id}: ${
-          cause instanceof MailerError ? cause.code : 'unknown'
+          cause instanceof UpstreamError ? cause.code : 'unknown'
         }`,
       );
     }
