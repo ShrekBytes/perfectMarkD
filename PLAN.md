@@ -106,11 +106,13 @@ The shipped workstreams' tickets have been closed and removed. One ticket is sti
 
 ## 6. Non-goals (v1)
 
-Cloud doc sync · public API · mobile-optimized editor · email infrastructure (password resets are manual until Resend is added) · i18n · collaboration · Obsidian-specific syntax · changes to the existing Obsidian plugin (it stays as-is; the web app links to it).
+Cloud doc sync · public API · mobile-optimized editor · i18n · collaboration · Obsidian-specific syntax · changes to the existing Obsidian plugin (it stays as-is; the web app links to it).
+
+Transactional email is deliberately not a non-goal any more: Verification, Password Reset, Email Change and the Admin reset all go out through Resend (ADR-0013), with `MAIL_MODE=console` as the local-only escape.
 
 ## 7. Your action items
 
 1. Register the domain (`perfectmarkd.com` / `.app` / `.io` — check availability).
-2. Create the three receiving wallets (USDT-TRC20, USDT-BEP20, LTC) and store keys safely; addresses go into admin settings at Phase 2.
-3. Decide the GitHub org/repo name (whole repo is public from Phase 1 — AGPL-3.0).
-4. Set up the Cloudflare Tunnel and DNS for the domain, and point it at the Compose stack on your machine (ADR-0010).
+2. ~~Create the three receiving wallets~~ — done; all three addresses are set in admin settings (2026-09-28).
+3. Decide the GitHub org/repo name (whole repo is public — AGPL-3.0).
+4. ~~Set up the Cloudflare Tunnel and DNS~~ — done; the stack is live at the domain through the tunnel (ADR-0010).
