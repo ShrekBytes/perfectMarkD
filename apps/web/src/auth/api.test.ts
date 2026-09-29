@@ -13,17 +13,11 @@ import {
   signInProviders,
   verifyEmail,
 } from './api';
+import { jsonResponse } from '../testing/json-response';
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
-}
 
 describe('register', () => {
   it('POSTs the credentials and returns the address a link went to', async () => {
@@ -31,7 +25,7 @@ describe('register', () => {
     // verified (email/02), so the response carries the address to wait for.
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(jsonResponse({ email: 'a@b.co' }, 201));
+      .mockResolvedValue(jsonResponse(201, { email: 'a@b.co' }));
     vi.stubGlobal('fetch', fetchMock);
 
     const sent = await register('a@b.co', 'correct horse battery');
@@ -53,11 +47,11 @@ describe('register', () => {
   it('throws an AuthError carrying the server message and status', async () => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          jsonResponse({ error: 'That email is already registered.' }, 409),
-        ),
+      vi.fn().mockResolvedValue(
+        jsonResponse(409, {
+          error: 'That email is already registered.',
+        }),
+      ),
     );
 
     await expect(register('a@b.co', 'correct horse battery')).rejects.toThrow(
@@ -68,7 +62,9 @@ describe('register', () => {
 
 describe('the verification link', () => {
   it('asks for a fresh link, and reports the server message on refusal', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ sent: true }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { sent: true }));
     vi.stubGlobal('fetch', fetchMock);
 
     await resendVerification('a@b.co');
@@ -82,11 +78,11 @@ describe('the verification link', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          jsonResponse({ error: 'Too many attempts. Try again shortly.' }, 429),
-        ),
+      vi.fn().mockResolvedValue(
+        jsonResponse(429, {
+          error: 'Too many attempts. Try again shortly.',
+        }),
+      ),
     );
     await expect(resendVerification('a@b.co')).rejects.toThrow(
       new AuthError('Too many attempts. Try again shortly.', 429),
@@ -97,7 +93,7 @@ describe('the verification link', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
-        jsonResponse({ user: { email: 'a@b.co', isAdmin: false } }),
+        jsonResponse(200, { user: { email: 'a@b.co', isAdmin: false } }),
       );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -112,7 +108,9 @@ describe('the verification link', () => {
 
 describe('Password Reset', () => {
   it('asks for a link, and reports the server message on refusal', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ sent: true }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { sent: true }));
     vi.stubGlobal('fetch', fetchMock);
 
     await requestPasswordReset('a@b.co');
@@ -127,11 +125,11 @@ describe('Password Reset', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          jsonResponse({ error: 'Too many attempts. Try again shortly.' }, 429),
-        ),
+      vi.fn().mockResolvedValue(
+        jsonResponse(429, {
+          error: 'Too many attempts. Try again shortly.',
+        }),
+      ),
     );
     await expect(requestPasswordReset('a@b.co')).rejects.toThrow(
       new AuthError('Too many attempts. Try again shortly.', 429),
@@ -161,13 +159,10 @@ describe('Password Reset', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        jsonResponse(
-          {
-            error: 'That link is no longer valid.',
-            code: 'link_invalid',
-          },
-          400,
-        ),
+        jsonResponse(400, {
+          error: 'That link is no longer valid.',
+          code: 'link_invalid',
+        }),
       ),
     );
 
@@ -186,7 +181,7 @@ describe('login', () => {
       vi
         .fn()
         .mockResolvedValue(
-          jsonResponse({ user: { email: 'a@b.co', isAdmin: true } }),
+          jsonResponse(200, { user: { email: 'a@b.co', isAdmin: true } }),
         ),
     );
 
@@ -202,7 +197,7 @@ describe('login', () => {
       vi
         .fn()
         .mockResolvedValue(
-          jsonResponse({ error: 'Incorrect email or password.' }, 401),
+          jsonResponse(401, { error: 'Incorrect email or password.' }),
         ),
     );
 
@@ -228,7 +223,7 @@ describe('logout', () => {
 describe('me', () => {
   it('GETs /api/me and returns the identity + gates payload', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({
+      jsonResponse(200, {
         email: 'a@b.co',
         isAdmin: false,
         plan: 'pro',
@@ -265,7 +260,7 @@ describe('me', () => {
   it('returns null when not signed in', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ error: 'Not signed in.' }, 401)),
+      vi.fn().mockResolvedValue(jsonResponse(401, { error: 'Not signed in.' })),
     );
 
     expect(await me()).toBeNull();
@@ -295,7 +290,7 @@ describe('changePassword', () => {
       vi
         .fn()
         .mockResolvedValue(
-          jsonResponse({ error: 'Current password is incorrect.' }, 401),
+          jsonResponse(401, { error: 'Current password is incorrect.' }),
         ),
     );
 
@@ -328,12 +323,9 @@ describe('setPassword', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        jsonResponse(
-          {
-            error: 'This account already has a password. Change it instead.',
-          },
-          409,
-        ),
+        jsonResponse(409, {
+          error: 'This account already has a password. Change it instead.',
+        }),
       ),
     );
 
@@ -350,7 +342,7 @@ describe('signInProviders', () => {
   it('GETs the advertisement the sign-in page renders the button from', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(jsonResponse({ google: false }));
+      .mockResolvedValue(jsonResponse(200, { google: false }));
     vi.stubGlobal('fetch', fetchMock);
 
     expect(await signInProviders()).toEqual({ google: false });
@@ -362,7 +354,7 @@ describe('signInProviders', () => {
   it('reports the feature on a deployment that has it configured', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ google: true })),
+      vi.fn().mockResolvedValue(jsonResponse(200, { google: true })),
     );
 
     expect(await signInProviders()).toEqual({ google: true });

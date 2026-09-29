@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CompQuotaDialog } from './CompQuotaDialog';
 import type { AdminUserDetail } from './api';
+import { jsonResponse } from '../testing/json-response';
 
 const onComp = vi.fn();
 const onClose = vi.fn();
@@ -20,13 +21,6 @@ function adminUserDetail(overrides: Partial<AdminUserDetail> = {}) {
     orders: [],
     ...overrides,
   } as AdminUserDetail;
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
 }
 
 beforeEach(() => {

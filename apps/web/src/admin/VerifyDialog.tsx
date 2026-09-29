@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { errorToMessage } from '../api/client';
 import { Dialog } from '../shell/Dialog';
 import { DURATIONS, planName, type PlanId } from '../pricing/plans';
 import { verifyOrder, type AdminOrder } from './api';
@@ -58,9 +59,7 @@ export function VerifyDialog({
       );
       onVerified();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
+      setError(errorToMessage(cause));
       setSubmitting(false);
     }
   };

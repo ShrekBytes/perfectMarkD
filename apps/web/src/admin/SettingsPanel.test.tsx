@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SettingsPanel } from './SettingsPanel';
 import type { AdminSettings } from './api';
+import { jsonResponse } from '../testing/json-response';
 
 const SEEDED: AdminSettings = {
   wallets: {
@@ -41,13 +42,6 @@ const SEEDED: AdminSettings = {
   },
   aiKeyPresent: false,
 };
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
-}
 
 beforeEach(() => {
   vi.stubGlobal(

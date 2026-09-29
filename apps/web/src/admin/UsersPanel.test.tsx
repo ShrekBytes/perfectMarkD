@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { UsersPanel } from './UsersPanel';
 import type { AdminUser, AdminUserDetail } from './api';
+import { jsonResponse } from '../testing/json-response';
 
 function adminUser(overrides: Partial<AdminUser> = {}): AdminUser {
   return {
@@ -50,13 +51,6 @@ function adminUserDetail(
     ],
     ...overrides,
   };
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
 }
 
 beforeEach(() => {

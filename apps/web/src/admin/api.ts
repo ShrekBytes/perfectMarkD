@@ -16,7 +16,7 @@ export type { OrderStatus, PaymentMethod } from '../billing/api';
 export type { PlanLimits, PlanPrices };
 
 /** The Entitlement state the queue shows alongside each Order. */
-export interface EntitlementView {
+interface EntitlementView {
   plan: string;
   expiresAt: string;
 }
@@ -29,7 +29,7 @@ export interface AdminOrder extends Order {
 }
 
 /** A verify decision: a preset duration (stacked server-side) or an exact date. */
-export type VerifyGrant = { durationMonths: number } | { expiresAt: string };
+type VerifyGrant = { durationMonths: number } | { expiresAt: string };
 
 /** One line of the admin audit trail (billing/02). */
 export interface AuditEntry {
@@ -78,7 +78,7 @@ export async function listAuditEntries(): Promise<AuditEntry[]> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** This period's Server Export usage, as the panel shows it. */
-export interface UsageView {
+interface UsageView {
   period: string;
   used: number;
   /** Admin-granted extra allowance for the period (comp quota). */
@@ -113,7 +113,7 @@ export interface AdminUserDetail extends AdminUser {
 }
 
 /** A manual Entitlement grant: a plan with a duration or an exact date. */
-export type ManualGrant = { plan: 'pro' | 'premium' } & VerifyGrant;
+type ManualGrant = { plan: 'pro' | 'premium' } & VerifyGrant;
 
 export async function listAdminUsers(query = ''): Promise<AdminUser[]> {
   const suffix = query.trim()
@@ -273,7 +273,7 @@ export async function updateAdminSetting(
 }
 
 /** Published model metadata from Test connection. */
-export interface AiConnectionModel {
+interface AiConnectionModel {
   id: string;
   contextLength: number | null;
   maxOutputTokens: number | null;

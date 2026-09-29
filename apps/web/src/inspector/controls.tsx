@@ -190,14 +190,12 @@ const inputClass =
 export function TextInput({
   value,
   onChange,
-  className,
   placeholder,
   ariaLabel,
   disabled,
 }: {
   value: string;
   onChange: (value: string) => void;
-  className?: string;
   placeholder?: string;
   ariaLabel: string;
   disabled?: boolean;
@@ -210,7 +208,7 @@ export function TextInput({
       placeholder={placeholder}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      className={`${inputClass} w-full ${className ?? ''}`}
+      className={`${inputClass} w-full`}
     />
   );
 }

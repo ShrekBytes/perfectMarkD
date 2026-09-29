@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { errorToMessage } from '../api/client';
 import { AuthForm, type AuthMode } from '../auth/AuthForm';
 import type { AuthUser } from '../auth/api';
 import { useAccountStore } from '../auth/account-store';
@@ -78,9 +79,7 @@ export function UpgradeFlow({ plan, onClose }: UpgradeFlowProps) {
       setOrder(created);
       setStep('instructions');
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
+      setError(errorToMessage(cause));
     } finally {
       setBusy(false);
     }

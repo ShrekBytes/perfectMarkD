@@ -37,7 +37,7 @@ const UNTITLED = 'Untitled document';
  *  in the database from the first run on, so the sample is seeded only once —
  *  never re-created after dismissal, and not re-created for profiles that
  *  predate it (they have documents but no meta record). */
-export interface OnboardingMeta {
+interface OnboardingMeta {
   sampleDocId: string | null;
   dismissed: boolean;
 }
@@ -46,13 +46,13 @@ export type SaveState = 'saved' | 'saving';
 
 /** Data backing the delete toast: the record to restore plus the assets that
  *  were removed along with it. */
-export interface DeleteSnapshot {
+interface DeleteSnapshot {
   doc: DocumentRecord;
   assets: AssetRecord[];
 }
 
 /** What the UI needs to download a document as a .md file. */
-export interface ExportPayload {
+interface ExportPayload {
   fileName: string;
   markdown: string;
 }
@@ -63,7 +63,7 @@ export type AddAssetResult =
   | { ok: true; ref: string; alt: string }
   | { ok: false; error: 'too-large' | 'unsupported' | 'no-document' };
 
-export interface DocumentStore {
+interface DocumentStore {
   status: 'loading' | 'ready';
   /** Library rows, most recently updated first. */
   docs: DocumentSummary[];
@@ -670,7 +670,7 @@ export function createDocumentStore() {
 }
 
 /** The app-wide store singleton. */
-export const documentStore = createDocumentStore();
+const documentStore = createDocumentStore();
 export const useDocumentStore = documentStore.useStore;
 
 /** Test hook for the singleton (component tests). */

@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VerificationQueue } from './VerificationQueue';
 import type { AdminOrder } from './api';
+import { jsonResponse } from '../testing/json-response';
 
 const TXID = 'a'.repeat(64);
 
@@ -32,13 +33,6 @@ function adminOrder(overrides: Partial<AdminOrder> = {}): AdminOrder {
     entitlement: null,
     ...overrides,
   };
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
 }
 
 beforeEach(() => {
@@ -296,7 +290,12 @@ it('shows a retryable error when the queue cannot load', async () => {
 
   render(<VerificationQueue />);
 
-  expect(await screen.findByRole('alert')).toBeInTheDocument();
+  const alert = await screen.findByRole('alert');
+  // The device is offline, not the server: fetch rejected, so the queue names
+  // the connection rather than passing the browser's "Failed to fetch" through.
+  expect(alert).toHaveTextContent(
+    /couldn.t reach the server\. Check your connection and try again\./i,
+  );
   expect(screen.getByTestId('queue-retry')).toBeInTheDocument();
 });
 

@@ -7,8 +7,6 @@ interface DialogProps {
   label: string;
   /** Extra classes for the panel: width, max-height, stacking. */
   panelClassName?: string;
-  /** Extra classes for the content wrapper under the heading row. */
-  contentClassName?: string;
   testId?: string;
   backdropTestId?: string;
   onClose: () => void;
@@ -24,7 +22,6 @@ interface DialogProps {
 export function Dialog({
   label,
   panelClassName = 'w-full max-w-xl',
-  contentClassName = '',
   testId,
   backdropTestId,
   onClose,
@@ -72,7 +69,7 @@ export function Dialog({
               <CloseIcon />
             </button>
           </div>
-          <div className={`mt-3 ${contentClassName}`}>{children}</div>
+          <div className="mt-3">{children}</div>
         </div>
       </div>
     </>

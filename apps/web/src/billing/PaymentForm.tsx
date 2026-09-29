@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { errorToMessage } from '../api/client';
 import { submitOrderPayment, type Network, type Order } from './api';
 import { isValidTxid, NETWORK_LABELS, networksForCoin } from './payment';
 
@@ -57,9 +58,7 @@ export function PaymentForm({
       });
       onSubmitted(updated);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
+      setError(errorToMessage(cause));
       setSubmitting(false);
     }
   };

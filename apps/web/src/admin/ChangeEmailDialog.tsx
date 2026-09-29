@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { errorToMessage } from '../api/client';
 import { Dialog } from '../shell/Dialog';
 import { changeUserEmail, type AdminUserDetail } from './api';
 
@@ -38,9 +39,7 @@ export function ChangeEmailDialog({
       setSentTo(await changeUserEmail(user.id, email));
       onDone();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
+      setError(errorToMessage(cause));
       setSubmitting(false);
     }
   };

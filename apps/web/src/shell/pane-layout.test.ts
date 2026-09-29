@@ -1,116 +1,36 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  clampPaneWidth,
-  effectiveEditorWidth,
-  SHELL_WIDE_MIN,
-  shellModeFor,
-  usePaneLayout,
-  type PaneLayoutState,
-} from './pane-layout';
+import { SHELL_WIDE_MIN, usePaneLayout } from './pane-layout';
 
 const CONTAINER = 1200;
 
-const openLayout: PaneLayoutState = {
-  editor: { collapsed: false, width: null },
-  inspector: { collapsed: false, width: 320 },
-};
-
 afterEach(() => cleanup());
 
-describe('effectiveEditorWidth', () => {
-  it('falls back to the 38% default ratio', () => {
-    expect(effectiveEditorWidth(openLayout.editor, CONTAINER)).toBe(456);
-  });
-
-  it('uses the explicit width when set', () => {
-    expect(
-      effectiveEditorWidth({ collapsed: false, width: 500 }, CONTAINER),
-    ).toBe(500);
-  });
-
-  it('collapses to zero', () => {
-    expect(
-      effectiveEditorWidth({ collapsed: true, width: null }, CONTAINER),
-    ).toBe(0);
-  });
-});
-
-describe('clampPaneWidth', () => {
-  it('keeps desired widths inside the limits', () => {
-    // max editor = 1200 - 320 (canvas min) - 320 (inspector) = 560
-    expect(clampPaneWidth('editor', 500, CONTAINER, openLayout)).toBe(500);
-    expect(clampPaneWidth('inspector', 300, CONTAINER, openLayout)).toBe(300);
-  });
-
-  it('enforces min widths', () => {
-    expect(clampPaneWidth('editor', 100, CONTAINER, openLayout)).toBe(280);
-    expect(clampPaneWidth('inspector', 100, CONTAINER, openLayout)).toBe(260);
-  });
-
-  it('enforces the canvas minimum against the neighbor pane', () => {
-    // The canvas keeps its 320px minimum; the neighbor yields down to its own
-    // floor: editor max = 1200 - 320 - 260, inspector max = 1200 - 320 - 280.
-    expect(clampPaneWidth('editor', 900, CONTAINER, openLayout)).toBe(620);
-    expect(clampPaneWidth('inspector', 700, CONTAINER, openLayout)).toBe(600);
-  });
-
-  it('lets a pane grow over the collapsed pane', () => {
-    const editorCollapsed: PaneLayoutState = {
-      ...openLayout,
-      editor: { collapsed: true, width: 400 },
-    };
-    expect(clampPaneWidth('inspector', 900, CONTAINER, editorCollapsed)).toBe(
-      880,
+describe('usePaneLayout compact mode', () => {
+  it('keeps the three-pane row at the breakpoint and goes compact one pixel below', () => {
+    // 280 editor + 320 canvas + 260 inspector — the row's own minimum, not a
+    // device width. Read through the hook, so the boundary is pinned where the
+    // shell actually reads it.
+    expect(SHELL_WIDE_MIN).toBe(860);
+    const at = renderHook(() =>
+      usePaneLayout({ current: { clientWidth: SHELL_WIDE_MIN } }),
     );
-
-    const inspectorCollapsed: PaneLayoutState = {
-      ...openLayout,
-      inspector: { collapsed: true, width: 320 },
-    };
-    expect(clampPaneWidth('editor', 900, CONTAINER, inspectorCollapsed)).toBe(
-      880,
+    expect(at.result.current.mode).toBe('wide');
+    const below = renderHook(() =>
+      usePaneLayout({ current: { clientWidth: SHELL_WIDE_MIN - 1 } }),
     );
-  });
-
-  it('protects the pane minimum when the container is too small', () => {
-    // 800 - 320 canvas - 320 inspector = 160 < editor min 280 → min wins
-    expect(clampPaneWidth('editor', 400, 800, openLayout)).toBe(280);
-  });
-
-  it('grants the neighbor the room the layout can actually spare', () => {
-    const narrow = {
-      ...openLayout,
-      inspector: { collapsed: false, width: 260 },
-    };
-    // At 1000px the row holds editor min (280) + canvas min (320) + 400 of
-    // inspector: the 260px inspector was already squeezed by the container,
-    // so the ceiling is what the negotiation can grant, not the old
-    // container − 380 (the editor's ratio) − 320 = 300 phantom.
-    expect(clampPaneWidth('inspector', 400, 1000, narrow)).toBe(400);
-  });
-});
-
-describe('shellModeFor', () => {
-  it('keeps the three-pane row at and above the panes’ own minimum', () => {
-    expect(SHELL_WIDE_MIN).toBe(860); // 280 editor + 320 canvas + 260 inspector
-    expect(shellModeFor(SHELL_WIDE_MIN)).toBe('wide');
-    expect(shellModeFor(1440)).toBe('wide');
-  });
-
-  it('goes compact one pixel below it', () => {
-    expect(shellModeFor(SHELL_WIDE_MIN - 1)).toBe('compact');
-    expect(shellModeFor(375)).toBe('compact');
+    expect(below.result.current.mode).toBe('compact');
   });
 
   it('never collapses the workspace on an unknown width', () => {
     // First paint before layout, and jsdom: the desktop layout stands.
-    expect(shellModeFor(0)).toBe('wide');
+    const { result } = renderHook(() =>
+      usePaneLayout({ current: { clientWidth: 0 } }),
+    );
+    expect(result.current.mode).toBe('wide');
   });
-});
 
-describe('usePaneLayout compact mode', () => {
   it('starts on the editor and reports the pane the user picked', () => {
     const compactRef = { current: { clientWidth: 420 } };
     const { result } = renderHook(() => usePaneLayout(compactRef));
@@ -194,5 +114,43 @@ describe('usePaneLayout', () => {
     // its own width.
     expect(result.current.editor.width).toBe(500);
     expect(result.current.inspector.width).toBe(320);
+  });
+
+  it('holds each pane at its own floor — the three that sum to 860', () => {
+    // The 860 Rule (DESIGN.md, ADR-0006) is a claim about these three numbers,
+    // so it is pinned here rather than left to the sum in `PANE_LIMITS`: a
+    // pane asked for less than its floor gets the floor, and the canvas keeps
+    // its own 320 minimum.
+    const { result } = renderHook(() => usePaneLayout(containerRef));
+    act(() => result.current.setPaneWidth('editor', 100));
+    expect(result.current.editor.width).toBe(280);
+    act(() => result.current.setPaneWidth('inspector', 100));
+    expect(result.current.inspector.width).toBe(260);
+    // The editor's floor is what the canvas's minimum is measured against:
+    // 1200 - 320 canvas - 260 inspector is the editor's ceiling.
+    act(() => result.current.setPaneWidth('editor', 5000));
+    expect(result.current.editor.width).toBe(1200 - 320 - 260);
+  });
+
+  it('protects the pane minimum when the container cannot hold them all', () => {
+    // 800 - 320 canvas - 320 inspector leaves 160 of editor, below its 280
+    // minimum: the pane minimum wins and the canvas degrades, so the row never
+    // renders a pane narrower than the rule allows.
+    const tightRef = { current: { clientWidth: 800 } };
+    const { result } = renderHook(() => usePaneLayout(tightRef));
+    act(() => result.current.setPaneWidth('editor', 400));
+
+    expect(result.current.editor.width).toBe(280);
+    expect(result.current.inspector.width).toBe(260);
+  });
+
+  it('lets the open pane grow across a collapsed one', () => {
+    const { result } = renderHook(() => usePaneLayout(containerRef));
+    act(() => result.current.togglePane('editor'));
+    act(() => result.current.setPaneWidth('inspector', 900));
+    // A collapsed neighbour has no floor to protect, so the inspector takes
+    // everything above the canvas minimum.
+    expect(result.current.inspector.width).toBe(1200 - 320);
+    expect(result.current.editor.collapsed).toBe(true);
   });
 });

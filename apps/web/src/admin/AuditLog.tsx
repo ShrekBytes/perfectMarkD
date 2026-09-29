@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { errorToMessage } from '../api/client';
 import { listAuditEntries, type AuditEntry } from './api';
 import { formatDate } from '../documents/text';
 
@@ -38,9 +39,7 @@ export function AuditLog() {
     try {
       setEntries(await listAuditEntries());
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
+      setError(errorToMessage(cause));
     }
   }, []);
 

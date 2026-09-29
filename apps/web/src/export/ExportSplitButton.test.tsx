@@ -20,6 +20,7 @@ import { downloadBlob } from '../library/download';
 import { stubBroadcastChannel } from '../testing/stub-broadcast-channel';
 import { stubIndexedDB } from '../testing/stub-idb';
 import { stubPrintIframes } from '../testing/stub-print-iframe';
+import { jsonResponse } from '../testing/json-response';
 import {
   hasShownPrintHint,
   markPrintHintShown,
@@ -357,19 +358,11 @@ const jobBody = {
   },
 };
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  } as unknown as Response;
-}
-
 /** The happy-path wire: enqueue → poll (done) → PDF download. */
 function stubHappyServerFetch(): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input);
-    if (path === '/api/export') return jsonResponse(jobBody, 202);
+    if (path === '/api/export') return jsonResponse(202, jobBody);
     if (path.endsWith('/pdf')) {
       return {
         ok: true,
@@ -378,7 +371,7 @@ function stubHappyServerFetch(): ReturnType<typeof vi.fn> {
           Promise.resolve(new Blob(['%PDF'], { type: 'application/pdf' })),
       } as unknown as Response;
     }
-    return jsonResponse({
+    return jsonResponse(200, {
       job: { ...jobBody.job, status: 'done', pages: 1, finishedAt: 'x' },
     });
   });
@@ -493,14 +486,11 @@ describe('Server Export (billing/04)', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        jsonResponse(
-          {
-            error:
-              'You have used all of this period’s Server Exports — it resets next period, or upgrade for a larger quota.',
-            code: 'quota_exceeded',
-          },
-          402,
-        ),
+        jsonResponse(402, {
+          error:
+            'You have used all of this period’s Server Exports — it resets next period, or upgrade for a larger quota.',
+          code: 'quota_exceeded',
+        }),
       ),
     );
     render(<ExportSplitButton />);
@@ -536,13 +526,10 @@ describe('Server Export (billing/04)', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        jsonResponse(
-          {
-            error: 'Server Export needs an active paid plan.',
-            code: 'entitlement_required',
-          },
-          403,
-        ),
+        jsonResponse(403, {
+          error: 'Server Export needs an active paid plan.',
+          code: 'entitlement_required',
+        }),
       ),
     );
     render(<ExportSplitButton />);
@@ -585,13 +572,10 @@ describe('Server Export (billing/04)', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        jsonResponse(
-          {
-            error: 'Too many exports in a minute — try again shortly.',
-            code: 'burst_limit',
-          },
-          429,
-        ),
+        jsonResponse(429, {
+          error: 'Too many exports in a minute — try again shortly.',
+          code: 'burst_limit',
+        }),
       ),
     );
     render(<ExportSplitButton />);
@@ -621,8 +605,8 @@ describe('Server Export (billing/04)', () => {
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
         const path = String(input);
-        if (path === '/api/export') return jsonResponse(jobBody, 202);
-        return jsonResponse({
+        if (path === '/api/export') return jsonResponse(202, jobBody);
+        return jsonResponse(200, {
           job: {
             ...jobBody.job,
             status: 'failed',

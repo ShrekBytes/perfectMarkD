@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChangeEmailDialog } from './ChangeEmailDialog';
 import type { AdminUserDetail } from './api';
+import { jsonResponse } from '../testing/json-response';
 
 const onDone = vi.fn();
 const onClose = vi.fn();
@@ -20,13 +21,6 @@ function adminUserDetail(): AdminUserDetail {
     aiUsage: { period: '2026-09', used: 0, allowance: 0, remaining: 0 },
     orders: [],
   };
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
 }
 
 /** Asserts the request the panel makes, and answers it. */

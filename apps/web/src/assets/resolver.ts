@@ -20,7 +20,7 @@ import type { AssetRecord } from '../documents/types';
 import { blobToDataURL } from '../documents/db';
 import { parseAssetRef } from './ingest';
 
-export type AssetUrlMode = 'blob-url' | 'data-uri';
+type AssetUrlMode = 'blob-url' | 'data-uri';
 
 export interface AssetResolverCache extends AssetResolver {
   /** Resolves every ref up front so later sync calls hit the cache. */

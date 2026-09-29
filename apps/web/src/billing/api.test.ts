@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, createOrder, listOrders, submitOrderPayment } from './api';
+import { jsonResponse } from '../testing/json-response';
 
 function stubFetch(handler: (url: string, init?: RequestInit) => Response) {
   const fetchMock = vi.fn((url: string | URL | Request, init?: RequestInit) =>
@@ -7,13 +8,6 @@ function stubFetch(handler: (url: string, init?: RequestInit) => Response) {
   );
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
 }
 
 afterEach(() => {

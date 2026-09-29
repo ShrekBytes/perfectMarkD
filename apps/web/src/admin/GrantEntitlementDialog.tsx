@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { errorToMessage } from '../api/client';
 import { Dialog } from '../shell/Dialog';
 import {
   DURATIONS,
@@ -64,9 +65,7 @@ export function GrantEntitlementDialog({
       );
       onGranted();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
+      setError(errorToMessage(cause));
       setSubmitting(false);
     }
   };

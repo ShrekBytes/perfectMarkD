@@ -9,7 +9,7 @@ function isTheme(value: unknown): value is Theme {
 }
 
 /** The user's stored choice, or null when they follow the system. */
-export function readStoredTheme(): Theme | null {
+function readStoredTheme(): Theme | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     return isTheme(stored) ? stored : null;
@@ -18,7 +18,7 @@ export function readStoredTheme(): Theme | null {
   }
 }
 
-export function systemTheme(): Theme {
+function systemTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light';

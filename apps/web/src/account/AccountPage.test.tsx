@@ -8,13 +8,7 @@ import {
   useAccountStore,
 } from '../auth/account-store';
 import { stubSystemTheme } from '../testing/match-media';
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
-}
+import { jsonResponse } from '../testing/json-response';
 
 beforeEach(() => {
   localStorage.clear();

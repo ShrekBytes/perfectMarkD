@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { errorToMessage } from '../api/client';
 import {
   getAdminSettings,
   listAdminOrders,
@@ -88,9 +89,7 @@ export function VerificationQueue() {
     try {
       setOrders(await listAdminOrders());
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Something went wrong.',
-      );
+      setError(errorToMessage(cause));
     }
   }, []);
 

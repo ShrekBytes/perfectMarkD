@@ -19,18 +19,6 @@ import type { StylesheetExchange } from './conversation';
 /** The client's name for the shared API error; its `code` names the gate. */
 export { ApiError as AiActionError };
 
-/** The route's typed refusal codes (spec §The AI route module). */
-export type AiErrorCode =
-  | 'ai_not_configured'
-  | 'ai_not_entitled'
-  | 'ai_access_off'
-  | 'ai_allowance_exhausted'
-  | 'ai_burst_limit'
-  | 'ai_input_too_long'
-  | 'ai_provider_error'
-  | 'ai_truncated'
-  | 'ai_invalid_response';
-
 export interface MarkdownRequest {
   instruction: string;
   target: AiTarget;

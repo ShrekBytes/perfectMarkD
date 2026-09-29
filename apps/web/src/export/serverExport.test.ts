@@ -10,6 +10,7 @@ import {
 import { stubBroadcastChannel } from '../testing/stub-broadcast-channel';
 import { stubIndexedDB } from '../testing/stub-idb';
 import { downloadBlob } from '../library/download';
+import { jsonResponse } from '../testing/json-response';
 import * as serverExport from './serverExport';
 import {
   buildServerExportPayload,
@@ -42,14 +43,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   setPollTimingForTests(1000, 10 * 60 * 1000);
 });
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  } as unknown as Response;
-}
 
 function queuedJob(id = 'job-1'): { job: Record<string, unknown> } {
   return {
@@ -178,7 +171,7 @@ describe('Server Export payload fonts contract', () => {
 
 describe('queueServerExport', () => {
   it('returns the queued job from a 202', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(queuedJob(), 202));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(202, queuedJob()));
     vi.stubGlobal('fetch', fetchMock);
 
     const job = await queueServerExport({
@@ -202,13 +195,10 @@ describe('queueServerExport', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        jsonResponse(
-          {
-            error: 'You have used all of this period’s Server Exports.',
-            code: 'quota_exceeded',
-          },
-          402,
-        ),
+        jsonResponse(402, {
+          error: 'You have used all of this period’s Server Exports.',
+          code: 'quota_exceeded',
+        }),
       ),
     );
 
@@ -231,13 +221,10 @@ describe('queueServerExport', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        jsonResponse(
-          {
-            error: 'Server Export needs an active paid plan.',
-            code: 'entitlement_required',
-          },
-          403,
-        ),
+        jsonResponse(403, {
+          error: 'Server Export needs an active paid plan.',
+          code: 'entitlement_required',
+        }),
       ),
     );
 
@@ -276,14 +263,14 @@ describe('waitForExportJob', () => {
   it('polls until the job is done', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse(queuedJob()))
+      .mockResolvedValueOnce(jsonResponse(200, queuedJob()))
       .mockResolvedValueOnce(
-        jsonResponse({
+        jsonResponse(200, {
           job: { ...queuedJob().job, status: 'running', startedAt: 'x' },
         }),
       )
       .mockResolvedValue(
-        jsonResponse({
+        jsonResponse(200, {
           job: {
             ...queuedJob().job,
             status: 'done',
@@ -305,7 +292,7 @@ describe('waitForExportJob', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        jsonResponse({
+        jsonResponse(200, {
           job: {
             ...queuedJob().job,
             status: 'failed',
@@ -327,9 +314,11 @@ describe('waitForExportJob', () => {
 
   it('gives up after the poll timeout instead of polling forever', async () => {
     setPollTimingForTests(1, 20);
+    // A fresh Response per poll: a real body is readable once, so one shared
+    // instance would fail the second read instead of the job timing out.
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(queuedJob())),
+      vi.fn(() => Promise.resolve(jsonResponse(200, queuedJob()))),
     );
 
     const error = await waitForExportJob('job-1').catch((e: unknown) => e);
@@ -365,14 +354,12 @@ describe('downloadExportPdf', () => {
   it('a vanished result surfaces the typed pdf_gone', async () => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          jsonResponse(
-            { error: 'This export is no longer available.', code: 'pdf_gone' },
-            410,
-          ),
-        ),
+      vi.fn().mockResolvedValue(
+        jsonResponse(410, {
+          error: 'This export is no longer available.',
+          code: 'pdf_gone',
+        }),
+      ),
     );
 
     const error = await downloadExportPdf(

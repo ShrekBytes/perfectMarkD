@@ -34,18 +34,18 @@ export type CompactPane = 'editor' | 'canvas' | 'inspector';
  * has run, or jsdom) keeps the wide layout: the workspace must never collapse
  * to a single pane on a guess.
  */
-export function shellModeFor(containerWidth: number): ShellMode {
+function shellModeFor(containerWidth: number): ShellMode {
   if (containerWidth <= 0) return 'wide';
   return containerWidth >= SHELL_WIDE_MIN ? 'wide' : 'compact';
 }
 
-export interface PaneLayoutState {
+interface PaneLayoutState {
   editor: { collapsed: boolean; width: number | null };
   inspector: { collapsed: boolean; width: number };
 }
 
 /** The editor's on-screen width: its explicit width, the 38% default, or 0 when collapsed. */
-export function effectiveEditorWidth(
+function effectiveEditorWidth(
   editor: PaneLayoutState['editor'],
   containerWidth: number,
 ): number {
@@ -79,7 +79,7 @@ function paneFloor(id: PaneId, layout: PaneLayoutState): number {
  * every minimum, the pane minimum wins (flexbox then degrades the canvas
  * gracefully).
  */
-export function clampPaneWidth(
+function clampPaneWidth(
   id: PaneId,
   desired: number,
   containerWidth: number,

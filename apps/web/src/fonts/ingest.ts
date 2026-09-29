@@ -61,7 +61,7 @@ export function familyForFile(name: string): string {
   return family || FALLBACK_FAMILY;
 }
 
-export interface PreparedFont {
+interface PreparedFont {
   /** Raw font bytes — the shape stored in IndexedDB (FontRecord.bytes). */
   bytes: Uint8Array<ArrayBuffer>;
   mediaType: string;
@@ -69,7 +69,7 @@ export interface PreparedFont {
   family: string;
 }
 
-export type PreparedFontResult =
+type PreparedFontResult =
   { ok: true; font: PreparedFont } | { ok: false; error: FontIngestError };
 
 /** Validates and normalizes one incoming font file into a storable record.

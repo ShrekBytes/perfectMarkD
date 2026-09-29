@@ -47,7 +47,7 @@ function fontApiAvailable(): boolean {
   );
 }
 
-export type FontRegisterVerdict = 'loaded' | 'invalid' | 'unavailable';
+type FontRegisterVerdict = 'loaded' | 'invalid' | 'unavailable';
 
 /** Loads a stored font's bytes into a live face. `invalid` means the bytes
  *  would not parse (refuse the upload); `unavailable` means this environment

@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { GrantEntitlementDialog } from './GrantEntitlementDialog';
 import type { AdminUserDetail } from './api';
+import { jsonResponse } from '../testing/json-response';
 
 const onGranted = vi.fn();
 const onClose = vi.fn();
@@ -23,13 +24,6 @@ function adminUserDetail(
     orders: [],
     ...overrides,
   };
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
 }
 
 beforeEach(() => {

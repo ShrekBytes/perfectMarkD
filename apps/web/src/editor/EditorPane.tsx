@@ -66,7 +66,6 @@ function ToolButton(props: {
   label: string;
   hint?: string;
   onClick?: () => void;
-  disabled?: boolean;
   /** Mirrors the popup state for toggle buttons (the Ask AI button). */
   ariaExpanded?: boolean;
   ref?: Ref<HTMLButtonElement>;
@@ -81,8 +80,7 @@ function ToolButton(props: {
       title={props.hint ?? props.label}
       aria-expanded={props.ariaExpanded}
       onClick={props.onClick}
-      disabled={props.disabled}
-      className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+      className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
     >
       <Icon />
     </button>

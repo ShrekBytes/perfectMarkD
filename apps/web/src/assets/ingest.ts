@@ -12,9 +12,9 @@
 /** Hard cap for a single asset; larger files are refused with a clear message. */
 export const MAX_ASSET_BYTES = 20 * 1024 * 1024;
 
-export type AssetIngestError = 'too-large' | 'unsupported';
+type AssetIngestError = 'too-large' | 'unsupported';
 
-export interface PreparedAsset {
+interface PreparedAsset {
   /** Raw image bytes — the shape stored in IndexedDB (AssetRecord.bytes). */
   bytes: Uint8Array<ArrayBuffer>;
   mediaType: string;
@@ -22,7 +22,7 @@ export interface PreparedAsset {
   alt: string;
 }
 
-export type PreparedAssetResult =
+type PreparedAssetResult =
   { ok: true; asset: PreparedAsset } | { ok: false; error: AssetIngestError };
 
 /** Anything ingest can read: a File from paste/drop/picker, or a bare Blob

@@ -60,10 +60,6 @@ export type AiEditProposal =
   | { kind: 'anchored'; edits: AiAnchoredEdit[] }
   | { kind: 'replace'; text: string };
 
-/** Everything an AI Action can produce, before review. A plan is not a change
- *  to review — it is the work list the user approves first (spec §Tier 2). */
-export type AiProposal = AiEditProposal | { kind: 'plan'; steps: AiPlanStep[] };
-
 /** The markdown route's success payload. */
 export interface AiMarkdownResult {
   proposal: AiEditProposal;
