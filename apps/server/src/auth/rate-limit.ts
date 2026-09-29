@@ -1,13 +1,13 @@
 import type { Clock } from './sessions.js';
 
-export interface RateLimitRule {
+interface RateLimitRule {
   /** Allowed requests per window. */
   limit: number;
   /** Window length in milliseconds. */
   windowMs: number;
 }
 
-export interface RateLimitDecision {
+interface RateLimitDecision {
   allowed: boolean;
   /** Seconds until the window resets; only meaningful when not allowed. */
   retryAfterSeconds: number;
@@ -23,14 +23,11 @@ export class FixedWindowRateLimiter {
   /** Opportunistic sweep so spoofed/one-off keys can't grow the map forever. */
   private lastSweep = 0;
 
-  constructor(
-    private readonly rule: RateLimitRule,
-    private readonly now: () => number = Date.now,
-  ) {}
+  constructor(private readonly rule: RateLimitRule) {}
 
   /** Records a request for `key` and reports whether it may proceed. */
   check(key: string): RateLimitDecision {
-    const current = this.now();
+    const current = Date.now();
     this.sweep(current);
     const entry = this.hits.get(key);
     if (!entry || current >= entry.resetAt) {
@@ -115,7 +112,7 @@ export interface AuthRateLimitConfig {
 }
 
 /** The two keys a send endpoint is limited on. */
-export interface SendRateLimitConfig {
+interface SendRateLimitConfig {
   /** The recipient — the key that protects a real inbox. */
   perAddress: RateLimitRule;
   /** The caller's address as our proxy saw it. */

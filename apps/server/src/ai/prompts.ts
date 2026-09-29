@@ -23,7 +23,7 @@ import {
 
 export type { AiPlanBrief };
 
-export type AiTargetKind = 'document' | 'selection';
+type AiTargetKind = 'document' | 'selection';
 
 /** The engine dialect every markdown prompt shares. */
 const DIALECT = `PerfectMarkD renders GitHub-Flavored Markdown to print-ready PDF pages.
@@ -63,7 +63,7 @@ ${MARKDOWN_SAFETY}
 
 ${ANCHORED_CONTRACT}`;
 
-export const AI_MARKDOWN_REPLACEMENT_SYSTEM_PROMPT = `You write markdown for PerfectMarkD.
+const AI_MARKDOWN_REPLACEMENT_SYSTEM_PROMPT = `You write markdown for PerfectMarkD.
 
 ${DIALECT}
 
@@ -92,7 +92,7 @@ Rules:
  * sections and what changes in each — never the replacement text, which each
  * step's own action produces later.
  */
-export const AI_PLAN_SYSTEM_PROMPT = `You plan edits to a markdown document for PerfectMarkD.
+const AI_PLAN_SYSTEM_PROMPT = `You plan edits to a markdown document for PerfectMarkD.
 
 ${DIALECT}
 
@@ -108,7 +108,7 @@ Rules:
 - Page size, margins, and header/footer bands are engine settings, not content: never plan a change to them.
 - Reply with the plan lines and nothing else — no preamble, no headings, no code fences.`;
 
-export interface PlanPromptInput {
+interface PlanPromptInput {
   instruction: string;
   /** The outline digest, built locally from the Document's sections. */
   outline: string;
@@ -136,7 +136,7 @@ export function buildPlanMessages(input: PlanPromptInput): AiMessage[] {
   ];
 }
 
-export interface MarkdownPromptInput {
+interface MarkdownPromptInput {
   instruction: string;
   targetKind: AiTargetKind;
   targetText: string;
@@ -178,7 +178,7 @@ export interface StylesheetHistoryTurn {
  * stylesheet lives: "the box's current text plus the last three exchanges").
  * Older turns add cost and no signal — the box is the source of truth.
  */
-export const MAX_STYLESHEET_HISTORY = 3;
+const MAX_STYLESHEET_HISTORY = 3;
 
 /** The turns a request actually replays: the newest few, oldest first. */
 export function replayHistory(
@@ -187,7 +187,7 @@ export function replayHistory(
   return history.slice(-MAX_STYLESHEET_HISTORY);
 }
 
-export interface StylesheetPromptInput {
+interface StylesheetPromptInput {
   instruction: string;
   /** The stylesheet as it stands; empty when the user has none yet. */
   css: string;

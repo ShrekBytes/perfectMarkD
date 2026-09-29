@@ -13,14 +13,14 @@
 import { rmSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import Database from 'better-sqlite3';
-export interface VacuumIntoResult {
+interface VacuumIntoResult {
   /** Absolute path of the produced dump. */
   targetPath: string;
   /** Size of the dump in bytes (matches statSync on the target). */
   sizeBytes: number;
 }
 
-export interface VacuumIntoOptions {
+interface VacuumIntoOptions {
   /**
    * Replace an existing target instead of failing. The nightly job writes a
    * fixed `latest.db` working file and overwrites it each run.

@@ -6,11 +6,7 @@ import { eq, sql } from 'drizzle-orm';
 import { createTestDatabase, removeTestDatabase } from '../db/testing.js';
 import type { AppDatabase } from '../db/database.js';
 import { exportsHistory, users } from '../db/schema.js';
-import {
-  HISTORY_RETENTION_DAYS,
-  createHistoryStore,
-  type HistoryStore,
-} from './store.js';
+import { HISTORY_RETENTION_DAYS, HistoryStore } from './store.js';
 import { purgeExpiredHistory, startHistoryPurge } from './purge.js';
 
 let cleanup: (() => void) | undefined;
@@ -38,7 +34,7 @@ function makePurgeFixture(): {
     .get()!.id;
   return {
     db,
-    store: createHistoryStore({
+    store: new HistoryStore({
       db,
       dir: historyDir,
       masterKey: 'a'.repeat(64),

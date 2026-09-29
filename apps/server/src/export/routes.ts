@@ -20,6 +20,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
 import { RollingWindowRateLimiter } from '../auth/rate-limit.js';
+import { requireSession } from '../auth/http.js';
 import type { AppDatabase } from '../db/database.js';
 import type { ExportJob, Plan } from '../db/schema.js';
 import { getPlanLimits, pageCapFor } from '../db/settings.js';
@@ -35,7 +36,7 @@ import {
 } from './queue.js';
 import type { ExportWorker } from './worker.js';
 
-export interface ExportRoutesOptions {
+interface ExportRoutesOptions {
   db: AppDatabase;
   payloads: PayloadStore;
   results: ResultStore;
@@ -66,9 +67,11 @@ export function exportRoutes(options: ExportRoutesOptions) {
     }),
   );
 
-  app.post('/', async (c) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+  // The enqueue is the guarded route; the two job reads answer an unknown or
+  // unowned job as 404, signed out included — another user's export is a 404
+  // the same way an Order is.
+  app.post('/', requireSession, async (c) => {
+    const user = c.var.user!;
 
     // One clock read for every decision below — a fresh now() could straddle
     // a UTC midnight and flip the usage period (the hazard admin/users.ts

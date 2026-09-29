@@ -12,14 +12,14 @@ import { Hono } from 'hono';
 import { and, eq } from 'drizzle-orm';
 import type { AppEnv } from './index.js';
 import type { Clock } from './auth/sessions.js';
-import { featureFlagsFor } from './flags.js';
+import { requireSession } from './auth/http.js';
 import { getAiProviderConfig, getPlanLimits } from './db/settings.js';
 import { findActiveEntitlement, quotaState } from './quota.js';
 import { aiAccountState } from './ai/state.js';
 import { identities, GOOGLE_PROVIDER } from './db/schema.js';
 import type { AiContext } from './ai/context.js';
 
-export interface MeRoutesOptions {
+interface MeRoutesOptions {
   /** Injectable clock (tests control expiry and the period boundary). */
   now?: Clock;
   /** The AI context: environment key presence and the provider seam. */
@@ -29,9 +29,10 @@ export interface MeRoutesOptions {
 export function meRoutes({ now = () => new Date(), ai }: MeRoutesOptions = {}) {
   const app = new Hono<AppEnv>();
 
+  app.use('*', requireSession);
+
   app.get('/', (c) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+    const user = c.var.user!;
 
     const db = c.var.db;
     const nowDate = now();
@@ -49,8 +50,14 @@ export function meRoutes({ now = () => new Date(), ai }: MeRoutesOptions = {}) {
       expiresAt: activeEntitlement?.expiresAt.toISOString() ?? null,
       quota: { used: state.used, limit: state.limit },
       // The gated Inspector controls (billing/04): open exactly while an
-      // Entitlement is active — the same condition as plan/expiresAt above.
-      flags: featureFlagsFor(activeEntitlement?.plan ?? null),
+      // Entitlement is active — the same condition as plan/expiresAt above,
+      // computed where that fact already is. All five (custom page size, custom
+      // stylesheet, header/footer banner images, background image, custom
+      // fonts) come with either paid plan, so one boolean carries them; the
+      // client never holds a plan→feature mapping of its own. A comped user
+      // without a plan (billing/03) spends comps on Server Export and gains no
+      // features: the gate is the plan, not the allowance.
+      flags: { paidTier: activeEntitlement !== null },
       // Which sign-in methods (CONTEXT.md) this account has (google-signin/01b).
       // A password of its own is a non-empty hash — that is all a Google
       // registration stores — and a Google identity is an `identities` row. The

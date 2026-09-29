@@ -50,7 +50,7 @@ export interface AiCompletionReply {
   finishReason: string;
 }
 
-export interface AiModelInfoRequest {
+interface AiModelInfoRequest {
   baseUrl: string;
   apiKey: string;
   model: string;

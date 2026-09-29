@@ -59,7 +59,7 @@ const MAX_FONTS = 50;
 
 const MAX_TITLE_LENGTH = 200;
 
-export type ParsedExportPayload =
+type ParsedExportPayload =
   { ok: true; payload: ExportPayload } | { ok: false; error: string };
 
 /**

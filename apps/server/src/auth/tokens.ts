@@ -56,13 +56,13 @@ const TOKEN_TTL_MS = {
 } satisfies Record<TokenPurpose, number>;
 
 /** What a redeemed link carries back to the flow that spends it. */
-export interface RedeemedToken {
+interface RedeemedToken {
   userId: number;
   /** The flow's own data, when the link has any (email/04's new address). */
   payload: string | null;
 }
 
-export interface IssueTokenOptions {
+interface IssueTokenOptions {
   purpose: TokenPurpose;
   userId: number;
   payload?: string | null;
@@ -170,7 +170,7 @@ const MAIL_FOR_PURPOSE = {
 >;
 
 /** The link a sender is asked for: what it is for, and who it goes to. */
-export interface LinkRequest {
+interface LinkRequest {
   purpose: TokenPurpose;
   userId: number;
   /** The one address the message is allowed to mention (ADR-0013). */

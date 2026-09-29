@@ -12,7 +12,7 @@ import type { AiProviderConfig } from '../db/schema.js';
 import { type AiModelInfo, type AiProvider } from './provider.js';
 import { UpstreamError } from '../fetch-with-timeout.js';
 
-export interface AiConnectionModel extends AiModelInfo {
+interface AiConnectionModel extends AiModelInfo {
   /** The model id the metadata was read for. */
   id: string;
 }
@@ -128,7 +128,7 @@ export async function testAiConnection({
 }
 
 /** Configured caps that cannot fit the model's published window. */
-export function connectionWarnings(
+function connectionWarnings(
   config: AiProviderConfig,
   model: AiModelInfo | null,
 ): string[] {

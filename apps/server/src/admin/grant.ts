@@ -9,20 +9,13 @@ import { DURATION_MONTHS } from '../db/schema.js';
 import { asRecord } from '../request-body.js';
 
 /** A duration (stacked onto the current Entitlement) or an exact date. */
-export type GrantInput = { durationMonths: number } | { expiresAt: Date };
+type GrantInput = { durationMonths: number } | { expiresAt: Date };
 
 /** The last millisecond of the given day, UTC. */
-export function endOfUtcDay(date: Date): Date {
+function endOfUtcDay(date: Date): Date {
   return new Date(
-    Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate(),
-      23,
-      59,
-      59,
-      999,
-    ),
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1) -
+      1,
   );
 }
 

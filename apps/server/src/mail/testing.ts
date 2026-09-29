@@ -10,10 +10,10 @@
 
 import type { Mailer } from './mailer.js';
 
-export type RecordedSendKind =
+type RecordedSendKind =
   'verification' | 'password_reset' | 'email_change' | 'email_changed_notice';
 
-export interface RecordedSend {
+interface RecordedSend {
   kind: RecordedSendKind;
   to: string;
   /** The one-time link, for the emails that carry one. */

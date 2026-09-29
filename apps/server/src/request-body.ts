@@ -2,14 +2,15 @@
 // Request-body parsing shared by the route modules (auth, orders, admin, AI)
 // and the streaming reader the export route needs (launch/05).
 //
-// Most bodies here are a few hundred bytes and `parseJson(await
-// c.req.text())` is exactly right for them. The Server Export payload is not:
-// it carries the document, its assets, and its fonts, and can legally reach
-// 50 MB. `text()` buffers every chunk, concatenates them into one buffer, and
-// decodes that — so the whole body is held as bytes and as a string at the
-// same time before the parse even starts. readJsonBody reads the stream
-// instead, decoding each chunk as it arrives and letting the bytes go as they
-// are consumed, so the byte copy is never retained.
+// Most bodies here are a few hundred bytes and reading the whole thing is
+// exactly right for them: `jsonBody` is the one call for that, and the
+// Server Export payload is not in that class. It carries the document, its
+// assets, and its fonts, and can legally reach 50 MB. `text()` buffers every
+// chunk, concatenates them into one buffer, and decodes that — so the whole
+// body is held as bytes and as a string at the same time before the parse even
+// starts. readJsonBody reads the stream instead, decoding each chunk as it
+// arrives and letting the bytes go as they are consumed, so the byte copy is
+// never retained.
 //
 // What it does not do is parse incrementally: JSON.parse still needs the whole
 // string, so the string and the parsed object coexist exactly as they did
@@ -36,7 +37,22 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-export type JsonBodyResult =
+/**
+ * The request body read and parsed in one call — the shape almost every route
+ * wants, so a new one does not have to decide between the two helpers.
+ *
+ * Malformed JSON, an empty body, and a body that is not an object all read as
+ * null, which each caller already refuses in its own words. Not the streaming
+ * reader below: this buffers, which is right for a few hundred bytes and wrong
+ * for the export payload.
+ */
+export async function jsonBody(c: {
+  req: { text: () => Promise<string> };
+}): Promise<Record<string, unknown> | null> {
+  return asRecord(parseJson(await c.req.text()));
+}
+
+type JsonBodyResult =
   | { ok: true; value: unknown }
   | { ok: false; reason: 'too_large' | 'malformed' | 'empty' };
 

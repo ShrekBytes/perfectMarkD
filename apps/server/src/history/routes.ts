@@ -15,6 +15,7 @@ import { Hono } from 'hono';
 import { Readable } from 'node:stream';
 import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
+import { requireSession } from '../auth/http.js';
 import { findActiveEntitlement } from '../quota.js';
 import {
   HistoryExpiredError,
@@ -23,13 +24,13 @@ import {
   type HistoryStore,
 } from './store.js';
 
-export interface HistoryRoutesOptions {
+interface HistoryRoutesOptions {
   store: HistoryStore;
   now: Clock;
 }
 
 /** The History modal's entry shape. Timestamps are ISO strings. */
-export function historyEntryView(row: ExportHistoryRow) {
+function historyEntryView(row: ExportHistoryRow) {
   return {
     id: row.id,
     name: row.name,
@@ -48,10 +49,8 @@ export function historyRoutes({ store, now }: HistoryRoutesOptions) {
   // inactive (the same "active" every other gate reads), so expiry re-locks
   // History the same way it re-locks the Inspector's gated controls
   // (billing/04).
-  app.use('*', async (c, next) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
-
+  app.use('*', requireSession, async (c, next) => {
+    const user = c.var.user!;
     const active = findActiveEntitlement(c.var.db, user.id, now());
     if (active?.plan !== 'premium') {
       return c.json(

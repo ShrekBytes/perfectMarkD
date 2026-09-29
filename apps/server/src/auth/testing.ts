@@ -25,7 +25,7 @@ export function testMailComposition(): {
   return { mail: createRecordingMailer(), publicOrigin: TEST_PUBLIC_ORIGIN };
 }
 
-export interface RegisterOptions {
+interface RegisterOptions {
   email?: string;
   password?: string;
 }
@@ -86,7 +86,7 @@ export function fakeGoogleSignIn(
  * cookie sends more than one entry in a single header, so the one wanted has to
  * be picked by name.
  */
-export function cookiePair(res: Response, name: string): string {
+function cookiePair(res: Response, name: string): string {
   const entry = res.headers
     .get('set-cookie')
     ?.split(/, (?=[^;]+?=)/)

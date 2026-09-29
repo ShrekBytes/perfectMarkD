@@ -45,13 +45,13 @@ const RATE_BAND = 0.5;
  */
 export const RATE_BAND_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export const RATE_AUDIT_ACTION = 'rate.refresh';
+const RATE_AUDIT_ACTION = 'rate.refresh';
 
 /** Where the fetch ended. `rejected` is a provider fault; `failed` is a
  *  transport fault. Neither writes a Rate. */
-export type RateRefreshOutcome = 'updated' | 'rejected' | 'failed';
+type RateRefreshOutcome = 'updated' | 'rejected' | 'failed';
 
-export interface RateRefreshResult {
+interface RateRefreshResult {
   outcome: RateRefreshOutcome;
   /** The accepted figure, when one was accepted. */
   usdtPerLtc: number | null;
@@ -59,7 +59,7 @@ export interface RateRefreshResult {
   reason: string | null;
 }
 
-export interface RateRefreshOptions {
+interface RateRefreshOptions {
   db: AppDatabase;
   provider: LtcRateProvider;
   /** Injectable clock; the fetch's own timestamps and the band use it. */
@@ -181,7 +181,7 @@ function recordFailure(
 /** The actor recorded on a rate audit entry; never a signed-in Admin. */
 const RATE_AUDIT_ACTOR = 'system:rate-refresh';
 
-export interface RateRefreshJobOptions extends RateRefreshOptions {
+interface RateRefreshJobOptions extends RateRefreshOptions {
   /** Fetch cadence; the ticket's number is every twelve hours. */
   intervalMs?: number;
 }

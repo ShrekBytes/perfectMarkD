@@ -45,7 +45,7 @@ export interface AppEnv {
 
 /** Everything the Server Export pipeline (server/03) needs at boot. When
  *  omitted, the export API is not mounted at all. */
-export interface ExportAppOptions {
+interface ExportAppOptions {
   /** Origin the worker loads the app's /export route from (ADR-0003) —
    *  the web dev server in development, the same origin in production. */
   origin: string;
@@ -63,7 +63,7 @@ export interface ExportAppOptions {
   renderPdf?: RenderPdf;
 }
 
-export interface CreateAppOptions {
+interface CreateAppOptions {
   db: AppDatabase;
   /** Signs session cookies; required once auth is mounted (server/02). */
   sessionSecret: string;

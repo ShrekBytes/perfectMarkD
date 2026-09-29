@@ -22,8 +22,7 @@ export const DURATION_MONTHS = [1, 3, 6, 12] as const;
 export type DurationMonths = (typeof DURATION_MONTHS)[number];
 
 /** Order lifecycle: created → verified/rejected (decided_at set). */
-export const ORDER_STATUSES = ['pending', 'verified', 'rejected'] as const;
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export type OrderStatus = 'pending' | 'verified' | 'rejected';
 
 /** The three receiving methods (ADR-0005); keys of the `wallets` setting. */
 export const PAYMENT_METHODS = ['USDT-TRC20', 'USDT-BEP20', 'LTC'] as const;
@@ -71,37 +70,21 @@ export interface AiProviderConfig {
  * there is a mailer: it mails a one-time link, and the account moves only when
  * the user follows it. Neither records an address, for the reason `user.delete`
  * does not — the trail documents the action without outliving the data it names.
+ * `rate.refresh` (ADR-0014) is the Rate refresh, and only its failures: a
+ * successful fetch writes no entry, because twice a day is ~700 a year and would
+ * drown the ones that matter. A refusal is the state a human needs to find later.
  */
-export const AUDIT_ACTIONS = [
-  'order.verify',
-  'order.reject',
-  'entitlement.grant',
-  'entitlement.revoke',
-  'quota.comp',
-  'user.reset_link',
-  'user.email_change',
-  'user.delete',
-  'settings.update',
-  // The Rate refresh (ADR-0014), and only its failures: a successful fetch
-  // writes no entry, because twice a day is ~700 a year and would drown the
-  // ones that matter. A refusal is the state a human needs to find later.
-  'rate.refresh',
-] as const;
-export type AuditAction = (typeof AUDIT_ACTIONS)[number];
-
-/**
- * Server Export job lifecycle (server/03). `queued` jobs carry their document
- * payload only in the API process's memory; `done` jobs hold the rendered PDF
- * the same way for the immediate download, and the worker copies results from
- * Premium jobs to Export History's encrypted disk (server/05).
- */
-export const EXPORT_JOB_STATUSES = [
-  'queued',
-  'running',
-  'done',
-  'failed',
-] as const;
-export type ExportJobStatus = (typeof EXPORT_JOB_STATUSES)[number];
+export type AuditAction =
+  | 'order.verify'
+  | 'order.reject'
+  | 'entitlement.grant'
+  | 'entitlement.revoke'
+  | 'quota.comp'
+  | 'user.reset_link'
+  | 'user.email_change'
+  | 'user.delete'
+  | 'settings.update'
+  | 'rate.refresh';
 
 /**
  * Typed job failures (server/03): the client matches on the code, not the
@@ -109,21 +92,15 @@ export type ExportJobStatus = (typeof EXPORT_JOB_STATUSES)[number];
  * validation) never create a row — these codes are for jobs that were
  * accepted and then failed.
  */
-export const EXPORT_JOB_ERROR_CODES = [
-  'page_cap_exceeded',
-  'render_failed',
-  'render_timeout',
-  'worker_restart',
-] as const;
-export type ExportJobErrorCode = (typeof EXPORT_JOB_ERROR_CODES)[number];
+export type ExportJobErrorCode =
+  'page_cap_exceeded' | 'render_failed' | 'render_timeout' | 'worker_restart';
 
 /** What an audit entry's action touched. */
-export const AUDIT_TARGET_TYPES = ['order', 'user', 'settings'] as const;
-export type AuditTargetType = (typeof AUDIT_TARGET_TYPES)[number];
+export type AuditTargetType = 'order' | 'user' | 'settings';
 
 export type WalletAddresses = Record<PaymentMethod, string>;
 
-export interface PlanPrice {
+interface PlanPrice {
   /** USDT per month. */
   monthly: number;
   /** Total USDT per duration option — 12 months seeded at 10× monthly. */
@@ -132,7 +109,7 @@ export interface PlanPrice {
 export type PlanPrices = Record<Plan, PlanPrice>;
 
 /** What a paid plan allows (PLAN.md §1 tiers table; billing/04 enforces). */
-export interface PlanLimit {
+interface PlanLimit {
   /** Hard page cap per Server Export. */
   pageCap: number;
   /** Monthly Server Export quota. */
@@ -187,12 +164,7 @@ export const sessions = sqliteTable('sessions', {
 });
 
 /** What a one-time emailed link is for. One table covers every flow's link. */
-export const TOKEN_PURPOSES = [
-  'verification',
-  'password_reset',
-  'email_change',
-] as const;
-export type TokenPurpose = (typeof TOKEN_PURPOSES)[number];
+export type TokenPurpose = 'verification' | 'password_reset' | 'email_change';
 
 /**
  * The one-time links in transactional email (ADR-0013): opaque 256-bit tokens,
@@ -400,7 +372,8 @@ export const exportJobs = sqliteTable('export_jobs', {
     .references(() => users.id, { onDelete: 'cascade' }),
   /** Plan at enqueue time (Plan); drives queue priority and the page cap. */
   plan: text('plan').notNull(),
-  status: text('status').notNull().default('queued'), // ExportJobStatus
+  /** queued → running → done | failed (the queue writes them, server/03). */
+  status: text('status').notNull().default('queued'),
   errorCode: text('error_code'), // ExportJobErrorCode, set on failure
   errorMessage: text('error_message'),
   /** Actual rendered page count, set on success. */

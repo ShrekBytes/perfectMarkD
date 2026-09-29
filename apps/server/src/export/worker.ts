@@ -56,7 +56,7 @@ export class RenderError extends Error {
   }
 }
 
-export interface ExportWorkerOptions {
+interface ExportWorkerOptions {
   db: AppDatabase;
   payloads: PayloadStore;
   results: ResultStore;

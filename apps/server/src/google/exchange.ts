@@ -33,7 +33,7 @@ export interface GoogleIdentity {
  * `UpstreamError` for every failure — a callback cannot act on a partial
  * answer, so there is no null to handle.
  */
-export type IdentityExchange = (code: string) => Promise<GoogleIdentity>;
+type IdentityExchange = (code: string) => Promise<GoogleIdentity>;
 
 /**
  * The non-sensitive scopes, and the only ones requested: a name, an email
@@ -58,7 +58,7 @@ export interface GoogleSignIn {
   exchange: IdentityExchange;
 }
 
-export interface GoogleSignInOptions {
+interface GoogleSignInOptions {
   clientId?: string | null;
   clientSecret?: string | null;
   redirectUri: string;
@@ -117,7 +117,7 @@ export function authorizationUrl({
   return `${AUTHORIZE_URL}?${params}`;
 }
 
-export interface GoogleIdentityExchangeOptions {
+interface GoogleIdentityExchangeOptions {
   clientId: string;
   clientSecret: string;
   redirectUri: string;

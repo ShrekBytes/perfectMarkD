@@ -23,7 +23,7 @@ import {
   type EntitlementLike,
 } from '../quota.js';
 
-export interface AiUsageState {
+interface AiUsageState {
   /** UTC `YYYY-MM`, the same period shape as Server Export usage. */
   period: string;
   /** AI Actions counted this period. */

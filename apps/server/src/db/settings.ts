@@ -210,7 +210,7 @@ export function parsePlanLimits(value: unknown): PlanLimits | null {
 }
 
 /** A positive USDT-per-LTC number, or null when it is not one. */
-export function parseLtcRate(value: unknown): number | null {
+function parseLtcRate(value: unknown): number | null {
   if (value === undefined || value === null) return null;
   return isFiniteNumber(value) && value > 0 ? value : null;
 }
@@ -221,7 +221,7 @@ export function parseLtcRate(value: unknown): number | null {
  * it in row metadata, so a failing fetch is distinguishable from a fresh one,
  * and so the Rate and its age cannot drift apart (ADR-0014).
  */
-export interface StoredLtcRate {
+interface StoredLtcRate {
   /**
    * The figure, or null while no fetch has ever succeeded. Null is not a
    * disabled state on its own: it is a Rate that does not exist yet, and the
@@ -250,7 +250,7 @@ function parseTimestamp(value: unknown): string | null {
  * with no successful fetch behind it, which is exactly the state the first
  * fetch treats as having nothing to compare against.
  */
-export function parseStoredLtcRate(value: unknown): StoredLtcRate | null {
+function parseStoredLtcRate(value: unknown): StoredLtcRate | null {
   const bare = parseLtcRate(value);
   if (bare !== null) {
     return {
@@ -440,7 +440,7 @@ export function pageCapFor(limits: PlanLimits, plan: string): number {
  * is derived from the Rate's own `lastSuccessAt`, so a failed fetch cannot
  * make a stale Rate look fresh.
  */
-export interface LtcRate {
+interface LtcRate {
   usdtPerLtc: number;
   /**
    * When a fetch last succeeded; null for a figure that was typed by hand

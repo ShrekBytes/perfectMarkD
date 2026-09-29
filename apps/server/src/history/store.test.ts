@@ -10,7 +10,6 @@ import {
   HistoryExpiredError,
   HistoryNotFoundError,
   HistoryStore,
-  createHistoryStore,
   parseMasterKey,
 } from './store.js';
 
@@ -44,7 +43,7 @@ function makeStore(): {
         .get()!.id,
   );
   return {
-    store: createHistoryStore({ db, dir: historyDir, masterKey: MASTER_KEY }),
+    store: new HistoryStore({ db, dir: historyDir, masterKey: MASTER_KEY }),
     db,
     historyDir,
     userA: ids[0]!,
@@ -282,7 +281,7 @@ describe('HistoryStore', () => {
     });
     // Same directory, rotated key: the path check passes, so the read truly
     // reaches the GCM integrity check.
-    const rotated = createHistoryStore({
+    const rotated = new HistoryStore({
       db,
       dir: historyDir,
       masterKey: 'b'.repeat(64),

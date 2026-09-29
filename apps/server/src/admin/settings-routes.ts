@@ -52,7 +52,7 @@ import { recordAudit } from './audit.js';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The Rate as the panel reads it: the figure, its age, and the last error. */
-export interface LtcRateStatusView {
+interface LtcRateStatusView {
   /** USDT per LTC, or null while no fetch has ever produced one. */
   usdtPerLtc: number | null;
   /** When the Rate was last fetched, ISO 8601. */
@@ -66,7 +66,7 @@ export interface LtcRateStatusView {
 }
 
 /** The settings the panel edits, as one view. */
-export interface AdminSettingsView {
+interface AdminSettingsView {
   wallets: WalletAddresses;
   prices: PlanPrices;
   limits: PlanLimits;
@@ -82,7 +82,7 @@ export interface AdminSettingsView {
  * The stored Rate as the panel reads it, from the accessor's own status shape.
  * One projection, so the settings view and the queue's read cannot drift.
  */
-export function ltcRateStatusView(status: LtcRateStatus): LtcRateStatusView {
+function ltcRateStatusView(status: LtcRateStatus): LtcRateStatusView {
   return {
     usdtPerLtc: status.rate?.usdtPerLtc ?? null,
     lastFetchedAt: status.rate?.lastSuccessAt ?? null,
@@ -92,7 +92,7 @@ export function ltcRateStatusView(status: LtcRateStatus): LtcRateStatusView {
   };
 }
 
-export function settingsView(
+function settingsView(
   db: AppDatabase,
   aiKeyPresent: boolean,
   now: Clock,
@@ -177,7 +177,7 @@ const KV_KEYS: Record<SettingKey, string> = {
   aiProvider: AI_PROVIDER_KEY,
 };
 
-export interface SettingsRoutesOptions {
+interface SettingsRoutesOptions {
   /** Injectable clock; the Rate's reported age is measured against it. */
   now?: Clock;
   /** The AI context (key presence + provider seam) for Test connection. */

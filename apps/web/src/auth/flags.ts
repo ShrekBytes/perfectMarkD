@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The gated-feature flags (billing/04): the client's mirror of the `flags`
-// field GET /api/me reports (apps/server/src/flags.ts owns the derivation).
+// field GET /api/me reports (the server derives it there, beside the active
+// Entitlement it already resolved).
 //
 // The feature-flag store is the account store's `flags` slice — /api/me is the
 // single source of truth for the gates, and the account store is its mirror,

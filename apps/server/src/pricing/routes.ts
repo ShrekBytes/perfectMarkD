@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../index.js';
 import { getPlanLimits, getPlanPrices } from '../db/settings.js';
-import type { PlanLimits, PlanPrices } from '../db/schema.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/pricing (live-pricing/01): the stored plan prices and plan limits,
@@ -21,12 +20,6 @@ import type { PlanLimits, PlanPrices } from '../db/schema.js';
 // The response is public, so it must not be cached: a cached price is the exact
 // stale-quote failure this endpoint exists to remove.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** The public view of the plan catalog's numbers. */
-export interface PricingView {
-  prices: PlanPrices;
-  limits: PlanLimits;
-}
 
 export function pricingRoutes() {
   const app = new Hono<AppEnv>();

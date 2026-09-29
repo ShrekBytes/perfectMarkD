@@ -24,7 +24,7 @@ import {
 
 /** The usage period a timestamp falls in, UTC `YYYY-MM` (schema: export_usage). */
 export function usagePeriod(now: Date): string {
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  return now.toISOString().slice(0, 7);
 }
 
 /** The Entitlement fields the quota and AI math read; null without one. */
@@ -60,7 +60,7 @@ export function findActiveEntitlement(
 }
 
 /** Everything the quota decision and the chip display need. */
-export interface QuotaState {
+interface QuotaState {
   /** Successful Server Exports this period (comps not included). */
   used: number;
   /** Admin-granted extra allowance for the period (comp quota). */

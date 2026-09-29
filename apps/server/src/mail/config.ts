@@ -28,7 +28,7 @@ import { createResendMailer } from './resend.js';
 /** The only mode that is not the provider. See the note above. */
 export type MailMode = 'console';
 
-export interface MailOptions {
+interface MailOptions {
   /** The deployment's provider key (RESEND_API_KEY). */
   apiKey?: string | null;
   /** The from-address, as the provider takes it (MAIL_FROM). */

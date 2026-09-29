@@ -30,7 +30,7 @@ export function createSession(
 }
 
 /** The resolved session user plus whether its expiry was rolled forward. */
-export interface ResolvedSession {
+interface ResolvedSession {
   user: User;
   /** True when the stored expiry was extended (callers re-issue the cookie). */
   rolled: boolean;

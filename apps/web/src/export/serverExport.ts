@@ -67,7 +67,7 @@ export type ServerExportErrorCode =
   | 'entitlement_required'
   | 'burst_limit'
   | 'payload_too_large'
-  // Terminal job failures (schema.ts EXPORT_JOB_ERROR_CODES).
+  // Terminal job failures (schema.ts ExportJobErrorCode).
   | 'page_cap_exceeded'
   | 'render_failed'
   | 'render_timeout'

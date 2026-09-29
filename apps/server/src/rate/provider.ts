@@ -25,7 +25,7 @@ export interface LtcRateProvider {
   fetchRate(): Promise<number>;
 }
 
-export interface LtcRateProviderOptions {
+interface LtcRateProviderOptions {
   /** Per-request deadline in milliseconds (default 10s). */
   timeoutMs?: number;
 }

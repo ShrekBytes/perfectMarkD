@@ -61,7 +61,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
  */
 type GoogleErrorCode = 'declined' | 'error' | 'rate_limited';
 
-export interface GoogleRoutesOptions {
+interface GoogleRoutesOptions {
   /** The deployment's OAuth client and the identity-exchange seam. */
   google: GoogleSignIn;
   /**

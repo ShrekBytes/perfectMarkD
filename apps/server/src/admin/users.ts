@@ -27,7 +27,7 @@ import {
   type WalletAddresses,
 } from '../db/schema.js';
 import type { AppDatabase } from '../db/database.js';
-import { asRecord, parseJson } from '../request-body.js';
+import { jsonBody } from '../request-body.js';
 import { quotaState, usagePeriod, type EntitlementLike } from '../quota.js';
 import { aiUsageState } from '../ai/state.js';
 import { recordAudit } from './audit.js';
@@ -52,7 +52,7 @@ import { parseGrant } from './grant.js';
 // claiming it went out.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface UsersRoutesOptions {
+interface UsersRoutesOptions {
   /** Injectable clock; stacking math, periods, and audit timestamps use it. */
   now?: () => Date;
   /**
@@ -95,12 +95,12 @@ const MAX_COMP_AMOUNT = 100_000;
 class CompsFloorError extends Error {}
 
 /** The Entitlement state shown in the panel (shared with the queue). */
-export interface EntitlementView {
+interface EntitlementView {
   plan: string;
   expiresAt: string;
 }
 
-export interface AdminOrderView {
+interface AdminOrderView {
   /** Null when the Order's account was deleted (anonymized Order). */
   userEmail: string | null;
   /** The user's current Entitlement — what a duration grant stacks onto. */
@@ -108,7 +108,7 @@ export interface AdminOrderView {
 }
 
 /** This period's Server Export usage, as the user detail shows it. */
-export interface UsageView {
+interface UsageView {
   period: string;
   used: number;
   /** Admin-granted extra allowance for the period (comp quota). */
@@ -126,7 +126,7 @@ export interface AiUsageView {
   remaining: number;
 }
 
-export interface AdminUserView {
+interface AdminUserView {
   id: number;
   email: string;
   isAdmin: boolean;
@@ -136,7 +136,7 @@ export interface AdminUserView {
   aiUsage: AiUsageView;
 }
 
-export interface AdminUserDetailView extends AdminUserView {
+interface AdminUserDetailView extends AdminUserView {
   /** The user's Order history, newest first (anonymizes away on deletion). */
   orders: Array<OrderView & AdminOrderView>;
 }
@@ -184,14 +184,6 @@ export function adminOrderView(
     entitlement:
       order.userId === null ? null : entitlementFor(db, order.userId),
   };
-}
-
-function entitlementRow(db: AppDatabase, userId: number) {
-  return db
-    .select()
-    .from(entitlements)
-    .where(eq(entitlements.userId, userId))
-    .get();
 }
 
 /** The shared quota/AI math shape for an Entitlement view; null without one. */
@@ -422,7 +414,7 @@ export function usersRoutes({
     if ('response' in loaded) return loaded.response;
     const user = loaded.user;
 
-    const body = asRecord(parseJson(await c.req.text()));
+    const body = await jsonBody(c);
     if (!body) return c.json({ error: 'Expected a JSON object.' }, 400);
     const plan = body.plan;
     if (
@@ -435,13 +427,13 @@ export function usersRoutes({
     if ('error' in grant) return c.json({ error: grant.error }, 400);
 
     const db = c.var.db;
-    const previous = entitlementRow(db, user.id);
+    const previous = entitlementFor(db, user.id);
     const nowDate = now();
     const expiresAt =
       'durationMonths' in grant
         ? expiryForGrant(
             nowDate,
-            previous ? previous.expiresAt : null,
+            previous === null ? null : new Date(previous.expiresAt),
             grant.durationMonths,
           )
         : grant.expiresAt;
@@ -458,12 +450,7 @@ export function usersRoutes({
         action: 'entitlement.grant',
         targetType: 'user',
         targetId: String(user.id),
-        before: previous
-          ? {
-              plan: previous.plan,
-              expiresAt: previous.expiresAt.toISOString(),
-            }
-          : null,
+        before: previous,
         after: { plan, expiresAt: expiresAt.toISOString() },
       });
     });
@@ -482,7 +469,7 @@ export function usersRoutes({
     const user = loaded.user;
 
     const db = c.var.db;
-    const previous = entitlementRow(db, user.id);
+    const previous = entitlementFor(db, user.id);
     if (!previous) {
       return c.json({ error: 'This user has no entitlement to revoke.' }, 409);
     }
@@ -494,10 +481,7 @@ export function usersRoutes({
         action: 'entitlement.revoke',
         targetType: 'user',
         targetId: String(user.id),
-        before: {
-          plan: previous.plan,
-          expiresAt: previous.expiresAt.toISOString(),
-        },
+        before: previous,
         after: null,
       });
     });
@@ -515,7 +499,7 @@ export function usersRoutes({
     const user = loaded.user;
 
     const db = c.var.db;
-    const body = asRecord(parseJson(await c.req.text()));
+    const body = await jsonBody(c);
     const amount = body?.amount;
     if (!Number.isInteger(amount) || (amount as number) === 0) {
       return c.json(
@@ -651,9 +635,7 @@ export function usersRoutes({
     const user = loaded.user;
 
     const db = c.var.db;
-    const newEmail = normalizeEmail(
-      asRecord(parseJson(await c.req.text()))?.email,
-    );
+    const newEmail = normalizeEmail((await jsonBody(c))?.email);
     if (newEmail === null) {
       return c.json({ error: 'Enter a valid email address.' }, 400);
     }

@@ -12,6 +12,7 @@ import {
   type User,
 } from '../db/schema.js';
 import { asRecord, parseJson } from '../request-body.js';
+import { requireSession } from '../auth/http.js';
 import { expiryForGrant } from './entitlement.js';
 import { parseGrant } from './grant.js';
 import { recordAudit, type Executor } from './audit.js';
@@ -36,7 +37,7 @@ import type { SendLimiter } from '../auth/rate-limit.js';
 // (billing/03) and settings live in sibling sub-apps behind the same gate.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface AdminRoutesOptions {
+interface AdminRoutesOptions {
   /** Injectable clock; expiry math and audit timestamps use it. */
   now?: () => Date;
   /**
@@ -144,10 +145,8 @@ export function adminRoutes({
 }: AdminRoutesOptions) {
   const app = new Hono<AppEnv>();
 
-  app.use('*', async (c, next) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
-    if (!user.isAdmin) {
+  app.use('*', requireSession, async (c, next) => {
+    if (!c.var.user!.isAdmin) {
       return c.json({ error: 'Admin access only.' }, 403);
     }
     return next();

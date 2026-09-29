@@ -32,7 +32,7 @@ const RESEND_EMAILS_URL = 'https://api.resend.com/emails';
 /** A send that has not answered in this long has failed. */
 const DEFAULT_TIMEOUT_MS = 10_000;
 
-export interface ResendMailerOptions {
+interface ResendMailerOptions {
   /** The deployment's provider key. */
   apiKey: string;
   /** From-address as the provider takes it: `Name <local@domain>`. */

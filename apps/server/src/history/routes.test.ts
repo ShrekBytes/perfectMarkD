@@ -12,7 +12,7 @@ import { entitlements, users } from '../db/schema.js';
 import { findExportJob } from '../export/queue.js';
 import type { RenderPdf } from '../export/worker.js';
 import type { ExportHistoryRow } from './store.js';
-import { createHistoryStore } from './store.js';
+import { HistoryStore } from './store.js';
 
 const SESSION_SECRET = 'test-session-secret';
 const MASTER_KEY = 'a'.repeat(64);
@@ -37,7 +37,7 @@ function makeApp(
 ): {
   app: AppType;
   db: AppDatabase;
-  history: ReturnType<typeof createHistoryStore>;
+  history: HistoryStore;
 } {
   const { db, dir } = createTestDatabase();
   const historyDir = mkdtempSync(join(tmpdir(), 'pmd-history-'));
@@ -45,7 +45,7 @@ function makeApp(
     removeTestDatabase(dir);
     rmSync(historyDir, { recursive: true, force: true });
   };
-  const history = createHistoryStore({
+  const history = new HistoryStore({
     db,
     dir: historyDir,
     masterKey: MASTER_KEY,

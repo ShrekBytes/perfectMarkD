@@ -11,7 +11,7 @@
 // Prints the seed facts as JSON for the verification steps to assert on.
 
 import { createDatabase } from '/app/dist/db/database.js';
-import { createHistoryStore } from '/app/dist/history/store.js';
+import { HistoryStore } from '/app/dist/history/store.js';
 import { users, entitlements } from '/app/dist/db/schema.js';
 import { hashPassword } from '/app/dist/auth/passwords.js';
 
@@ -27,7 +27,7 @@ if (!KEY) {
 }
 
 const db = createDatabase(DB_PATH);
-const history = createHistoryStore({ db, dir: HISTORY_DIR, masterKey: KEY });
+const history = new HistoryStore({ db, dir: HISTORY_DIR, masterKey: KEY });
 
 // Clean slate for idempotent reruns (the rehearsal only runs on a fresh db,
 // but a half-run retry must not leave duplicates).

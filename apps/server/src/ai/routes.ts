@@ -35,7 +35,8 @@ import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
 import type { LogSink } from '../request-logger.js';
 import { RollingWindowRateLimiter } from '../auth/rate-limit.js';
-import { asRecord, parseJson } from '../request-body.js';
+import { requireSession } from '../auth/http.js';
+import { asRecord, jsonBody, parseJson } from '../request-body.js';
 import { users, type AiProviderConfig } from '../db/schema.js';
 import { getAiProviderConfig, getPlanLimits } from '../db/settings.js';
 import { findActiveEntitlement } from '../quota.js';
@@ -58,7 +59,7 @@ import {
   type StylesheetHistoryTurn,
 } from './prompts.js';
 
-export interface AiRoutesOptions {
+interface AiRoutesOptions {
   /** The environment key and the provider seam. */
   ai: AiContext;
   now: Clock;
@@ -70,7 +71,7 @@ export interface AiRoutesOptions {
  *  Document; `replace` is a selection, an empty-Document generation, or a
  *  whole stylesheet; `plan` is the approved work list a large Document is
  *  broken into before any of it runs (spec §Tier 2). */
-export type AiProposalResult =
+type AiProposalResult =
   | { kind: 'anchored'; edits: AnchoredEdit[] }
   | { kind: 'replace'; text: string }
   | { kind: 'plan'; steps: AiPlanStep[] };
@@ -140,6 +141,10 @@ type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
 export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
   const app = new Hono<AppEnv>();
+  // The session guard is not one of the spec's gates: every command belongs to
+  // an account, the AI Access switch included, so a user can always turn the
+  // feature back on from the Account page.
+  app.use('*', requireSession);
   // Rolling 60-second per-user burst window (the Admin sets the ceiling).
   const bursts = new RollingWindowRateLimiter(now);
 
@@ -278,9 +283,8 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
    * feature back on from the Account page.
    */
   app.put('/access', async (c) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
-    const body = asRecord(parseJson(await c.req.text()));
+    const user = c.var.user!;
+    const body = await jsonBody(c);
     if (typeof body?.access !== 'boolean') {
       return c.json({ error: 'The AI switch must be on or off.' }, 400);
     }
@@ -327,8 +331,7 @@ type GateResult = GatePass | { response: Response };
  * include AI (an allowance of zero) is the same refusal as no plan at all.
  */
 function gateFor(c: Context<AppEnv>, ai: AiContext, now: Clock): GateResult {
-  const user = c.var.user;
-  if (!user) return { response: c.json({ error: 'Not signed in.' }, 401) };
+  const user = c.var.user!;
 
   const db = c.var.db;
   const config = getAiProviderConfig(db);

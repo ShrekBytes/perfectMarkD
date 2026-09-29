@@ -339,8 +339,8 @@ the timestamp, never written back. This matches how the codebase already handles
 expiry: `isEntitlementActive` (`quota.ts:34`) derives it from `expiresAt` rather
 than storing an expired flag, and needs no job to stay correct.
 
-**Do not add `'expired'` to `ORDER_STATUSES`.** `ORDER_STATUSES` is
-`['pending', 'verified', 'rejected']` (`schema.ts:25`) and those are the three
+**Do not add `'expired'` to `OrderStatus`.** `OrderStatus` is
+`'pending' | 'verified' | 'rejected'` (`schema.ts`) and those are the three
 outcomes of a *decision*. An unpaid Order has had no decision, so it is not a
 fourth outcome. `orderView` exposes the deadline and the derived flag instead,
 and the client renders from that.

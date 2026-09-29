@@ -95,7 +95,7 @@ function insideDir(dir: string, storedPath: string): boolean {
   return target === root || target.startsWith(root + sep);
 }
 
-export interface HistoryStoreOptions {
+interface HistoryStoreOptions {
   db: AppDatabase;
   /** Root directory for the encrypted files (kept outside any web root). */
   dir: string;
@@ -287,8 +287,4 @@ export class HistoryStore {
     if (!row || row.userId !== userId) throw new HistoryNotFoundError();
     return row;
   }
-}
-
-export function createHistoryStore(options: HistoryStoreOptions): HistoryStore {
-  return new HistoryStore(options);
 }

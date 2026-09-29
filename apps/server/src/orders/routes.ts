@@ -4,6 +4,7 @@ import type { AppEnv } from '../index.js';
 import type { Clock } from '../auth/sessions.js';
 import { isUniqueViolation } from '../db/sqlite-errors.js';
 import { asRecord, parseJson } from '../request-body.js';
+import { requireSession } from '../auth/http.js';
 import { getLtcRate, getPlanPrices, getWallets } from '../db/settings.js';
 import {
   DURATION_MONTHS,
@@ -196,7 +197,7 @@ export function orderView(
   };
 }
 
-export interface OrderRoutesOptions {
+interface OrderRoutesOptions {
   /** Injectable clock; the Rate's age and the Payment Window both read it. */
   now?: Clock;
 }
@@ -206,9 +207,10 @@ export function orderRoutes({
 }: OrderRoutesOptions = {}) {
   const app = new Hono<AppEnv>();
 
+  app.use('*', requireSession);
+
   app.post('/', async (c) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+    const user = c.var.user!;
 
     const parsed = parseCreate(parseJson(await c.req.text()));
     if ('error' in parsed) {
@@ -299,8 +301,7 @@ export function orderRoutes({
   });
 
   app.get('/', (c) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+    const user = c.var.user!;
 
     const rows = c.var.db
       .select()
@@ -318,8 +319,7 @@ export function orderRoutes({
   });
 
   app.post('/:id/submission', async (c) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+    const user = c.var.user!;
 
     const id = Number(c.req.param('id'));
     if (!Number.isInteger(id) || id <= 0) {

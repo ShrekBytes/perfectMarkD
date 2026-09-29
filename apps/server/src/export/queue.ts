@@ -60,7 +60,7 @@ export class ResultStore {
  * The client-facing job view (GET /api/export/jobs/:id). Timestamps are ISO
  * strings, matching the other API views.
  */
-export interface ExportJobView {
+interface ExportJobView {
   id: string;
   status: string;
   plan: string;

@@ -1,4 +1,4 @@
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { setCookie, setSignedCookie } from 'hono/cookie';
 import type { AppEnv } from '../index.js';
 import { SESSION_COOKIE, SESSION_TTL_MS } from './sessions.js';
@@ -7,6 +7,18 @@ import { SESSION_COOKIE, SESSION_TTL_MS } from './sessions.js';
  * Transport-level helpers shared by the session middleware (index.ts) and the
  * auth routes, so the cookie attributes and proxy-header parsing exist once.
  */
+
+/**
+ * The one "not signed in" guard. The 401 and its wording are the API's, not a
+ * route's: mounted once per sub-app with no public route (Orders, /api/me, the
+ * AI commands, the Admin panel, Export History) and per route where a sub-app
+ * also serves signed-out callers (the auth routes' account actions, the export
+ * enqueue). A handler behind it can read `c.var.user` without asking again.
+ */
+export const requireSession: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (!c.var.user) return c.json({ error: 'Not signed in.' }, 401);
+  await next();
+};
 
 /**
  * The hop appended by our trusted reverse proxy. Caddy *appends* the client IP

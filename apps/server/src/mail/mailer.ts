@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** A recipient: the one address the mail provider ever sees. */
-export interface MailRecipient {
+interface MailRecipient {
   to: string;
 }
 
@@ -28,7 +28,7 @@ export interface MailRecipient {
  * address. `url` is absolute and built by the caller, which is the only place
  * that knows the app's public origin.
  */
-export interface VerificationEmail extends MailRecipient {
+interface VerificationEmail extends MailRecipient {
   url: string;
 }
 
@@ -36,7 +36,7 @@ export interface VerificationEmail extends MailRecipient {
  * Password Reset: a one-time link that sets a new password without signing in.
  * The Admin's reset link is the same email.
  */
-export interface PasswordResetEmail extends MailRecipient {
+interface PasswordResetEmail extends MailRecipient {
   url: string;
 }
 
@@ -45,7 +45,7 @@ export interface PasswordResetEmail extends MailRecipient {
  * follows to swap the account's login address onto it. The Admin's change (when
  * email/05 lands) is the same email.
  */
-export interface EmailChangeEmail extends MailRecipient {
+interface EmailChangeEmail extends MailRecipient {
   url: string;
 }
 
@@ -53,7 +53,7 @@ export interface EmailChangeEmail extends MailRecipient {
  * The notice the old address gets after an Email change, so a hijacker cannot
  * cut the owner off silently. It carries no link.
  */
-export type EmailChangedNotice = MailRecipient;
+type EmailChangedNotice = MailRecipient;
 
 export interface Mailer {
   sendVerification(email: VerificationEmail): Promise<void>;

@@ -1,6 +1,6 @@
 import type { MailMode } from './mail/config.js';
 
-export interface ServerEnv {
+interface ServerEnv {
   port: number;
   dbPath: string;
   /** Signs session cookies — auth (server/02) makes it required once used. */

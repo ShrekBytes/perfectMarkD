@@ -37,7 +37,7 @@ type PageRenderResult =
   | { ok: true; outline: OutlineEntry[]; pageCount: number }
   | { ok: false; errorCode: string; message: string };
 
-export interface PlaywrightRenderOptions {
+interface PlaywrightRenderOptions {
   /** Where /export lives — the web dev server, or the same origin in prod. */
   origin: string;
   /** Deadline for one job, start to finish: the handshake, the page's own
@@ -45,7 +45,7 @@ export interface PlaywrightRenderOptions {
   timeoutMs?: number;
 }
 
-export interface PlaywrightRenderer {
+interface PlaywrightRenderer {
   renderPdf: RenderPdf;
   /** Shuts the pooled contexts and the shared browser down (tests; process
    *  exit covers production). */

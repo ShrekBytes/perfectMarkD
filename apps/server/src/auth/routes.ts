@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { and, eq } from 'drizzle-orm';
 import type { AppEnv } from '../index.js';
 import { isUniqueViolation } from '../db/sqlite-errors.js';
-import { asRecord, parseJson } from '../request-body.js';
+import { asRecord, jsonBody, parseJson } from '../request-body.js';
 import { users } from '../db/schema.js';
 import {
   hashPassword,
@@ -16,7 +16,12 @@ import {
   deleteUserSessions,
 } from './sessions.js';
 import type { Clock } from './sessions.js';
-import { clearSessionCookie, clientIp, setSessionCookie } from './http.js';
+import {
+  clearSessionCookie,
+  clientIp,
+  requireSession,
+  setSessionCookie,
+} from './http.js';
 import { UpstreamError } from '../fetch-with-timeout.js';
 import type { LogSink } from '../request-logger.js';
 import {
@@ -321,9 +326,7 @@ export function authRoutes(options: AuthOptions) {
   });
 
   app.post('/resend-verification', async (c) => {
-    const parsed = normalizeEmail(
-      asRecord(parseJson(await c.req.text()))?.email,
-    );
+    const parsed = normalizeEmail((await jsonBody(c))?.email);
     if (parsed === null) {
       return c.json({ error: 'Enter a valid email address.' }, 400);
     }
@@ -349,7 +352,7 @@ export function authRoutes(options: AuthOptions) {
   });
 
   app.post('/verify-email', async (c) => {
-    const token = asRecord(parseJson(await c.req.text()))?.token;
+    const token = (await jsonBody(c))?.token;
     if (typeof token !== 'string' || token === '') {
       return invalidLink(c);
     }
@@ -387,9 +390,7 @@ export function authRoutes(options: AuthOptions) {
    * tells a stranger nothing.
    */
   app.post('/request-password-reset', async (c) => {
-    const parsed = normalizeEmail(
-      asRecord(parseJson(await c.req.text()))?.email,
-    );
+    const parsed = normalizeEmail((await jsonBody(c))?.email);
     if (parsed === null) {
       return c.json({ error: 'Enter a valid email address.' }, 400);
     }
@@ -413,7 +414,7 @@ export function authRoutes(options: AuthOptions) {
    * account with no password of its own (Google) gains one (story 13).
    */
   app.post('/reset-password', async (c) => {
-    const body = asRecord(parseJson(await c.req.text()));
+    const body = await jsonBody(c);
     const token = body?.token;
     if (typeof token !== 'string' || token === '') {
       return invalidLink(c);
@@ -501,14 +502,15 @@ export function authRoutes(options: AuthOptions) {
     return c.body(null, 204);
   });
 
-  app.post('/change-password', async (c) => {
+  // The account actions need a session; the routes above it serve signed-out
+  // callers, so the guard is mounted per route rather than once for the router.
+  app.post('/change-password', requireSession, async (c) => {
     const limited = rejectRateLimited(c, limiters.passwordConfirm);
     if (limited) return limited;
 
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+    const user = c.var.user!;
 
-    const body = asRecord(parseJson(await c.req.text()));
+    const body = await jsonBody(c);
     const currentPassword = body?.currentPassword;
     const newPassword = body?.newPassword;
     if (typeof currentPassword !== 'string') {
@@ -559,11 +561,10 @@ export function authRoutes(options: AuthOptions) {
    * account has is revoked. No mail goes out — the address is already verified,
    * and the account did not ask to be reachable somewhere new.
    */
-  app.post('/set-password', async (c) => {
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+  app.post('/set-password', requireSession, async (c) => {
+    const user = c.var.user!;
 
-    const newPassword = asRecord(parseJson(await c.req.text()))?.newPassword;
+    const newPassword = (await jsonBody(c))?.newPassword;
     if (
       typeof newPassword !== 'string' ||
       newPassword.length < MIN_PASSWORD_LENGTH
@@ -590,12 +591,9 @@ export function authRoutes(options: AuthOptions) {
     return c.body(null, 204);
   });
 
-  app.get('/me', (c) => {
-    const user = c.var.user;
-    return user
-      ? c.json({ user: publicUser(user) })
-      : c.json({ error: 'Not signed in.' }, 401);
-  });
+  app.get('/me', requireSession, (c) =>
+    c.json({ user: publicUser(c.var.user!) }),
+  );
 
   /**
    * What sign-in methods this instance has (google-signin/01), for a sign-in
@@ -621,14 +619,13 @@ export function authRoutes(options: AuthOptions) {
    * accounts exist, and the address may be claimed while the link is in flight
    * anyway. Swap time is where that is decided.
    */
-  app.post('/change-email', async (c) => {
+  app.post('/change-email', requireSession, async (c) => {
     const limited = rejectRateLimited(c, limiters.passwordConfirm);
     if (limited) return limited;
 
-    const user = c.var.user;
-    if (!user) return c.json({ error: 'Not signed in.' }, 401);
+    const user = c.var.user!;
 
-    const body = asRecord(parseJson(await c.req.text()));
+    const body = await jsonBody(c);
     const currentPassword = body?.currentPassword;
     const newEmail = normalizeEmail(body?.email);
     if (typeof currentPassword !== 'string' || currentPassword === '') {
@@ -678,7 +675,7 @@ export function authRoutes(options: AuthOptions) {
    * moment this address — not the one it replaces — was proven.
    */
   app.post('/confirm-email-change', async (c) => {
-    const token = asRecord(parseJson(await c.req.text()))?.token;
+    const token = (await jsonBody(c))?.token;
     if (typeof token !== 'string' || token === '') {
       return invalidLink(c);
     }

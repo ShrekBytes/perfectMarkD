@@ -2,7 +2,7 @@ import { serve } from '@hono/node-server';
 import { createDatabase } from './db/database.js';
 import { loadEnv } from './env.js';
 import { createApp } from './index.js';
-import { createHistoryStore } from './history/store.js';
+import { HistoryStore } from './history/store.js';
 import { startHistoryPurge } from './history/purge.js';
 import { startLtcRateRefresh } from './rate/job.js';
 import { createLtcRateProvider } from './rate/provider.js';
@@ -47,7 +47,7 @@ const db = createDatabase(env.dbPath);
 // Export History storage (server/05): finished Premium exports, encrypted at
 // rest, live here. parseMasterKey rejects malformed key material — a bad key
 // fails the boot above the first request, not mid-deployment.
-const history = createHistoryStore({
+const history = new HistoryStore({
   db,
   dir: env.historyDir,
   masterKey: env.historyEncryptionKey,

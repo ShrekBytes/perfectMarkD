@@ -24,8 +24,7 @@ const MAX_DETAIL_LENGTH = 2_000;
  * The four ways a request at this boundary can fail. Fixed here because the
  * answer to "what happened out there" must not depend on which client asked.
  */
-export type UpstreamErrorCode =
-  'transport' | 'timeout' | 'http' | 'invalid_response';
+type UpstreamErrorCode = 'transport' | 'timeout' | 'http' | 'invalid_response';
 
 /**
  * Every failure at this boundary, in one shape. `message` is the writing
@@ -58,7 +57,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 /** The two failures a request cannot classify for itself, in the client's words. */
-export interface TimeoutFetchErrors {
+interface TimeoutFetchErrors {
   /** What the deadline firing becomes. */
   timeout: () => UpstreamError;
   /** What any other failure — DNS, refusal, a reset socket — becomes. */

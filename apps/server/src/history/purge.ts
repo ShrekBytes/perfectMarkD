@@ -15,7 +15,7 @@ import type { Clock } from '../auth/sessions.js';
 import type { LogSink } from '../request-logger.js';
 import type { HistoryStore } from './store.js';
 
-export interface PurgeResult {
+interface PurgeResult {
   /** Rows (and, except where noted, their files) removed. */
   purged: number;
   /** Files that could not be unlinked — their rows are gone regardless. */
@@ -53,7 +53,7 @@ export function purgeExpiredHistory(
   return { purged: deleted.length, failedFiles };
 }
 
-export interface HistoryPurgeOptions {
+interface HistoryPurgeOptions {
   db: AppDatabase;
   store: HistoryStore;
   /** Sweep cadence; the ticket's number is daily. */
