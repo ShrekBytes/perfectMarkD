@@ -2,12 +2,11 @@ import { useState, type FormEvent } from 'react';
 import { errorToFormFailure, type FormFailure } from '../api/client';
 import { useAccountStore } from '../auth/account-store';
 import { requestEmailChange } from '../auth/api';
+import { INPUT_CLASS } from '../auth/field';
+import { AccountSection } from './AccountSection';
 
 /** The form is rendered once per page, so the IDs are stable and unique. */
 const ERROR_ID = 'account-email-error';
-
-const INPUT_CLASS =
-  'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
 
 /**
  * The Account page's login-email section: the address in use, and the form that
@@ -50,16 +49,7 @@ export function ChangeEmailSection() {
   const fieldInvalid = failure?.fieldError ? true : undefined;
 
   return (
-    <section
-      aria-labelledby="account-email-heading"
-      className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
-    >
-      <h2
-        id="account-email-heading"
-        className="text-base font-semibold tracking-tight text-ink"
-      >
-        Login email
-      </h2>
+    <AccountSection headingId="account-email-heading" heading="Login email">
       <p
         data-testid="change-email-current"
         className="mt-1 font-mono text-xs text-ink-soft"
@@ -149,6 +139,6 @@ export function ChangeEmailSection() {
           </button>
         </>
       )}
-    </section>
+    </AccountSection>
   );
 }

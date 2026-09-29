@@ -1,16 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { errorToFormFailure, type FormFailure } from '../api/client';
 import { changePassword } from '../auth/api';
-
-/** The policy the server enforces on new passwords (server/02). */
-const PASSWORD_MIN = 8;
+import { INPUT_CLASS, PASSWORD_MIN, passwordHint } from '../auth/field';
+import { AccountSection } from './AccountSection';
 
 /** The form is rendered once per page, so the IDs are stable and unique. */
 const HINT_ID = 'account-password-hint';
 const ERROR_ID = 'account-password-error';
-
-const INPUT_CLASS =
-  'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
 
 export interface ChangePasswordFormProps {
   /**
@@ -77,10 +73,7 @@ export function ChangePasswordForm({
     }
   };
 
-  const hint =
-    next.length > 0 && next.length < PASSWORD_MIN
-      ? `At least ${PASSWORD_MIN} characters — ${PASSWORD_MIN - next.length} more needed.`
-      : `At least ${PASSWORD_MIN} characters.`;
+  const hint = passwordHint(next.length);
 
   const fieldInvalid =
     failure !== null && failure.fieldError ? true : undefined;
@@ -90,17 +83,10 @@ export function ChangePasswordForm({
       .join(' ') || undefined;
 
   return (
-    <section
-      aria-labelledby="account-password-heading"
-      className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
+    <AccountSection
+      headingId="account-password-heading"
+      heading="Change password"
     >
-      <h2
-        id="account-password-heading"
-        className="text-base font-semibold tracking-tight text-ink"
-      >
-        Change password
-      </h2>
-
       <form
         onSubmit={(event) => void onSubmit(event)}
         // With JS broken this would otherwise GET, putting the password in the
@@ -186,6 +172,6 @@ export function ChangePasswordForm({
           {submitting ? 'Changing…' : 'Change password'}
         </button>
       </form>
-    </section>
+    </AccountSection>
   );
 }

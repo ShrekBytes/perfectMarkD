@@ -12,6 +12,7 @@ import {
 } from '../billing/payment';
 import { formatDate } from '../documents/text';
 import { Dialog } from '../shell/Dialog';
+import { DialogActions } from '../shell/DialogActions';
 import { GrantEntitlementDialog } from './GrantEntitlementDialog';
 import { CompQuotaDialog } from './CompQuotaDialog';
 import { SendResetLinkDialog } from './SendResetLinkDialog';
@@ -346,30 +347,15 @@ function RevokeActions({
   };
 
   return (
-    <>
-      {error && (
-        <p role="alert" className="mt-3 text-xs text-danger">
-          {error}
-        </p>
-      )}
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="confirm-revoke"
-          disabled={submitting}
-          onClick={() => void onRevoke()}
-          className="h-9 flex-1 rounded-control border border-danger/30 text-sm font-medium text-danger transition-colors duration-150 outline-offset-2 outline-accent hover:bg-danger/10 focus-visible:outline-2 disabled:opacity-60"
-        >
-          {submitting ? 'Revoking…' : 'Revoke entitlement'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
-        >
-          Cancel
-        </button>
-      </div>
-    </>
+    <DialogActions
+      error={error}
+      confirmLabel="Revoke entitlement"
+      busyLabel="Revoking…"
+      submitting={submitting}
+      tone="danger-ghost"
+      confirmTestId="confirm-revoke"
+      onConfirm={() => void onRevoke()}
+      onCancel={onClose}
+    />
   );
 }

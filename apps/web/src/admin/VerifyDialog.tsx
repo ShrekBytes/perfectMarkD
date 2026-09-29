@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { errorToMessage } from '../api/client';
 import { Dialog } from '../shell/Dialog';
+import { DialogActions } from '../shell/DialogActions';
 import { DURATIONS, planName, type PlanId } from '../pricing/plans';
 import { verifyOrder, type AdminOrder } from './api';
 import { previewExpiry } from './verification-display';
@@ -133,30 +134,16 @@ export function VerifyDialog({
         </p>
       )}
 
-      {error && (
-        <p role="alert" className="mt-3 text-xs text-danger">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="confirm-verify"
-          disabled={(!duration && !customDate) || submitting}
-          onClick={() => void onVerify()}
-          className="h-9 flex-1 rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
-        >
-          {submitting ? 'Granting…' : 'Verify & grant'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
-        >
-          Cancel
-        </button>
-      </div>
+      <DialogActions
+        error={error}
+        confirmLabel="Verify & grant"
+        busyLabel="Granting…"
+        submitting={submitting}
+        disabled={!duration && !customDate}
+        confirmTestId="confirm-verify"
+        onConfirm={() => void onVerify()}
+        onCancel={onClose}
+      />
     </Dialog>
   );
 }

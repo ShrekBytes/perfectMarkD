@@ -9,6 +9,7 @@ import {
 } from '../history/api';
 import { formatBytes } from '../history/format';
 import { formatDate } from '../documents/text';
+import { AccountSection } from './AccountSection';
 
 /** Any failure crossing the boundary becomes an ApiError the UI can render. */
 function toApiError(cause: unknown): ApiError {
@@ -61,17 +62,10 @@ export function HistorySection() {
   };
 
   return (
-    <section
-      aria-labelledby="account-history-heading"
-      className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
+    <AccountSection
+      headingId="account-history-heading"
+      heading="Export history"
     >
-      <h2
-        id="account-history-heading"
-        className="text-base font-semibold tracking-tight text-ink"
-      >
-        Export history
-      </h2>
-
       {premiumGated && (
         <div className="mt-3 py-4 text-center">
           <p className="text-sm text-ink">Export History is part of Premium.</p>
@@ -161,6 +155,6 @@ export function HistorySection() {
           Exports are removed 30 days after they were made.
         </p>
       )}
-    </section>
+    </AccountSection>
   );
 }

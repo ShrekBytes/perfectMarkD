@@ -3,11 +3,9 @@ import { ApiError, errorToUserMessage } from '../api/client';
 import { AuthPageShell, SignInFooter } from './AuthPageShell';
 import { readResetEmail, rememberResetEmail } from './pending-email';
 import { requestPasswordReset } from './api';
+import { INPUT_CLASS } from './field';
 
 const ERROR_ID = 'reset-request-error';
-
-const INPUT_CLASS =
-  'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
 
 const BUTTON_CLASS =
   'touch-target mt-3 h-9 w-full rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60';

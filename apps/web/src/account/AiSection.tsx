@@ -15,6 +15,7 @@ import { Link } from '../router';
 import { ToggleRow } from '../inspector/controls';
 import { formatDate } from '../documents/text';
 import { useAccountStore, useAiState } from '../auth/account-store';
+import { AccountSection } from './AccountSection';
 
 export function AiSection() {
   const ai = useAiState();
@@ -33,17 +34,7 @@ export function AiSection() {
   };
 
   return (
-    <section
-      aria-labelledby="account-ai-heading"
-      className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
-    >
-      <h2
-        id="account-ai-heading"
-        className="text-base font-semibold tracking-tight text-ink"
-      >
-        AI Actions
-      </h2>
-
+    <AccountSection headingId="account-ai-heading" heading="AI Actions">
       {ai.included ? (
         <>
           <div className="mt-4">
@@ -93,6 +84,6 @@ export function AiSection() {
           {error}
         </p>
       )}
-    </section>
+    </AccountSection>
   );
 }

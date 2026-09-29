@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { errorToMessage } from '../api/client';
 import { Dialog } from '../shell/Dialog';
+import { DialogActions } from '../shell/DialogActions';
 import { rejectOrder, type AdminOrder } from './api';
 
 interface RejectDialogProps {
@@ -127,30 +128,17 @@ export function RejectDialog({
         />
       </label>
 
-      {error && (
-        <p role="alert" className="mt-2 text-xs text-danger">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="confirm-reject"
-          disabled={reason.trim() === '' || submitting}
-          onClick={() => void onReject()}
-          className="h-9 flex-1 rounded-control bg-danger text-sm font-medium text-white transition-colors duration-150 outline-offset-2 outline-accent focus-visible:outline-2 disabled:opacity-60"
-        >
-          {submitting ? 'Rejecting…' : 'Reject order'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
-        >
-          Cancel
-        </button>
-      </div>
+      <DialogActions
+        error={error}
+        confirmLabel="Reject order"
+        busyLabel="Rejecting…"
+        submitting={submitting}
+        disabled={reason.trim() === ''}
+        tone="danger"
+        confirmTestId="confirm-reject"
+        onConfirm={() => void onReject()}
+        onCancel={onClose}
+      />
     </Dialog>
   );
 }

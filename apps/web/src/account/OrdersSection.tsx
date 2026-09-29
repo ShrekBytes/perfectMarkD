@@ -5,6 +5,7 @@ import { orderDateTime, STATUS_BADGE, STATUS_LABEL } from '../billing/payment';
 import { formatDate } from '../documents/text';
 import { PaymentForm } from '../billing/PaymentForm';
 import { PaymentInstructions } from '../billing/PaymentInstructions';
+import { AccountSection } from './AccountSection';
 
 interface OrdersSectionProps {
   orders: Order[] | null;
@@ -41,17 +42,7 @@ export function OrdersSection({
   const anyLapsed = orders?.some((order) => order.paymentExpired) ?? false;
 
   return (
-    <section
-      aria-labelledby="account-orders-heading"
-      className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
-    >
-      <h2
-        id="account-orders-heading"
-        className="text-base font-semibold tracking-tight text-ink"
-      >
-        Orders
-      </h2>
-
+    <AccountSection headingId="account-orders-heading" heading="Orders">
       {error && (
         <div className="mt-3">
           <p role="alert" className="text-xs text-danger">
@@ -242,6 +233,6 @@ export function OrdersSection({
           </ul>
         </>
       )}
-    </section>
+    </AccountSection>
   );
 }

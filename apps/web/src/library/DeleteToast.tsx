@@ -1,14 +1,15 @@
-import { useEffect } from 'react';
 import { useDocumentStore } from '../documents/store';
-import { CloseIcon } from '../shell/icons';
-
-/** How long the undoable delete toast stays before the deletion is final. */
-export const DELETE_TOAST_MS = 7000;
+import { Toast } from '../shell/Toast';
+import { useToastTimer } from '../shell/useTransientToast';
 
 /**
  * Bottom-center toast for the last deletion, with an Undo action. The
  * deletion becomes permanent when the toast times out, is dismissed, or a
  * newer deletion replaces it. Sits above the zoom pill's resting place.
+ *
+ * The message and the dismissal live in the document store, not here, so the
+ * store owns what is deleted; the clock is the shell's, shared with every
+ * other toast.
  */
 export function DeleteToast() {
   const deleteToast = useDocumentStore((state) => state.deleteToast);
@@ -17,24 +18,20 @@ export function DeleteToast() {
     (state) => state.dismissDeleteToast,
   );
 
-  useEffect(() => {
-    if (!deleteToast) return;
-    const timer = setTimeout(dismissDeleteToast, DELETE_TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [deleteToast, dismissDeleteToast]);
+  useToastTimer(deleteToast, dismissDeleteToast);
 
   if (!deleteToast) return null;
 
   return (
-    <div
-      role="status"
-      data-testid="delete-toast"
-      className="fixed inset-x-0 bottom-16 z-[60] flex justify-center pointer-events-none"
-    >
-      <div className="animate-fade-in pointer-events-auto flex items-center gap-3 rounded-pane border border-hairline-strong bg-surface px-4 py-2.5 shadow-lg">
-        <p className="text-sm text-ink">
+    <Toast
+      testId="delete-toast"
+      onDismiss={dismissDeleteToast}
+      message={
+        <>
           Deleted <span className="font-medium">{deleteToast.doc.name}</span>
-        </p>
+        </>
+      }
+      action={
         <button
           type="button"
           onClick={() => void undoDelete()}
@@ -42,15 +39,7 @@ export function DeleteToast() {
         >
           Undo
         </button>
-        <button
-          type="button"
-          aria-label="Dismiss"
-          onClick={dismissDeleteToast}
-          className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
-        >
-          <CloseIcon />
-        </button>
-      </div>
-    </div>
+      }
+    />
   );
 }

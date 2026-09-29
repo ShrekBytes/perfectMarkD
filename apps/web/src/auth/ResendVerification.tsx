@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { errorToMessage } from '../api/client';
 import { resendVerification } from './api';
+import { INPUT_CLASS } from './field';
 
 const BUTTON_CLASS =
   'touch-target mt-2 h-9 w-full rounded-control border border-hairline text-sm font-medium text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2 disabled:opacity-60';
@@ -52,7 +53,7 @@ export function ResendVerification({ email }: { email?: string }) {
             required
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
-            className="touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+            className={INPUT_CLASS}
           />
         </label>
       )}

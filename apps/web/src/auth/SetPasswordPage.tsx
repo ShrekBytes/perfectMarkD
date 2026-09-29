@@ -4,16 +4,11 @@ import { Link } from '../router';
 import { AuthPageShell } from './AuthPageShell';
 import { COPY_CLASS, Panel, tokenFromUrl } from './link-page';
 import { LINK_INVALID_CODE, resetPassword } from './api';
-
-/** The policy the server enforces on new passwords (server/02). */
-const PASSWORD_MIN = 8;
+import { INPUT_CLASS, PASSWORD_MIN, passwordHint } from './field';
 
 /** The form renders once per page, so the IDs are stable and unique. */
 const HINT_ID = 'set-password-hint';
 const ERROR_ID = 'set-password-error';
-
-const INPUT_CLASS =
-  'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
 
 const BUTTON_CLASS =
   'touch-target mt-4 flex h-9 w-full items-center justify-center rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60';
@@ -158,10 +153,7 @@ export function SetPasswordPage() {
     );
   }
 
-  const hint =
-    next.length > 0 && next.length < PASSWORD_MIN
-      ? `At least ${PASSWORD_MIN} characters — ${PASSWORD_MIN - next.length} more needed.`
-      : `At least ${PASSWORD_MIN} characters.`;
+  const hint = passwordHint(next.length);
   // Both fields carry the same message (the policy, or the mismatch), so both
   // point at it: a mismatch flagged on one field reads as "that one is wrong".
   const describedBy =

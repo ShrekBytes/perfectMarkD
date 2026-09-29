@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { errorToMessage } from '../api/client';
 import { Dialog } from '../shell/Dialog';
+import { DialogActions } from '../shell/DialogActions';
 import { compQuota, type AdminUserDetail } from './api';
 
 interface CompQuotaDialogProps {
@@ -70,30 +71,16 @@ export function CompQuotaDialog({
         below zero.
       </p>
 
-      {error && (
-        <p role="alert" className="mt-3 text-xs text-danger">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="confirm-comp"
-          disabled={!valid || submitting}
-          onClick={() => void onSubmit()}
-          className="h-9 flex-1 rounded-control bg-accent-strong text-sm font-medium text-accent-ink transition-colors duration-150 outline-offset-2 outline-accent hover:bg-accent-deep focus-visible:outline-2 disabled:opacity-60"
-        >
-          {submitting ? 'Applying…' : 'Apply comp'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 rounded-control border border-hairline px-3 text-sm text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
-        >
-          Cancel
-        </button>
-      </div>
+      <DialogActions
+        error={error}
+        confirmLabel="Apply comp"
+        busyLabel="Applying…"
+        submitting={submitting}
+        disabled={!valid}
+        confirmTestId="confirm-comp"
+        onConfirm={() => void onSubmit()}
+        onCancel={onClose}
+      />
     </Dialog>
   );
 }

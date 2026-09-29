@@ -1,16 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { errorToFormFailure, type FormFailure } from '../api/client';
 import { useAccountStore } from '../auth/account-store';
-
-/** The policy the server enforces on new passwords (server/02). */
-const PASSWORD_MIN = 8;
+import { INPUT_CLASS, PASSWORD_MIN, passwordHint } from '../auth/field';
+import { AccountSection } from './AccountSection';
 
 /** The form is rendered once per page, so the IDs are stable and unique. */
 const HINT_ID = 'account-set-password-hint';
 const ERROR_ID = 'account-set-password-error';
-
-const INPUT_CLASS =
-  'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
 
 export interface SetPasswordFormProps {
   /**
@@ -75,10 +71,7 @@ export function SetPasswordForm({ onSet }: SetPasswordFormProps) {
     }
   };
 
-  const hint =
-    next.length > 0 && next.length < PASSWORD_MIN
-      ? `At least ${PASSWORD_MIN} characters — ${PASSWORD_MIN - next.length} more needed.`
-      : `At least ${PASSWORD_MIN} characters.`;
+  const hint = passwordHint(next.length);
 
   const fieldInvalid = failure?.fieldError ? true : undefined;
   const nextDescribedBy =
@@ -87,16 +80,10 @@ export function SetPasswordForm({ onSet }: SetPasswordFormProps) {
       .join(' ') || undefined;
 
   return (
-    <section
-      aria-labelledby="account-set-password-heading"
-      className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
+    <AccountSection
+      headingId="account-set-password-heading"
+      heading="Set password"
     >
-      <h2
-        id="account-set-password-heading"
-        className="text-base font-semibold tracking-tight text-ink"
-      >
-        Set password
-      </h2>
       <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink-soft">
         Optional. This account has no password of its own — set one and you can
         sign in with a password as well as the way you signed in here. If you
@@ -163,6 +150,6 @@ export function SetPasswordForm({ onSet }: SetPasswordFormProps) {
           {submitting ? 'Setting…' : 'Set password'}
         </button>
       </form>
-    </section>
+    </AccountSection>
   );
 }

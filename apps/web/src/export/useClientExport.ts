@@ -24,7 +24,10 @@ import {
   printViaHiddenIframe,
   type PrintQualityBrowser,
 } from './clientExport';
-import { useTransientToast, type ExportToast } from './useTransientToast';
+import {
+  useTransientToast,
+  type ToastMessage,
+} from '../shell/useTransientToast';
 
 export type ExportPhase = 'idle' | 'building' | 'awaiting-hint' | 'printing';
 
@@ -53,7 +56,7 @@ export interface ClientExportState {
   hintVisible: boolean;
   /** The hint dialog carries the browser notice when it applies. */
   showBrowserNoticeInHint: boolean;
-  toast: ExportToast | null;
+  toast: ToastMessage | null;
   runExport(): Promise<void>;
   confirmHint(): Promise<void>;
   cancelHint(): void;

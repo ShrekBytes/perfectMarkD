@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import {
   ChevronDownIcon,
-  CloseIcon,
   DownloadIcon,
   PrinterIcon,
   ServerIcon,
   SpinnerIcon,
 } from '../shell/icons';
+import { Toast } from '../shell/Toast';
 import { useAccountStore } from '../auth/account-store';
 import {
   useDismissOnOutsidePointer,
@@ -18,7 +18,6 @@ import { trackEvent } from '../analytics/tracker';
 import { PrintHintDialog } from './PrintHintDialog';
 import { useClientExport } from './useClientExport';
 import { useServerExport } from './useServerExport';
-import type { ExportToast } from './useTransientToast';
 
 /**
  * The top bar's `⬇ Export ▾` split button: the main action is Client Export
@@ -220,44 +219,13 @@ export function ExportSplitButton() {
       {pricingOpen && <PricingModal onClose={() => setPricingOpen(false)} />}
 
       {toast && (
-        <ExportToastView
-          toast={toast}
-          dismissToast={flow.toast ? flow.dismissToast : server.dismissToast}
+        <Toast
+          testId="export-toast"
+          tone={toast.kind === 'error' ? 'error' : 'neutral'}
+          message={toast.text}
+          onDismiss={flow.toast ? flow.dismissToast : server.dismissToast}
         />
       )}
     </>
-  );
-}
-
-/** The export toast — one self-contained block either flow borrows. */
-function ExportToastView({
-  toast,
-  dismissToast,
-}: {
-  toast: ExportToast;
-  dismissToast: () => void;
-}) {
-  return (
-    <div
-      role="status"
-      data-testid="export-toast"
-      className="pointer-events-none fixed inset-x-0 bottom-16 z-[60] flex justify-center"
-    >
-      <div className="animate-fade-in pointer-events-auto flex items-center gap-3 rounded-pane border border-hairline-strong bg-surface px-4 py-2.5 shadow-lg">
-        <p
-          className={`text-sm ${toast.kind === 'error' ? 'text-danger' : 'text-ink'}`}
-        >
-          {toast.text}
-        </p>
-        <button
-          type="button"
-          aria-label="Dismiss"
-          onClick={dismissToast}
-          className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
-        >
-          <CloseIcon />
-        </button>
-      </div>
-    </div>
   );
 }

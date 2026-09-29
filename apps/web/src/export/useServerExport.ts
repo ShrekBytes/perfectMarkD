@@ -21,7 +21,10 @@ import {
   ServerExportError,
   waitForExportJob,
 } from './serverExport';
-import { useTransientToast, type ExportToast } from './useTransientToast';
+import {
+  useTransientToast,
+  type ToastMessage,
+} from '../shell/useTransientToast';
 
 const RENDERING_NOTICE = 'Rendering on the server…';
 const EXPORT_COMPLETE = 'Server Export complete — the PDF is downloading.';
@@ -41,7 +44,7 @@ export type ServerExportOutcome =
 export interface ServerExportState {
   /** Any in-flight work — disables the split button. */
   busy: boolean;
-  toast: ExportToast | null;
+  toast: ToastMessage | null;
   /** Runs the flow — see ServerExportOutcome. */
   runExport(): Promise<ServerExportOutcome>;
   dismissToast(): void;

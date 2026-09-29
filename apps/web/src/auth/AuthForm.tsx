@@ -9,11 +9,9 @@ import {
   type AuthUser,
 } from './api';
 import { ResendVerification } from './ResendVerification';
+import { INPUT_CLASS, PASSWORD_MIN, passwordHint } from './field';
 
 export type AuthMode = 'login' | 'register';
-
-/** The policy the server enforces on new passwords (server/02). */
-const PASSWORD_MIN = 8;
 
 /** Shared by the password helper and the form-level error. A page renders one
  *  AuthForm at a time, so the IDs are stable and unique in the document. */
@@ -42,11 +40,6 @@ const COPY = {
  *  auth fields explicitly (coarse pointers floor it at 44px). */
 const SWITCH_CLASS =
   'touch-target mt-2 flex h-9 w-full items-center justify-center rounded-control border border-hairline text-sm font-medium text-ink-soft transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2';
-
-/** The two fields share one control: same geometry, same ring, same touch
- *  floor. */
-const INPUT_CLASS =
-  'touch-target mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2';
 
 /** Statuses where the recovery is to fix what was typed, so the inputs are
  *  marked invalid. A 5xx, an unreadable body, or a fetch that never landed is
@@ -153,14 +146,7 @@ export function AuthForm({
     }
   };
 
-  const passwordTooShort =
-    password.length > 0 && password.length < PASSWORD_MIN;
-  const hint =
-    mode === 'register'
-      ? passwordTooShort
-        ? `At least ${PASSWORD_MIN} characters — ${PASSWORD_MIN - password.length} more needed.`
-        : `At least ${PASSWORD_MIN} characters.`
-      : null;
+  const hint = mode === 'register' ? passwordHint(password.length) : null;
 
   const fieldInvalid =
     failure !== null && isFieldError(failure.status) ? true : undefined;

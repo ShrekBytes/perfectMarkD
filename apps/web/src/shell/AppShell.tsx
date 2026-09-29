@@ -5,7 +5,9 @@ import { PlanEndedBanner } from './PlanEndedBanner';
 import { CollapsedPaneToggle, PaneDivider } from './PaneDivider';
 import { PaneSwitcher } from './PaneSwitcher';
 import { WelcomeStrip } from './WelcomeStrip';
-import { CloseIcon, UploadIcon } from './icons';
+import { Toast } from './Toast';
+import { useToastTimer } from './useTransientToast';
+import { UploadIcon } from './icons';
 import { PANE_LIMITS, usePaneLayout } from './pane-layout';
 import { useTheme } from '../theme/theme';
 import { useDocumentStore } from '../documents/store';
@@ -103,12 +105,10 @@ export function AppShell() {
   const draggingFiles = useFileDrop(importFiles, handleRejectedDrop);
 
   // The rejected-drop toast leaves on its own — transient chrome for a
-  // transient mistake — and resets its window when another drop lands.
-  useEffect(() => {
-    if (!rejectedDrop) return;
-    const timer = setTimeout(() => setRejectedDrop(null), 6000);
-    return () => clearTimeout(timer);
-  }, [rejectedDrop]);
+  // transient mistake — and the clock is the shell's, so it expires on the
+  // same count as every other toast.
+  const dismissRejectedDrop = useCallback(() => setRejectedDrop(null), []);
+  useToastTimer(rejectedDrop, dismissRejectedDrop);
 
   return (
     <div className="pm-shell flex h-full flex-col overflow-hidden bg-canvas text-ink">
@@ -282,27 +282,15 @@ export function AppShell() {
 
       {libraryOpen && <LibraryPanel onClose={() => setLibraryOpen(false)} />}
       {rejectedDrop && (
-        <div
-          role="status"
-          data-testid="drop-rejected-toast"
-          className="pointer-events-none fixed inset-x-0 bottom-16 z-[60] flex justify-center"
-        >
-          <div className="animate-fade-in pointer-events-auto flex items-center gap-3 rounded-pane border border-hairline-strong bg-surface px-4 py-2.5 shadow-lg">
-            <p className="text-sm text-ink">
-              {rejectedDrop.length === 1
-                ? `Only .md files can be imported. "${rejectedDrop[0]}" is not Markdown — convert it to .md or paste its text into the editor.`
-                : `Only .md files can be imported. ${rejectedDrop.length} of the dropped files are not Markdown — convert them to .md or paste their text into the editor.`}
-            </p>
-            <button
-              type="button"
-              aria-label="Dismiss"
-              onClick={() => setRejectedDrop(null)}
-              className="touch-target flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors duration-150 outline-offset-2 outline-accent hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
-            >
-              <CloseIcon />
-            </button>
-          </div>
-        </div>
+        <Toast
+          testId="drop-rejected-toast"
+          onDismiss={dismissRejectedDrop}
+          message={
+            rejectedDrop.length === 1
+              ? `Only .md files can be imported. "${rejectedDrop[0]}" is not Markdown — convert it to .md or paste its text into the editor.`
+              : `Only .md files can be imported. ${rejectedDrop.length} of the dropped files are not Markdown — convert them to .md or paste their text into the editor.`
+          }
+        />
       )}
       <DeleteToast />
     </div>

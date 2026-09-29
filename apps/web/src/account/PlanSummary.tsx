@@ -3,6 +3,7 @@ import { planName, type PlanId } from '../pricing/plans';
 import type { EntitlementState } from '../auth/account-store';
 import type { Order } from '../billing/api';
 import { formatDate } from '../documents/text';
+import { AccountSection } from './AccountSection';
 
 /** Adds calendar months in UTC, clamping day-of-month overflow (Jan 31 + 1
  *  month → Feb 28) — the same arithmetic apps/server's admin/entitlement.ts
@@ -87,17 +88,7 @@ export function PlanSummary({
   const ended = last !== null && last.endedAt.getTime() <= Date.now();
 
   return (
-    <section
-      aria-labelledby="account-plan-heading"
-      className="rounded-pane border border-hairline bg-surface p-4 sm:p-5"
-    >
-      <h2
-        id="account-plan-heading"
-        className="text-base font-semibold tracking-tight text-ink"
-      >
-        Plan
-      </h2>
-
+    <AccountSection headingId="account-plan-heading" heading="Plan">
       {entitlement && (
         <div className="mt-3">
           <p className="text-sm font-semibold text-ink">
@@ -169,6 +160,6 @@ export function PlanSummary({
           </Link>
         </div>
       )}
-    </section>
+    </AccountSection>
   );
 }
