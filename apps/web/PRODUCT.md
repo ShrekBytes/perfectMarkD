@@ -54,7 +54,7 @@ in USDT — same numeral, no conversion):
 - Gated controls in the UI show a lock that opens the pricing modal — never a signup wall.
 - Client-side gates are bypassable by design (AGPL): everything of real value (Server Export) is enforced server-side.
 - Terminology is fixed by the glossary in `CONTEXT.md` (Document, Page Break, Preset, Outline, Client Export, Server Export, Quota, Order, Verification). Use those terms; respect the listed "avoid" words.
-- v1 non-goals: cloud document sync, public API, mobile-optimized editor, email infrastructure, i18n, collaboration, Obsidian-specific syntax.
+- v1 non-goals: see `PLAN.md` §6.
 
 ## Brand Commitments
 
@@ -65,7 +65,7 @@ in USDT — same numeral, no conversion):
 
 ## Evidence on Hand
 
-- `PLAN.md` — the product plan: tiers, billing flow, privacy posture, roadmap, risks.
+- `PLAN.md` — the product plan: tiers, billing flow, privacy posture, open work, risks.
 - `CONTEXT.md` — the domain glossary and canonical terminology.
 - `docs/adr/` — architecture decisions (AGPL-3.0, print-pipeline Client Export, single-engine server export, monorepo stack, manual crypto billing).
 - `apps/web/src/documents/sample.md` — the polished multi-page onboarding sample (headings, callouts, table, highlighted code, math, diagrams).

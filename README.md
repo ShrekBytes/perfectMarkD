@@ -2,7 +2,7 @@
 
 Turns markdown into perfectly laid-out PDFs — the platform-independent successor to the [Advanced PDF Export](https://github.com/ShrekBytes/advanced-pdf-export) Obsidian plugin. Drop-in editor, no signup: what you see is exactly the PDF you get.
 
-Status: pre-launch. The roadmap lives in [PLAN.md](PLAN.md), decisions in [docs/adr/](docs/adr/), tickets in `.scratch/`.
+Status: pre-launch. The vocabulary is [CONTEXT.md](CONTEXT.md), the open work lives in [PLAN.md](PLAN.md), decisions in [docs/adr/](docs/adr/), tickets in `.scratch/`, and how to build and verify it in [AGENTS.md](AGENTS.md).
 
 ## Layout
 
@@ -53,7 +53,7 @@ The api and caddy images are compiled by [`.github/workflows/images.yml`](.githu
 
 The shipped deployment serves the stack behind a Cloudflare Tunnel, which terminates TLS in front of Caddy ([ADR-0010](docs/adr/0010-deploy-on-own-machine-behind-cloudflare-tunnel.md)) — so `SITE_ADDRESS` stays `:80` and no inbound ports are needed. Server Export (paid plans) works out of the box: headless Chromium is baked into the api image.
 
-Runbooks live in [`docs/ops/`](docs/ops/): [admin.md](docs/ops/admin.md) for verifying payments, resetting passwords and changing wallets · [hosting.md](docs/ops/hosting.md) for what the host does not need · [restore.md](docs/ops/restore.md) for backups and getting back from a bad day.
+Runbooks live in [`docs/ops/`](docs/ops/): [admin](docs/ops/admin.md) for verifying a payment, resetting a password, and changing a wallet · [restore](docs/ops/restore.md) for backup and recovery · [hosting](docs/ops/hosting.md) for what the stack does _not_ need · [launch checklist](docs/ops/launch-checklist.md) and [announcement drafts](docs/ops/announcements.md) for going live.
 
 ### Versions and releases
 
@@ -88,10 +88,6 @@ With no id set, the instance loads no tracker and collects nothing.
 Umami's image is compiled by [`.github/workflows/umami-image.yml`](.github/workflows/umami-image.yml) and published to GHCR as a public package, so `docker compose up -d` pulls it — the deployment host never needs a build toolchain or room for a 100k-file compile ([ADR-0012](docs/adr/0012-build-the-umami-image-in-ci.md)). `ops/umami/Dockerfile` is the source it builds from; a local build is one command, recorded in `docker-compose.yml`.
 
 Exposing a host directly instead? Set `SITE_ADDRESS=<domain>` in `.env` and Caddy provisions TLS automatically.
-
-## Operations
-
-Runbooks live in [`docs/ops/`](docs/ops/): [admin](docs/ops/admin.md) for verifying a payment, resetting a password, and changing a wallet · [restore](docs/ops/restore.md) for backup and recovery · [hosting](docs/ops/hosting.md) for what the stack does _not_ need · [launch checklist](docs/ops/launch-checklist.md) and [announcement drafts](docs/ops/announcements.md) for going live.
 
 ## License
 

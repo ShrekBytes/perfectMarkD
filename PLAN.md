@@ -76,7 +76,7 @@ Server Export payloads are processed in memory and deleted immediately after ren
 | `apps/web` | React + Vite SPA (no Next.js — no SEO surface, static hosting): CodeMirror 6, Tailwind, Zustand, IndexedDB doc library; `/` editor, `/pricing`, `/export` (hidden route the server loads) |
 | `apps/server` | Node + Hono + Drizzle + SQLite: auth, Orders, Entitlements, quotas, Export History, export worker |
 
-**Key decisions** (see `docs/adr/`): whole repo AGPL-3.0 (ADR-0001) · Client Export via print pipeline (ADR-0002) · server renders the app's own `/export` route in Playwright (ADR-0003) · stack (ADR-0004) · manual crypto billing (ADR-0005).
+**Key decisions** (see `docs/adr/`, 0001–0014; a selection, not the whole log): whole repo AGPL-3.0 (ADR-0001) · Client Export via print pipeline (ADR-0002) · server renders the app's own `/export` route in Playwright (ADR-0003) · stack (ADR-0004) · manual crypto billing (ADR-0005).
 
 - **Library swaps from the plugin**: markdown-it replaces Obsidian's renderer; **KaTeX replaces MathJax** (synchronous, print-perfect, kills the MathJax-CSS-extraction code); **Shiki replaces Prism + CODE_THEMES** (VS Code-grade theme catalog — every old theme name has a Shiki equivalent); mermaid stays; RTL detection ports as-is.
 - **Flavor**: GFM (tables, task lists, strikethrough, footnotes), GFM Alerts (`> [!NOTE]`), YAML frontmatter (stripped by default, toggle), `$…$`/`$$…$$` math, images. No Obsidianisms — no `==mark==`, no `[[wikilinks]]`.
@@ -84,13 +84,7 @@ Server Export payloads are processed in memory and deleted immediately after ren
 - **Infra**: the Admin's own machine, Docker Compose — `caddy` (static files, reverse proxy), `api`, `umami` (its image is compiled in CI and pulled, [ADR-0012](docs/adr/0012-build-the-umami-image-in-ci.md)) — published at the real domain through a **Cloudflare Tunnel** (outbound only: no port forwarding, no static IP, no inbound rules; TLS terminates at Cloudflare's edge, so Caddy stays on plain HTTP). Nightly SQLite dump + history backup to object storage. Budget: ~€1/mo storage + domain — no server rent until the stack moves to a VPS, which is deferred (ADR-0010).
 - **Persistence**: free users' documents live in IndexedDB (blobs for images) — local-only. Server Export POSTs document + assets (≤ 50 MB payload) ephemerally. No cloud doc sync in v1.
 
-## 4. Roadmap
-
-| Phase | Scope | Ship |
-|---|---|---|
-| **1 — Engine + free app** (~3–4 wks) | Monorepo, `packages/core` port with regression tests, editor app: 3-pane UI, library, Inspector (locks inert), Client Export print flow, sample onboarding, /pricing page | Public free launch — no accounts exist yet |
-| **2 — Paid tier** (~2–3 wks) | Server + auth, Server Export pipeline, quotas, upgrade flow + Order submission, admin panel (payments/users/settings/audit), gated-feature unlocks (custom page size, CSS, fonts, banner/background images), Export History | Payments go live |
-| **3 — Polish & launch ops** (~1–2 wks) | Umami analytics, docs page, backups + restore runbook, perf guards (large-doc warning, lazy Shiki, mermaid caching), deploy on own machine behind a Cloudflare Tunnel, launch checklist | Full launch |
+## 4. Open work
 
 The shipped workstreams' tickets have been closed and removed. One ticket is still open: [`.scratch/launch/issues/06-launch-checklist.md`](.scratch/launch/issues/06-launch-checklist.md) — the launch checklist, which needs live human verification (real crypto payments, non-Chrome browsers) rather than code. **Execution order comes from each ticket's `Blocked by:` line** — work the frontier: any ticket whose blockers are resolved, lowest number first.
 

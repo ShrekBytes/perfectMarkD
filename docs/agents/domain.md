@@ -4,13 +4,21 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root, or
-- **`CONTEXT-MAP.md`** at the repo root if it exists: it points at one `CONTEXT.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+Read the ones that bear on the work, in this order:
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+- **`CONTEXT.md`** — the canonical glossary. Use its terms verbatim; see "Use the glossary's vocabulary" below.
+- **`docs/adr/`** — the numbered decision log, one file per decision. Read the ADRs that touch the area you are about to work in, and read one before overriding any. `AGENTS.md` names the current range.
+- **`docs/agents/`** — this file, plus `issue-tracker.md` (tracker conventions) and `triage-labels.md` (the `Status:` vocabulary).
+- **`apps/web/DESIGN.md`** — the binding visual system. `AGENTS.md` and `PLAN.md` both defer to it, and both say to fix one side or the other when they disagree. Never leave both.
+- **`apps/web/PRODUCT.md`** — product scope and the WCAG 2.2 AA target.
+- **`docs/ops/`** — five runbooks: `admin.md` (verifying a payment, resetting a password, changing a wallet), `restore.md` (backup and recovery), `hosting.md` (what the stack does not need), `launch-checklist.md` and `announcements.md` (going live).
+- **`packages/core/src/golden/README.md`** — the paginator's regression net. Read it before touching the paginator.
+
+If any of these files do not exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
 ## File structure
+
+The two trees below are *shapes*, not this repository's layout. This repository's real locations are the list above.
 
 Single-context repo (most repos):
 
