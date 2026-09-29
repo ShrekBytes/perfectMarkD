@@ -406,17 +406,17 @@ export function bannerStyle(
 /** Style for the header text band (the band's inner markup is
  *  buildHFInnerHTML). Color is intentionally absent: the header text band is
  *  painted by the shared `.mpdf-page-header-text` sheet rule, so a Custom
- *  Stylesheet can restyle it. */
-export function headerBandStyle(): string {
-  return `position:absolute;top:var(--pm-band-top);left:var(--pm-margin-left);right:var(--pm-margin-right);height:var(--pm-header-h);display:flex;align-items:center;white-space:nowrap;`;
-}
+ *  Stylesheet can restyle it. A constant rather than a builder because every
+ *  number in it is a CSS custom property, so the geometry is the sheet's to
+ *  carry, not the caller's to compute. */
+export const HEADER_BAND_STYLE = `position:absolute;top:var(--pm-band-top);left:var(--pm-margin-left);right:var(--pm-margin-right);height:var(--pm-header-h);display:flex;align-items:center;white-space:nowrap;`;
 
-/** Style for the footer text band. Color is intentionally absent: the footer
- *  text band is painted by the shared `.mpdf-page-footer-text` sheet rule, so
- *  a Custom Stylesheet can restyle it. */
-export function footerBandStyle(): string {
-  return `position:absolute;bottom:0;left:0;right:0;height:var(--pm-footer-h);display:flex;align-items:center;padding:0 var(--pm-margin-right) 0 var(--pm-margin-left);`;
-}
+/** Style for the footer text band. Color is intentionally absent, for
+ *  HEADER_BAND_STYLE's reason: the footer text band is painted by the shared
+ *  `.mpdf-page-footer-text` sheet rule. A constant for the same reason — only
+ *  the insets are fixed, being flush with the page edges by design; the height
+ *  and the horizontal padding still ride the sheet's variables. */
+export const FOOTER_BAND_STYLE = `position:absolute;bottom:0;left:0;right:0;height:var(--pm-footer-h);display:flex;align-items:center;padding:0 var(--pm-margin-right) 0 var(--pm-margin-left);`;
 
 /** Inner markup for a header/footer band: a centered span when center text is
  *  present, otherwise a left span plus a margin-left:auto right span. Empty

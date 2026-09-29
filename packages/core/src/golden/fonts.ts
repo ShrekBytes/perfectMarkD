@@ -40,13 +40,13 @@ const NODE_MODULES = join(SRC_DIR, '..', 'node_modules');
 // ─── The bundled families ─────────────────────────────────────────────────────
 
 /** Body serif — stands in for the presets' Georgia and Times New Roman. */
-export const GOLDEN_SERIF = 'IBM Plex Serif';
+const GOLDEN_SERIF = 'IBM Plex Serif';
 /** Body sans — stands in for their Helvetica Neue and Arial. */
-export const GOLDEN_SANS = 'IBM Plex Sans';
+const GOLDEN_SANS = 'IBM Plex Sans';
 /** Code, inline and fenced — stands in for Courier New. */
-export const GOLDEN_MONO = 'IBM Plex Mono';
+const GOLDEN_MONO = 'IBM Plex Mono';
 /** Arabic — the RTL fixture's script; none of the Plex faces carry it. */
-export const GOLDEN_ARABIC = 'Noto Sans Arabic';
+const GOLDEN_ARABIC = 'Noto Sans Arabic';
 
 /** The weights the doc CSS actually puts to use: 400 body, 600 for h2/h5/h6
  *  and `th`, 700 for h1/h3/h4 and `strong`. The doc CSS does ask for italic
@@ -113,7 +113,7 @@ export const GOLDEN_CODE_STACK = `"${GOLDEN_MONO}"`;
 
 /** A face the suite serves, as the harness needs it: what to force-load
  *  before measuring, and which file carries it. */
-export interface BundledFace {
+interface BundledFace {
   family: string;
   weight: number;
   style: string;
@@ -132,7 +132,7 @@ export function faceSpecCSS(face: FaceSpec, size = 16): string {
   return `${face.style} ${face.weight} ${size}px "${face.family}"`;
 }
 
-export interface BundledFonts {
+interface BundledFonts {
   /** @font-face text for every face, urls pointed at `origin`'s font route. */
   css: string;
   faces: BundledFace[];

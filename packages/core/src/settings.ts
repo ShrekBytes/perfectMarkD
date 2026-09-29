@@ -90,7 +90,6 @@ export interface DocumentSettings extends DocStyle {
   codeFontLigatures: boolean;
   autoBreakH1: boolean;
   autoBreakH2: boolean;
-  includeFilenameAsTitle: boolean;
   /** Width in mm, used only when pageSize === "Custom". */
   customPageWidth: number;
   /** Height in mm, used only when pageSize === "Custom". */
@@ -123,8 +122,6 @@ export interface DocumentSettings extends DocStyle {
   backgroundImageScope: 'full-page' | 'content-only';
   /** 0–1 opacity for the background image layer. */
   backgroundImageOpacity: number;
-  /** When true, headings H1–H6 are embedded as a bookmark tree in the exported PDF. */
-  includeOutline: boolean;
 
   // ── Custom Stylesheet (the user's own CSS layer) ──────────────────────────
   /** The user's CSS, appended after the generated rules by the CSS builder.
@@ -374,7 +371,6 @@ export const DEFAULT_SETTINGS: DocumentSettings = {
   codeFontLigatures: false,
   autoBreakH1: false,
   autoBreakH2: false,
-  includeFilenameAsTitle: false,
   customPageWidth: 210, // A4 width in mm
   customPageHeight: 297, // A4 height in mm
   // Band sizing (0 = auto from font size)
@@ -391,8 +387,6 @@ export const DEFAULT_SETTINGS: DocumentSettings = {
   backgroundImageSize: 'cover',
   backgroundImageScope: 'full-page',
   backgroundImageOpacity: 1,
-  // Outline / bookmarks
-  includeOutline: true,
   // Custom Stylesheet layer (off until a user writes CSS and turns it on)
   customStylesheet: '',
   customStylesheetEnabled: false,

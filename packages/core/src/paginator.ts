@@ -126,6 +126,32 @@ function makeFitFn(
     contentHeightPx - HEIGHT_EPS;
 }
 
+/**
+ * Counts how many of an element's splittable children fit on the page, by
+ * measuring a fragment built from the first n of them and stopping at the
+ * first that no longer fits. Returns the largest n that fits, or 0 when even
+ * the first child does not — which is the caller's cue to fall back to its
+ * forced split.
+ *
+ * The list and table splitters both run this loop. The pre splitter keeps its
+ * own, because it is a genuine variant rather than a copy: it has to hold on
+ * to each candidate fragment (that fragment *is* the split it returns, and a
+ * code block's has to keep its highlight spans), and its builder can decline
+ * to produce one at all, which this count-only helper has no way to express.
+ */
+function countFittingChildren(
+  total: number,
+  build: (n: number) => HTMLElement,
+  fits: (node: HTMLElement) => boolean,
+): number {
+  let fitCount = 0;
+  for (let i = 0; i < total; i++) {
+    if (fits(build(i + 1))) fitCount = i + 1;
+    else break;
+  }
+  return fitCount;
+}
+
 // ── Inline (text) splitter ───────────────────────────────────────────────────
 
 function trimLeadingWhitespace(el: HTMLElement): void {
@@ -280,12 +306,11 @@ export function splitListElement(
   const existingStart =
     listEl.tagName === 'OL' ? ((listEl as HTMLOListElement).start ?? 1) : 1;
 
-  let fitCount = 0;
-  for (let i = 0; i < items.length; i++) {
-    if (fits(buildListWithItems(listEl, items.slice(0, i + 1), existingStart)))
-      fitCount = i + 1;
-    else break;
-  }
+  let fitCount = countFittingChildren(
+    items.length,
+    (n) => buildListWithItems(listEl, items.slice(0, n), existingStart),
+    fits,
+  );
 
   // When forced (alone on empty page), guarantee at least 1 item moves forward.
   if (fitCount <= 0) {
@@ -335,12 +360,11 @@ export function splitTableElement(
       );
   if (rows.length === 0) return null;
 
-  let fitCount = 0;
-  for (let i = 0; i < rows.length; i++) {
-    if (fits(buildTableWithRows(tableEl, rows.slice(0, i + 1))))
-      fitCount = i + 1;
-    else break;
-  }
+  let fitCount = countFittingChildren(
+    rows.length,
+    (n) => buildTableWithRows(tableEl, rows.slice(0, n)),
+    fits,
+  );
 
   // When forced (alone on empty page), guarantee at least 1 row moves forward.
   if (fitCount <= 0) {
@@ -596,7 +620,7 @@ function beginPagination(
  *  is not the run's dominant cost. */
 const YIELD_EVERY_NODES = 50;
 
-export interface PaginateChunkedOptions {
+interface PaginateChunkedOptions {
   /** Nodes per batch; lower yields more often. Defaults to 50. */
   yieldEvery?: number;
   /**

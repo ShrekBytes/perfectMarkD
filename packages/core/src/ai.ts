@@ -135,10 +135,10 @@ export interface AnchoredEdit {
  * `empty_search` is an anchor that quotes nothing. Every one of them refuses
  * the whole reply — a proposal that cannot be applied is never offered.
  */
-export type AnchoredEditParseFailure =
+type AnchoredEditParseFailure =
   'no_blocks' | 'malformed_block' | 'empty_search';
 
-export type AnchoredEditParseResult =
+type AnchoredEditParseResult =
   | { ok: true; edits: AnchoredEdit[] }
   | { ok: false; code: AnchoredEditParseFailure; blockIndex: number };
 
@@ -148,10 +148,9 @@ export type AnchoredEditParseResult =
  * nothing (`empty_search`). The failure names the first offending block, so
  * the review surface can say which one it was.
  */
-export type AnchoredEditApplyFailure =
-  'empty_search' | 'not_found' | 'ambiguous';
+type AnchoredEditApplyFailure = 'empty_search' | 'not_found' | 'ambiguous';
 
-export type AnchoredEditApplyResult =
+type AnchoredEditApplyResult =
   | { ok: true; text: string }
   | {
       ok: false;
@@ -515,7 +514,7 @@ export interface AiSizeRefusal {
   message: string;
 }
 
-export type AiSizeCheck = { ok: true } | { ok: false; refusal: AiSizeRefusal };
+type AiSizeCheck = { ok: true } | { ok: false; refusal: AiSizeRefusal };
 
 export interface AiSendSizeInput {
   instruction: string;
@@ -605,7 +604,7 @@ export type AiLadderDecision =
       paragraphRange: TextSelection | null;
     };
 
-export interface AiLadderInput {
+interface AiLadderInput {
   /** The whole Document, as the editor has it. */
   documentText: string;
   target: {
@@ -859,10 +858,10 @@ export function planBriefText(brief: AiPlanBrief): string {
 /** A plan longer than this is a runaway reply, not a plan. */
 export const MAX_AI_PLAN_STEPS = 20;
 
-export type AiPlanParseFailure =
+type AiPlanParseFailure =
   'no_steps' | 'unknown_section' | 'malformed_step' | 'too_many_steps';
 
-export type AiPlanParseResult =
+type AiPlanParseResult =
   | { ok: true; steps: AiPlanStep[] }
   | { ok: false; code: AiPlanParseFailure; line: string };
 

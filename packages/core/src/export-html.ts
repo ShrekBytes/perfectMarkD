@@ -28,8 +28,8 @@ import {
   buildHFInnerHTML,
   escapeCSSForStyle,
   escapeHTML,
-  footerBandStyle,
-  headerBandStyle,
+  FOOTER_BAND_STYLE,
+  HEADER_BAND_STYLE,
   resolvePageGeometry,
 } from './css-builder.js';
 import { isRTLContent } from './render.js';
@@ -40,7 +40,7 @@ import type { DocumentSettings } from './settings.js';
 /** Optional inputs for buildExportHTML. Everything required to assemble the
  *  print document arrives through the positional arguments; these only tune
  *  metadata, host-supplied stylesheets, and RTL parity with the preview. */
-export interface ExportHTMLOptions {
+interface ExportHTMLOptions {
   /** Document title for the <title> element. Defaults to "Export" — the
    *  plugin used the document's basename. Only metadata: visible page content
    *  comes from the layouts. */
@@ -116,13 +116,13 @@ export function buildExportHTML(
     const contentHTML = layout.pageNodes.map((n) => n.outerHTML).join('\n');
 
     const headerHTML = layout.hasHeader
-      ? `<div class="mpdf-page-header-text" style="${headerBandStyle()}">${buildHFInnerHTML(layout.headerCenter, layout.headerLeft, layout.headerRight)}</div>`
+      ? `<div class="mpdf-page-header-text" style="${HEADER_BAND_STYLE}">${buildHFInnerHTML(layout.headerCenter, layout.headerLeft, layout.headerRight)}</div>`
       : '';
 
     const contentDivHTML = `<div class="mpdf-doc"${isRTL ? ' dir="rtl"' : ''} style="position:absolute;top:${g.mTop + g.headerH}px;left:${g.mLeft}px;width:${g.contentW}px;">${contentHTML}</div>`;
 
     const footerHTML = layout.hasFooter
-      ? `<div class="mpdf-page-footer-text" style="${footerBandStyle()}">${buildHFInnerHTML(layout.footerCenter, layout.footerLeft, layout.footerRight)}</div>`
+      ? `<div class="mpdf-page-footer-text" style="${FOOTER_BAND_STYLE}">${buildHFInnerHTML(layout.footerCenter, layout.footerLeft, layout.footerRight)}</div>`
       : '';
 
     // Banner divs precede their text divs so DOM order puts text on top.

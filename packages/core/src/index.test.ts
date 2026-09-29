@@ -18,8 +18,8 @@ it('exposes the public engine surface from the package index', () => {
 it('keeps the internal-only helpers off the package surface', () => {
   const api = Object.keys(core);
   // Spot-checks across the modules: an estimate the ladder owns, a render
-  // clean-up pass, a splitter, a geometry constant, a settings constant, the
-  // styling-reference tables, and the DOM delegates (deleted outright).
+  // clean-up pass, splitters, a geometry constant, a settings constant, and
+  // the styling-reference tables.
   for (const internal of [
     'estimateAiSize',
     'postProcessRenderedHTML',
@@ -27,9 +27,15 @@ it('keeps the internal-only helpers off the package surface', () => {
     'mmToPx',
     'SETTINGS_VERSION',
     'STYLING_REFERENCE_VARIABLES',
-    'createDiv',
-    'aiBudgets',
-    'paginateEl',
+    // Four more, each a live `export` in its own module that the package
+    // surface deliberately omits: the ladder's write cap, a section-label
+    // predicate, a second splitter, and a stylesheet sanitiser. Their being
+    // real exports is the point — the assertion can only fail if one of them
+    // is promoted to the barrel.
+    'aiWriteCapTokens',
+    'isBareSectionLabel',
+    'splitListElement',
+    'stripPageAtRules',
   ]) {
     expect(api, internal).not.toContain(internal);
   }

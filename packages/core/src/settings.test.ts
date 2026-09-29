@@ -63,11 +63,10 @@ describe('DEFAULT_SETTINGS', () => {
   });
 
   it('keeps the fields the engine needs', () => {
-    // Custom page size in mm, outline, header/footer band sizing,
-    // banner + background asset refs — all kept by engine-port/02.
+    // Custom page size in mm, header/footer band sizing, banner +
+    // background asset refs — all kept by engine-port/02.
     expect(DEFAULT_SETTINGS.customPageWidth).toBe(210);
     expect(DEFAULT_SETTINGS.customPageHeight).toBe(297);
-    expect(DEFAULT_SETTINGS.includeOutline).toBe(true);
     expect(DEFAULT_SETTINGS.headerHeight).toBe(0);
     expect(DEFAULT_SETTINGS.footerHeight).toBe(0);
     expect(DEFAULT_SETTINGS.headerImageRef).toBe('');

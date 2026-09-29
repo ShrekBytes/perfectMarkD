@@ -37,7 +37,7 @@ import { GOLDEN_BODY_STACK, GOLDEN_CODE_STACK } from './fonts.js';
  *
  *  Applied after the caller's overrides, not before: the pin is the suite's
  *  guarantee, not a default a test can accidentally opt out of. */
-export function withBundledFonts(s: DocumentSettings): DocumentSettings {
+function withBundledFonts(s: DocumentSettings): DocumentSettings {
   return {
     ...s,
     fontFamily: s.fontFamily.includes('sans-serif')

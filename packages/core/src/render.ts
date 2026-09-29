@@ -203,7 +203,7 @@ function renderMermaidBlock(
 
 // ─── Render pipeline ────────────────────────────────────────────────────────────
 
-export interface RenderMarkdownOptions {
+interface RenderMarkdownOptions {
   /** Only the render-affecting settings; callers pass their full
    *  DocumentSettings and the rest of the object is ignored. */
   settings?: Pick<DocumentSettings, 'codeTheme' | 'hideFrontmatter'>;
@@ -212,7 +212,7 @@ export interface RenderMarkdownOptions {
   renderMermaid?: RenderMermaidHook;
 }
 
-export interface RenderMarkdownResult {
+interface RenderMarkdownResult {
   /** Clean, paginator-ready HTML. */
   html: string;
   /** Parsed YAML frontmatter object, or null when absent/invalid. Exposed

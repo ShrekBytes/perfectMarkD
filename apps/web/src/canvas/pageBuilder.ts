@@ -22,8 +22,8 @@ import {
   bgImageLayerStyle,
   buildFrameOverlayHTML,
   buildHFInnerHTML,
-  footerBandStyle,
-  headerBandStyle,
+  FOOTER_BAND_STYLE,
+  HEADER_BAND_STYLE,
   type AssetResolver,
   type DocumentSettings,
   type PageGeometry,
@@ -124,7 +124,7 @@ export function buildPage({
     const header = document.createElement('div');
     header.dataset.pmLayer = 'header-text';
     header.className = 'mpdf-page-header-text';
-    header.style.cssText = headerBandStyle();
+    header.style.cssText = HEADER_BAND_STYLE;
     box.appendChild(header);
     header.innerHTML = buildHFInnerHTML(
       layout.headerCenter,
@@ -155,7 +155,7 @@ export function buildPage({
     const footer = document.createElement('div');
     footer.dataset.pmLayer = 'footer-text';
     footer.className = 'mpdf-page-footer-text';
-    footer.style.cssText = footerBandStyle();
+    footer.style.cssText = FOOTER_BAND_STYLE;
     box.appendChild(footer);
     footer.innerHTML = buildHFInnerHTML(
       layout.footerCenter,

@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One documented name of the stable contract. */
-export interface StylingReferenceEntry {
+interface StylingReferenceEntry {
   /** The variable or selector, exactly as a stylesheet writes it. */
   name: string;
   /** One line on what the name holds or targets. */

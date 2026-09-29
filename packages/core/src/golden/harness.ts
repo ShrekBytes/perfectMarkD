@@ -58,7 +58,7 @@ let pagePromise: Promise<Page> | undefined;
  *  Node-side) write to it. Lives in the harness module, not the page. */
 const servedFiles = new Map<string, string | Buffer>();
 
-export async function getPage(): Promise<Page> {
+async function getPage(): Promise<Page> {
   pagePromise ??= openPage();
   return await pagePromise;
 }
@@ -235,19 +235,19 @@ async function serveBundle(name: string, text: string): Promise<string> {
 }
 
 /** The engine module URL, served fresh for this run. */
-export async function engineURL(): Promise<string> {
+async function engineURL(): Promise<string> {
   return await serveBundle('engine.js', await engineBundle());
 }
 
 /** The suite's own mermaid renderer URL (its own bundle — mermaid itself is
  *  huge and only the math+mermaid golden document needs it). It pins the
  *  diagram's font family; see golden/mermaid.ts. */
-export async function mermaidURL(): Promise<string> {
+async function mermaidURL(): Promise<string> {
   return await serveBundle('mermaid.js', await mermaidBundle());
 }
 
 /** The KaTeX stylesheet text, exactly as core ships it. */
-export async function mathCSS(): Promise<string> {
+async function mathCSS(): Promise<string> {
   return await katexCSS();
 }
 
@@ -257,11 +257,11 @@ export async function mathCSS(): Promise<string> {
  *  same helper — the block before it is `@font-face`, and a shadow-level copy
  *  would resolve those `url(fonts/…)` against the host root rather than the
  *  served origin. */
-export async function mathLayoutCSS(): Promise<string> {
+async function mathLayoutCSS(): Promise<string> {
   return katexLayoutCSS(await katexCSS());
 }
 
-export interface OverflowViolation {
+interface OverflowViolation {
   page: number;
   tag: string;
 }
@@ -386,7 +386,7 @@ export async function genericFontElements(
 
 /** What a golden assertion sees of one laid-out page: node signatures
  *  (structure + split detail) and the headings it carries. */
-export interface GoldenPage {
+interface GoldenPage {
   /** Per-node signatures in document order, e.g.
    *  `H2 "Section 1"`, `P`, `OL[12@5]`, `TABLE[14r+th]`, `PRE[22l]`. */
   sigs: string[];
@@ -394,7 +394,7 @@ export interface GoldenPage {
   headings: { text: string; level: number }[];
 }
 
-export interface GoldenResult {
+interface GoldenResult {
   pageCount: number;
   pages: GoldenPage[];
   outline: OutlineEntry[];
@@ -404,11 +404,8 @@ export interface GoldenResult {
   contentHeights: number[];
 }
 
-export interface RunOptions {
+interface RunOptions {
   title?: string;
-  /** Inlines the KaTeX stylesheet into the export document the way the
-   *  web app does (default: yes, so export HTML is print-realistic). */
-  includeMathCSS?: boolean;
   /** Renders ```mermaid fences via the web app's hook bundle. Default
    *  false: only the math+mermaid golden document opts in (the bundle is
    *  ~8MB and slow to build). */
@@ -532,7 +529,9 @@ export async function runPipeline(
   const [engine, mermaid, math, layout, fonts] = [
     await engineURL(),
     options.renderMermaid ? await mermaidURL() : undefined,
-    options.includeMathCSS === false ? undefined : await mathCSS(),
+    // Math CSS is always inlined, the way the web app does it, so the export
+    // HTML the goldens measure is print-realistic.
+    await mathCSS(),
     await mathLayoutCSS(),
     (await bundled()).css,
   ];
@@ -553,7 +552,7 @@ export async function runPipeline(
     options: {
       title: options.title ?? 'Golden',
       mathCSS: math,
-      mathLayoutCSS: options.includeMathCSS === false ? '' : layout,
+      mathLayoutCSS: layout,
       fontFaceCSS: fonts,
     },
   };
