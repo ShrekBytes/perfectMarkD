@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Launch chrome (spec .scratch/launch-chrome/spec.md): the shared footer on
-// the non-editor surfaces, the About and Privacy pages, and a 404 for unknown
-// paths. Static content only — the API server isn't needed for any of it.
+// Launch chrome: the shared footer on the non-editor surfaces, the About and
+// Privacy pages, and a 404 for unknown paths. Static content only — the API
+// server isn't needed for any of it.
 // ─────────────────────────────────────────────────────────────────────────────
 import { expect, test, type Page } from '@playwright/test';
 

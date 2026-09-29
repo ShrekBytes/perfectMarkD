@@ -92,7 +92,7 @@ Server Export payloads are processed in memory and deleted immediately after ren
 | **2 — Paid tier** (~2–3 wks) | Server + auth, Server Export pipeline, quotas, upgrade flow + Order submission, admin panel (payments/users/settings/audit), gated-feature unlocks (custom page size, CSS, fonts, banner/background images), Export History | Payments go live |
 | **3 — Polish & launch ops** (~1–2 wks) | Umami analytics, docs page, backups + restore runbook, perf guards (large-doc warning, lazy Shiki, mermaid caching), deploy on own machine behind a Cloudflare Tunnel, launch checklist | Full launch |
 
-Workstreams & tickets live in `.scratch/`: [`account-page`](.scratch/account-page/spec.md) · [`ai-transforms`](.scratch/ai-transforms/spec.md) · [`billing`](.scratch/billing/spec.md) · [`docs-page`](.scratch/docs-page/spec.md) · [`launch`](.scratch/launch/spec.md) · [`launch-chrome`](.scratch/launch-chrome/spec.md). **Execution order comes from each ticket's `Blocked by:` line** — work the frontier: any ticket whose blockers are resolved, lowest number first.
+The shipped workstreams' tickets have been closed and removed. One ticket is still open: [`.scratch/launch/issues/06-launch-checklist.md`](.scratch/launch/issues/06-launch-checklist.md) — the launch checklist, which needs live human verification (real crypto payments, non-Chrome browsers) rather than code. **Execution order comes from each ticket's `Blocked by:` line** — work the frontier: any ticket whose blockers are resolved, lowest number first.
 
 ## 5. Risks & mitigations
 

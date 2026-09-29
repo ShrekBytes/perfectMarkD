@@ -13,8 +13,7 @@
 // whose error vocabularies could plausibly diverge, and stopped holding when
 // the Google and rate clients landed carrying the same four code strings by
 // copy-paste — at which point the seam takes two strings and one parser, not
-// the five knobs keeping the copies apart was argued to need. The full
-// argument is in .scratch/ponytail-2/issues/01-one-upstream-error-vocabulary.md.
+// the five knobs keeping the copies apart was argued to need.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Bound on what an upstream error body can hold (debugging detail). */

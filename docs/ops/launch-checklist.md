@@ -264,11 +264,9 @@ item below is a warning, not an unfinished box.
       been restarted** so the worker picked it up. Confirmed by the Admin,
       2026-09-28, by AI working. Rotating the key is also a restart.
 - [x] **A model is chosen:** `stealth/space-bunny-alpha`, live and working as of
-      2026-09-28. Two free OpenRouter ids are also recorded on
-      `ai-transforms/08` if a zero-cost option is ever wanted.
+      2026-09-28.
 - [x] **The cost calculator was removed rather than used.** The Admin's call,
-      2026-09-28, and it is now done —
-      [`launch/13`](../../.scratch/launch/issues/13-remove-ai-cost-readout.md).
+      2026-09-28, and it is now done.
       The readout is gone, the price arithmetic and the token counts both:
       pricing a worst case from two caps and two published rates is too basic to
       plan a real budget around. The Test connection **cap-mismatch warnings
@@ -295,13 +293,10 @@ item below is a warning, not an unfinished box.
 
 Short version, for the announcement decision:
 
-1. **The three remaining follow-up to-dos**, written up in
-   [`.scratch/launch/follow-up-todos.md`](../../.scratch/launch/follow-up-todos.md)
-   and since cut into tickets: make the pricing surface read live admin
-   settings, fetch the LTC rate every 12 hours instead of by hand, and give a
-   pending Order a 6-hour payment window. The fourth to-do, removing the AI
-   cost calculator, is done —
-   [launch/13](../../.scratch/launch/issues/13-remove-ai-cost-readout.md).
+1. **Nothing.** The four follow-up to-dos this pass produced have all shipped:
+   the pricing surface reads live admin settings, the LTC rate is fetched every
+   12 hours instead of by hand, a pending Order has a 6-hour payment window, and
+   the AI cost calculator is gone.
 2. **One real USDT-TRC20 payment and one real LTC payment**, through to
    verification and expiry. The only remaining launch blocker that needs
    something this pass could not do.
@@ -318,9 +313,8 @@ announcing; 1 and 3–6 are "before you say it works".
 
 ## Follow-up work
 
-Three to-dos came out of this pass. They are written up in
-[`.scratch/launch/follow-up-todos.md`](../../.scratch/launch/follow-up-todos.md),
-where they have since been cut into tickets:
+Three to-dos came out of this pass, and all three have since shipped. Kept as
+the record of what each was asked for and why:
 
 - **Make the pricing surface read live admin settings.** This one is not
   cosmetic. `apps/web/src/pricing/plans.ts` hardcodes the prices while Orders are

@@ -77,7 +77,7 @@ The tag publishes `perfectmarkd-api` and `perfectmarkd-caddy` under that version
 
 ### Analytics
 
-Analytics is self-hosted Umami, served at `/analytics` on the same origin ([launch/01](.scratch/launch/issues/01-analytics-umami.md)) — no third-party service, no cookies, no stored addresses. It is off until you point the app at it:
+Analytics is self-hosted Umami, served at `/analytics` on the same origin — no third-party service, no cookies, no stored addresses. It is off until you point the app at it:
 
 1. Bring the stack up, open `https://<domain>/analytics`, and sign in with `admin` / `umami` — change the password immediately.
 2. Add a website for your domain and copy its id.
