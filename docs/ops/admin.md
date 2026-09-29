@@ -2,7 +2,9 @@
 
 The day-to-day jobs of running PerfectMarkD as its Admin: verifying a payment,
 getting a user back into their account, and changing a wallet address.
-Everything here is done in the `/admin` panel.
+Everything here is done in the `/admin` panel, with one exception —
+[Google Sign-In](#google-sign-in), which is configured by environment rather
+than in the panel.
 
 Deployment and backups are separate: [README's Deployment
 section](../../README.md#deployment) for bringing the stack up,
@@ -25,6 +27,39 @@ panel's own gate is client-side convenience only.
 
 The panel has four tabs: **Users**, **Verification** (the default landing tab),
 **Settings**, and **Audit log**.
+
+## Google Sign-In
+
+The one job in this runbook with no panel surface: Google Sign-In is configured
+entirely by environment variables, so there is nothing to click and nothing in
+`/admin` reports its state.
+
+```sh
+grep GOOGLE_ .env
+```
+
+Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` and the feature exists for
+every user; leave either unset and it exists for nobody. The server mounts the
+OAuth routes only when both are present — unconfigured, `/api/auth/providers`
+reports it off, the routes do not exist, and the button is never rendered. That
+is absent rather than broken: no user ever sees a control that fails.
+
+**Set `GOOGLE_REDIRECT_URI` explicitly unless you are on the shipped domain.**
+This is the one sharp edge. When it is unset the server does not derive a
+sensible default from `PUBLIC_ORIGIN` — it falls back to a hardcoded constant,
+`https://perfectmarkd.00022000.xyz/auth/google/callback`
+(`apps/server/src/env.ts:87`), and nothing warns you that this disagrees with
+your own origin. So a self-hoster who sets the two client keys and stops there
+gets a consent flow that returns to a hostname they do not control, and the
+exchange fails with Google's `redirect_uri_mismatch`. The callback has to be
+registered with the OAuth client at Google's console too, for both of them if
+you serve the app on more than one origin.
+
+Both keys are set on the live deployment, confirmed 2026-09-28, so the button is
+published to users there and `GOOGLE_REDIRECT_URI` is deliberately unset because
+the hardcoded default is already that instance's origin. What has *not* been
+exercised is a full round trip through Google's consent screen against it: the
+wiring is configured, the end-to-end result is unverified.
 
 ## Verify a payment
 

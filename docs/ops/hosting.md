@@ -57,3 +57,30 @@ depends on your machine's systemd setup and nothing else, and the published
 images and `docker-compose.yml` are identical either way. The project's contract
 stops at "the deployment is `podman compose pull && podman compose up -d
 --no-build` from a checkout on this host".
+
+## The published images are amd64 only
+
+This is the one constraint on that contract rather than a host detail, and it is
+the thing to fix before the move rather than after it.
+
+Both application images are built in CI on an `ubuntu-latest` runner by
+`docker/build-push-action` with no `platforms:` input
+(`.github/workflows/images.yml`), so each publishes for the runner's own
+architecture: **`linux/amd64` only**. The Umami image is built the same way
+(`.github/workflows/umami-image.yml`, ADR-0012) and is `linux/amd64` for the
+same reason. `ghcr.io/shrekbytes/perfectmarkd-{caddy,api}` and
+`perfectmarkd-umami` are therefore all single-arch, while the `postgres:15-alpine`
+dependency in `docker-compose.yml` is upstream's and is multi-arch.
+
+Nothing is blocked today: this project's host is x86_64. The gap is with
+ADR-0010's deferred move, which names a `t4g.micro` — AWS Graviton, arm64.
+`podman compose pull` would fetch an image the host cannot execute and the api
+would fail to start with an exec format error, which reads like a broken image
+rather than a missing architecture.
+
+The fix is a multi-arch build — `platforms: linux/amd64,linux/arm64` on the
+buildx step, which the workflows already set up — or a rebuild on the new host.
+**Neither is done.** Building both architectures on every push roughly doubles
+the image build, so it is worth doing at the move rather than in advance; the
+point of recording it here is that it is a decision to make on the day, not a
+surprise to debug on the day.
