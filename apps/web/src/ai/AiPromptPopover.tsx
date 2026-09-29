@@ -22,10 +22,11 @@ import {
   type RefObject,
 } from 'react';
 import type { AiLadderDecision, AiScope } from '@perfectmarkd/core';
-import { useEscapeLayer } from '../shell/focus';
+import { useDismissOnOutsidePointer, useEscapeLayer } from '../shell/focus';
 import { AI_COMMANDS } from './trigger';
 import { FirstUseNotice } from './FirstUseNotice';
-import { periodLabel, resetDate } from './format';
+import { periodLabel } from './format';
+import { formatDate } from '../documents/text';
 import type { AiAccountState, AiCommand } from './types';
 
 /** The command's own gate state, resolved from the account block. */
@@ -214,18 +215,7 @@ export function AiPromptPopover({
   // working, and a press on the anchor is the button toggling it, so neither
   // counts. While a request is running the popup is that Action's progress
   // surface, so only Cancel (or Esc) ends the run; dismissal is inert.
-  useEffect(() => {
-    if (working) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!target) return;
-      if (panelRef.current?.contains(target)) return;
-      if (anchorRef?.current?.contains(target)) return;
-      onDismiss();
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [anchorRef, onDismiss, working]);
+  useDismissOnOutsidePointer(!working, panelRef, onDismiss, anchorRef);
 
   const info = AI_COMMANDS[command];
   // A refused target has nothing to run: the popup states why and offers the
@@ -285,7 +275,7 @@ export function AiPromptPopover({
         <div className="mt-2">
           <p className="text-xs leading-5 text-ink-soft">
             You have used all {ai.allowance} AI Actions for{' '}
-            {periodLabel(ai.period)}. They reset on {resetDate(ai.resetsAt)}.
+            {periodLabel(ai.period)}. They reset on {formatDate(ai.resetsAt)}.
           </p>
           <button
             type="button"

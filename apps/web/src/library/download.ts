@@ -14,6 +14,12 @@ export function downloadBlob(fileName: string, blob: Blob): void {
   URL.revokeObjectURL(url);
 }
 
+/** The name a PDF download saves under: the title as given, plus the ".pdf"
+ *  the browser needs unless the name already carries it. */
+export function pdfFileName(fileName: string): string {
+  return fileName.toLowerCase().endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+}
+
 export function downloadMarkdown(fileName: string, markdown: string): void {
   downloadBlob(
     fileName,

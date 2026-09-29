@@ -28,7 +28,7 @@ import {
   type RenderMermaidHook,
 } from '@perfectmarkd/core';
 import { registerPayloadFonts } from '../fonts/loader';
-import { runDocumentPipeline } from '../canvas/pipeline';
+import { runDocumentPipeline, swapAssetRefs } from '../canvas/pipeline';
 
 export const EXPORT_RENDER_MESSAGE = 'pmd:export-render';
 export const EXPORT_READY_FLAG = '__pmdExportReady';
@@ -122,15 +122,7 @@ export async function renderServerExportDocument(
     // Markdown images keep their asset:// refs through the render; swap in
     // the payload's data: URIs (dropping unresolvable ones) exactly like the
     // Client Export path — the output must be self-contained.
-    for (const layout of result.layouts) {
-      for (const node of layout.pageNodes) {
-        for (const img of node.querySelectorAll('img[src^="asset://"]')) {
-          const resolved = resolveAsset(img.getAttribute('src')!);
-          if (resolved) img.setAttribute('src', resolved);
-          else img.remove();
-        }
-      }
-    }
+    swapAssetRefs(result.layouts, resolveAsset);
 
     const html = buildExportHTML(
       result.layouts,

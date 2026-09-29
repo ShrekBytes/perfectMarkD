@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { formatPageCount, formatRelativeTime } from '../documents/text';
 import { useDocumentStore } from '../documents/store';
 import { PresetThumb } from '../inspector/PresetThumb';
@@ -14,7 +14,12 @@ import {
   UploadIcon,
 } from '../shell/icons';
 import { EmptyState } from '../shell/EmptyState';
-import { useEscapeLayer, useMenuKeyboard, useModalFocus } from '../shell/focus';
+import {
+  useDismissOnOutsidePointer,
+  useEscapeLayer,
+  useMenuKeyboard,
+  useModalFocus,
+} from '../shell/focus';
 import { downloadMarkdown } from './download';
 import { thumbFootprint } from './thumb';
 
@@ -320,16 +325,7 @@ function RowActionsMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Dropdown dismissal on outside pointer press.
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [open]);
+  useDismissOnOutsidePointer(open, containerRef, () => setOpen(false));
 
   const close = () => {
     setOpen(false);

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listAdminUsers, type AdminUser } from './api';
 import { UserDetail } from './UserDetail';
-import { planName } from '../pricing/plans';
-import { orderDate } from '../billing/payment';
+import { entitlementLabel, orderDate } from '../billing/payment';
 
 function usageLine(user: AdminUser): string {
   const { used, allowance, comps, period } = user.usage;
@@ -138,7 +137,7 @@ export function UsersPanel() {
                 </div>
                 <p className="mt-0.5 text-xs text-ink-soft">
                   {user.entitlement
-                    ? `${planName(user.entitlement.plan as 'pro' | 'premium')} until ${user.entitlement.expiresAt.slice(0, 10)}`
+                    ? entitlementLabel(user.entitlement)
                     : 'Free'}
                   {' · '}
                   {usageLine(user)}

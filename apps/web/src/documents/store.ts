@@ -142,12 +142,6 @@ const INITIAL_STATE = {
   deleteToast: null,
 };
 
-function newId(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
 function newRecord(
   name: string,
   markdown: string,
@@ -155,7 +149,7 @@ function newRecord(
   settings: DocumentSettings = { ...DEFAULT_SETTINGS },
 ): DocumentRecord {
   return {
-    id: newId(),
+    id: dbApi.newId(),
     name,
     markdown,
     settings,
@@ -525,7 +519,7 @@ export function createDocumentStore() {
         const copy: DocumentRecord = {
           ...source,
           settings: { ...source.settings },
-          id: newId(),
+          id: dbApi.newId(),
           name: uniqueName(
             get().docs.map((row) => row.name),
             `${source.name} copy`,
@@ -615,7 +609,7 @@ export function createDocumentStore() {
         const prepared = await prepareAsset(file);
         if (!prepared.ok) return prepared;
 
-        const id = newId();
+        const id = dbApi.newId();
         const asset: AssetRecord = {
           id,
           bytes: prepared.asset.bytes,

@@ -20,9 +20,7 @@ export interface FeatureFlags {
 
 /**
  * Every gate locked — the default before /api/me answers, and the standing
- * state for signed-out and Free users: they never gain gates.
+ * state for signed-out and Free users: they never gain gates. (The paid-tier
+ * variant is a test fixture; it lives in src/testing/account-state.ts.)
  */
 export const LOCKED_FLAGS: FeatureFlags = { paidTier: false };
-
-/** Every gate open — what an active Pro/Premium Entitlement reports. */
-export const OPEN_FLAGS: FeatureFlags = { paidTier: true };

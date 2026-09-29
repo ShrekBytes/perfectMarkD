@@ -6,7 +6,8 @@ import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AiLadderDecision, AiScope } from '@perfectmarkd/core';
 import { AiPromptPopover, type AiPromptGate } from './AiPromptPopover';
-import { UNCONFIGURED_AI, type AiAccountState } from './types';
+import type { AiAccountState } from './types';
+import { UNCONFIGURED_AI } from '../testing/account-state';
 
 afterEach(() => {
   cleanup();

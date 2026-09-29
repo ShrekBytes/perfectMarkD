@@ -78,6 +78,92 @@ const codeThemeOptions = CODE_THEMES.map((theme) => ({
   label: theme === 'none' ? 'None (plain code)' : theme,
 }));
 
+/** The Colors section's eight rows — one table, in render order: the row
+ *  label, the picker's aria name, the settings key, and the subgroup the row
+ *  renders under. `transparentShows` carries the blockquote background's
+ *  display quirk: the native picker cannot host 'transparent', so the row
+ *  shows the paper color the engine paints while the store keeps the raw
+ *  value. */
+const COLOR_ROWS = [
+  {
+    subgroup: 'Text',
+    key: 'accentColor',
+    label: 'Accent',
+    aria: 'Accent color',
+  },
+  {
+    subgroup: 'Text',
+    key: 'bodyColor',
+    label: 'Body text',
+    aria: 'Body text color',
+  },
+  {
+    subgroup: 'Text',
+    key: 'boldColor',
+    label: 'Bold text',
+    aria: 'Bold text color',
+  },
+  {
+    subgroup: 'Text',
+    key: 'headingColor',
+    label: 'Headings',
+    aria: 'Heading color',
+  },
+  {
+    subgroup: 'Blocks & tables',
+    key: 'blockquoteBg',
+    label: 'Quote background',
+    aria: 'Blockquote background',
+    transparentShows: '#f8f8f8',
+  },
+  {
+    subgroup: 'Blocks & tables',
+    key: 'blockquoteBorderColor',
+    label: 'Quote border',
+    aria: 'Blockquote border color',
+  },
+  {
+    subgroup: 'Blocks & tables',
+    key: 'codeBackground',
+    label: 'Code background',
+    aria: 'Code background',
+  },
+  {
+    subgroup: 'Blocks & tables',
+    key: 'tableHeaderBg',
+    label: 'Table header',
+    aria: 'Table header background',
+  },
+] as const;
+
+type ColorRowSpec = (typeof COLOR_ROWS)[number];
+
+/** One row of the color table: the label, the picker named by aria, and the
+ *  row's settings key. */
+function ColorRowField({
+  row,
+  settings,
+  set,
+}: {
+  row: ColorRowSpec;
+  settings: TabProps['settings'];
+  set: TabProps['set'];
+}) {
+  const value =
+    'transparentShows' in row && settings[row.key] === 'transparent'
+      ? row.transparentShows
+      : settings[row.key];
+  return (
+    <Field label={row.label}>
+      <ColorInput
+        ariaLabel={row.aria}
+        value={value}
+        onChange={(value) => set({ [row.key]: value })}
+      />
+    </Field>
+  );
+}
+
 /** The gallery tile's sketch footprint: 3:4 like the page, small enough that
  *  a 4-across grid of presets is one glance instead of a scroll. */
 const TILE_THUMB = { width: 60, height: 80 };
@@ -305,77 +391,27 @@ export function StyleTab({
         {/* Two subgroups, not nine siblings: the text colors and the block
             surfaces are different decisions, and nine identical rows force the
             eye to read every label to find the one it wants. */}
-        <Subgroup title="Text">
-          <Field label="Accent">
-            <ColorInput
-              ariaLabel="Accent color"
-              value={settings.accentColor}
-              onChange={(accentColor) => set({ accentColor })}
-            />
-          </Field>
-          <Field label="Body text">
-            <ColorInput
-              ariaLabel="Body text color"
-              value={settings.bodyColor}
-              onChange={(bodyColor) => set({ bodyColor })}
-            />
-          </Field>
-          <Field label="Bold text">
-            <ColorInput
-              ariaLabel="Bold text color"
-              value={settings.boldColor}
-              onChange={(boldColor) => set({ boldColor })}
-            />
-          </Field>
-          <Field label="Headings">
-            <ColorInput
-              ariaLabel="Heading color"
-              value={settings.headingColor}
-              onChange={(headingColor) => set({ headingColor })}
-            />
-          </Field>
-        </Subgroup>
-        <Subgroup title="Blocks & tables">
-          <Field label="Quote background">
-            <ColorInput
-              ariaLabel="Blockquote background"
-              value={
-                settings.blockquoteBg === 'transparent'
-                  ? '#f8f8f8'
-                  : settings.blockquoteBg
-              }
-              onChange={(blockquoteBg) => set({ blockquoteBg })}
-            />
-          </Field>
-          <Field label="Quote border">
-            <ColorInput
-              ariaLabel="Blockquote border color"
-              value={settings.blockquoteBorderColor}
-              onChange={(blockquoteBorderColor) =>
-                set({ blockquoteBorderColor })
-              }
-            />
-          </Field>
-          <Field label="Code background">
-            <ColorInput
-              ariaLabel="Code background"
-              value={settings.codeBackground}
-              onChange={(codeBackground) => set({ codeBackground })}
-            />
-          </Field>
-          <Field label="Table header">
-            <ColorInput
-              ariaLabel="Table header background"
-              value={settings.tableHeaderBg}
-              onChange={(tableHeaderBg) => set({ tableHeaderBg })}
-            />
-          </Field>
-          <ToggleRow
-            checked={settings.tableStriped}
-            onChange={(tableStriped) => set({ tableStriped })}
-            label="Striped table rows"
-          />
-        </Subgroup>
+        {(['Text', 'Blocks & tables'] as const).map((subgroup) => (
+          <Subgroup key={subgroup} title={subgroup}>
+            {COLOR_ROWS.filter((row) => row.subgroup === subgroup).map(
+              (row) => (
+                <ColorRowField
+                  key={row.key}
+                  row={row}
+                  settings={settings}
+                  set={set}
+                />
+              ),
+            )}
+            {subgroup === 'Blocks & tables' && (
+              <ToggleRow
+                checked={settings.tableStriped}
+                onChange={(tableStriped) => set({ tableStriped })}
+                label="Striped table rows"
+              />
+            )}
+          </Subgroup>
+        ))}
       </Section>
 
       <Section title="Code blocks">

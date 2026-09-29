@@ -17,6 +17,7 @@
 import type { AssetResolver } from '@perfectmarkd/core';
 import type { IDBPDatabase } from 'idb';
 import type { AssetRecord } from '../documents/types';
+import { blobToDataURL } from '../documents/db';
 import { parseAssetRef } from './ingest';
 
 export type AssetUrlMode = 'blob-url' | 'data-uri';
@@ -26,17 +27,6 @@ export interface AssetResolverCache extends AssetResolver {
   warmup(refs: readonly string[]): Promise<void>;
   /** Revokes created blob URLs (no-op for data: URIs and passthroughs). */
   dispose(): void;
-}
-
-function blobToDataURL(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(reader.result as string));
-    reader.addEventListener('error', () =>
-      reject(reader.error ?? new Error('Failed to read asset blob.')),
-    );
-    reader.readAsDataURL(blob);
-  });
 }
 
 /** Rebuilds a renderable Blob from the stored bytes + media type. */

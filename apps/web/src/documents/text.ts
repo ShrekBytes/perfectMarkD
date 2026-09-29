@@ -1,9 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Text helpers around document facts: names, relative timestamps for the
-// Library list, page-count phrasing, and the top-bar gauge's paper label.
+// Library list, the ISO date part the account surfaces show, page-count
+// phrasing, and the top-bar gauge's paper label.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { DocumentSettings } from '@perfectmarkd/core';
+
+/** The calendar day an ISO instant falls on, `YYYY-MM-DD` — the date part
+ *  the account page's AI block and the Export History list render. */
+export function formatDate(iso: string): string {
+  return iso.slice(0, 10);
+}
 
 /** Returns `base`, or the first free `base copy`, `base copy 2`, … variant. */
 export function uniqueName(existing: readonly string[], base: string): string {

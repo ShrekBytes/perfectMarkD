@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { AccountMenuItems } from './AccountMenu';
 import { BookIcon, MoonIcon, MoreIcon, SunIcon } from './icons';
-import { useEscapeLayer, useMenuKeyboard } from './focus';
+import {
+  useDismissOnOutsidePointer,
+  useEscapeLayer,
+  useMenuKeyboard,
+} from './focus';
 import type { Theme } from '../theme/theme';
 
 interface ShellMenuProps {
@@ -34,16 +38,7 @@ export function ShellMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Dropdown dismissal on outside pointer press.
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [open]);
+  useDismissOnOutsidePointer(open, containerRef, () => setOpen(false));
 
   // Escape resolves the topmost layer only and returns focus to the trigger;
   // the menu itself roves with the arrow keys (focus.ts).

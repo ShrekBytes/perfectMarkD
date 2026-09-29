@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, navigate } from '../router';
 import { useAccountStore } from '../auth/account-store';
-import { useEscapeLayer, useMenuKeyboard } from './focus';
+import {
+  useDismissOnOutsidePointer,
+  useEscapeLayer,
+  useMenuKeyboard,
+} from './focus';
 
 interface AccountMenuItemsProps {
   onClose: () => void;
@@ -106,16 +110,7 @@ export function AccountMenu() {
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Dropdown dismissal on outside pointer press.
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [open]);
+  useDismissOnOutsidePointer(open, containerRef, () => setOpen(false));
 
   // Escape resolves the topmost layer only and returns focus to the trigger;
   // the menu itself roves with the arrow keys (focus.ts).

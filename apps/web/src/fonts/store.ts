@@ -11,7 +11,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { deleteFont, listFonts, openDatabase, putFont } from '../documents/db';
+import {
+  deleteFont,
+  listFonts,
+  newId,
+  openDatabase,
+  putFont,
+} from '../documents/db';
 import type { FontRecord } from '../documents/types';
 import { prepareFont, type FontIngestError } from './ingest';
 import { registerCustomFont, unregisterCustomFont } from './loader';
@@ -31,12 +37,6 @@ interface CustomFontState {
   /** Removes a font from the library and unregisters its face; documents
    *  that still select it fall back to their CSS stack. */
   remove: (id: string) => Promise<void>;
-}
-
-function newId(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `font-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export const useCustomFontStore = create<CustomFontState>()((set, get) => ({

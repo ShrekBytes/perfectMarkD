@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type DocumentSettings } from '@perfectmarkd/core';
 import {
   exportFileName,
+  formatDate,
   formatPageCount,
   formatRelativeTime,
   nameFromFile,
@@ -152,5 +153,11 @@ describe('proofGaugeLabel', () => {
     expect(proofGaugeLabel(settingsWith({ pageSize: 'Letter' }), null)).toBe(
       'Letter',
     );
+  });
+});
+
+describe('formatDate', () => {
+  it('shows the ISO date part, matching the order list', () => {
+    expect(formatDate('2026-09-12T13:45:00.000Z')).toBe('2026-09-12');
   });
 });

@@ -10,8 +10,8 @@ import {
 } from '../auth/account-store';
 import * as api from '../auth/api';
 import type { MePayload } from '../auth/api';
-import { LOCKED_FLAGS, OPEN_FLAGS } from '../auth/flags';
-import { UNCONFIGURED_AI } from '../ai/types';
+import { LOCKED_FLAGS } from '../auth/flags';
+import { OPEN_FLAGS, UNCONFIGURED_AI } from '../testing/account-state';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
@@ -29,7 +29,11 @@ import { ExportSplitButton } from './ExportSplitButton';
 import { setBrowserNoticeDelayForTests } from './useClientExport';
 import { trackEvent } from '../analytics/tracker';
 
-vi.mock('../library/download', () => ({ downloadBlob: vi.fn() }));
+vi.mock('../library/download', () => ({
+  downloadBlob: vi.fn(),
+  pdfFileName: (name: string) =>
+    name.toLowerCase().endsWith('.pdf') ? name : `${name}.pdf`,
+}));
 
 // Analytics is asserted as "the button asked for this", not as "Umami
 // received it" — the wrapper's own suite covers delivery.

@@ -19,8 +19,8 @@ import {
   resetAccountStoreForTests,
   useAccountStore,
 } from '../auth/account-store';
-import { OPEN_FLAGS } from '../auth/flags';
-import { UNCONFIGURED_AI, type AiAccountState } from '../ai/types';
+import { OPEN_FLAGS, UNCONFIGURED_AI } from '../testing/account-state';
+import type { AiAccountState } from '../ai/types';
 import * as aiApi from '../ai/api';
 import { resetStylesheetConversationForTests } from '../ai/conversation';
 import {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ToggleRow } from '../inspector/controls';
 import { formatRelativeTime } from '../documents/text';
+import { DURATIONS, PAID_PLAN_IDS, type PaidPlanId } from '../pricing/plans';
 import {
   getAdminSettings,
   testAiConnection,
@@ -22,11 +23,6 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   'USDT-BEP20': 'USDT — BEP-20 (BNB Smart Chain)',
   LTC: 'Litecoin (mainnet)',
 };
-
-const DURATIONS = [1, 3, 6, 12] as const;
-
-const PLANS = ['pro', 'premium'] as const;
-type PaidPlan = (typeof PLANS)[number];
 
 /**
  * The admin Settings tab (billing/03 + ai-transforms/03): wallet addresses,
@@ -216,21 +212,13 @@ function WalletsSection({
       <div className="mt-2 space-y-2">
         {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map(
           (method) => (
-            <label
+            <TextField
               key={method}
-              className="block text-xs font-medium text-ink-soft"
-            >
-              {PAYMENT_METHOD_LABELS[method]}
-              <input
-                type="text"
-                data-testid={`wallet-input-${method}`}
-                value={draft[method]}
-                onChange={(event) =>
-                  setDraft({ ...draft, [method]: event.target.value })
-                }
-                className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
-              />
-            </label>
+              label={PAYMENT_METHOD_LABELS[method]}
+              testId={`wallet-input-${method}`}
+              value={draft[method]}
+              onChange={(value) => setDraft({ ...draft, [method]: value })}
+            />
           ),
         )}
       </div>
@@ -250,11 +238,11 @@ function WalletsSection({
   );
 }
 
-type PriceDraft = Record<PaidPlan, Record<string, string>>;
+type PriceDraft = Record<PaidPlanId, Record<string, string>>;
 
 function toPriceDraft(prices: PlanPrices): PriceDraft {
   return Object.fromEntries(
-    PLANS.map((plan) => [
+    PAID_PLAN_IDS.map((plan) => [
       plan,
       Object.fromEntries([
         ['monthly', String(prices[plan].monthly)],
@@ -273,7 +261,7 @@ function toPrices(draft: PriceDraft): PlanPrices | null {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   };
   const out = {} as PlanPrices;
-  for (const plan of PLANS) {
+  for (const plan of PAID_PLAN_IDS) {
     const monthly = parse(draft[plan].monthly ?? '');
     if (monthly === null) return null;
     const durations = {} as PlanPrices['pro']['durations'];
@@ -306,7 +294,7 @@ function PricesSection({
       onSaved,
     });
 
-  const onDraft = (plan: PaidPlan, field: string, value: string) => {
+  const onDraft = (plan: PaidPlanId, field: string, value: string) => {
     setDraft((current) => ({
       ...current,
       [plan]: { ...current[plan], [field]: value },
@@ -317,7 +305,7 @@ function PricesSection({
     <section className="rounded-pane border border-hairline bg-surface p-3">
       <h3 className="text-xs font-medium text-ink-soft">Plan prices (USDT)</h3>
       <div className="mt-2 space-y-3">
-        {PLANS.map((plan) => (
+        {PAID_PLAN_IDS.map((plan) => (
           <div key={plan} data-testid={`prices-${plan}`}>
             <p className="text-xs font-medium capitalize text-ink">{plan}</p>
             <div className="mt-1.5 flex flex-wrap gap-2">
@@ -357,13 +345,13 @@ function PricesSection({
 }
 
 type LimitsDraft = Record<
-  PaidPlan,
+  PaidPlanId,
   { pageCap: string; quotaMonthly: string; aiActionsMonthly: string }
 >;
 
 function toLimitsDraft(limits: PlanLimits): LimitsDraft {
   return Object.fromEntries(
-    PLANS.map((plan) => [
+    PAID_PLAN_IDS.map((plan) => [
       plan,
       {
         pageCap: String(limits[plan].pageCap),
@@ -385,7 +373,7 @@ function toLimits(draft: LimitsDraft): PlanLimits | { error: string } {
     return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
   };
   const out = {} as PlanLimits;
-  for (const plan of PLANS) {
+  for (const plan of PAID_PLAN_IDS) {
     const pageCap = parsePositive(draft[plan].pageCap);
     const quotaMonthly = parsePositive(draft[plan].quotaMonthly);
     if (pageCap === null || quotaMonthly === null) {
@@ -423,7 +411,7 @@ function LimitsSection({
       onSaved,
     });
 
-  const onDraft = (plan: PaidPlan, field: string, value: string) => {
+  const onDraft = (plan: PaidPlanId, field: string, value: string) => {
     setDraft((current) => ({
       ...current,
       [plan]: { ...current[plan], [field]: value },
@@ -437,7 +425,7 @@ function LimitsSection({
         month)
       </h3>
       <div className="mt-2 space-y-3">
-        {PLANS.map((plan) => (
+        {PAID_PLAN_IDS.map((plan) => (
           <div key={plan} data-testid={`limits-${plan}`}>
             <p className="text-xs font-medium capitalize text-ink">{plan}</p>
             <div className="mt-1.5 flex flex-wrap gap-2">
@@ -697,39 +685,27 @@ function AiProviderSection({
       </div>
 
       <div className="mt-1 space-y-2">
-        <label className="block text-xs font-medium text-ink-soft">
-          Base URL (OpenAI-compatible API root)
-          <input
-            type="text"
-            data-testid="ai-base-url"
-            value={draft.baseUrl}
-            onChange={(event) => onDraft({ baseUrl: event.target.value })}
-            className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
-          />
-        </label>
+        <TextField
+          label="Base URL (OpenAI-compatible API root)"
+          testId="ai-base-url"
+          value={draft.baseUrl}
+          onChange={(baseUrl) => onDraft({ baseUrl })}
+        />
         <div className="flex flex-wrap gap-2">
-          <label className="block min-w-0 flex-1 text-xs font-medium text-ink-soft">
-            Model
-            <input
-              type="text"
-              data-testid="ai-model"
-              value={draft.model}
-              onChange={(event) => onDraft({ model: event.target.value })}
-              className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
-            />
-          </label>
-          <label className="block min-w-0 flex-1 text-xs font-medium text-ink-soft">
-            Stylesheet model override (optional)
-            <input
-              type="text"
-              data-testid="ai-stylesheet-model"
-              value={draft.stylesheetModel}
-              onChange={(event) =>
-                onDraft({ stylesheetModel: event.target.value })
-              }
-              className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
-            />
-          </label>
+          <TextField
+            className="min-w-0 flex-1"
+            label="Model"
+            testId="ai-model"
+            value={draft.model}
+            onChange={(model) => onDraft({ model })}
+          />
+          <TextField
+            className="min-w-0 flex-1"
+            label="Stylesheet model override (optional)"
+            testId="ai-stylesheet-model"
+            value={draft.stylesheetModel}
+            onChange={(stylesheetModel) => onDraft({ stylesheetModel })}
+          />
         </div>
         <label className="block text-xs font-medium text-ink-soft">
           Reasoning effort
@@ -887,6 +863,38 @@ function AiTestReport({ report }: { report: AiConnectionReport }) {
         </pre>
       )}
     </div>
+  );
+}
+
+/** A labelled text input — the wallet rows and the AI provider's URL/model
+ *  fields share one shape. `className` rides the label for the fields that
+ *  sit beside each other (flex-1). */
+function TextField({
+  label,
+  testId,
+  value,
+  onChange,
+  className,
+}: {
+  label: string;
+  testId: string;
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <label
+      className={`block text-xs font-medium text-ink-soft ${className ?? ''}`}
+    >
+      {label}
+      <input
+        type="text"
+        data-testid={testId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 block h-9 w-full rounded-control border border-hairline bg-canvas px-2.5 font-mono text-sm text-ink outline-offset-2 outline-accent focus-visible:outline-2"
+      />
+    </label>
   );
 }
 

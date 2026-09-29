@@ -5,8 +5,12 @@ import {
   type AdminUserDetail,
   type AiUsageView,
 } from './api';
-import { orderDate, STATUS_BADGE, STATUS_LABEL } from '../billing/payment';
-import { planName } from '../pricing/plans';
+import {
+  entitlementLabel,
+  orderDate,
+  STATUS_BADGE,
+  STATUS_LABEL,
+} from '../billing/payment';
 import { Dialog } from '../shell/Dialog';
 import { GrantEntitlementDialog } from './GrantEntitlementDialog';
 import { CompQuotaDialog } from './CompQuotaDialog';
@@ -116,7 +120,7 @@ export function UserDetail({
         <p className="text-xs font-medium text-ink-soft">Entitlement</p>
         <p data-testid="user-entitlement" className="mt-1 text-sm text-ink">
           {entitlement
-            ? `${planName(entitlement.plan as 'pro' | 'premium')} until ${entitlement.expiresAt.slice(0, 10)}`
+            ? entitlementLabel(entitlement)
             : 'No active entitlement.'}
         </p>
         <div className="mt-2.5 flex gap-2">
@@ -259,8 +263,7 @@ export function UserDetail({
           onClose={() => setDialog(null)}
         >
           <p className="text-xs text-ink-soft">
-            {user.email} — {planName(entitlement.plan as 'pro' | 'premium')}{' '}
-            until {entitlement.expiresAt.slice(0, 10)}.
+            {user.email} — {entitlementLabel(entitlement)}.
           </p>
           <p className="mt-2 text-xs text-ink">
             Revoking locks the paid features and stops the quota immediately.

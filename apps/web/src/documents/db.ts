@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // IndexedDB persistence for the local document library, via the `idb`
-// wrapper. Thin CRUD only — autosave, undo, and cross-tab sync live in
-// store.ts on top of these primitives.
+// wrapper. Thin CRUD plus the two record primitives the stores share (id
+// minting and the stored-bytes data: URI) — autosave, undo, and cross-tab
+// sync live in store.ts on top of these.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { openDB, type IDBPDatabase } from 'idb';
@@ -85,6 +86,28 @@ export function deleteDocument(db: IDBPDatabase, id: string): Promise<void> {
   return db.delete(DOCS, id).then(() => undefined);
 }
 
+/** One id for every locally created record (documents, assets, fonts):
+ *  a UUID where the platform has one, a timestamp+random fallback where it
+ *  doesn't (jsdom, hardened browsers). */
+export function newId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Reads a Blob as a self-contained data: URI — the form the export document
+ *  and the Server Export payload carry for stored images and fonts. */
+export function blobToDataURL(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(reader.result as string));
+    reader.addEventListener('error', () =>
+      reject(reader.error ?? new Error('Failed to read stored bytes.')),
+    );
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function putAssets(
   db: IDBPDatabase,
   assets: AssetRecord[],
@@ -93,13 +116,6 @@ export function putAssets(
   const tx = db.transaction(ASSETS, 'readwrite');
   for (const asset of assets) void tx.store.put(asset);
   return tx.done.then(() => undefined);
-}
-
-export function getAsset(
-  db: IDBPDatabase,
-  id: string,
-): Promise<AssetRecord | undefined> {
-  return db.get(ASSETS, id);
 }
 
 export async function getAssets(

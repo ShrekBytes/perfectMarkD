@@ -5,7 +5,6 @@ import {
   deleteAssets,
   deleteDocument,
   deleteFont,
-  getAsset,
   getAssets,
   getDocument,
   getMeta,
@@ -93,7 +92,7 @@ it('round-trips assets and reads several at once', async () => {
   };
   await putAssets(db, [asset]);
 
-  expect((await getAsset(db, 'asset-1'))?.bytes).toEqual(bytes);
+  expect((await getAssets(db, ['asset-1']))[0]?.bytes).toEqual(bytes);
   expect(await getAssets(db, ['asset-1', 'missing'])).toEqual([asset]);
 });
 
@@ -114,8 +113,8 @@ it('deletes assets by id', async () => {
   ]);
   await deleteAssets(db, ['asset-1']);
 
-  expect(await getAsset(db, 'asset-1')).toBeUndefined();
-  expect(await getAsset(db, 'asset-2')).toBeDefined();
+  expect(await getAssets(db, ['asset-1'])).toEqual([]);
+  expect((await getAssets(db, ['asset-2'])).length).toBe(1);
 });
 
 it('round-trips meta values under their key', async () => {

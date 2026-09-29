@@ -9,7 +9,7 @@
 // finished export re-checks /api/me so the quota chip reflects the spend.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ApiError } from '../api/client';
 import { useAccountStore } from '../auth/account-store';
 import { useDocumentStore } from '../documents/store';
@@ -21,9 +21,8 @@ import {
   ServerExportError,
   waitForExportJob,
 } from './serverExport';
-import type { ExportToast } from './useClientExport';
+import { useTransientToast, type ExportToast } from './useTransientToast';
 
-const TOAST_MS = 6000;
 const RENDERING_NOTICE = 'Rendering on the server…';
 const EXPORT_COMPLETE = 'Server Export complete — the PDF is downloading.';
 
@@ -50,28 +49,9 @@ export interface ServerExportState {
 
 export function useServerExport(): ServerExportState {
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<ExportToast | null>(null);
+  const { toast, showToast, dismissToast } = useTransientToast();
   /** Re-entry guard against double-clicks ahead of the re-render. */
   const busyRef = useRef(false);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-    },
-    [],
-  );
-
-  const showToast = useCallback((next: ExportToast) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(next);
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
-  }, []);
-
-  const dismissToast = useCallback(() => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(null);
-  }, []);
 
   const runExport = useCallback(async (): Promise<ServerExportOutcome> => {
     const store = useDocumentStore.getState();

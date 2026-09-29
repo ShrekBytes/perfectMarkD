@@ -13,7 +13,7 @@
 // delay before the dialog opens over it (Firefox/Safari only).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useDocumentStore } from '../documents/store';
 import {
   buildExportDocument,
@@ -24,15 +24,10 @@ import {
   printViaHiddenIframe,
   type PrintQualityBrowser,
 } from './clientExport';
+import { useTransientToast, type ExportToast } from './useTransientToast';
 
 export type ExportPhase = 'idle' | 'building' | 'awaiting-hint' | 'printing';
 
-export interface ExportToast {
-  kind: 'notice' | 'error';
-  text: string;
-}
-
-const TOAST_MS = 6000;
 const BROWSER_NOTICE = 'Tip: for best print results, use Chrome or Edge.';
 const EXPORT_ERROR = 'Client Export failed. Please try again.';
 
@@ -72,30 +67,11 @@ export function useClientExport(): ClientExportState {
 
   const [phase, setPhase] = useState<ExportPhase>('idle');
   const [showBrowserNoticeInHint, setShowBrowserNoticeInHint] = useState(false);
-  const [toast, setToast] = useState<ExportToast | null>(null);
+  const { toast, showToast, dismissToast } = useTransientToast();
   /** Re-entry guard against double-clicks ahead of the re-render. */
   const busyRef = useRef(false);
   /** The built document waiting behind the hint dialog. */
   const pendingHTMLRef = useRef<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-    },
-    [],
-  );
-
-  const showToast = useCallback((next: ExportToast) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(next);
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
-  }, []);
-
-  const dismissToast = useCallback(() => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(null);
-  }, []);
 
   const finish = useCallback(() => {
     busyRef.current = false;

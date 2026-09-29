@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { errorToMessage } from '../api/client';
 import { Link } from '../router';
 import { ToggleRow } from '../inspector/controls';
-import { resetDate } from '../ai/format';
+import { formatDate } from '../documents/text';
 import { useAccountStore, useAiState } from '../auth/account-store';
 
 export function AiSection() {
@@ -55,7 +55,7 @@ export function AiSection() {
               className="mt-0.5 font-mono text-xs text-ink tabular-nums"
             >
               {ai.remaining} of {ai.allowance} left this month · resets{' '}
-              {resetDate(ai.resetsAt)}
+              {formatDate(ai.resetsAt)}
             </p>
           </div>
 

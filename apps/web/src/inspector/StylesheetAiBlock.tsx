@@ -20,7 +20,8 @@ import { useState } from 'react';
 import { errorToMessage } from '../api/client';
 import { useAccountStore, useAiState } from '../auth/account-store';
 import { FirstUseNotice } from '../ai/FirstUseNotice';
-import { periodLabel, resetDate } from '../ai/format';
+import { periodLabel } from '../ai/format';
+import { formatDate } from '../documents/text';
 import { useStylesheetChat } from '../ai/useStylesheetChat';
 import type { StylesheetTurn } from '../ai/conversation';
 
@@ -128,7 +129,7 @@ export function StylesheetAiBlock({
         <div data-testid="stylesheet-ai-exhausted">
           <p className="text-xs leading-5 text-ink-soft">
             You have used all {ai.allowance} AI Actions for{' '}
-            {periodLabel(ai.period)}. They reset on {resetDate(ai.resetsAt)}.
+            {periodLabel(ai.period)}. They reset on {formatDate(ai.resetsAt)}.
           </p>
           <button
             type="button"

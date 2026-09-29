@@ -37,25 +37,6 @@ export interface AiAccountState {
   resetsAt: string;
 }
 
-/**
- * The AI state of an instance with no provider configured (spec §Gate
- * precedence, step 1): the commands do not exist, so every AI surface reads
- * this and renders nothing. Also the shape a test fixture starts from.
- */
-export const UNCONFIGURED_AI: AiAccountState = {
-  configured: false,
-  included: false,
-  access: true,
-  disclosureSeen: false,
-  maxInputCharacters: 60_000,
-  maxOutputTokens: 16_000,
-  contextWindow: 128_000,
-  allowance: 0,
-  remaining: 0,
-  period: '1970-01',
-  resetsAt: '1970-01-01T00:00:00.000Z',
-};
-
 /** Whether an AI Action targets a selection or the whole Document. */
 export type AiTargetKind = 'document' | 'selection';
 

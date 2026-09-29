@@ -24,9 +24,10 @@ import { createAssetResolver } from '../assets/resolver';
 import { ensureCustomFontsLoaded, fontFacesForExport } from '../fonts/loader';
 import { KATEX_LAYOUT_CSS } from '../canvas/katex-css';
 import { collectAssetRefs, runDocumentPipeline } from '../canvas/pipeline';
+import { delay } from './clientExport';
 import { renderMermaid } from '../canvas/mermaid';
 import { openDatabase } from '../documents/db';
-import { downloadBlob } from '../library/download';
+import { downloadBlob, pdfFileName } from '../library/download';
 
 /** Field-for-field the enqueue route's job view (server/03 queue.ts jobView);
  *  the two sides share names, not code. */
@@ -179,9 +180,6 @@ export function setPollTimingForTests(
   pollTimeoutMs = timeoutMs;
 }
 
-const delay = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
 /**
  * Polls the job until it reaches a terminal state. `done` resolves; `failed`
  * throws with the job's typed code and message (the worker writes those for
@@ -222,8 +220,5 @@ export async function downloadExportPdf(
     credentials: 'include',
   });
   if (!res.ok) throw await errorFrom(res);
-  const name = fileName.toLowerCase().endsWith('.pdf')
-    ? fileName
-    : `${fileName}.pdf`;
-  downloadBlob(name, await res.blob());
+  downloadBlob(pdfFileName(fileName), await res.blob());
 }

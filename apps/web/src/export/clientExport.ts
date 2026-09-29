@@ -22,7 +22,11 @@ import { buildExportHTML, type DocumentSettings } from '@perfectmarkd/core';
 import { createAssetResolver } from '../assets/resolver';
 import { KATEX_EXPORT_CSS } from '../canvas/katex-css';
 import { ensureCustomFontsLoaded, fontFaceCSSForExport } from '../fonts/loader';
-import { collectAssetRefs, runDocumentPipeline } from '../canvas/pipeline';
+import {
+  collectAssetRefs,
+  runDocumentPipeline,
+  swapAssetRefs,
+} from '../canvas/pipeline';
 import { renderMermaid } from '../canvas/mermaid';
 import { openDatabase } from '../documents/db';
 
@@ -55,15 +59,7 @@ export async function buildExportDocument(
     // document must be self-contained, so swap in the warmed data: URIs.
     // A ref the store can't resolve drops the image, matching how the
     // banner/background layers treat unresolvable refs (ticket 08's notes).
-    for (const layout of result.layouts) {
-      for (const node of layout.pageNodes) {
-        for (const img of node.querySelectorAll('img[src^="asset://"]')) {
-          const resolved = assets(img.getAttribute('src')!);
-          if (resolved) img.setAttribute('src', resolved);
-          else img.remove();
-        }
-      }
-    }
+    swapAssetRefs(result.layouts, assets);
 
     return buildExportHTML(result.layouts, settings, assets, {
       title,

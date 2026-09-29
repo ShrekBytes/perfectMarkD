@@ -22,6 +22,10 @@ export type { DurationMonths };
 export type PlanId = 'free' | 'pro' | 'premium';
 export type PaidPlanId = 'pro' | 'premium';
 
+/** The paid plan ids in catalog order — for the surfaces that iterate only
+ *  the plans with stored numbers (the admin panel's price/limit drafts). */
+export const PAID_PLAN_IDS: readonly PaidPlanId[] = ['pro', 'premium'];
+
 export interface Plan {
   id: PlanId;
   name: string;

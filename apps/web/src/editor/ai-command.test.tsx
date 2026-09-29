@@ -11,7 +11,8 @@ import {
   resetStylesheetConversationForTests,
   useStylesheetConversation,
 } from '../ai/conversation';
-import { UNCONFIGURED_AI, type AiAccountState } from '../ai/types';
+import type { AiAccountState } from '../ai/types';
+import { UNCONFIGURED_AI } from '../testing/account-state';
 import { useAccountStore } from '../auth/account-store';
 import {
   resetDocumentStoreForTests,

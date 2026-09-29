@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ApiError, errorFrom, FALLBACK_CODE } from '../api/client';
-import { downloadBlob } from '../library/download';
+import { downloadBlob, pdfFileName } from '../library/download';
 
 export interface HistoryEntry {
   id: number;
@@ -57,10 +57,5 @@ export async function downloadHistoryPdf(entry: HistoryEntry): Promise<void> {
   });
   if (!res.ok) throw await errorFrom(res);
   const blob = await res.blob();
-  downloadBlob(
-    entry.name.toLowerCase().endsWith('.pdf')
-      ? entry.name
-      : `${entry.name}.pdf`,
-    blob,
-  );
+  downloadBlob(pdfFileName(entry.name), blob);
 }

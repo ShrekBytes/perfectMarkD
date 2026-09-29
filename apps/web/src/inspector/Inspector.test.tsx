@@ -19,8 +19,8 @@ import {
 } from '../auth/account-store';
 import * as api from '../auth/api';
 import type { MePayload } from '../auth/api';
-import { LOCKED_FLAGS, OPEN_FLAGS } from '../auth/flags';
-import { UNCONFIGURED_AI } from '../ai/types';
+import { LOCKED_FLAGS } from '../auth/flags';
+import { OPEN_FLAGS, UNCONFIGURED_AI } from '../testing/account-state';
 import { useCustomFontStore } from '../fonts/store';
 import {
   resetDocumentStoreForTests,

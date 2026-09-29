@@ -9,6 +9,7 @@
 // and the decoration it dims can never disagree about which change is which.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { countOccurrences } from '@perfectmarkd/core';
 import type { AiEditProposal, AiTarget } from './types';
 
 /** One change, located: replace `[from, to)` with `insert` in the Document. */
@@ -57,16 +58,4 @@ export function locateProposal(
   // The acceptance path applies edits in the order given; decorations must be
   // in document order. Sorting a copy keeps both: ids carry the identity.
   return hunks.sort((x, y) => x.from - y.from || x.to - y.to);
-}
-
-/** How many times a needle can be read in the text, overlaps counted — the
- *  engine's own rule, mirrored so both refuse the same proposals. */
-function countOccurrences(text: string, search: string): number {
-  let count = 0;
-  let index = text.indexOf(search);
-  while (index !== -1) {
-    count += 1;
-    index = text.indexOf(search, index + 1);
-  }
-  return count;
 }

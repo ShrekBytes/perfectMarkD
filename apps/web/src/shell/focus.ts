@@ -46,6 +46,36 @@ export function useEscapeLayer(active: boolean, close: () => void): void {
   }, [active]);
 }
 
+/**
+ * Dropdown/popover dismissal on outside pointer press: while `active`, a
+ * press that lands outside `surfaceRef` (and outside `exemptRef`, for
+ * popovers whose own trigger toggles them and must not dismiss itself)
+ * calls `onDismiss`. One implementation so the overlay layer can never
+ * drift apart.
+ */
+export function useDismissOnOutsidePointer(
+  active: boolean,
+  surfaceRef: RefObject<HTMLElement | null>,
+  onDismiss: () => void,
+  exemptRef?: RefObject<HTMLElement | null>,
+): void {
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
+  useEffect(() => {
+    if (!active) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target instanceof Node ? event.target : null;
+      if (!target) return;
+      if (surfaceRef.current?.contains(target)) return;
+      if (exemptRef?.current?.contains(target)) return;
+      onDismissRef.current();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [active, surfaceRef, exemptRef]);
+}
+
 const FOCUSABLE = [
   'a[href]',
   'button:not([disabled])',

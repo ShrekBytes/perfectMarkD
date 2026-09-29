@@ -170,6 +170,27 @@ export function collectAssetRefs(
 }
 
 /**
+ * Swaps every `asset://` img src in the laid-out pages for the resolver's
+ * URL, removing the images it cannot resolve — an export document must be
+ * self-contained. Shared by the Client Export builder and the /export
+ * protocol path, whose output must be identical.
+ */
+export function swapAssetRefs(
+  layouts: readonly PageLayout[],
+  resolve: (ref: string) => string | undefined,
+): void {
+  for (const layout of layouts) {
+    for (const node of layout.pageNodes) {
+      for (const img of node.querySelectorAll('img[src^="asset://"]')) {
+        const resolved = resolve(img.getAttribute('src')!);
+        if (resolved) img.setAttribute('src', resolved);
+        else img.remove();
+      }
+    }
+  }
+}
+
+/**
  * Runs the full engine pipeline over a document.
  * Returns the page layouts plus the shared doc CSS / RTL decision / page
  * geometry every renderer of those layouts must reuse.

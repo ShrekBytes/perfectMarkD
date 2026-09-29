@@ -28,7 +28,7 @@ import {
   type DocumentSettings,
   type FontFaceSource,
 } from '@perfectmarkd/core';
-import { listFonts, openDatabase } from '../documents/db';
+import { blobToDataURL, listFonts, openDatabase } from '../documents/db';
 import type { FontRecord } from '../documents/types';
 import { fontFormatFor } from './ingest';
 
@@ -38,11 +38,6 @@ const loadedFaces = new Map<string, FontFace>();
 const payloadFaces = new Map<string, FontFace>();
 /** Family → in-flight registration, so concurrent renders share one load. */
 const inflight = new Map<string, Promise<boolean>>();
-
-/** True when the family has a live registered face this session. */
-export function isFontFamilyLoaded(family: string): boolean {
-  return loadedFaces.has(family) || payloadFaces.has(family);
-}
 
 function fontApiAvailable(): boolean {
   return (
@@ -105,22 +100,6 @@ export async function ensureCustomFontsLoaded(
   await Promise.all(families.map((family) => loadFamily(family)));
 }
 
-/** Encodes stored font bytes as a data: URI — the self-contained form the
- *  export document and the Server Export payload carry. */
-export function fontToDataUri(
-  record: Pick<FontRecord, 'bytes' | 'mediaType'>,
-): Promise<string> {
-  const blob = new Blob([record.bytes], { type: record.mediaType });
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(reader.result as string));
-    reader.addEventListener('error', () =>
-      reject(reader.error ?? new Error('Failed to read font bytes.')),
-    );
-    reader.readAsDataURL(blob);
-  });
-}
-
 /** The settings' custom families as data-URI faces for export embedding.
  *  Families the store can't resolve (deleted font) drop out — the export
  *  falls back, exactly like unresolvable image refs. */
@@ -137,7 +116,9 @@ export async function fontFacesForExport(
     if (record) {
       faces.push({
         family,
-        url: await fontToDataUri(record),
+        url: await blobToDataURL(
+          new Blob([record.bytes], { type: record.mediaType }),
+        ),
         format: fontFormatFor(record.mediaType),
       });
     }

@@ -9,8 +9,6 @@ import {
   ensureCustomFontsLoaded,
   fontFaceCSSForExport,
   fontFacesForExport,
-  fontToDataUri,
-  isFontFamilyLoaded,
   registerCustomFont,
   registerPayloadFonts,
   unregisterCustomFont,
@@ -27,14 +25,23 @@ interface StubFace {
 }
 
 let stubFaces: StubFace[];
+/**
+ * The faces the loader has registered with document.fonts. Written ONLY by the
+ * document.fonts.add/delete stubs below, so it holds production state — the
+ * stub's `load()` deliberately does not touch it.
+ */
 let registry: Set<StubFace>;
 /** When set, face.load() rejects — a corrupt font file. */
 let failNextLoad: boolean;
+const addFace = vi.fn((face: StubFace) => registry.add(face));
+const deleteFace = vi.fn((face: StubFace) => registry.delete(face));
 
 function stubFontFace(): void {
   stubFaces = [];
   registry = new Set();
   failNextLoad = false;
+  addFace.mockClear();
+  deleteFace.mockClear();
   const Face = vi.fn(function (
     this: unknown,
     family: string,
@@ -45,7 +52,6 @@ function stubFontFace(): void {
       source,
       load: vi.fn(async () => {
         if (failNextLoad) throw new Error('bad font');
-        registry.add(face);
       }),
     };
     stubFaces.push(face);
@@ -54,11 +60,20 @@ function stubFontFace(): void {
   vi.stubGlobal('FontFace', Face);
   vi.stubGlobal('document', {
     ...(typeof document === 'object' ? document : {}),
-    fonts: {
-      add: vi.fn((face: StubFace) => registry.has(face)),
-      delete: vi.fn((face: StubFace) => registry.delete(face)),
-    },
+    fonts: { add: addFace, delete: deleteFace },
   });
+}
+
+/**
+ * The loaded-family check: a family is loaded when the loader has handed one
+ * of its faces to document.fonts. This reads `registry`, which only
+ * document.fonts.add/delete write — so a family the loader merely constructed
+ * and `load()`ed, but never registered, reads as not loaded. That is what
+ * makes these tests fail if a `document.fonts.add(face)` call goes missing;
+ * reading the stub's own bookkeeping instead would let them pass regardless.
+ */
+function isFontFamilyLoaded(family: string): boolean {
+  return [...registry].some((face) => face.family === family);
 }
 
 function fontRecord(overrides: Partial<FontRecord> = {}): FontRecord {
@@ -164,13 +179,6 @@ describe('ensureCustomFontsLoaded', () => {
     await ensureCustomFontsLoaded(settings);
     await ensureCustomFontsLoaded(settings);
     expect(stubFaces).toHaveLength(1);
-  });
-});
-
-describe('fontToDataUri', () => {
-  it('encodes the bytes as a data URI of the font media type', async () => {
-    const uri = await fontToDataUri(fontRecord({ mediaType: 'font/ttf' }));
-    expect(uri).toBe('data:font/ttf;base64,AQID');
   });
 });
 

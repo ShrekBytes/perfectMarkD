@@ -21,7 +21,6 @@ vi.mock('./loader', () => ({
   }),
   // The export helpers live in loader.ts but touch no store state here.
   ensureCustomFontsLoaded: vi.fn(async () => undefined),
-  isFontFamilyLoaded: vi.fn(() => false),
 }));
 
 const woff2 = (name = 'Inter.woff2'): File =>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ChevronDownIcon,
   CloseIcon,
@@ -8,12 +8,17 @@ import {
   SpinnerIcon,
 } from '../shell/icons';
 import { useAccountStore } from '../auth/account-store';
-import { useEscapeLayer, useMenuKeyboard } from '../shell/focus';
+import {
+  useDismissOnOutsidePointer,
+  useEscapeLayer,
+  useMenuKeyboard,
+} from '../shell/focus';
 import { PricingModal } from '../pricing/PricingModal';
 import { trackEvent } from '../analytics/tracker';
 import { PrintHintDialog } from './PrintHintDialog';
-import { useClientExport, type ExportToast } from './useClientExport';
+import { useClientExport } from './useClientExport';
 import { useServerExport } from './useServerExport';
+import type { ExportToast } from './useTransientToast';
 
 /**
  * The top bar's `⬇ Export ▾` split button: the main action is Client Export
@@ -49,16 +54,7 @@ export function ExportSplitButton() {
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Dropdown dismissal on outside pointer press.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [menuOpen]);
+  useDismissOnOutsidePointer(menuOpen, containerRef, () => setMenuOpen(false));
 
   // Escape resolves the topmost layer only and returns focus to the trigger;
   // the menu itself roves with the arrow keys (focus.ts).

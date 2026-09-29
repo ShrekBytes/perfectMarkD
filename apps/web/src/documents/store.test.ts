@@ -485,12 +485,12 @@ describe('delete with undo', () => {
 
     await fresh.getState().deleteDocument(sameId);
     let after = await dbApi.openDatabase();
-    expect(await dbApi.getAsset(after, 'asset-1')).toBeUndefined();
+    expect(await dbApi.getAssets(after, ['asset-1'])).toEqual([]);
     after.close();
 
     await fresh.getState().undoDelete();
     after = await dbApi.openDatabase();
-    expect(await dbApi.getAsset(after, 'asset-1')).toBeDefined();
+    expect((await dbApi.getAssets(after, ['asset-1'])).length).toBe(1);
     expect((await dbApi.getDocument(after, sameId))?.assetIds).toEqual([
       'asset-1',
     ]);
@@ -508,7 +508,7 @@ describe('delete with undo', () => {
 
     await store.getState().deleteDocument(sameId);
     const after = await dbApi.openDatabase();
-    expect(await dbApi.getAsset(after, 'asset-1')).toBeDefined();
+    expect((await dbApi.getAssets(after, ['asset-1'])).length).toBe(1);
     after.close();
   });
 });
@@ -526,7 +526,7 @@ describe('addAsset', () => {
     // The asset is durable immediately, before any autosave…
     const reader = await dbApi.openDatabase();
     const assetId = parseAssetRef(result.ref)!;
-    const asset = await dbApi.getAsset(reader, assetId);
+    const asset = (await dbApi.getAssets(reader, [assetId]))[0];
     expect(asset?.mediaType).toBe('image/png');
     // fake-indexeddb's clone hands bytes back as an array-like under jsdom;
     // compare bytewise rather than by typed-array identity.
@@ -573,7 +573,9 @@ describe('addAsset', () => {
 
     await readyStore();
     const reader = await dbApi.openDatabase();
-    const asset = await dbApi.getAsset(reader, parseAssetRef(result.ref)!);
+    const asset = (
+      await dbApi.getAssets(reader, [parseAssetRef(result.ref)!])
+    )[0];
     expect(Array.from(asset?.bytes ?? [])).toEqual(new Array(8).fill(0));
     expect(asset?.mediaType).toBe('image/png');
     reader.close();

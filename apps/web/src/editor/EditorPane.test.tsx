@@ -13,7 +13,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { EditorPane } from './EditorPane';
 import { MAX_ASSET_BYTES } from '../assets/ingest';
-import { getAsset, openDatabase } from '../documents/db';
+import { getAssets, openDatabase } from '../documents/db';
 import {
   resetDocumentStoreForTests,
   useDocumentStore,
@@ -239,7 +239,7 @@ it('inserts picked images as asset refs and stores them', async () => {
     useDocumentStore.getState().markdown,
   )![1]!;
   const reader = await openDatabase();
-  const asset = await getAsset(reader, ref);
+  const asset = (await getAssets(reader, [ref]))[0];
   expect(asset?.mediaType).toBe('image/png');
   reader.close();
 });

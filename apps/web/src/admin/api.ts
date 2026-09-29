@@ -6,10 +6,14 @@ import {
   putJson,
 } from '../api/client';
 import type { Order, PaymentMethod } from '../billing/api';
+// The stored prices/limits are one wire shape read by the pricing surfaces and
+// edited by the admin panel — the pricing API owns the types.
+import type { PlanLimits, PlanPrices } from '../pricing/api';
 
 export { ApiError };
 export type { Order };
 export type { OrderStatus, PaymentMethod } from '../billing/api';
+export type { PlanLimits, PlanPrices };
 
 /** The Entitlement state the queue shows alongside each Order. */
 export interface EntitlementView {
@@ -204,20 +208,6 @@ export async function deleteAdminUser(userId: number): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type WalletAddresses = Record<PaymentMethod, string>;
-
-export interface PlanPrice {
-  monthly: number;
-  durations: Record<1 | 3 | 6 | 12, number>;
-}
-export type PlanPrices = Record<'pro' | 'premium', PlanPrice>;
-
-export interface PlanLimit {
-  pageCap: number;
-  quotaMonthly: number;
-  /** Monthly AI Actions; zero disables AI Actions for the plan. */
-  aiActionsMonthly: number;
-}
-export type PlanLimits = Record<'pro' | 'premium', PlanLimit>;
 
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
 

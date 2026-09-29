@@ -21,7 +21,11 @@ import {
   waitForExportJob,
 } from './serverExport';
 
-vi.mock('../library/download', () => ({ downloadBlob: vi.fn() }));
+vi.mock('../library/download', () => ({
+  downloadBlob: vi.fn(),
+  pdfFileName: (name: string) =>
+    name.toLowerCase().endsWith('.pdf') ? name : `${name}.pdf`,
+}));
 
 beforeEach(async () => {
   localStorage.clear();

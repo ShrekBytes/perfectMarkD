@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as api from './api';
 import type { MePayload } from './api';
-import { LOCKED_FLAGS, OPEN_FLAGS } from './flags';
-import { UNCONFIGURED_AI } from '../ai/types';
+import { LOCKED_FLAGS } from './flags';
+import { OPEN_FLAGS, UNCONFIGURED_AI } from '../testing/account-state';
 import { resetAccountStoreForTests, useAccountStore } from './account-store';
 
 afterEach(() => {

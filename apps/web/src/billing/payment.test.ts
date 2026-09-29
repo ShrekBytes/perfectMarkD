@@ -1,15 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
   isValidTxid,
-  NETWORKS,
+  NETWORK_LABELS,
   networkWarning,
   PAYMENT_METHODS,
 } from './payment';
 
-describe('payment methods and networks', () => {
-  it('mirrors the server’s canonical sets', () => {
+// The canonical sets, hand-copied from apps/server/src/db/schema.ts (NETWORKS
+// and the Coin/PaymentMethod unions). The web owns no copy of them — these
+// assertions are the drift check: a network or coin added server-side must
+// arrive here too, or the payment instructions go unlabelled for it.
+const SERVER_NETWORKS = ['TRC20', 'BEP20', 'mainnet'];
+
+describe('payment methods', () => {
+  it('mirrors the server’s canonical set', () => {
     expect(PAYMENT_METHODS).toEqual(['USDT-TRC20', 'USDT-BEP20', 'LTC']);
-    expect(NETWORKS).toEqual(['TRC20', 'BEP20', 'mainnet']);
+  });
+
+  it('labels every network the server can route', () => {
+    expect(Object.keys(NETWORK_LABELS).sort()).toEqual(
+      [...SERVER_NETWORKS].sort(),
+    );
   });
 });
 

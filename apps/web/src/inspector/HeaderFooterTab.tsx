@@ -40,6 +40,68 @@ const pageNumberPositionOptions: {
 const FORMAT_HINT =
   'Example: Page {{current}} of {{total}} — {{title}} is the document name';
 
+/** The per-band rows' differences, table-shaped: settings keys, aria names,
+ *  toggle labels, placeholders, and the section title — the two bands render
+ *  through one component so the sections cannot drift. The footer's keys and
+ *  names are carried verbatim, including the quirks (`footerTextAlignment`,
+ *  the "Footer text alignment" aria label, and "Bottom"/"Top border"). */
+interface BandConfig {
+  band: 'header' | 'footer';
+  title: string;
+  showKey: 'showHeader' | 'showFooter';
+  showLabel: string;
+  firstPageKey: 'showHeaderOnFirstPage' | 'showFooterOnFirstPage';
+  firstPageLabel: string;
+  textKey: 'headerText' | 'footerText';
+  textPlaceholder: string;
+  alignKey: 'headerAlignment' | 'footerTextAlignment';
+  alignAria: string;
+  sizeKey: 'headerFontSize' | 'footerFontSize';
+  sizeAria: string;
+  colorKey: 'headerFontColor' | 'footerFontColor';
+  colorAria: string;
+  borderKey: 'showHeaderBorder' | 'showFooterBorder';
+  borderLabel: string;
+}
+
+const HEADER_BAND: BandConfig = {
+  band: 'header',
+  title: 'Header',
+  showKey: 'showHeader',
+  showLabel: 'Show header',
+  firstPageKey: 'showHeaderOnFirstPage',
+  firstPageLabel: 'Show header on first page',
+  textKey: 'headerText',
+  textPlaceholder: 'e.g. Quarterly report',
+  alignKey: 'headerAlignment',
+  alignAria: 'Header alignment',
+  sizeKey: 'headerFontSize',
+  sizeAria: 'Header font size',
+  colorKey: 'headerFontColor',
+  colorAria: 'Header font color',
+  borderKey: 'showHeaderBorder',
+  borderLabel: 'Bottom border',
+};
+
+const FOOTER_BAND: BandConfig = {
+  band: 'footer',
+  title: 'Footer',
+  showKey: 'showFooter',
+  showLabel: 'Show footer',
+  firstPageKey: 'showFooterOnFirstPage',
+  firstPageLabel: 'Show footer on first page',
+  textKey: 'footerText',
+  textPlaceholder: 'e.g. Acme Inc',
+  alignKey: 'footerTextAlignment',
+  alignAria: 'Footer text alignment',
+  sizeKey: 'footerFontSize',
+  sizeAria: 'Footer font size',
+  colorKey: 'footerFontColor',
+  colorAria: 'Footer font color',
+  borderKey: 'showFooterBorder',
+  borderLabel: 'Top border',
+};
+
 /** The per-band banner gate: a live picker when the flag is open, the lock
  *  otherwise. One shape for both bands so they can't drift apart. */
 function BannerImageField({
@@ -83,6 +145,93 @@ function BannerImageField({
   );
 }
 
+/** One band section — the eight rows every band carries, keyed off its
+ *  config; every row but the show/hide toggle is inert while the band is
+ *  switched off. */
+function BandSection({
+  config,
+  settings,
+  set,
+  onOpenPricing,
+  flags,
+  addImage,
+}: {
+  config: BandConfig;
+  settings: TabProps['settings'];
+  set: TabProps['set'];
+  onOpenPricing: () => void;
+  flags: TabProps['flags'];
+  addImage: TabProps['addImage'];
+}) {
+  const shown = settings[config.showKey];
+  return (
+    <Section title={config.title}>
+      <ToggleRow
+        checked={shown}
+        onChange={(value) => set({ [config.showKey]: value })}
+        label={config.showLabel}
+      />
+      <ToggleRow
+        checked={settings[config.firstPageKey]}
+        onChange={(value) => set({ [config.firstPageKey]: value })}
+        label={config.firstPageLabel}
+        disabled={!shown}
+      />
+      <Field label="Text">
+        <TextInput
+          ariaLabel={`${config.title} text`}
+          value={settings[config.textKey]}
+          onChange={(value) => set({ [config.textKey]: value })}
+          placeholder={config.textPlaceholder}
+          disabled={!shown}
+        />
+      </Field>
+      <Field label="Alignment">
+        <Select<Alignment>
+          ariaLabel={config.alignAria}
+          value={settings[config.alignKey]}
+          options={alignmentOptions}
+          onChange={(value) => set({ [config.alignKey]: value })}
+          disabled={!shown}
+        />
+      </Field>
+      <Field label="Size (px)">
+        <NumberInput
+          ariaLabel={config.sizeAria}
+          value={settings[config.sizeKey]}
+          min={1}
+          onChange={(value) => set({ [config.sizeKey]: value })}
+          disabled={!shown}
+        />
+      </Field>
+      <Field label="Color">
+        <ColorInput
+          ariaLabel={config.colorAria}
+          value={settings[config.colorKey]}
+          onChange={(value) => set({ [config.colorKey]: value })}
+          disabled={!shown}
+        />
+      </Field>
+      <ToggleRow
+        checked={settings[config.borderKey]}
+        onChange={(value) => set({ [config.borderKey]: value })}
+        label={config.borderLabel}
+        disabled={!shown}
+      />
+      <BannerImageField
+        band={config.band}
+        bandLabel={config.title}
+        imageRef={settings[`${config.band}ImageRef`]}
+        set={set}
+        onOpenPricing={onOpenPricing}
+        flags={flags}
+        addImage={addImage}
+        disabled={!shown}
+      />
+    </Section>
+  );
+}
+
 export function HeaderFooterTab({
   settings,
   set,
@@ -90,137 +239,11 @@ export function HeaderFooterTab({
   flags,
   addImage,
 }: TabProps) {
+  const bandProps = { settings, set, onOpenPricing, flags, addImage };
   return (
     <>
-      <Section title="Header">
-        <ToggleRow
-          checked={settings.showHeader}
-          onChange={(showHeader) => set({ showHeader })}
-          label="Show header"
-        />
-        <ToggleRow
-          checked={settings.showHeaderOnFirstPage}
-          onChange={(showHeaderOnFirstPage) => set({ showHeaderOnFirstPage })}
-          label="Show header on first page"
-          disabled={!settings.showHeader}
-        />
-        <Field label="Text">
-          <TextInput
-            ariaLabel="Header text"
-            value={settings.headerText}
-            onChange={(headerText) => set({ headerText })}
-            placeholder="e.g. Quarterly report"
-            disabled={!settings.showHeader}
-          />
-        </Field>
-        <Field label="Alignment">
-          <Select<Alignment>
-            ariaLabel="Header alignment"
-            value={settings.headerAlignment}
-            options={alignmentOptions}
-            onChange={(headerAlignment) => set({ headerAlignment })}
-            disabled={!settings.showHeader}
-          />
-        </Field>
-        <Field label="Size (px)">
-          <NumberInput
-            ariaLabel="Header font size"
-            value={settings.headerFontSize}
-            min={1}
-            onChange={(headerFontSize) => set({ headerFontSize })}
-            disabled={!settings.showHeader}
-          />
-        </Field>
-        <Field label="Color">
-          <ColorInput
-            ariaLabel="Header font color"
-            value={settings.headerFontColor}
-            onChange={(headerFontColor) => set({ headerFontColor })}
-            disabled={!settings.showHeader}
-          />
-        </Field>
-        <ToggleRow
-          checked={settings.showHeaderBorder}
-          onChange={(showHeaderBorder) => set({ showHeaderBorder })}
-          label="Bottom border"
-          disabled={!settings.showHeader}
-        />
-        <BannerImageField
-          band="header"
-          bandLabel="Header"
-          imageRef={settings.headerImageRef}
-          set={set}
-          onOpenPricing={onOpenPricing}
-          flags={flags}
-          addImage={addImage}
-          disabled={!settings.showHeader}
-        />
-      </Section>
-
-      <Section title="Footer">
-        <ToggleRow
-          checked={settings.showFooter}
-          onChange={(showFooter) => set({ showFooter })}
-          label="Show footer"
-        />
-        <ToggleRow
-          checked={settings.showFooterOnFirstPage}
-          onChange={(showFooterOnFirstPage) => set({ showFooterOnFirstPage })}
-          label="Show footer on first page"
-          disabled={!settings.showFooter}
-        />
-        <Field label="Text">
-          <TextInput
-            ariaLabel="Footer text"
-            value={settings.footerText}
-            onChange={(footerText) => set({ footerText })}
-            placeholder="e.g. Acme Inc"
-            disabled={!settings.showFooter}
-          />
-        </Field>
-        <Field label="Alignment">
-          <Select<Alignment>
-            ariaLabel="Footer text alignment"
-            value={settings.footerTextAlignment}
-            options={alignmentOptions}
-            onChange={(footerTextAlignment) => set({ footerTextAlignment })}
-            disabled={!settings.showFooter}
-          />
-        </Field>
-        <Field label="Size (px)">
-          <NumberInput
-            ariaLabel="Footer font size"
-            value={settings.footerFontSize}
-            min={1}
-            onChange={(footerFontSize) => set({ footerFontSize })}
-            disabled={!settings.showFooter}
-          />
-        </Field>
-        <Field label="Color">
-          <ColorInput
-            ariaLabel="Footer font color"
-            value={settings.footerFontColor}
-            onChange={(footerFontColor) => set({ footerFontColor })}
-            disabled={!settings.showFooter}
-          />
-        </Field>
-        <ToggleRow
-          checked={settings.showFooterBorder}
-          onChange={(showFooterBorder) => set({ showFooterBorder })}
-          label="Top border"
-          disabled={!settings.showFooter}
-        />
-        <BannerImageField
-          band="footer"
-          bandLabel="Footer"
-          imageRef={settings.footerImageRef}
-          set={set}
-          onOpenPricing={onOpenPricing}
-          flags={flags}
-          addImage={addImage}
-          disabled={!settings.showFooter}
-        />
-      </Section>
+      <BandSection config={HEADER_BAND} {...bandProps} />
+      <BandSection config={FOOTER_BAND} {...bandProps} />
 
       <Section title="Page numbers">
         <ToggleRow

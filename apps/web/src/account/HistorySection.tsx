@@ -7,7 +7,8 @@ import {
   listHistory,
   type HistoryEntry,
 } from '../history/api';
-import { formatBytes, formatDate } from '../history/format';
+import { formatBytes } from '../history/format';
+import { formatDate } from '../documents/text';
 
 /** Any failure crossing the boundary becomes an ApiError the UI can render. */
 function toApiError(cause: unknown): ApiError {
