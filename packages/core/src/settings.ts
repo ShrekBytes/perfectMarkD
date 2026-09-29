@@ -398,51 +398,27 @@ export const DEFAULT_SETTINGS: DocumentSettings = {
   customStylesheetEnabled: false,
 };
 
-/** Color pickers in the Colors settings group. Used to reset only those
- *  fields to the active preset's defaults without touching other DocStyle. */
-export const PRESET_COLOR_KEYS = [
-  'accentColor',
-  'bodyColor',
-  'boldColor',
-  'headingColor',
-  'blockquoteBg',
-  'blockquoteBorderColor',
-  'tableHeaderBg',
-  'codeBackground',
-] as const satisfies readonly (keyof DocStyle)[];
+/** The DocStyle keys, read off the default style so a field added to the
+ *  interface (and to the default style) is copied without a second edit. */
+const DEFAULT_STYLE_KEYS = Object.keys(defaultStyle) as (keyof DocStyle)[];
+
+/** Copies the given DocStyle keys out of the broader settings — a keyed
+ *  write that TypeScript only accepts through a generic parameter, where
+ *  each key's value type stays put instead of collapsing to the union. */
+function pickStyle<K extends keyof DocStyle>(
+  keys: readonly K[],
+  s: DocumentSettings,
+): Pick<DocStyle, K> {
+  const picked = {} as Pick<DocStyle, K>;
+  for (const key of keys) picked[key] = s[key];
+  return picked;
+}
 
 /** Extracts only the DocStyle fields from the broader settings object.
  *  Used to snapshot the current look before switching presets, so each
  *  preset can remember per-user tweaks independently. */
 export function extractDocStyle(s: DocumentSettings): DocStyle {
-  return {
-    name: s.name,
-    fontFamily: s.fontFamily,
-    fontSize: s.fontSize,
-    lineHeight: s.lineHeight,
-    paragraphSpacing: s.paragraphSpacing,
-    headingScale: s.headingScale,
-    accentColor: s.accentColor,
-    bodyColor: s.bodyColor,
-    boldColor: s.boldColor,
-    headingColor: s.headingColor,
-    h1BorderBottom: s.h1BorderBottom,
-    h2BorderBottom: s.h2BorderBottom,
-    centerH1: s.centerH1,
-    blockquoteBg: s.blockquoteBg,
-    blockquoteBorderColor: s.blockquoteBorderColor,
-    codeBackground: s.codeBackground,
-    codeFontSize: s.codeFontSize,
-    codeFontFamily: s.codeFontFamily,
-    codeTheme: s.codeTheme,
-    tableHeaderBg: s.tableHeaderBg,
-    tableStriped: s.tableStriped,
-    pageBackground: s.pageBackground,
-    marginTop: s.marginTop,
-    marginBottom: s.marginBottom,
-    marginLeft: s.marginLeft,
-    marginRight: s.marginRight,
-  };
+  return pickStyle(DEFAULT_STYLE_KEYS, s);
 }
 
 /** Clamps critical numeric settings to safe ranges and repairs invalid

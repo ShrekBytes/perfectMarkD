@@ -1,5 +1,5 @@
+import { buildInfo } from '@perfectmarkd/core';
 import { Link } from '../router';
-import { buildInfo } from '../version';
 import { GITHUB_URL, LICENSE_URL, PLUGIN_URL } from './site-links';
 
 const plainLink =
@@ -18,7 +18,12 @@ const plainLink =
  * needs, and it has to be readable from a screenshot of the page.
  */
 export function Footer() {
-  const { version, commit } = buildInfo();
+  // CI inlines the stamp as Vite env; core's buildInfo reads the APP_* keys
+  // the server image gets as build args, so the names map here.
+  const { version, commit } = buildInfo({
+    APP_VERSION: import.meta.env.VITE_APP_VERSION,
+    APP_COMMIT: import.meta.env.VITE_APP_COMMIT,
+  });
   return (
     <footer className="flex flex-wrap items-center gap-3 border-t border-hairline bg-surface px-4 py-4 text-xs text-ink-soft">
       <a

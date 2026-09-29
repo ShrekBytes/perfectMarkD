@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { getSignedCookie } from 'hono/cookie';
+import { buildInfo } from '@perfectmarkd/core';
 import type { AppDatabase } from './db/database.js';
 import type { User } from './db/schema.js';
 import { requestLogger, type LogSink } from './request-logger.js';
-import { buildInfo } from './version.js';
 import { authRoutes, type AuthOptions } from './auth/routes.js';
 import { orderRoutes } from './orders/routes.js';
 import { pricingRoutes } from './pricing/routes.js';
@@ -212,7 +212,7 @@ export function createApp({
     // says "the export came out wrong", the first question is which build, and
     // `ok` alone cannot answer it. Compose's healthcheck only reads `ok`, so
     // this stays compatible with it.
-    .get('/healthz', (c) => c.json({ ok: true, ...buildInfo() }))
+    .get('/healthz', (c) => c.json({ ok: true, ...buildInfo(process.env) }))
     .route('/api/me', meRoutes({ now: clock, ai }))
     .route(
       '/api/auth',

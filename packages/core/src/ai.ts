@@ -62,19 +62,6 @@ export function estimateAiSize(text: string): AiSizeEstimate {
   };
 }
 
-/**
- * The worst-case token estimate for a character budget with no text to
- * measure: the tighter, script-aware ratio, so an estimate made from a
- * character count alone errs toward over-estimating rather than promising a fit
- * the model cannot meet. It is the conservative end of `estimateAiSize`'s
- * range, not a second estimator — the ratio is the same constant that function
- * selects from.
- */
-export function estimateTokensForCharacters(characters: number): number {
-  if (!Number.isFinite(characters) || characters <= 0) return 0;
-  return Math.ceil(characters / NON_ASCII_CHARS_PER_TOKEN);
-}
-
 // ─── AI Scope resolution ────────────────────────────────────────────────────
 
 /** A selection in the editor, as UTF-16 code-unit offsets into the Document. */
@@ -282,11 +269,15 @@ export function applyAnchoredEdits(
 }
 
 /**
- * How many times an anchor can be read in the text. Overlaps count: `aa` in
+ * How many times `search` can be read in the text. Overlaps count: `aa` in
  * `aaa` can be read in two places, so applying it would guess which one the
  * model meant — the estimate errs toward refusing.
+ *
+ * The occurrence count behind the anchored-edit refusals: applyAnchoredEdits
+ * accepts an anchor only when it matches exactly once, and the editor's
+ * inline-proposal locator applies the same rule on its side.
  */
-function countOccurrences(text: string, search: string): number {
+export function countOccurrences(text: string, search: string): number {
   let count = 0;
   let index = text.indexOf(search);
   while (index !== -1) {
@@ -428,12 +419,6 @@ export function extractSections(markdown: string): DocumentSection[] {
 /** How a section with no heading is named in a digest, a plan, or a request. */
 export const NO_HEADING_LABEL = '(no heading)';
 
-/** The name a section is known by on its own. An empty heading (`## `) is a
- *  heading nobody can quote, so it reads as no heading at all. */
-export function sectionLabel(section: { heading: string | null }): string {
-  return headingOf(section) ?? NO_HEADING_LABEL;
-}
-
 /**
  * The names the sections of one Document are known by, in order. A heading is
  * its own name; sections with no heading are numbered when there is more than
@@ -507,23 +492,6 @@ export interface AiBudgets {
   maxOutputTokens: number;
   /** The model's window: everything sent plus the output reserve fits here. */
   contextWindow: number;
-}
-
-/**
- * The budgets the ladder measures against, from whatever carries the three
- * configured numbers — the Admin's AI Provider Config on the server, the
- * account block on the client — so neither side maps them its own way.
- */
-export function aiBudgets(source: {
-  maxInputCharacters: number;
-  maxOutputTokens: number;
-  contextWindow: number;
-}): AiBudgets {
-  return {
-    maxInputCharacters: source.maxInputCharacters,
-    maxOutputTokens: source.maxOutputTokens,
-    contextWindow: source.contextWindow,
-  };
 }
 
 /** A target may be at most about half the output budget in estimated tokens,

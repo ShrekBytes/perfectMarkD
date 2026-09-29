@@ -11,11 +11,19 @@ vi.mock('../canvas/mermaid', async () => {
 });
 
 import {
+  buildStylingReferenceMarkdown,
   STYLING_REFERENCE_ANCHOR,
-  STYLING_REFERENCE_SELECTORS,
-  STYLING_REFERENCE_VARIABLES,
 } from '@perfectmarkd/core';
 import { loadDocsContent, sectionNavFromHtml } from './docs-content';
+
+/** The contract names the styling reference's tables document, read back out
+ *  of the generated markdown (`| \`name\` | … |` rows) — the tables are
+ *  internal to core, and the markdown is their public carrier. */
+function stylingReferenceNames(): string[] {
+  return [...buildStylingReferenceMarkdown().matchAll(/^\| `([^`]+)` \|/gm)].map(
+    (m) => m[1]!,
+  );
+}
 
 describe('loadDocsContent', () => {
   it('renders every section from the single markdown source, in order', async () => {
@@ -53,10 +61,9 @@ describe('loadDocsContent', () => {
 
   it('renders the drift-tested contract names, the @page note, and the internal statement', async () => {
     const { html } = await loadDocsContent();
-    for (const { name } of STYLING_REFERENCE_VARIABLES) {
-      expect(html).toContain(name);
-    }
-    for (const { name } of STYLING_REFERENCE_SELECTORS) {
+    const names = stylingReferenceNames();
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) {
       expect(html).toContain(name);
     }
     expect(html).toContain('@page');

@@ -5,14 +5,12 @@ import {
   checkAiSendSize,
   decideAiLadder,
   estimateAiSize,
-  estimateTokensForCharacters,
   extractSections,
   findPlanStepSection,
   parseAiPlan,
   parseAnchoredEdits,
   resolveAiScope,
   resolveParagraphRange,
-  sectionLabel,
   sectionLabels,
   type AiBudgets,
 } from './ai';
@@ -76,22 +74,6 @@ describe('estimateAiSize', () => {
     const latin = estimateAiSize('a'.repeat(60));
     const cjk = estimateAiSize('字'.repeat(60));
     expect(cjk.estimatedTokens).toBeGreaterThan(latin.estimatedTokens);
-  });
-});
-
-describe('estimateTokensForCharacters', () => {
-  it('uses the tight, script-aware ratio so a cap is never under-estimated', () => {
-    // The same ratio `estimateAiSize` uses for Arabic, Persian, Chinese, or
-    // Japanese: half the characters, so the worst case is the larger number.
-    expect(estimateTokensForCharacters(60_000)).toBe(30_000);
-    expect(estimateTokensForCharacters(1)).toBe(1);
-  });
-
-  it('is zero for zero or an unusable count', () => {
-    expect(estimateTokensForCharacters(0)).toBe(0);
-    expect(estimateTokensForCharacters(-10)).toBe(0);
-    expect(estimateTokensForCharacters(Number.NaN)).toBe(0);
-    expect(estimateTokensForCharacters(Number.POSITIVE_INFINITY)).toBe(0);
   });
 });
 
@@ -1301,14 +1283,6 @@ describe('findPlanStepSection', () => {
         change: 'x',
       }),
     ).toBeNull();
-  });
-});
-
-describe('sectionLabel', () => {
-  it('names a section with no heading, or an empty one', () => {
-    expect(sectionLabel({ heading: null })).toBe('(no heading)');
-    expect(sectionLabel({ heading: '' })).toBe('(no heading)');
-    expect(sectionLabel({ heading: 'One' })).toBe('One');
   });
 });
 

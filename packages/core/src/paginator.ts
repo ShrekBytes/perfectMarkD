@@ -28,7 +28,6 @@ import {
   PDFNumber,
 } from 'pdf-lib';
 
-import { createDiv, createEl, setCssStyles } from './dom.js';
 import { yieldToBrowser } from './scheduling.js';
 import type { DocumentSettings } from './settings.js';
 
@@ -314,7 +313,7 @@ function buildTableWithRows(
   const colgroup = tableEl.querySelector('colgroup');
   if (colgroup) clone.appendChild(colgroup.cloneNode(true));
   if (tableEl.tHead) clone.appendChild(tableEl.tHead.cloneNode(true));
-  const tbody = createEl('tbody');
+  const tbody = document.createElement('tbody');
   for (const row of rows) tbody.appendChild(row.cloneNode(true));
   clone.appendChild(tbody);
   return clone;
@@ -465,34 +464,25 @@ function splitElement(
 // ── Main pagination loop ─────────────────────────────────────────────────────
 
 /**
- * The pagination loop as a resumable stepper: one `step()` call advances the
- * distribution by at most one node, so a caller can interleave the run with
- * whatever it needs (paginateEl drains it outright; paginateElChunked yields
- * to the event loop between batches). The loop's state — the sandbox, the
- * working page, the mutated child list — lives in the closure, so pausing
- * between steps changes nothing about the result.
+ * Opens the pagination run and returns its resumable stepper: one `step()`
+ * call advances the distribution by at most one node. The loop's state — the
+ * sandbox, the working page, the mutated child list — lives in the closure,
+ * so pausing between steps changes nothing about the result, which is what
+ * lets paginateElChunked interleave the run with yields to the event loop.
+ *
+ * `pageCount()` is read-only and safe mid-run — that is what makes progress
+ * reporting possible. `dispose()` detaches the measurement sandbox and must
+ * run on every path, success or throw.
  */
-interface PaginationRun {
-  /** Advances one node; false once every child has been distributed. */
-  step(): boolean;
-  /** Pages completed so far, the in-progress one included. Read-only: safe
-   *  to call mid-run, which is what makes progress reporting possible. */
-  pageCount(): number;
-  /** Flushes the final page and returns the buckets (never empty). */
-  finish(): HTMLElement[][];
-  /** Detaches the measurement sandbox. Always call, success or throw. */
-  dispose(): void;
-}
-
 function beginPagination(
   sourceEl: HTMLElement,
   contentWidthPx: number,
   contentHeightPx: number,
   docCSS: string,
-): PaginationRun {
+) {
   // Hidden shadow-root sandbox: scoped CSS prevents host-document pollution.
-  const sandboxHost = createDiv();
-  setCssStyles(sandboxHost, {
+  const sandboxHost = document.createElement('div');
+  Object.assign(sandboxHost.style, {
     position: 'fixed',
     top: '0',
     left: '-99999px',
@@ -508,7 +498,7 @@ function beginPagination(
   sandboxSheet.replaceSync(docCSS);
   sandboxShadow.adoptedStyleSheets = [sandboxSheet];
 
-  const inner = createDiv();
+  const inner = document.createElement('div');
   // `.mpdf-doc` is the scope selector buildDocCSS emits (see css-builder.ts) —
   // the class name must match for sandboxed measurement to see real styles.
   inner.className = 'mpdf-doc';
@@ -518,9 +508,9 @@ function beginPagination(
   sandboxShadow.appendChild(inner);
 
   // Measurement div: same width, always empty before each measurement.
-  const measure = createDiv();
+  const measure = document.createElement('div');
   measure.className = 'mpdf-doc';
-  setCssStyles(measure, {
+  Object.assign(measure.style, {
     position: 'absolute',
     top: '0',
     left: '0',
@@ -600,34 +590,6 @@ function beginPagination(
   };
 }
 
-/** Distributes a rendered section's block children into page-height buckets,
- *  splitting oversized elements by natural unit (line, row, list item, word,
- *  or character) when they don't fit whole. Returns one HTMLElement[] per page.
- *
- *  Synchronous and uninterrupted. Hosts that render documents big enough to
- *  freeze the tab use paginateElChunked instead. */
-export function paginateEl(
-  sourceEl: HTMLElement,
-  contentWidthPx: number,
-  contentHeightPx: number,
-  docCSS: string,
-): HTMLElement[][] {
-  const run = beginPagination(
-    sourceEl,
-    contentWidthPx,
-    contentHeightPx,
-    docCSS,
-  );
-  try {
-    while (run.step()) {
-      // Drain: the caller wants the answer, not the ability to breathe.
-    }
-    return run.finish();
-  } finally {
-    run.dispose();
-  }
-}
-
 /** Nodes distributed between yields. Layout is flushed once per candidate
  *  node, so ~50 of them is a few milliseconds of work at most — small enough
  *  that input latency stays imperceptible, large enough that the yield itself
@@ -645,14 +607,12 @@ export interface PaginateChunkedOptions {
   onProgress?: (pages: number) => void;
 }
 
-/**
- * paginateEl, handing the main thread back every `yieldEvery` nodes.
- *
- * The output is identical — same buckets, same nodes, same order; only the
- * scheduling differs. This is the variant the document pipeline uses, because
- * a 300-page section is thousands of layout flushes in a row and a tab that
- * cannot paint or answer a keystroke for seconds reads as broken.
- */
+/** Distributes a rendered section's block children into page-height buckets,
+ *  splitting oversized elements by natural unit (line, row, list item, word,
+ *  or character) when they don't fit whole. Returns one HTMLElement[] per
+ *  page. Identical buckets whatever the cadence — only the scheduling
+ *  differs — so hosts that render documents big enough to freeze the tab
+ *  lower `yieldEvery` and nothing else moves. */
 export async function paginateElChunked(
   sourceEl: HTMLElement,
   contentWidthPx: number,
@@ -702,6 +662,16 @@ function resolvePageNumberFormat(
     .replace(/\{\{\s*title\s*\}\}/g, title);
 }
 
+/** The three text zones of a header/footer band, keyed by the alignment and
+ *  position settings ('left' | 'center' | 'right') that route text into
+ *  them — the table the band-building reads instead of an alignment switch
+ *  per field. */
+interface BandText {
+  left: string;
+  center: string;
+  right: string;
+}
+
 /** Converts paginated page-node arrays into fully-resolved PageLayout objects,
  *  computing header/footer text and page number strings for each page.
  *  documentTitle backs the {{title}} placeholder in pageNumberFormat. */
@@ -730,40 +700,21 @@ export function buildPageLayouts(
       documentTitle,
     );
 
-    let footerLeft = '',
-      footerRight = '',
-      footerCenter = '';
-    let headerLeft = '',
-      headerCenter = '',
-      headerRight = '';
+    const header: BandText = { left: '', center: '', right: '' };
+    const footer: BandText = { left: '', center: '', right: '' };
 
     if (pageShowsFooter) {
-      if (s.footerText) {
-        if (s.footerTextAlignment === 'center') footerCenter = s.footerText;
-        else if (s.footerTextAlignment === 'left') footerLeft = s.footerText;
-        else footerRight = s.footerText;
-      }
-      // Place page number in its own zone; merge with a separator when both land in the same slot.
+      if (s.footerText) footer[s.footerTextAlignment] = s.footerText;
+      // Place page number in its own zone; merge with a separator when both
+      // land in the same slot.
       if (s.showPageNumbers) {
-        const join = (existing: string) =>
-          existing ? existing + ' — ' + numStr : numStr;
-        if (s.pageNumberPosition === 'center')
-          footerCenter = join(footerCenter);
-        else if (s.pageNumberPosition === 'left') footerLeft = join(footerLeft);
-        else footerRight = join(footerRight);
+        const at = s.pageNumberPosition;
+        footer[at] = footer[at] ? `${footer[at]} — ${numStr}` : numStr;
       }
     }
 
-    if (pageShowsHeader) {
-      if (s.headerText) {
-        if (s.headerAlignment === 'center') {
-          headerCenter = s.headerText;
-        } else if (s.headerAlignment === 'left') {
-          headerLeft = s.headerText;
-        } else {
-          headerRight = s.headerText;
-        }
-      }
+    if (pageShowsHeader && s.headerText) {
+      header[s.headerAlignment] = s.headerText;
     }
 
     // Compute once here so both preview and export paths can read directly from
@@ -771,11 +722,11 @@ export function buildPageLayouts(
     const hasHeader =
       s.showHeader &&
       pageShowsHeader &&
-      !!(headerLeft || headerCenter || headerRight || s.showHeaderBorder);
+      !!(header.left || header.center || header.right || s.showHeaderBorder);
     const hasFooter =
       s.showFooter &&
       pageShowsFooter &&
-      !!(footerLeft || footerRight || footerCenter || s.showFooterBorder);
+      !!(footer.left || footer.center || footer.right || s.showFooterBorder);
 
     return {
       pageNodes,
@@ -785,12 +736,12 @@ export function buildPageLayouts(
       pageShowsFooter,
       hasHeader,
       hasFooter,
-      headerLeft,
-      headerCenter,
-      headerRight,
-      footerLeft,
-      footerRight,
-      footerCenter,
+      headerLeft: header.left,
+      headerCenter: header.center,
+      headerRight: header.right,
+      footerLeft: footer.left,
+      footerRight: footer.right,
+      footerCenter: footer.center,
     };
   });
 }

@@ -20,7 +20,6 @@
 import { Hono, type Context } from 'hono';
 import { eq } from 'drizzle-orm';
 import {
-  aiBudgets,
   applyAnchoredEdits,
   checkAiSendSize,
   parseAiPlan,
@@ -172,7 +171,7 @@ export function aiRoutes({ ai, now, log }: AiRoutesOptions) {
   ): Promise<Response> => {
     const sized = checkAiSendSize({
       ...command.send,
-      budgets: aiBudgets(gate.config),
+      budgets: gate.config,
     });
     if (!sized.ok) return tooLong(c, sized.refusal);
 

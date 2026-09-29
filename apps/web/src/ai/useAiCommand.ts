@@ -22,7 +22,6 @@
 
 import { useCallback, useRef, useState } from 'react';
 import {
-  aiBudgets,
   buildOutlineDigest,
   checkAiSendSize,
   decideAiLadder,
@@ -231,7 +230,7 @@ export function useAiCommand(
       return decideAiLadder({
         documentText: documentText(),
         target: scope,
-        budgets: aiBudgets(account),
+        budgets: account,
         cursor: view ? view.state.selection.main.head : null,
       });
     },
@@ -538,7 +537,7 @@ export function useAiCommand(
             instruction: state.instruction,
             targetText: section.text,
             brief,
-            budgets: aiBudgets(current),
+            budgets: current,
           })
         : { ok: true as const };
       if (!check.ok) {

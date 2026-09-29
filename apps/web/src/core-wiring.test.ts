@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { normalizeMarkdown } from '@perfectmarkd/core';
+import { PAGE_SIZES } from '@perfectmarkd/core';
 
 it('web resolves the workspace dependency on packages/core', () => {
-  expect(normalizeMarkdown('a\r\nb')).toBe('a\nb');
+  expect(PAGE_SIZES.A4).toEqual({ w: 794, h: 1123 });
 });

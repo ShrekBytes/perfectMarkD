@@ -2,17 +2,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDocCSS,
-  buildStylingReferenceMarkdown,
   DEFAULT_SETTINGS,
   renderMarkdown,
   resolvePageGeometry,
+  type DocumentSettings,
+} from './index';
+import {
+  buildStylingReferenceMarkdown,
   STYLING_REFERENCE_ANCHOR,
   STYLING_REFERENCE_HEADING,
   STYLING_REFERENCE_PAGE_VARIABLES,
   STYLING_REFERENCE_SELECTORS,
   STYLING_REFERENCE_VARIABLES,
-  type DocumentSettings,
-} from './index';
+} from './styling-reference';
 
 /** Settings with every branch of buildDocCSS enabled: both heading
  *  decorations, centering, striped tables, ligatures, RTL, and the Custom

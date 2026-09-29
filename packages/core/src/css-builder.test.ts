@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bgImageCssProps,
+  bgImageLayerStyle,
   buildCodeBlockCSS,
   buildFontFaceCSS,
   buildDocCSS,
@@ -116,21 +116,34 @@ describe('escapeCSSForStyle', () => {
   });
 });
 
-describe('bgImageCssProps', () => {
-  it('maps every backgroundImageSize value to CSS props', () => {
-    expect(bgImageCssProps('cover')).toEqual({
-      size: 'cover',
-      repeat: 'no-repeat',
-    });
-    expect(bgImageCssProps('contain')).toEqual({
-      size: 'contain',
-      repeat: 'no-repeat',
-    });
-    expect(bgImageCssProps('fill')).toEqual({
-      size: '100% 100%',
-      repeat: 'no-repeat',
-    });
-    expect(bgImageCssProps('tile')).toEqual({ size: 'auto', repeat: 'repeat' });
+describe('bgImageLayerStyle', () => {
+  const geometry = resolvePageGeometry(DEFAULT_SETTINGS);
+
+  it('maps every backgroundImageSize value to its CSS size and repeat', () => {
+    const style = (size: DocumentSettings['backgroundImageSize']) =>
+      bgImageLayerStyle(
+        settings({ backgroundImageSize: size }),
+        geometry,
+        'b.png',
+      );
+    expect(style('cover')).toContain(
+      'background-size:cover;background-repeat:no-repeat;',
+    );
+    expect(style('contain')).toContain(
+      'background-size:contain;background-repeat:no-repeat;',
+    );
+    expect(style('fill')).toContain(
+      'background-size:100% 100%;background-repeat:no-repeat;',
+    );
+    expect(style('tile')).toContain(
+      'background-size:auto;background-repeat:repeat;',
+    );
+  });
+
+  it('returns undefined when the ref is unresolvable', () => {
+    expect(
+      bgImageLayerStyle(DEFAULT_SETTINGS, geometry, undefined),
+    ).toBeUndefined();
   });
 });
 

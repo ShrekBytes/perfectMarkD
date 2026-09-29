@@ -226,21 +226,6 @@ export function stripPageAtRules(css: string): string {
   return out;
 }
 
-/** Maps a `backgroundImageSize` setting value to its CSS `background-size`
- *  and `background-repeat` values. Centralises logic shared by the preview
- *  and export render paths. */
-export function bgImageCssProps(
-  size: DocumentSettings['backgroundImageSize'],
-): {
-  size: string;
-  repeat: string;
-} {
-  return {
-    size: size === 'fill' ? '100% 100%' : size === 'tile' ? 'auto' : size, // "cover" | "contain" pass through
-    repeat: size === 'tile' ? 'repeat' : 'no-repeat',
-  };
-}
-
 // ─── Color & font helpers ─────────────────────────────────────────────────────
 
 /** Returns relative luminance (0–1) of a CSS hex color; non-hex values return 1 (treat as light). */
@@ -384,19 +369,24 @@ export function buildFrameOverlayHTML(s: DocumentSettings): string {
 // string in their own element.
 
 /** Style for the page background image layer; caller passes undefined when
- *  the background is disabled or the ref unresolvable. */
+ *  the background is disabled or the ref unresolvable. The `background-size`
+ *  mapping: "cover"/"contain" pass through, "fill" stretches to the box,
+ *  "tile" repeats at its natural size. */
 export function bgImageLayerStyle(
   s: DocumentSettings,
   g: PageGeometry,
   url: string | undefined,
 ): string | undefined {
   if (!url) return undefined;
-  const bgCss = bgImageCssProps(s.backgroundImageSize);
+  const size = s.backgroundImageSize;
+  const bgSize =
+    size === 'fill' ? '100% 100%' : size === 'tile' ? 'auto' : size;
+  const bgRepeat = size === 'tile' ? 'repeat' : 'no-repeat';
   const pos =
     s.backgroundImageScope === 'content-only'
       ? `top:${g.mTop + g.headerH}px;left:${g.mLeft}px;width:${g.contentW}px;height:${g.contentH}px;`
       : 'inset:0;';
-  return `position:absolute;${pos}background-image:url('${url}');background-size:${bgCss.size};background-repeat:${bgCss.repeat};background-position:center;opacity:${s.backgroundImageOpacity};pointer-events:none;`;
+  return `position:absolute;${pos}background-image:url('${url}');background-size:${bgSize};background-repeat:${bgRepeat};background-position:center;opacity:${s.backgroundImageOpacity};pointer-events:none;`;
 }
 
 /** Style for a header/footer banner image behind the band text. */

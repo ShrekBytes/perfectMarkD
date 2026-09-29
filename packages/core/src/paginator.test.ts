@@ -316,9 +316,9 @@ describe('splitPreElement', () => {
   });
 });
 
-// ─── paginateEl ───────────────────────────────────────────────────────────────
+// ─── paginateElChunked ────────────────────────────────────────────────────────
 
-import { paginateEl, paginateElChunked } from './paginator';
+import { paginateElChunked } from './paginator';
 
 /** Stands in for real layout: the paginator measures the height of the
  *  measure div, which holds clones of the candidate page content. Mocked
@@ -334,8 +334,8 @@ function mockedHeightRect(this: Element): DOMRect {
   return { height } as DOMRect;
 }
 
-/** Installs the mocked measurement and restores it in `finally`. The async
- *  twin below exists because the mock has to outlive an awaited run. */
+/** Installs the mocked measurement and restores it in `finally`. The mock
+ *  has to outlive an awaited run, so the async wrapper is what tests use. */
 function installMockedHeights(): () => void {
   const proto = Element.prototype as unknown as {
     getBoundingClientRect: () => DOMRect;
@@ -347,15 +347,6 @@ function installMockedHeights(): () => void {
   };
 }
 
-function withMockedHeights<T>(fn: () => T): T {
-  const restore = installMockedHeights();
-  try {
-    return fn();
-  } finally {
-    restore();
-  }
-}
-
 async function withMockedHeightsAsync<T>(fn: () => Promise<T>): Promise<T> {
   const restore = installMockedHeights();
   try {
@@ -365,16 +356,21 @@ async function withMockedHeightsAsync<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-describe('paginateEl', () => {
+describe('paginateElChunked', () => {
   const makeSource = (html: string) => {
     const source = document.createElement('div');
     source.innerHTML = html;
     return source;
   };
 
-  it('puts everything on one page when it all fits', () => {
+  it('puts everything on one page when it all fits', async () => {
     const source = makeSource('<p>one</p><p>two</p><p>three</p>');
-    const pages = paginateEl(source, 600, 1000, 'p { margin: 0; }');
+    const pages = await paginateElChunked(
+      source,
+      600,
+      1000,
+      'p { margin: 0; }',
+    );
     expect(pages).toHaveLength(1);
     expect(pages[0]!.map((n) => n.textContent)).toEqual([
       'one',
@@ -383,31 +379,37 @@ describe('paginateEl', () => {
     ]);
   });
 
-  it('distributes blocks into page-height buckets', () => {
+  it('distributes blocks into page-height buckets', async () => {
     const source = makeSource(
       '<p data-h="100">a</p><p data-h="100">b</p><p data-h="100">c</p>',
     );
-    const pages = withMockedHeights(() => paginateEl(source, 600, 250, ''));
+    const pages = await withMockedHeightsAsync(() =>
+      paginateElChunked(source, 600, 250, ''),
+    );
     expect(pages).toHaveLength(2);
     expect(pages[0]!.map((n) => n.textContent)).toEqual(['a', 'b']);
     expect(pages[1]!.map((n) => n.textContent)).toEqual(['c']);
   });
 
-  it('moves an unsplittable oversize element to its own page', () => {
+  it('moves an unsplittable oversize element to its own page', async () => {
     const source = makeSource(
       '<p data-h="100">a</p><img data-h="500" src="x.png" alt="">',
     );
-    const pages = withMockedHeights(() => paginateEl(source, 600, 250, ''));
+    const pages = await withMockedHeightsAsync(() =>
+      paginateElChunked(source, 600, 250, ''),
+    );
     expect(pages).toHaveLength(2);
     expect(pages[0]!.map((n) => n.tagName)).toEqual(['P']);
     expect(pages[1]!.map((n) => n.tagName)).toEqual(['IMG']);
   });
 
-  it('force-splits a list that alone exceeds a page, continuing numbering', () => {
+  it('force-splits a list that alone exceeds a page, continuing numbering', async () => {
     const source = makeSource(
       '<ol><li data-h="60">one</li><li data-h="60">two</li><li data-h="60">three</li></ol>',
     );
-    const pages = withMockedHeights(() => paginateEl(source, 600, 100, ''));
+    const pages = await withMockedHeightsAsync(() =>
+      paginateElChunked(source, 600, 100, ''),
+    );
     expect(pages).toHaveLength(3);
     const listPerPage = pages.map((page) => page[0] as HTMLOListElement);
     expect(listPerPage.map((l) => l.children.length)).toEqual([1, 1, 1]);
@@ -415,47 +417,20 @@ describe('paginateEl', () => {
     expect(listPerPage[2]!.start).toBe(3);
   });
 
-  it('replicates the table head on every page a split table spans', () => {
+  it('replicates the table head on every page a split table spans', async () => {
     const source = makeSource(
       '<table><thead><tr><th>H</th></tr></thead><tbody>' +
         '<tr data-h="80">r1</tr><tr data-h="80">r2</tr><tr data-h="80">r3</tr>' +
         '</tbody></table>',
     );
-    const pages = withMockedHeights(() => paginateEl(source, 600, 120, ''));
+    const pages = await withMockedHeightsAsync(() =>
+      paginateElChunked(source, 600, 120, ''),
+    );
     expect(pages.length).toBeGreaterThanOrEqual(2);
     for (const page of pages) {
       expect((page[0] as HTMLTableElement).tHead?.textContent).toBe('H');
     }
   });
-
-  it('returns one empty page for an empty source', () => {
-    const source = makeSource('');
-    expect(paginateEl(source, 600, 1000, '')).toEqual([[]]);
-  });
-
-  it('does not mutate the source element', () => {
-    const source = makeSource('<p data-h="100">a</p><p data-h="100">b</p>');
-    const before = source.innerHTML;
-    withMockedHeights(() => paginateEl(source, 600, 150, ''));
-    expect(source.innerHTML).toBe(before);
-  });
-
-  it('removes the measurement sandbox from the document afterwards', () => {
-    const source = makeSource('<p data-h="100">a</p>');
-    const bodyChildren = document.body.children.length;
-    withMockedHeights(() => paginateEl(source, 600, 150, ''));
-    expect(document.body.children.length).toBe(bodyChildren);
-  });
-});
-
-// ─── paginateElChunked ────────────────────────────────────────────────────────
-
-describe('paginateElChunked', () => {
-  const makeSource = (html: string) => {
-    const source = document.createElement('div');
-    source.innerHTML = html;
-    return source;
-  };
 
   /** A shape that exercises every branch of the loop: whole blocks, a
    *  force-split list, and an unsplittable oversize element. */
@@ -476,14 +451,17 @@ describe('paginateElChunked', () => {
       page.map((node) => `${node.tagName}:${node.textContent ?? ''}`),
     );
 
-  it('produces exactly the pages paginateEl does', async () => {
-    const sync = withMockedHeights(() =>
-      paginateEl(makeSource(MIXED), 600, 250, ''),
-    );
-    const chunked = await withMockedHeightsAsync(() =>
+  it('produces the same pages at every yield cadence', async () => {
+    // The stepper's contract: pausing between steps changes nothing about
+    // the result, so a run that yields after every node and one that
+    // batches land on the same buckets.
+    const fine = await withMockedHeightsAsync(() =>
       paginateElChunked(makeSource(MIXED), 600, 250, '', { yieldEvery: 1 }),
     );
-    expect(digest(chunked)).toEqual(digest(sync));
+    const coarse = await withMockedHeightsAsync(() =>
+      paginateElChunked(makeSource(MIXED), 600, 250, ''),
+    );
+    expect(digest(fine)).toEqual(digest(coarse));
   });
 
   it('returns one empty page for an empty source', async () => {
@@ -706,7 +684,7 @@ describe('extractOutlineEntries', () => {
   const layoutsFrom = (pagesHtml: string[]): PageLayout[] =>
     buildPageLayouts(
       pagesHtml.map((html) => {
-        // One page-node per page, matching paginateEl's output shape.
+        // One page-node per page, matching the paginator's output shape.
         const div = document.createElement('div');
         div.innerHTML = html;
         return [div];

@@ -445,9 +445,9 @@ const RUN_PIPELINE = /* js */ `
       const container = document.createElement('div');
       container.innerHTML = html;
       allPages.push(
-        ...core.paginateEl(
+        ...(await core.paginateElChunked(
           container, geometry.contentW, geometry.contentH, paginateCSS,
-        ),
+        )),
       );
     }
     if (allPages.length === 0) allPages.push([]);
