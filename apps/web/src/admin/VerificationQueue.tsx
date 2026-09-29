@@ -8,11 +8,11 @@ import {
 import { amountsMatch, explorerUrl } from './verification-display';
 import {
   NETWORK_LABELS,
-  orderDate,
   orderDateTime,
   STATUS_BADGE,
   STATUS_LABEL,
 } from '../billing/payment';
+import { formatDate } from '../documents/text';
 import { VerifyDialog } from './VerifyDialog';
 import { RejectDialog } from './RejectDialog';
 
@@ -294,13 +294,13 @@ export function VerificationQueue() {
                 )}
 
                 <p className="mt-1.5 text-xs text-ink-faint">
-                  Created {orderDate(order.createdAt)}
+                  Created {formatDate(order.createdAt)}
                   {order.decidedAt &&
-                    ` · Decided ${orderDate(order.decidedAt)}`}
+                    ` · Decided ${formatDate(order.decidedAt)}`}
                   {order.paymentDeadline !== null &&
                     ` · ${
                       order.paymentExpired
-                        ? `window lapsed ${orderDate(order.paymentDeadline)}`
+                        ? `window lapsed ${formatDate(order.paymentDeadline)}`
                         : `payable until ${orderDateTime(order.paymentDeadline)}`
                     }`}
                 </p>

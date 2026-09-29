@@ -15,16 +15,14 @@
  * naming the stored limit the response fills it from.
  */
 
-import type { DurationMonths, PlanLimits, PlanPrices } from './api';
+import type { DurationMonths, PaidPlan, PlanLimits, PlanPrices } from './api';
 
 export type { DurationMonths };
 
 export type PlanId = 'free' | 'pro' | 'premium';
-export type PaidPlanId = 'pro' | 'premium';
-
-/** The paid plan ids in catalog order — for the surfaces that iterate only
- *  the plans with stored numbers (the admin panel's price/limit drafts). */
-export const PAID_PLAN_IDS: readonly PaidPlanId[] = ['pro', 'premium'];
+/** The paid subset of `PlanId`. The pricing API owns the union — it is the
+ *  wire shape's own key — so the catalog names it rather than repeating it. */
+export type PaidPlanId = PaidPlan;
 
 export interface Plan {
   id: PlanId;
@@ -49,6 +47,16 @@ export const PLANS: Plan[] = [
     blurb: 'High volume, priority rendering, and export history.',
   },
 ];
+
+/** The paid plan ids, in catalog order — for the surfaces that iterate only the
+ *  plans with stored numbers (the admin panel's price/limit drafts). Read off
+ *  PLANS rather than restated, so a paid plan added to the catalog cannot be
+ *  left out of the admin's numbers. The predicate narrows on `id !== 'free'`,
+ *  which is what makes the paid subset; a second paid-free member would need
+ *  the predicate to name it. */
+export const PAID_PLAN_IDS: readonly PaidPlanId[] = PLANS.map(
+  (plan) => plan.id,
+).filter((id): id is PaidPlanId => id !== 'free');
 
 /** What a price or a limit figure reads as once the pricing read has failed.
  *  Every surface renders this same word, so no two of them describe one state

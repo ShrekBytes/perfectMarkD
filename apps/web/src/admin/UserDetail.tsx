@@ -7,10 +7,10 @@ import {
 } from './api';
 import {
   entitlementLabel,
-  orderDate,
   STATUS_BADGE,
   STATUS_LABEL,
 } from '../billing/payment';
+import { formatDate } from '../documents/text';
 import { Dialog } from '../shell/Dialog';
 import { GrantEntitlementDialog } from './GrantEntitlementDialog';
 import { CompQuotaDialog } from './CompQuotaDialog';
@@ -112,7 +112,7 @@ export function UserDetail({
           {user.email}
         </h2>
         <p className="shrink-0 text-xs text-ink-faint">
-          Joined {orderDate(user.createdAt)}
+          Joined {formatDate(user.createdAt)}
         </p>
       </div>
 
@@ -200,7 +200,7 @@ export function UserDetail({
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="text-ink-faint">
-                    {orderDate(order.createdAt)}
+                    {formatDate(order.createdAt)}
                   </span>
                   <span
                     className={`rounded-control border px-1.5 py-0.5 font-medium ${STATUS_BADGE[order.status as OrderStatus]}`}

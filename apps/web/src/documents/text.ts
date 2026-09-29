@@ -1,13 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Text helpers around document facts: names, relative timestamps for the
-// Library list, the ISO date part the account surfaces show, page-count
-// phrasing, and the top-bar gauge's paper label.
+// Library list, the ISO date part the account, billing, and AI surfaces show,
+// page-count phrasing, and the top-bar gauge's paper label.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { DocumentSettings } from '@perfectmarkd/core';
 
-/** The calendar day an ISO instant falls on, `YYYY-MM-DD` — the date part
- *  the account page's AI block and the Export History list render. */
+/** The calendar day an ISO instant falls on, `YYYY-MM-DD`. The surfaces that
+ *  show a date read it through here — the account and admin Order lists, the
+ *  Entitlement readouts, the admin audit trail, the Export History list, and
+ *  the AI period resets — so no two of them describe one instant differently.
+ *  (A surface that also shows the time, like the audit trail's, reads the date
+ *  half here and formats the time itself.) */
 export function formatDate(iso: string): string {
   return iso.slice(0, 10);
 }

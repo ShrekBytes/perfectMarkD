@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listAdminUsers, type AdminUser } from './api';
 import { UserDetail } from './UserDetail';
-import { entitlementLabel, orderDate } from '../billing/payment';
+import { entitlementLabel } from '../billing/payment';
+import { formatDate } from '../documents/text';
 
 function usageLine(user: AdminUser): string {
   const { used, allowance, comps, period } = user.usage;
@@ -132,7 +133,7 @@ export function UsersPanel() {
                     )}
                   </p>
                   <p className="shrink-0 text-xs text-ink-faint">
-                    Joined {orderDate(user.createdAt)}
+                    Joined {formatDate(user.createdAt)}
                   </p>
                 </div>
                 <p className="mt-0.5 text-xs text-ink-soft">

@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { Dialog } from '../shell/Dialog';
-import { DURATIONS } from '../pricing/plans';
+import {
+  DURATIONS,
+  PAID_PLAN_IDS,
+  planName,
+  type PaidPlanId,
+} from '../pricing/plans';
 import { grantEntitlement, type AdminUserDetail } from './api';
 import { previewExpiry } from './verification-display';
-
-const PLAN_LABEL: Record<string, string> = { pro: 'Pro', premium: 'Premium' };
+import { entitlementLabel } from '../billing/payment';
 
 interface GrantEntitlementDialogProps {
   user: AdminUserDetail;
@@ -24,7 +28,7 @@ export function GrantEntitlementDialog({
   onGranted,
   onClose,
 }: GrantEntitlementDialogProps) {
-  const [plan, setPlan] = useState<'pro' | 'premium'>('pro');
+  const [plan, setPlan] = useState<PaidPlanId>('pro');
   const [duration, setDuration] = useState<number | null>(null);
   const [customDate, setCustomDate] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -78,14 +82,14 @@ export function GrantEntitlementDialog({
       <p className="text-xs text-ink-soft">{user.email}</p>
       <p className="mt-1 text-xs" data-testid="grant-current">
         {current
-          ? `Current: ${PLAN_LABEL[current.plan] ?? current.plan} until ${current.expiresAt.slice(0, 10)}.`
+          ? `Current: ${entitlementLabel(current)}.`
           : 'The user has no active entitlement.'}
       </p>
 
       <div className="mt-4">
         <p className="text-xs font-medium text-ink-soft">Plan</p>
         <div className="mt-1.5 flex gap-1.5">
-          {(['pro', 'premium'] as const).map((planId) => (
+          {PAID_PLAN_IDS.map((planId) => (
             <button
               key={planId}
               type="button"
@@ -98,7 +102,7 @@ export function GrantEntitlementDialog({
                   : 'border-hairline bg-canvas text-ink-soft hover:bg-surface-hover hover:text-ink'
               }`}
             >
-              {PLAN_LABEL[planId]}
+              {planName(planId)}
             </button>
           ))}
         </div>
@@ -144,7 +148,7 @@ export function GrantEntitlementDialog({
           data-testid="grant-preview"
           className="mt-3 rounded-control border border-hairline bg-canvas px-2.5 py-2 text-xs text-ink"
         >
-          {PLAN_LABEL[plan]} until {preview} ({previewNote}).
+          {planName(plan)} until {preview} ({previewNote}).
         </p>
       )}
 

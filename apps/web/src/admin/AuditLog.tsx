@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listAuditEntries, type AuditEntry } from './api';
+import { formatDate } from '../documents/text';
 
 function entryTime(iso: string): string {
   const date = new Date(iso);
-  return `${iso.slice(0, 10)} ${date.toISOString().slice(11, 16)} UTC`;
+  return `${formatDate(iso)} ${date.toISOString().slice(11, 16)} UTC`;
 }
 
 /** Compact, stable JSON for the before/after snapshots. */

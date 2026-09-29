@@ -7,11 +7,7 @@
 
 import type { Coin, Network, OrderStatus, PaymentMethod } from './api';
 import { planName, type PaidPlanId } from '../pricing/plans';
-
-/** The `YYYY-MM-DD` an Order list shows for created/decided timestamps. */
-export function orderDate(iso: string): string {
-  return iso.slice(0, 10);
-}
+import { formatDate } from '../documents/text';
 
 /** The Entitlement readout the admin surfaces share: "Premium until
  *  2026-12-01". Unknown plan ids render as the raw id (planName's fallback). */
@@ -19,7 +15,7 @@ export function entitlementLabel(entitlement: {
   plan: string;
   expiresAt: string;
 }): string {
-  return `${planName(entitlement.plan as PaidPlanId)} until ${entitlement.expiresAt.slice(0, 10)}`;
+  return `${planName(entitlement.plan as PaidPlanId)} until ${formatDate(entitlement.expiresAt)}`;
 }
 
 /**

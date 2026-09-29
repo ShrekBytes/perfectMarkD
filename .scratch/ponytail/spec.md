@@ -69,3 +69,18 @@ the web sweep by the visual e2e baselines.
 - `03-web-sweep.md` — table-driven inspector sections, shared interaction
   plumbing, small cuts, fixture relocation, `countOccurrences` adoption.
   Blocked by: 02.
+- `04-web-leftovers.md` — the six leftovers 03 left open: one plan-label
+  source, one date helper, no restated tables. Blocked by: 03.
+
+## Delivered
+
+All four tickets landed as sequential waves (2026-09-29). Net roughly 1,180
+lines removed across the three packages, no behavior change, and no dependency
+added or removed. The sweep's own regression net held throughout: the core
+paginator goldens and the web visual e2e baselines are byte-identical, with no
+snapshot update anywhere in the series.
+
+Ticket 03 closed by deliberately leaving six items behind rather than
+widening its own scope; `04-web-leftovers.md` is the pass over them that
+`03`'s closing note promised. Every item there is deletion or derivation from a
+table that already exists — the pass created no new file.

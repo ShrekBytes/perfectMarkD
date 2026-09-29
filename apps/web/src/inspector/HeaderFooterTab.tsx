@@ -46,7 +46,6 @@ const FORMAT_HINT =
  *  names are carried verbatim, including the quirks (`footerTextAlignment`,
  *  the "Footer text alignment" aria label, and "Bottom"/"Top border"). */
 interface BandConfig {
-  band: 'header' | 'footer';
   title: string;
   showKey: 'showHeader' | 'showFooter';
   showLabel: string;
@@ -62,10 +61,10 @@ interface BandConfig {
   colorAria: string;
   borderKey: 'showHeaderBorder' | 'showFooterBorder';
   borderLabel: string;
+  imageKey: 'headerImageRef' | 'footerImageRef';
 }
 
 const HEADER_BAND: BandConfig = {
-  band: 'header',
   title: 'Header',
   showKey: 'showHeader',
   showLabel: 'Show header',
@@ -81,10 +80,10 @@ const HEADER_BAND: BandConfig = {
   colorAria: 'Header font color',
   borderKey: 'showHeaderBorder',
   borderLabel: 'Bottom border',
+  imageKey: 'headerImageRef',
 };
 
 const FOOTER_BAND: BandConfig = {
-  band: 'footer',
   title: 'Footer',
   showKey: 'showFooter',
   showLabel: 'Show footer',
@@ -100,13 +99,14 @@ const FOOTER_BAND: BandConfig = {
   colorAria: 'Footer font color',
   borderKey: 'showFooterBorder',
   borderLabel: 'Top border',
+  imageKey: 'footerImageRef',
 };
 
 /** The per-band banner gate: a live picker when the flag is open, the lock
  *  otherwise. One shape for both bands so they can't drift apart. */
 function BannerImageField({
-  band,
   bandLabel,
+  imageKey,
   imageRef,
   set,
   onOpenPricing,
@@ -114,8 +114,8 @@ function BannerImageField({
   addImage,
   disabled,
 }: {
-  band: 'header' | 'footer';
   bandLabel: string;
+  imageKey: BandConfig['imageKey'];
   imageRef: string;
   set: TabProps['set'];
   onOpenPricing: () => void;
@@ -124,15 +124,14 @@ function BannerImageField({
   /** Inert and dimmed when the owning band is switched off. */
   disabled?: boolean;
 }) {
-  const refKey = `${band}ImageRef` as const;
   return flags.paidTier ? (
     <Field label="Banner image">
       <GateImagePicker
         ariaLabel={`${bandLabel} banner image`}
         addImage={addImage}
         value={imageRef}
-        onRef={(ref) => set({ [refKey]: ref })}
-        onRemove={() => set({ [refKey]: '' })}
+        onRef={(ref) => set({ [imageKey]: ref })}
+        onRemove={() => set({ [imageKey]: '' })}
         disabled={disabled}
       />
     </Field>
@@ -219,9 +218,9 @@ function BandSection({
         disabled={!shown}
       />
       <BannerImageField
-        band={config.band}
         bandLabel={config.title}
-        imageRef={settings[`${config.band}ImageRef`]}
+        imageKey={config.imageKey}
+        imageRef={settings[config.imageKey]}
         set={set}
         onOpenPricing={onOpenPricing}
         flags={flags}

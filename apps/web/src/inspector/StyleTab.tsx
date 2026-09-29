@@ -138,6 +138,13 @@ const COLOR_ROWS = [
 
 type ColorRowSpec = (typeof COLOR_ROWS)[number];
 
+/** The color table's subgroups, in the order the rows declare them, derived so
+ *  a subgroup added to the table renders without a second edit. Two subgroups,
+ *  not nine siblings: the text colors and the block surfaces are different
+ *  decisions, and nine identical rows force the eye to read every label to find
+ *  the one it wants. */
+const COLOR_SUBGROUPS = [...new Set(COLOR_ROWS.map((row) => row.subgroup))];
+
 /** One row of the color table: the label, the picker named by aria, and the
  *  row's settings key. */
 function ColorRowField({
@@ -388,10 +395,7 @@ export function StyleTab({
       </Section>
 
       <Section title="Colors">
-        {/* Two subgroups, not nine siblings: the text colors and the block
-            surfaces are different decisions, and nine identical rows force the
-            eye to read every label to find the one it wants. */}
-        {(['Text', 'Blocks & tables'] as const).map((subgroup) => (
+        {COLOR_SUBGROUPS.map((subgroup) => (
           <Subgroup key={subgroup} title={subgroup}>
             {COLOR_ROWS.filter((row) => row.subgroup === subgroup).map(
               (row) => (

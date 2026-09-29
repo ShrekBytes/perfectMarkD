@@ -2,7 +2,7 @@
 // Display helpers for the Export History modal (server/05). Kept apart from
 // the api module so formatting rules stay testable in isolation — same split
 // as billing's api.ts / payment.ts. (The list's date column renders through
-// the shared formatDate in documents/text.ts.)
+// the shared formatDate.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Human-sized bytes for the modal's size column. */

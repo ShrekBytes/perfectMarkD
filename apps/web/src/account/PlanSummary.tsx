@@ -2,6 +2,7 @@ import { Link } from '../router';
 import { planName, type PlanId } from '../pricing/plans';
 import type { EntitlementState } from '../auth/account-store';
 import type { Order } from '../billing/api';
+import { formatDate } from '../documents/text';
 
 /** Adds calendar months in UTC, clamping day-of-month overflow (Jan 31 + 1
  *  month → Feb 28) — the same arithmetic apps/server's admin/entitlement.ts
@@ -103,7 +104,7 @@ export function PlanSummary({
             {planName(entitlement.plan as PlanId)}
           </p>
           <p className="mt-0.5 text-xs text-ink-soft tabular-nums">
-            Expires {entitlement.expiresAt.slice(0, 10)}
+            Expires {formatDate(entitlement.expiresAt)}
           </p>
         </div>
       )}
@@ -125,7 +126,7 @@ export function PlanSummary({
           </div>
           <p className="mt-0.5 text-xs text-ink-soft tabular-nums">
             {ended
-              ? `Ended ${last.endedAt.toISOString().slice(0, 10)} — nothing auto-renews.`
+              ? `Ended ${formatDate(last.endedAt.toISOString())} — nothing auto-renews.`
               : 'No longer active — nothing auto-renews.'}
           </p>
         </div>

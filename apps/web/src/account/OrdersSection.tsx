@@ -1,12 +1,8 @@
 import { useState } from 'react';
 import { Link } from '../router';
 import type { Order } from '../billing/api';
-import {
-  orderDate,
-  orderDateTime,
-  STATUS_BADGE,
-  STATUS_LABEL,
-} from '../billing/payment';
+import { orderDateTime, STATUS_BADGE, STATUS_LABEL } from '../billing/payment';
+import { formatDate } from '../documents/text';
 import { PaymentForm } from '../billing/PaymentForm';
 import { PaymentInstructions } from '../billing/PaymentInstructions';
 
@@ -143,9 +139,9 @@ export function OrdersSection({
                         {order.amountExpected} {order.coin}
                       </p>
                       <p className="mt-0.5 text-xs text-ink-faint">
-                        Created {orderDate(order.createdAt)}
+                        Created {formatDate(order.createdAt)}
                         {order.decidedAt &&
-                          ` · Decided ${orderDate(order.decidedAt)}`}
+                          ` · Decided ${formatDate(order.decidedAt)}`}
                       </p>
                     </div>
                     <span

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Dialog } from '../shell/Dialog';
-import { DURATIONS } from '../pricing/plans';
+import { DURATIONS, planName, type PlanId } from '../pricing/plans';
 import { verifyOrder, type AdminOrder } from './api';
 import { previewExpiry } from './verification-display';
+import { entitlementLabel } from '../billing/payment';
 
 interface VerifyDialogProps {
   order: AdminOrder;
@@ -10,8 +11,6 @@ interface VerifyDialogProps {
   onVerified: () => void;
   onClose: () => void;
 }
-
-const PLAN_LABEL: Record<string, string> = { pro: 'Pro', premium: 'Premium' };
 
 /**
  * The Verify decision (billing/02): grant a preset duration or an exact
@@ -31,7 +30,7 @@ export function VerifyDialog({
   const [submitting, setSubmitting] = useState(false);
 
   const { entitlement } = order;
-  const planLabel = PLAN_LABEL[order.plan] ?? order.plan;
+  const planLabel = planName(order.plan as PlanId);
   const preview = customDate
     ? customDate
     : duration
@@ -87,7 +86,7 @@ export function VerifyDialog({
       </p>
       <p className="mt-2 text-xs" data-testid="current-entitlement">
         {entitlement
-          ? `Current: ${PLAN_LABEL[entitlement.plan] ?? entitlement.plan} until ${entitlement.expiresAt.slice(0, 10)}.`
+          ? `Current: ${entitlementLabel(entitlement)}.`
           : 'The user has no active entitlement.'}
       </p>
 
